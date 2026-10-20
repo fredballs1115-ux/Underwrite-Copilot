@@ -905,6 +905,29 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     );
   });
 
+  it("says why recorded sales carry no median: too few under the floor, and none struck a unit over it", () => {
+    const recorded = (count: number, medianPerSqft: number | null = null) =>
+      rowOf(
+        buildStressTest({
+          extraction: APARTMENT,
+          challenger: null,
+          market: null,
+          modelVsMarket: null,
+          actuals: null,
+          derived: null,
+          storedAssetClass: "multifamily",
+          recordedSales: { count, medianPerSqft, medianPerUnit: null, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" },
+          readOn: READ_ON,
+        }),
+        "basis",
+      ).evidence.find((e) => e.label.startsWith("Recorded sales"))!;
+    expect(recorded(2)).toMatchObject({ text: "2 recorded sales, too few for a median /unit", value: null });
+    expect(recorded(1).text).toBe("1 recorded sale, too few for a median /unit");
+    // Six sales clear the floor; a record states no unit count, so no
+    // per-unit median is struck, whatever the count.
+    expect(recorded(6, 310)).toMatchObject({ text: "6 recorded sales; no per-unit median is struck on recorded sales", value: null });
+  });
+
   it("the office deal's vacancy and exit read the tracker as published figures, the metro's", () => {
     const v = rowOf(officeTest, "vacancy");
     expect(v.evidence.some((e) => /vacancy \(research tracker\)/.test(e.label) && e.kind === "published" && e.scope === "metro")).toBe(true);

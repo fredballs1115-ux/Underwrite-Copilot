@@ -86,6 +86,7 @@ import { sizeLoan } from "@/lib/tools/deal-math";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import { HOLD_MONTHS, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
+import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
 import {
   STRESS_KEYS,
@@ -117,7 +118,10 @@ const SAME_SHARE = 0.02;
 /** Recorded sales from public property records, as the page already read
  *  them (lib/public-comps): a median only where the count reaches the
  *  comps page's own floor (`MEDIAN_FLOOR`, 3), which the caller has applied
- *  by handing a median in. */
+ *  by handing a median in — and only where the sales are the deal's own
+ *  kind of evidence (lib/public-comps/vs-median: not a portfolio, a plan or
+ *  land, or another class's sales), which the caller has applied by handing
+ *  the set in at all. */
 export interface RecordedSalesEvidence {
   count: number;
   medianPerSqft: number | null;
@@ -1350,14 +1354,25 @@ function basisRow(ctx: Ctx): StressRow | null {
     });
   }
   // Recorded sales from public records, a median only from three sales up
-  // — the comps page's own floor, applied by the caller.
+  // — the comps page's own floor, applied by the caller. Where the count
+  // clears the floor and still no median stands, the count is not why: a
+  // per-unit median is struck on no recorded sales (a record states no
+  // unit count), and a $/SF one only over the sales that state an area.
   const rs = ctx.recordedSales;
   if (rs && rs.count > 0) {
     const v = per === "unit" ? rs.medianPerUnit : rs.medianPerSqft;
+    const sales = `${rs.count} recorded ${rs.count === 1 ? "sale" : "sales"}`;
     evidence.push({
       kind: "published",
       label: `Recorded sales (${rs.providerName})`,
-      text: v != null ? `median ${money(v)}${perWord} over ${rs.count} recorded sales` : `${rs.count} recorded ${rs.count === 1 ? "sale" : "sales"}, too few for a median ${perWord}`,
+      text:
+        v != null
+          ? `median ${money(v)}${perWord} over ${rs.count} recorded sales`
+          : rs.count < MEDIAN_FLOOR
+            ? `${sales}, too few for a median ${perWord}`
+            : per === "unit"
+              ? `${sales}; no per-${noun} median is struck on recorded sales`
+              : `${sales}, too few of them stating an area for a median /SF`,
       value: v != null ? Math.round(v) : null,
       asOf: rs.retrievedAt,
       publisher: rs.providerName,

@@ -48,7 +48,15 @@ export type VsMedianRead =
       /** the sales behind the middle compared against */
       count: number;
     }
-  | { kind: "withheld"; reason: string };
+  | {
+      kind: "withheld";
+      reason: string;
+      /** why, as a value a caller can test: the deal is a portfolio, a plan
+       *  or land, the sales are another kind of building, or the subject's
+       *  scale is off the recorded stock's. The first three say the sales
+       *  are not the deal's own kind of evidence at all. */
+      why: "portfolio" | "plan_or_land" | "class" | "scale";
+    };
 
 /** The class a search's filter holds the sales to, as a class key, or null
  *  for all recorded sales. "multifamily/mixed" (a live provider's filter)
@@ -72,10 +80,10 @@ export function vsMedianRead(
 ): VsMedianRead | null {
   if (!stats || !subject || (subject.price == null && subject.perSf == null)) return null;
   if (subject.portfolio) {
-    return { kind: "withheld", reason: "The deal is a portfolio, and these are the sales around one address, so its price is not set against their middle." };
+    return { kind: "withheld", reason: "The deal is a portfolio, and these are the sales around one address, so its price is not set against their middle.", why: "portfolio" };
   }
   if (subject.planOrLand) {
-    return { kind: "withheld", reason: "The deal's price is a plan's or land's, not a standing building's, so it is not set against these sales' middle." };
+    return { kind: "withheld", reason: "The deal's price is a plan's or land's, not a standing building's, so it is not set against these sales' middle.", why: "plan_or_land" };
   }
   const filtered =
     typeof classFilter === "object" && classFilter
@@ -88,6 +96,7 @@ export function vsMedianRead(
       reason: filtered
         ? `These sales are filed as ${classFilterText(filtered)}, not ${kind}, so the deal's price is not set against their middle.`
         : `These are all recorded sales here, not ${kind} alone, so the deal's price is not set against their middle.`,
+      why: "class",
     };
   }
   const sfCount = stats.perSqftCount ?? 0;
@@ -105,6 +114,7 @@ export function vsMedianRead(
     return {
       kind: "withheld",
       reason: "The subject's scale differs from the surrounding recorded stock, so a whole-price comparison isn't meaningful here.",
+      why: "scale",
     };
   }
   return null;
