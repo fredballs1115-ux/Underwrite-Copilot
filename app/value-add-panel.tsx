@@ -34,8 +34,8 @@ const dollars = (n: number) => (Number.isInteger(Math.round(n * 100) / 100) ? `$
  * The premium's proof, as the chip says it. Proven only where the renovated
  * doors achieve at least the premium the program is priced on (or where the
  * achieved premium is the only one stated); an achieved premium under the
- * priced one is said as a shortfall, "Achieved $140, 30% under the $200
- * priced" — the chip had read "Premium proven on renovated units" beside a
+ * priced one is said as a shortfall in dollars, "Achieved $140, $60 under
+ * the $200 priced" — the chip had read "Premium proven on renovated units" beside a
  * stress row calling the same premium unsupported.
  */
 export function premiumProof(r: Pick<ValueAddRead, "premium" | "achievedPremium">): { proven: boolean; text: string } {
@@ -43,10 +43,13 @@ export function premiumProof(r: Pick<ValueAddRead, "premium" | "achievedPremium"
   if (r.premium == null || Math.round(r.achievedPremium * 100) >= Math.round(r.premium * 100)) {
     return { proven: true, text: "Premium proven on renovated units" };
   }
-  const under = Math.round(((r.premium - r.achievedPremium) / r.premium) * 100);
+  // The shortfall in dollars a month, as the stress row's gap says the same
+  // premium ("$60 a month … over the achieved $140"): a share here beside a
+  // dollar gap there read as two different figures.
+  const under = Math.round((r.premium - r.achievedPremium) * 100) / 100;
   return {
     proven: false,
-    text: `Achieved ${dollars(r.achievedPremium)}, ${under < 1 ? "less than 1%" : `${under}%`} under the ${dollars(r.premium)} priced`,
+    text: `Achieved ${dollars(r.achievedPremium)}, ${under < 1 ? "less than $1" : dollars(under)} under the ${dollars(r.premium)} priced`,
   };
 }
 

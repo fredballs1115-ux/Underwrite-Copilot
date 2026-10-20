@@ -172,10 +172,24 @@ describe("the sample's documents tie to one another", () => {
     expect(roll.text.startsWith(`${vacancy.high} vacant (by count`)).toBe(true);
     // No next step asks for a re-run the model already makes.
     expect(SAMPLE_DEAL.verdict.nextSteps.join(" ")).not.toMatch(/re-run/i);
-    // The conservative case is the model's own: its IRR is the engine's at
-    // the going-in exit, which the model runs.
-    const conservative = SAMPLE_DEAL.verdict.screen!.sensitivity.find((x) => x.scenario === "conservative")!;
-    expect(conservative.note).toContain(`returns ${row("exit_cap").impact!.altIrrPct!.toFixed(1)}%`);
+    // The scenarios are one set (audit of PR #482, L9c): the base case is the
+    // model's own, its levered IRR the engine's at the going-in exit, which
+    // the model runs; the conservative case is under it; the sponsor's says
+    // the model's returns carry neither the OM's exit nor the premium.
+    const scenario = (k: string) => SAMPLE_DEAL.verdict.screen!.sensitivity.find((x) => x.scenario === k)!;
+    const modelIrr = row("exit_cap").impact!.altIrrPct!.toFixed(1);
+    expect(scenario("base").note).toContain(`is a ${modelIrr}% levered IRR`);
+    expect(scenario("base").note).toContain(`the T-12's ${vacancy.base} vacancy`);
+    expect(scenario("conservative").note).toContain(`under the model's ${modelIrr}%`);
+    expect(scenario("sponsor").note).toContain("the model's returns carry neither");
+    // The premium is in none of the model's returns: no sentence says the
+    // returns lean on it (M5).
+    expect(SAMPLE_DEAL.verdict.reason).toContain("the pro forma's rents lean on an unproven $200 premium");
+    expect(SAMPLE_DEAL.verdict.reason).not.toMatch(/returns lean/);
+    // "Today" is the rent roll's; the T-12's 9.1% is a trailing year's (M6).
+    const said = [...SAMPLE_DEAL.verdict.topRisks, ...SAMPLE_DEAL.verdict.nextSteps, ...SAMPLE_DEAL.market.checks.map((c) => c.note), ...SAMPLE_DEAL.challenges.challenges.map((c) => c.challenge), SAMPLE_DEAL.challenges.stressTest];
+    const v = vacancy.base.replace(".", "\\.");
+    for (const s of said) expect(s, s).not.toMatch(new RegExp(`runs ${v}|${v}(?: vacant)? (?:today|in place)`));
     // The tax reset is said as a condition, as the row says it.
     expect(SAMPLE_DEAL.verdict.topRisks.find((r) => r.includes("bill"))).toMatch(/^If the sale resets/);
   });

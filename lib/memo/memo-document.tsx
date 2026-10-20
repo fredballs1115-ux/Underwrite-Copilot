@@ -575,9 +575,9 @@ export interface MemoStressBlock {
    *  the OM's figures 16.7% to 11.5% with the evidence: …", or "" where the
    *  test carries none (the read line already says why no return is re-run) */
   headline?: string;
-  /** what each row's IRR is (lib/stress-test-words `rerunWords`): "the
-   *  model at 9.3%, this input alone at the OM's figure, then at the
-   *  evidence's" */
+  /** what each row's re-run is (lib/stress-test-words `rerunWords`): "from
+   *  the model's own 9.3% levered IRR, this input alone set to the OM's
+   *  figure, then to the evidence's" */
   rerun?: string;
   rows: StressRowWords[];
 }
@@ -1669,7 +1669,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
             })}
             {data.stressTest.rows.length > 0 ? (
               <Text style={s.stressKey}>
-                {`Ticks: the OM's figure in the row's tone, the evidence's in ink. Each row's IRR: ${data.stressTest.rerun || "the model as it runs, this input alone at the OM's figure, then at the evidence's"}; the report prints every row.`}
+                {`Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun || "from the model as it runs, this input alone set to the OM's figure, then to the evidence's"}; the report has every row.`}
               </Text>
             ) : null}
           </Section>

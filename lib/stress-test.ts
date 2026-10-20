@@ -122,6 +122,7 @@ import {
   headlineBasisLeftOut,
   HEADLINE_NOI_LEFT_OUT,
   type StressHeadline,
+  type StressAtEvidence,
   type StressKept,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
@@ -2561,8 +2562,47 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
     omitted: omitted.sort((a, b) => order(a.key) - order(b.key)),
     unsolved,
     modelIrrPct,
-    keptAtOm: keptAtOm(inCase, players, omitted, model, modelExpense).sort((a, b) => order(a.key) - order(b.key)),
+    keptAtOm: keptAtOm(inCase, players, omitted, model, modelExpense, noiIn ? anchorRent : null).sort((a, b) => order(a.key) - order(b.key)),
+    atEvidence: atEvidence(players, model, modelExpense).sort((a, b) => order(a.key) - order(b.key)),
   };
+}
+
+/** The row's own figure for an expense row's line as a case sets it: the
+ *  row's bill or premium at `line`, the line each run sets, less the rest of
+ *  the model's line. */
+const ownBill = (s: Extract<HeadlineSwap, { kind: "expense" }>, line: number): number | null => {
+  const om0 = s.row.omSays.value;
+  return om0 == null ? null : om0 + (line - s.om);
+};
+
+/**
+ * The rows the evidence's case runs at the evidence's figure where the model
+ * as it runs has another (`StressHeadline.atEvidence`): every player whose
+ * evidence figure is not the model's own, the other half of why the
+ * evidence's case is not the model's run. Read off the same swaps the cases
+ * are struck on.
+ */
+function atEvidence(players: readonly HeadlineSwap[], model: UnderwriteInputs, modelExpense: number): StressAtEvidence[] {
+  const out: StressAtEvidence[] = [];
+  for (const s of players) {
+    let evidence: number | null;
+    let own: number | null;
+    if (s.kind === "scalar") {
+      evidence = s.alt * 100;
+      own = model[s.input] * 100;
+    } else if (s.kind === "expense") {
+      evidence = ownBill(s, s.alt);
+      own = ownBill(s, modelExpense);
+    } else {
+      evidence = s.altNoi;
+      own = year1Noi(model);
+    }
+    if (evidence == null || own == null) continue;
+    const tol = s.kind === "scalar" ? 1e-9 : 0.5;
+    if (!Number.isFinite(evidence) || !Number.isFinite(own) || Math.abs(evidence - own) < tol) continue;
+    out.push({ key: s.row.key, label: s.row.title, evidence, model: own });
+  }
+  return out;
 }
 
 /**
@@ -2579,12 +2619,14 @@ function keptAtOm(
   omitted: StressHeadline["omitted"],
   model: UnderwriteInputs,
   modelExpense: number,
+  anchorRent: number | null,
 ): StressKept[] {
   const out: StressKept[] = [];
   for (const s of inCase) {
     if (players.includes(s) || s.row.key === "basis") continue;
     let om: number;
     let own: number;
+    let noi: number | undefined;
     if (s.kind === "scalar") {
       // A percent input in the engine's decimal, said as a percent.
       om = s.om * 100;
@@ -2592,13 +2634,20 @@ function keptAtOm(
     } else if (s.kind === "expense") {
       // The row's own bill or premium, and the model's: the line each run
       // sets, less the rest of the model's line.
-      const om0 = s.row.omSays.value;
+      const om0 = ownBill(s, s.om);
       if (om0 == null) continue;
       om = om0;
-      own = om0 + (modelExpense - s.om);
+      own = ownBill(s, modelExpense)!;
     } else {
-      om = s.omNoi;
-      own = year1Noi(model);
+      // What both cases keep is the rent line that makes the OM's NOI at the
+      // OM's vacancy and expenses (the anchor), not the NOI itself: where a
+      // vacancy, tax or insurance swap moves the evidence's case, its NOI
+      // moves from that rent line. So the rent line is the kept figure, the
+      // model's own rent line beside it, and the OM's NOI it is struck to.
+      if (anchorRent == null) continue;
+      om = anchorRent;
+      own = model.inPlaceRentAnnual;
+      noi = s.omNoi;
     }
     const tol = s.kind === "scalar" ? 1e-9 : 0.5;
     if (!Number.isFinite(om) || !Number.isFinite(own) || Math.abs(om - own) < tol) continue;
@@ -2609,7 +2658,7 @@ function keptAtOm(
       : s.row.verdict === "holds"
         ? "holds"
         : "unchecked";
-    out.push({ key: s.row.key, label: s.row.title, why, om, model: own });
+    out.push({ key: s.row.key, label: s.row.title, why, om, model: own, ...(noi != null ? { noi } : {}) });
   }
   return out;
 }

@@ -2932,7 +2932,8 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeGreaterThan(-1);
     expect(stress).toBeGreaterThan(at("The call, in full"));
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
-    const page = pages[stress] + (pages[stress + 1] ?? "");
+    // The stress test runs on until the grids; its pages read as one.
+    const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
     expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched · 2 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, whole: the two cases, the split and
@@ -2970,12 +2971,12 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll, May 31, 2026)");
     expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
     expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
-    expect(page).toMatch(/The return: the model at 9\.3%, this input alone at the OM's figure, then at the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
+    expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The basis row's move is the engine's, spelled.
     expect(page).toContain(
-      "The return: the model at 9.3%, this input alone at the OM's figure, then at the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
+      "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
     );
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the
@@ -2983,7 +2984,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("STRETCHED Real estate taxes");
     expect(page).toContain("OM says: Real estate taxes (2026): $727,896 (p. 27)");
     expect(page).toContain("Gap: If the sale resets the assessment to the price, the bill is $952k, $224k (23.5%) over the OM's $728k line — whether it does is the jurisdiction's to say.");
-    expect(page).toMatch(/The return: the model at 9\.3%, this input alone at the OM's figure, then at the evidence's\. If the tax line is the \$952k bill if the sale resets the assessment to the price, not the OM's \$728k, the levered IRR moves from 9\.3% to 5\.9%/);
+    expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If the tax line is the \$952k bill if the sale resets the assessment to the price, not the OM's \$728k, the levered IRR moves from 9\.3% to 5\.9%/);
     // An unchecked row says why, and that no return was re-run.
     expect(page).toContain("Unchecked: The OM states no loan rate.");
     expect(page).toContain("The return: No return is re-run: no figure to swap.");

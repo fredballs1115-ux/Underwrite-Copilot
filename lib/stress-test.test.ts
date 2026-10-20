@@ -1669,18 +1669,30 @@ describe("the headline", () => {
     const kept = keptSentence(test);
     if (h.keptAtOm!.length > 0) {
       expect(kept).toMatch(/^Against the model as it runs \([-−]?\d+\.\d%\), the evidence's case keeps the OM's figure where /);
-      for (const k of h.keptAtOm!) expect(kept).toContain(`${headlineName(k.key)} `);
+      // The NOI row keeps the rent line that makes the OM's NOI, never the
+      // NOI itself, and says so (audit of PR #482, H2).
+      for (const k of h.keptAtOm!) expect(kept).toContain(k.key === "noi" ? "the rent line " : `${headlineName(k.key)} `);
       expect(headlineSentence(test)!.endsWith(kept!)).toBe(true);
-    } else expect(kept).toBeNull();
+    } else if ((h.atEvidence ?? []).length === 0) expect(kept).toBeNull();
+    // The other half of why: each evidence figure the evidence's case runs
+    // where the model runs another is a part, its figure not the model's.
+    for (const e of h.atEvidence!) {
+      expect(parts.has(e.key)).toBe(true);
+      expect(Math.abs(e.evidence - e.model)).toBeGreaterThan(1e-9);
+      expect(kept).toContain(`${headlineName(e.key)} `);
+    }
+    if (h.atEvidence!.length > 0) expect(kept).toContain("runs the evidence's figure where the model runs another: ");
     // Display only: carrying it changes neither case.
     const again = stressHeadline(test.rows, model)!;
     expect([again.omIrrPct, again.evidenceIrrPct]).toEqual([h.omIrrPct, h.evidenceIrrPct]);
     // Every re-run's words name the model's figure as its base.
-    expect(rerunWords(test)).toBe(`the model at ${h.modelIrrPct!.toFixed(1)}%, this input alone at the OM's figure, then at the evidence's`);
+    // The figure is named as a levered IRR, so it never reads as a vacancy
+    // beside a rent roll's (audit of PR #482, M3).
+    expect(rerunWords(test)).toBe(`from the model's own ${h.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's`);
     const same = { ...rowOf(test, "vacancy").impact!, altValue: rowOf(test, "vacancy").impact!.omValue };
-    expect(rerunWords(test, same)).toMatch(/, this input alone at the OM's figure, which is the evidence's$/);
+    expect(rerunWords(test, same)).toMatch(/, this input alone set to the OM's figure, which is the evidence's$/);
     // A test with no headline names no figure.
-    expect(rerunWords({ ...test, headline: null })).toBe("the model as it runs, this input alone at the OM's figure, then at the evidence's");
+    expect(rerunWords({ ...test, headline: null })).toBe("from the model as it runs, this input alone set to the OM's figure, then to the evidence's");
   });
 
   it("with one row past its evidence, the whole gap is that row's, struck on the OM's case — which is the row's own re-run only where no other row is in the OM's case (audit H2)", () => {

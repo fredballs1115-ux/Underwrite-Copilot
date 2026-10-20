@@ -1010,10 +1010,11 @@ describe("DealView — the sample deal renders every section without a runtime e
     // The vacancy gap, 300 bps on the model's 9.0%, stays outside the band.
     expect(risks.find((r) => r.title.startsWith("Vacancy"))?.severity).toBe("high");
     // The challenger's five (three high, the taxes among them) beside the
-    // reconciliation's and the market's rows — the market's one aggressive
-    // read, the exit; its rent growth reads in line, as the stress test's
-    // row holds.
-    expect(html).toContain('title="4 high · 6 med · 2 low"');
+    // reconciliation's and the market's rows — the market's two aggressive
+    // reads against the rules of thumb, the exit and the rent growth (the
+    // stress test sets the growth against today's published rents on its
+    // own, and the stored check states no verdict of it).
+    expect(html).toContain('title="4 high · 7 med · 2 low"');
     // A row whose size cannot be read on that footing keeps its old grade.
     const unread = deriveRisks({
       ...(p.results as Parameters<typeof deriveRisks>[0]),

@@ -1441,7 +1441,7 @@ describe("ModelView — the sample model renders every panel", () => {
       // The sample's finding counts, as the deal page counts them.
       const text = visibleText(html);
       expect(text).toMatch(/Buy box\s*1\s*finding\b/);
-      expect(text).toMatch(/Analyses\s*9\s*findings/);
+      expect(text).toMatch(/Analyses\s*10\s*findings/);
       // No round pill tabs of the old design.
       expect(text).not.toContain("Buy box & fit");
       expect(text).not.toContain("Financials & model");
@@ -9137,7 +9137,7 @@ describe("ValueAddPanel — the doors, the premium against its break-even, and t
     // The renovated doors achieve $235 of the $250 priced: a shortfall,
     // never "proven" (the walkthrough: the chip read proven beside a stress
     // row calling the premium unsupported).
-    expect(text).toContain("Achieved $235, 6% under the $250 priced");
+    expect(text).toContain("Achieved $235, $15 under the $250 priced");
     expect(text).not.toContain("Premium proven on renovated units");
     // At or over the priced premium, the doors prove it.
     const over = readValueAdd(program([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250"), row("Achieved renovation premium", "$260")]))!;

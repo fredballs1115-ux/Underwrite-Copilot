@@ -199,6 +199,12 @@ export interface StressHeadline {
    *  of the swaps, or its evidence is the OM's own figure. Absent where
    *  `modelIrrPct` is. */
   keptAtOm?: StressKept[];
+  /** the rows the evidence's case runs at the evidence's figure where the
+   *  model as it runs has another (the sample's reset tax bill against the
+   *  model's seller's bill) — with `keptAtOm`, every input the evidence's
+   *  case runs that the model does not. Absent where `modelIrrPct` is, and on
+   *  a headline struck before it was carried. */
+  atEvidence?: StressAtEvidence[];
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -207,9 +213,29 @@ export interface StressKept {
   /** the row's own title */
   label: string;
   why: "holds" | "unchecked" | "left_out" | "same";
-  /** the OM's figure the two cases run on, in the row's own unit */
+  /** the OM's figure the two cases run on, in the row's own unit — on the
+   *  NOI row, the rent line (`inPlaceRentAnnual`) that makes the OM's NOI at
+   *  the OM's own vacancy and expenses, which is what both cases keep (`noi`
+   *  says which NOI it is struck to) */
   om: number;
-  /** the model's own figure for the same input, in the same unit */
+  /** the model's own figure for the same input, in the same unit — on the
+   *  NOI row, the model's own rent line */
+  model: number;
+  /** on the NOI row only: the OM's NOI the kept rent line is struck to. Where
+   *  a vacancy, tax or insurance swap moves the evidence's case, its NOI
+   *  moves from that rent line, so the NOI itself is not what is kept. */
+  noi?: number;
+}
+
+/** One row the evidence's case runs at the evidence's figure where the
+ *  model runs another (`atEvidence`), in the row's own unit. */
+export interface StressAtEvidence {
+  key: StressKey;
+  /** the row's own title */
+  label: string;
+  /** the evidence's figure the evidence's case runs on */
+  evidence: number;
+  /** the model's own figure for the same input */
   model: number;
 }
 
@@ -249,7 +275,7 @@ export const HEADLINE_METHOD = {
   evidenceCase: [
     "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
     "One that holds or is unchecked stays at the OM's figure.",
-    "So the evidence's case is not the model as it runs: the headline draws the model's own levered IRR beside the two cases, and names each figure it keeps at the OM's where the model runs another.",
+    "So the evidence's case is not the model as it runs: the headline draws the model's own levered IRR beside the two cases, and names each figure it keeps at the OM's, and each evidence figure it runs, where the model runs another.",
     "The price stays at the model's in both cases: the ask, a share's price grossed up to the whole, or an auction's floor.",
     "The headline asks what that price earns, and the price row says how far the ask sits from the comps.",
   ],

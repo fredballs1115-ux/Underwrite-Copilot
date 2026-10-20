@@ -418,17 +418,24 @@ export function modelIrrOf(test: StressTest): number | null | undefined {
 }
 
 /**
- * What a row's re-run is, in the words every surface prints beside it: "the
- * model at 9.3%, this input alone at the OM's figure, then at the
- * evidence's" — each run the model as it runs with ONE input changed, never
- * the OM's case. Where the OM's figure is the evidence's, the two runs are
- * one, said so. Without the model's figure, "the model as it runs".
+ * What a row's re-run is, in the words every surface prints beside it: "from
+ * the model's own 9.3% levered IRR, this input alone set to the OM's figure,
+ * then to the evidence's" — each run the model as it runs with ONE input
+ * changed, never the OM's case. The figure is named as a levered IRR, so it
+ * never reads as a vacancy beside a rent roll's. Where the OM's figure is the
+ * evidence's, the two runs are one, said so. Without the model's figure,
+ * "from the model as it runs".
  */
 export function rerunWords(test: StressTest, impact?: StressImpact | null): string {
   const m = modelIrrOf(test);
-  const base = m === undefined ? "the model as it runs" : m == null ? "the model as it runs (its levered IRR does not solve)" : `the model at ${irrText(m)}`;
+  const base =
+    m === undefined
+      ? "from the model as it runs"
+      : m == null
+        ? "from the model as it runs (its levered IRR does not solve)"
+        : `from the model's own ${irrText(m)} levered IRR`;
   const same = impact != null && Math.abs(impact.altValue - impact.omValue) < 1e-9;
-  return same ? `${base}, this input alone at the OM's figure, which is the evidence's` : `${base}, this input alone at the OM's figure, then at the evidence's`;
+  return same ? `${base}, this input alone set to the OM's figure, which is the evidence's` : `${base}, this input alone set to the OM's figure, then to the evidence's`;
 }
 
 const KEPT_LEAD: Record<StressKept["why"], string> = {
@@ -438,29 +445,47 @@ const KEPT_LEAD: Record<StressKept["why"], string> = {
   unchecked: "where a row is unchecked",
 };
 
+/** One kept figure with the model's beside it. The NOI row keeps the rent
+ *  line that makes the OM's NOI, never the NOI itself, and is said so. */
+function keptText(k: StressKept): string {
+  if (k.key === "noi" && k.noi != null) {
+    return `the rent line ${money(k.om)} that makes the OM's ${money(k.noi)} NOI at the OM's vacancy and expenses (the model's rent line ${money(k.model)})`;
+  }
+  return `${headlineName(k.key)} ${figureText(k.key, k.om)} (the model's ${figureText(k.key, k.model)})`;
+}
+
 /**
- * Why the evidence's case is not the model as it runs: the rows it keeps at
- * the OM's figure where the model has another, named with both figures, read
- * off the headline's own `keptAtOm` — "Against the model as it runs (9.3%),
- * the evidence's case keeps the OM's figure where a row holds: vacancy 6.0%
- * (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and
- * where a row is left out: the NOI $3.88M (the model's $3.71M)." Null where
- * nothing is kept at a figure of the OM's the model does not run, or where
- * the headline does not carry the model.
+ * Why the evidence's case is not the model as it runs, whole: the rows it
+ * keeps at the OM's figure where the model has another, and the rows it runs
+ * at the evidence's figure where the model has another, each named with both
+ * figures, read off the headline's own `keptAtOm` and `atEvidence` — "Against
+ * the model as it runs (9.3%), the evidence's case keeps the OM's figure
+ * where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr
+ * (the model's 3.0%/yr); and where a row is left out: the rent line $7.62M
+ * that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the
+ * model's rent line $7.15M). It runs the evidence's figure where the model
+ * runs another: the taxes $952k (the model's $728k)." Null where neither list
+ * names a figure, or where the headline does not carry the model.
  */
 export function keptSentence(test: StressTest): string | null {
   const h = liveHeadline(test);
-  if (!h || h.modelIrrPct === undefined || !h.keptAtOm || h.keptAtOm.length === 0) return null;
+  if (!h || h.modelIrrPct === undefined) return null;
+  const kept = h.keptAtOm ?? [];
+  const atEvidence = h.atEvidence ?? [];
+  if (kept.length === 0 && atEvidence.length === 0) return null;
   const order: StressKept["why"][] = ["holds", "left_out", "same", "unchecked"];
   const clauses = order.flatMap((why) => {
-    const items = h.keptAtOm!.filter((k) => k.why === why);
+    const items = kept.filter((k) => k.why === why);
     if (items.length === 0) return [];
-    const said = items.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.om)} (the model's ${figureText(k.key, k.model)})`);
-    return [`${KEPT_LEAD[why]}: ${joinAnd(said)}`];
+    return [`${KEPT_LEAD[why]}: ${joinAnd(items.map(keptText))}`];
   });
   const model = h.modelIrrPct == null ? "its levered IRR does not solve" : irrText(h.modelIrrPct);
+  const lead = `Against the model as it runs (${model}), the evidence's case`;
+  const evidenceSaid = atEvidence.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.evidence)} (the model's ${figureText(k.key, k.model)})`);
+  const evidenceClause = evidenceSaid.length > 0 ? `the evidence's figure where the model runs another: ${joinAnd(evidenceSaid)}` : "";
+  if (clauses.length === 0) return `${lead} runs ${evidenceClause}.`;
   const joined = clauses.length === 1 ? clauses[0] : `${clauses.slice(0, -1).join("; ")}; and ${clauses[clauses.length - 1]}`;
-  return `Against the model as it runs (${model}), the evidence's case keeps the OM's figure ${joined}.`;
+  return `${lead} keeps the OM's figure ${joined}.${evidenceClause ? ` It runs ${evidenceClause}.` : ""}`;
 }
 
 /** The sentence a document prints where the headline is withheld: the
