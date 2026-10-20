@@ -117,9 +117,10 @@ jobs:
               t = re.sub(r"<[^>]+>", " ", t)
               return re.sub(r"\s+", " ", html.unescape(t)).strip()
           m = re.search(r'data-qa="stress-headline-line"[^>]*>(.*?)</p>', src, re.S)
-          print(f"STRESS {name}: headline: {text(m.group(1)) if m else 'none drawn'}")
+          # As notices, so the lines read off the run's annotations too.
+          print(f"::notice title=STRESS {name}::headline: {text(m.group(1)) if m else 'none drawn'}")
           rows = re.findall(r'data-qa="stress-row-([a-z_]+)" data-verdict="([a-z]+)"', src)
-          print(f"STRESS {name}: rows: {', '.join(f'{k} {v}' for k, v in rows) or 'none drawn'}")
+          print(f"::notice title=STRESS {name}::rows: {', '.join(f'{k} {v}' for k, v in rows) or 'none drawn'}")
           PY
           done
           # /how-we-test (2026-10-19, the refocus): the methodology page, its
