@@ -121,6 +121,9 @@ export function fmrLine(
   };
 }
 
+/** The benchmark rows that price a whole 2–4 unit property, not a unit. */
+const WHOLE_PROPERTY_ROW = /_2_4_unit$/;
+
 /** Friendly names for benchmark metrics — raw keys read like plumbing.
  *  Unknown metrics fall back to de-underscored text. (A fair market rent is
  *  never one row here: `benchItems` reads a metro's as one line.) */
@@ -695,66 +698,87 @@ export function ResearchPanelView({
       {hasBenchmarks && (
         <div className="mt-4 border-t border-line pt-3">
           <h3 className="text-[11px] uppercase tracking-wide text-muted">{vsMarketHeading(basis)}</h3>
-          <ul className="mt-2 space-y-2">
-            {benchItems(metroBench).map((item) => {
-              if (item.kind === "fmr") {
-                const line = fmrLine(item, today);
-                return (
-                  <li
-                    key={`${item.metro}|fmr`}
-                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-                  >
-                    <span>
-                      {`${line.heading}: `}
-                      <span className="font-mono tabular-nums">{line.figures}</span>
-                    </span>
-                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} today={today} yearEnded={line.ended} />
-                  </li>
-                );
-              }
-              const b = item.b;
-              // Vacancy rows also say where this metro sits in its sector's
-              // cross-metro ranking — same builder as the market page.
-              const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
-              const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
-              const rank =
-                standing && standing.rank !== null
-                  ? { label: rankLabel({ rank: standing.rank, tied: standing.tied }), total: standing.total }
-                  : undefined;
-              return (
-                <li
-                  key={`${b.metro}|${b.metric}`}
-                  className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-                >
-                  <span>
-                    {benchRowLabel(b)}
-                    {": "}
-                    <span className="font-mono tabular-nums">
-                      {fmtBenchValue(b.metric, b.low, b.high)}
-                    </span>
-                    {rank && vac && (
-                      <Link
-                        href={`/market?sector=${vac[1]}`}
-                        title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
-                        className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
-                      >
-                        {`${rank.label} of ${rank.total}`}
-                      </Link>
-                    )}
-                    {/* A research-tracker figure's own house, area and
-                        period (lib/tracker-read) — the row's date is the
-                        day the research was read, not the figure's. */}
-                    {b.cite && (
-                      <span className="block text-[11px] text-muted" data-qa="bench-cite">
-                        {b.cite}
-                      </span>
-                    )}
-                  </span>
-                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} />
-                </li>
-              );
-            })}
-          </ul>
+          {(() => {
+            // The 2–4 unit rows are whole properties' — a duplex's, a
+            // fourplex's price, never one unit's — so they sit in a group of
+            // their own under their own heading, never under the deal's
+            // price a unit (the QA of 2026-10-20: "this deal ≈ $274k/unit"
+            // headed a whole property's median sale price).
+            const items = benchItems(metroBench);
+            const isWhole = (i: BenchItem) => i.kind === "row" && WHOLE_PROPERTY_ROW.test(i.b.metric);
+            const groups = [items.filter((i) => !isWhole(i)), items.filter(isWhole)];
+            return groups.map((group, g) =>
+              group.length === 0 ? null : (
+                <div key={g}>
+                  {g === 1 && (
+                    <h4 className="mt-3 text-[11px] uppercase tracking-wide text-muted" data-qa="bench-whole-property">
+                      2–4 unit sales — a whole property each, not a unit, so not set against this deal
+                    </h4>
+                  )}
+                  <ul className="mt-2 space-y-2">
+                    {group.map((item) => {
+                      if (item.kind === "fmr") {
+                        const line = fmrLine(item, today);
+                        return (
+                          <li
+                            key={`${item.metro}|fmr`}
+                            className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                          >
+                            <span>
+                              {`${line.heading}: `}
+                              <span className="font-mono tabular-nums">{line.figures}</span>
+                            </span>
+                            <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} today={today} yearEnded={line.ended} />
+                          </li>
+                        );
+                      }
+                      const b = item.b;
+                      // Vacancy rows also say where this metro sits in its sector's
+                      // cross-metro ranking — same builder as the market page.
+                      const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
+                      const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
+                      const rank =
+                        standing && standing.rank !== null
+                          ? { label: rankLabel({ rank: standing.rank, tied: standing.tied }), total: standing.total }
+                          : undefined;
+                      return (
+                        <li
+                          key={`${b.metro}|${b.metric}`}
+                          className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                        >
+                          <span>
+                            {benchRowLabel(b)}
+                            {": "}
+                            <span className="font-mono tabular-nums">
+                              {fmtBenchValue(b.metric, b.low, b.high)}
+                            </span>
+                            {rank && vac && (
+                              <Link
+                                href={`/market?sector=${vac[1]}`}
+                                title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
+                                className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                              >
+                                {`${rank.label} of ${rank.total}`}
+                              </Link>
+                            )}
+                            {/* A research-tracker figure's own house, area and
+                                period (lib/tracker-read) — the row's date is the
+                                day the research was read, not the figure's. */}
+                            {b.cite && (
+                              <span className="block text-[11px] text-muted" data-qa="bench-cite">
+                                {b.cite}
+                              </span>
+                            )}
+                          </span>
+                          <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ),
+            );
+          })()}
         </div>
       )}
     </section>
