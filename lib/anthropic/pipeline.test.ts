@@ -2742,3 +2742,50 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     expect(buildBrief(input)).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone");
   });
 });
+
+describe("runAnalysis — a restart mid-screen (the first-run audit of 2026-10-20)", () => {
+  afterEach(async () => {
+    const { resetInProcessRunsForTest } = await import("@/lib/in-process-runs");
+    resetInProcessRunsForTest();
+  });
+
+  it("the stop handler marks the run failed at once, and the run never writes 'running' over it", async () => {
+    const { RESTART_MESSAGES, inProcessRuns, markInterruptedRuns } = await import("@/lib/in-process-runs");
+    let heldDuring: string[] = [];
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      heldDuring = [...inProcessRuns().keys()];
+      // The signal arrives mid-step: the handler writes the row as the
+      // database write does (only a live row is touched).
+      await markInterruptedRuns(async (rows) => {
+        for (const { dealId, message } of rows) {
+          const j = state.jobs.find((r) => r.deal_id === dealId);
+          if (j && (j.status === "queued" || j.status === "running")) Object.assign(j, { status: "error", error: message });
+        }
+      });
+      return EXTRACTION;
+    });
+    await runAnalysis("d1");
+    expect(heldDuring).toEqual(["d1"]);
+    expect(job().status).toBe("error");
+    expect(job().error).toBe(RESTART_MESSAGES.screen);
+    // In-process runs keep no checkpoints, so the sentence promises no resume.
+    expect(job().error).not.toMatch(/resume|picks up/i);
+    // The run stopped at its next step boundary: no later step ran.
+    expect(challengeAssumptions).not.toHaveBeenCalled();
+    expect(synthesizeVerdict).not.toHaveBeenCalled();
+    // And the process lets go of it.
+    expect(inProcessRuns().size).toBe(0);
+  });
+
+  it("a worker attempt (resumed) is not held: the worker handles its own signals", async () => {
+    const { inProcessRuns } = await import("@/lib/in-process-runs");
+    let held = -1;
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      held = inProcessRuns().size;
+      return EXTRACTION;
+    });
+    await runAnalysis("d1", { resume: true });
+    expect(held).toBe(0);
+    expect(job().status).toBe("done");
+  });
+});

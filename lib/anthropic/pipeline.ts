@@ -7,6 +7,7 @@ import { readFirstSignal } from "./first-signal";
 import { DATABASE_READ_FAILURE, describeRunFailure, ScreenError } from "./failure";
 import { NO_FIGURES_FAILURE, NO_OM_FAILURE, pageCapFailure } from "./document-failures";
 import { RunGate, concurrencyFromEnv } from "./run-gate";
+import { interruptedRunMessage, trackInProcessRun } from "@/lib/in-process-runs";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger, type UsageLedger } from "./usage";
 import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
 import {
@@ -137,6 +138,14 @@ export function textLayerMissed(x: ExtractionResult): "no figures" | "no NOI" | 
 }
 
 async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
+  // The process was told to stop and this run's row was marked failed
+  // (lib/in-process-runs): a step boundary never writes "running" over the
+  // restart's sentence, and the run stops here. A run that still finishes
+  // in the grace period writes its "done", which is then the truth.
+  const restarted = interruptedRunMessage(dealId);
+  if (restarted && patch.status !== "done" && patch.status !== "error") {
+    throw new ScreenError(restarted);
+  }
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
     .from("analysis_jobs")
@@ -1136,6 +1145,9 @@ async function runAnalysisSteps(
   // extraction; settled, bounded, before the run gives up its turn.
   let pictureLift: Promise<void> | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
+  // An in-process run (the worker resumes from checkpoints and handles its
+  // own signals) is held where the stop handler can find it.
+  const untrack = resume ? () => {} : trackInProcessRun(dealId, "screen");
   try {
     releaseSlot = await runGate.acquire();
     const admin = createSupabaseAdminClient();
@@ -1909,6 +1921,7 @@ async function runAnalysisSteps(
     await pictureLift;
     releaseSlot?.();
     stopHeartbeat();
+    untrack();
     await releaseOmSource(omSource);
   }
   return finished;
@@ -1942,6 +1955,7 @@ async function runReconciliationSteps(
   let omSource: OmSource | null = null;
   let releaseSlot: (() => void) | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
+  const untrack = trackInProcessRun(dealId, "reconcile");
   try {
     releaseSlot = await runGate.acquire();
     const admin = createSupabaseAdminClient();
@@ -2004,6 +2018,7 @@ async function runReconciliationSteps(
   } finally {
     releaseSlot?.();
     stopHeartbeat();
+    untrack();
     await releaseOmSource(omSource);
   }
 }
