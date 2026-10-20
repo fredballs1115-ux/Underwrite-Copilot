@@ -1618,7 +1618,10 @@ describe("ModelView — the sample model renders every panel", () => {
       const code = readFileSync("app/demo/demo-data.ts", "utf8");
       expect(code).toContain("actualsFromRows(");
       expect(code).not.toContain("compareNoi(");
-      expect(code).toContain("sampleDerivedInputs({ regulation, asOf: noon })");
+      // The derivation and the model's read are lib/sample-stress's, the
+      // build the stress test and the homepage share.
+      expect(code).toContain("sampleModelReads({ today, reads })");
+      expect(readFileSync("lib/sample-stress.ts", "utf8")).toContain("sampleDerivedInputs({ regulation, asOf: noon })");
     });
 
     it("types no name, call or rule into the page: they are the readers'", () => {

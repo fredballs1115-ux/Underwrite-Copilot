@@ -26,6 +26,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { sampleStressTest } from "@/lib/sample-stress";
+import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { constructionSeedFor } from "@/lib/model-market";
 import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { inferStrategy } from "@/lib/deal-strategy";
@@ -954,15 +955,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              {/* The OM's assumptions tested on the sample (lib/sample-stress),
-                  on the same derivation as the bench, with no figure read
-                  today — the homepage reads none — so its published rows
-                  stand unchecked and the document rows carry the test. */}
-              <DemoTabs
-                buyBox={SAMPLE_BUY_BOX}
-                financials={sampleFinancials()}
-                stressTest={sampleStressTest({ today: new Date().toISOString().slice(0, 10), derived: BENCH })}
-              />
+              <SampleWalkthrough />
             </Reveal>
           </div>
         </section>
@@ -1520,6 +1513,22 @@ function DealPreview({ header }: { header: HeaderFacts }) {
         <SampleDealHero header={header} titleAs="h2" stamp />
       </div>
     </div>
+  );
+}
+
+// ── The walkthrough ─────────────────────────────────────────────────────────
+// The OM's assumptions tested on the sample (lib/sample-stress): the one
+// build /demo draws and the signed-in sample's page agrees with, on today's
+// figures for the sample's market (lib/sample-stress-read). A read that fails
+// leaves the published rows unchecked, never the page down.
+async function SampleWalkthrough() {
+  const reads = await sampleTodayReads();
+  return (
+    <DemoTabs
+      buyBox={SAMPLE_BUY_BOX}
+      financials={sampleFinancials()}
+      stressTest={sampleStressTest({ today: new Date().toISOString().slice(0, 10), reads })}
+    />
   );
 }
 

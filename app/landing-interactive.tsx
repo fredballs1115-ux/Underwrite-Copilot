@@ -313,9 +313,8 @@ function AnalysesView({
 /** The deal page's Financials tab on the sample, in its order: the
  *  extracted terms, the debt sizer, then the first-draft model card
  *  (app/sample-model-card, the card's own body). The model's read against
- *  the published figures, which the deal page draws between the two, needs
- *  today's figures the homepage does not read, and is left out rather than
- *  imitated (/demo draws it). The terms' tiles are held to three across:
+ *  the published figures, which the deal page draws between the two, is
+ *  left out of the walkthrough rather than imitated (/demo draws it). The terms' tiles are held to three across:
  *  four of them in this column left "$68,000,000" wider than its tile.
  *  Drawn once its chunk has loaded (`useWalkthrough`), its shape until then. */
 function FinancialsView({ financials }: { financials?: SampleFinancials }) {
@@ -395,8 +394,8 @@ export function DemoPanel({
   /** the OM's assumptions tested on the sample (lib/sample-stress), built
    *  on the server, which the Overview leads with after the call */
   stressTest?: StressTest | null;
-  /** the market check's demand card's rows, read today (/demo reads them;
-   *  the homepage reads none) */
+  /** the market check's demand card's rows, read today (/demo hands them
+   *  in; the homepage's walkthrough draws none) */
   demand?: MetroDemand | null;
   /** the Analyses tab's open sub-tab */
   analysis?: AnalysisKey;

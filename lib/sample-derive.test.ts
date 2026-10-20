@@ -29,7 +29,9 @@ describe("sampleDerivedInputs — the sample deal, actuals included", () => {
 
   it("every public entry point derives through it — the page, the workbook and the report", () => {
     const root = process.cwd();
-    for (const rel of ["app/demo/demo-data.ts", "app/api/demo/underwrite.xlsx/route.ts", "app/api/demo/report/route.ts"]) {
+    // /demo derives through lib/sample-stress, the build its stress test
+    // and the homepage's share.
+    for (const rel of ["lib/sample-stress.ts", "app/api/demo/underwrite.xlsx/route.ts", "app/api/demo/report/route.ts"]) {
       const src = readFileSync(join(root, rel), "utf8");
       // The workbook tells it the rent rules and the day, as the signed-in
       // route tells its derivation (the cover's lines; no figure moves), and

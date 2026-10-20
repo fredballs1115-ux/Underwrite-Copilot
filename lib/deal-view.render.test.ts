@@ -139,7 +139,7 @@ function sampleProps(initialTab: string | null, initialAnalysis: string | null =
     todayIso: "2026-09-08",
     // The OM's assumptions tested on the sample (lib/sample-stress), as the
     // deal page builds them on the server and hands them to the Overview.
-    stressTest: sampleStressTest({ today: "2026-09-08", derived }),
+    stressTest: sampleStressTest({ today: "2026-09-08" }),
   } as unknown as Props;
 }
 

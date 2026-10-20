@@ -575,7 +575,7 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
   });
 
   it("leads the Overview with the OM's assumptions tested on the sample, after the call and before the risk digest (2026-10-19)", () => {
-    const stressTest = sampleStressTest({ today: "2026-09-21", derived: sampleDerivedInputs() });
+    const stressTest = sampleStressTest({ today: "2026-09-21" });
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview" as never, stressTest }));
     const t = text(html);
     expect(a11yIssues(html)).toEqual([]);
