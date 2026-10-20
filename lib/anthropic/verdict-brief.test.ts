@@ -595,7 +595,9 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("5 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
     expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
-    expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say that no impact was struck in code, and never estimate one.");
+    expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");
+    // The instruction is said in a reader's words, never the phrase a verdict would echo.
+    expect(brief).not.toContain("no impact was struck in code");
     expect(brief).not.toContain("The IRR moves above are the engine's own");
   });
 });

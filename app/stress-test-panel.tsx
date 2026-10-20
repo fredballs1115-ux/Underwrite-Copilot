@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
+import { noMoveWhy } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
@@ -350,7 +351,8 @@ function UncheckedGroup({ rows }: { rows: readonly StressRow[] }) {
   );
 }
 
-function RowView({ row, withheld }: { row: StressRow; withheld: string | null }) {
+function RowView({ row, test }: { row: StressRow; test: StressTest }) {
+  const withheld = test.impactsWithheld;
   // A row held to a rule of thumb alone keeps its word but is never drawn
   // as a green "holds": the site's own default is no evidence of the deal's.
   const v = row.ruleOfThumbOnly && row.verdict === "holds" ? { ...VERDICT.holds, chip: VERDICT.unchecked.chip } : VERDICT[row.verdict];
@@ -378,7 +380,9 @@ function RowView({ row, withheld }: { row: StressRow; withheld: string | null })
         <ImpactView impact={row.impact} />
       ) : (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="stress-no-impact">
-          {withheld ? "No return struck: the model's reads are withheld (see above)." : "No return struck: no figure the engine can take."}
+          {/* One sentence a row: the reason once at the top where the whole
+              test re-runs nothing, else the row's own (lib/stress-test-words). */}
+          {withheld ? "No return is re-run (see the note above)." : noMoveWhy(test, row)}
         </p>
       )}
 
@@ -421,7 +425,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
           {tested.map((r, i) => (
-            <RowView key={`${r.key}-${i}`} row={r} withheld={test.impactsWithheld} />
+            <RowView key={`${r.key}-${i}`} row={r} test={test} />
           ))}
         </ol>
       )}

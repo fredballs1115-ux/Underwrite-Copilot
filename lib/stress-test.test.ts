@@ -584,8 +584,8 @@ describe("a value-add plan deal", () => {
   const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
   const test = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: readFor(derived, { plan: true }), actuals: null, derived, storedAssetClass: "multifamily", readOn: READ_ON });
 
-  it("withholds every impact: a plan deal is judged on its yield on total cost", () => {
-    expect(test.impactsWithheld).toBe("A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.");
+  it("withholds every impact: the model runs today's income, not the business plan", () => {
+    expect(test.impactsWithheld).toBe("On a value-add, lease-up, conversion or development deal the model runs today's income with the budget in year one, not the business plan, so a re-run would measure the wrong deal; no return is re-run.");
     expect(test.rows.every((r) => r.impact === null)).toBe(true);
     // The rows still read: the verdicts are the gaps', not the model's.
     expect(rowOf(test, "vacancy").verdict).not.toBe("unchecked");

@@ -1655,7 +1655,9 @@ function finishRow(row: StressRow): void {
  *  design, which is not a model that failed to derive. */
 export const SHARE_NO_MODEL = "The shared screen carries no model, so no return is re-run here.";
 
-const PLAN_REASON = "A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.";
+// On a plan deal the model runs the in-place income with the budget booked in
+// year one (lib/underwrite/plan-caveat), not the business plan: said so.
+const PLAN_REASON = "On a value-add, lease-up, conversion or development deal the model runs today's income with the budget in year one, not the business plan, so a re-run would measure the wrong deal; no return is re-run.";
 
 /**
  * The stress test for a deal, from what the deal page already holds. One

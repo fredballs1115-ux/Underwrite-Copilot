@@ -199,7 +199,7 @@ export function noMoveWhy(test: StressTest, row: StressRow): string {
   if (test.impactsWithheld) return test.impactsWithheld;
   if (row.key === "renovation_premium") return "No return is re-run: the premium is no model input; its worth is struck at the exit cap against a door's cost.";
   if (row.verdict === "unchecked") return "No return is re-run: no figure to swap.";
-  return "No return is re-run: no model input takes this figure.";
+  return "No return is re-run: the model has no input for this figure.";
 }
 
 /**

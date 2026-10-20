@@ -339,7 +339,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(taxes).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(t).toContain("Holds Real estate taxes OM p. 15");
     expect(t).toContain("The OM against the evidence $532k");
-    expect(t).toContain("No return struck: no figure the engine can take.");
+    expect(t).toContain("No return is re-run: the model has no input for this figure.");
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
 
@@ -379,7 +379,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).not.toContain("No return struck: No return");
     // The two tested rows point up; the unchecked row's reason is its own.
     expect(w.match(/data-qa="stress-no-impact"/g)).toHaveLength(2);
-    expect(t).toContain("No return struck: the model's reads are withheld (see above).");
+    expect(t).toContain("No return is re-run (see the note above).");
     expect(w).not.toContain('data-bar="stress-impact"');
     // The track still draws: the evidence stands whether or not the engine runs.
     expect(w).toContain('data-bar="stress-om"');
