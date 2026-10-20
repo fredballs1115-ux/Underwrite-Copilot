@@ -851,12 +851,7 @@ export function DealView({
         {section === "overview" && (
           <div className="flex flex-col gap-6">
             {isSample && <SampleGuide onNavigate={navigateLegacy} />}
-            {screenDiff && <SinceLastScreen diff={screenDiff} />}
-            {discrepancies && discrepancies.discrepancies.length > 0 && (
-              <ReconciliationPanel dealId={dealId} result={discrepancies} />
-            )}
             {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
-            <PropertyActuals data={actuals} />
             <OverviewView
               results={results}
               active={live}
@@ -866,35 +861,44 @@ export function DealView({
               staleWhy={staleWhy}
               stopped={stopped != null}
               stressTest={stressTest}
-              // Feature 1: prompt for the actuals docs, directly under the
-              // stress test whose rows they turn into tests. Hidden while a
-              // screen runs, on the sample, and once both docs are folded in.
-              afterStress={(() => {
-                if (live || isSample || !hasOm) return null;
-                const slot = (
-                  kind: "rent_roll" | "t12",
-                  stored: boolean,
-                ): ActualsSlotState =>
-                  stored
-                    ? "done"
-                    : documents.some((d) => d.kind === kind)
-                      ? "uploaded"
-                      : "missing";
-                const rrState = slot("rent_roll", !!actuals.rentRoll);
-                const t12State = slot("t12", !!actuals.t12);
-                if (rrState === "done" && t12State === "done") return null;
-                return (
-                  <ActualsPrompt
-                    dealId={dealId}
-                    rentRoll={rrState}
-                    t12={t12State}
-                    // The reader's own model, offered where the Reconciler
-                    // takes one: not while a run of any kind is in flight.
-                    onReconcile={active ? null : () => navigateLegacy("reconciler")}
-                  />
-                );
-              })()}
+              // Under the call and the stress test, never above them (the
+              // first-run audit of 2026-10-20: after a re-screen with actuals
+              // the diff and the reconciliation had opened the page): first
+              // the prompt for the actuals docs, directly under the stress
+              // test whose rows they turn into tests — hidden while a screen
+              // runs, on the sample, and once both docs are folded in — then
+              // what changed since the last screen, then the documents'
+              // reconciliation.
+              afterStress={
+                <>
+                  {(() => {
+                    if (live || isSample || !hasOm) return null;
+                    const slot = (kind: "rent_roll" | "t12", stored: boolean): ActualsSlotState =>
+                      stored ? "done" : documents.some((d) => d.kind === kind) ? "uploaded" : "missing";
+                    const rrState = slot("rent_roll", !!actuals.rentRoll);
+                    const t12State = slot("t12", !!actuals.t12);
+                    if (rrState === "done" && t12State === "done") return null;
+                    return (
+                      <ActualsPrompt
+                        dealId={dealId}
+                        rentRoll={rrState}
+                        t12={t12State}
+                        // The reader's own model, offered where the Reconciler
+                        // takes one: not while a run of any kind is in flight.
+                        onReconcile={active ? null : () => navigateLegacy("reconciler")}
+                      />
+                    );
+                  })()}
+                  {screenDiff && <SinceLastScreen diff={screenDiff} />}
+                  {discrepancies && discrepancies.discrepancies.length > 0 && (
+                    <ReconciliationPanel dealId={dealId} result={discrepancies} />
+                  )}
+                </>
+              }
             />
+            {/* The property's own figures, after the call and its test, as
+                /demo and the homepage's walkthrough draw them. */}
+            <PropertyActuals data={actuals} />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
               <DealTasks

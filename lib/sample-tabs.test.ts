@@ -105,13 +105,24 @@ const dealParts = (code: string) =>
     .map((c) => AS_SAMPLE[c] ?? c);
 
 describe("each walkthrough tab draws /demo's parts, in /demo's order, and /demo the deal page's", () => {
-  it("Overview: the guide, the actuals, the call with the stress test, the playground", () => {
+  it("Overview: the guide, the call with the stress test, the actuals, the playground", () => {
     // By the section's JSX: deal-view also names the section in its handler
     // for the stress-test jump (`const onOverview = section === "overview"`).
     const deal = dealParts(slice(DEAL_VIEW, '{section === "overview" && (', '{section === "financials" && ('));
     const demo = partsIn(slice(DEMO, 'section === "overview"', 'section === "financials"'));
     const home = partsIn(drawn(HOME, "OverviewTab")).filter((c) => !loading(c));
-    expect(deal).toEqual(["SampleGuide", "PropertyActuals", "OverviewView", "SensitivityPlayground"]);
+    // The call and its stress test lead: nothing the deal holds of its own
+    // — its actuals, a re-screen's diff, the documents' reconciliation —
+    // opens above them (the first-run audit of 2026-10-20).
+    expect(deal).toEqual(["SampleGuide", "OverviewView", "PropertyActuals", "SensitivityPlayground"]);
+    // The parts the sample leaves off ride the slot under the stress test
+    // (OverviewView's `afterStress`), never above the call.
+    const all = partsIn(slice(DEAL_VIEW, '{section === "overview" && (', '{section === "financials" && ('));
+    const slot = slice(DEAL_VIEW, "afterStress={", "<PropertyActuals data={actuals} />");
+    for (const part of ["ActualsPrompt", "SinceLastScreen", "ReconciliationPanel"]) {
+      expect(all.indexOf(part), part).toBeGreaterThan(all.indexOf("OverviewView"));
+      expect(slot, part).toContain(`<${part}`);
+    }
     expect(demo).toEqual(deal);
     expect(home).toEqual(demo);
   });
@@ -245,8 +256,8 @@ describe("the walkthrough draws /demo's build, part for part", () => {
   /** Where each marker first appears in a render. */
   const order = (html: string, markers: string[]) => markers.map((m) => html.indexOf(m));
 
-  it("Overview: the guide, the actuals, the call and its stress test, the playground, in /demo's order", () => {
-    const markers = ["How to read this screen", "Property actuals", 'data-qa="stress-test-panel"', "Risk digest", 'data-qa="playground-model"'];
+  it("Overview: the guide, the call and its stress test, the actuals, the playground, in /demo's order", () => {
+    const markers = ["How to read this screen", 'data-qa="stress-test-panel"', "Risk digest", "Property actuals", 'data-qa="playground-model"'];
     for (const html of [home("Overview"), demo("overview")]) {
       const at = order(html, markers);
       expect(at.every((i) => i > -1), at.join()).toBe(true);

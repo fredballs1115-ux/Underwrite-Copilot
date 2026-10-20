@@ -171,8 +171,10 @@ export function DemoSections({
         {section === "overview" && (
           <div className="flex flex-col gap-6">
             <SampleGuide onNavigate={navigate} />
-            <PropertyActuals data={data.actuals} />
             <OverviewView results={results} active={false} onNavigate={navigate} stressTest={data.stressTest} />
+            {/* The property's own figures after the call and its test, as
+                the deal page draws them. */}
+            <PropertyActuals data={data.actuals} />
             <SensitivityPlayground data={data.playground} />
           </div>
         )}
