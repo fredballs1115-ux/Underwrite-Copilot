@@ -64,7 +64,7 @@ import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { StressTest } from "@/lib/stress-test-types";
-import { headlineShort, leadRows, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
+import { headlineShort, leadRows, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -118,13 +118,14 @@ export const STATUS_CHIP: Record<
 
 /** The chips' key under the row's "Buy box": each mark in a word or two,
  *  as the deal page's buy-box card has it (inside the mandate, a near
- *  miss, outside it, not determinable yet). */
+ *  miss, outside it, not checked). A criterion the memorandum states no
+ *  figure for is not checked on a finished screen, never "not read yet". */
 const STATUS_ORDER = ["pass", "near", "miss", "unknown"] as const;
 export const STATUS_WORD: Record<(typeof STATUS_ORDER)[number], string> = {
   pass: "inside",
   near: "near miss",
   miss: "outside",
-  unknown: "not read yet",
+  unknown: "not checked",
 };
 
 /**
@@ -574,6 +575,10 @@ export interface MemoStressBlock {
    *  the OM's figures 16.7% to 11.5% with the evidence: …", or "" where the
    *  test carries none (the read line already says why no return is re-run) */
   headline?: string;
+  /** what each row's re-run is (lib/stress-test-words `rerunWords`): "from
+   *  the model's own 9.3% levered IRR, this input alone set to the OM's
+   *  figure, then to the evidence's" */
+  rerun?: string;
   rows: StressRowWords[];
 }
 
@@ -593,7 +598,8 @@ export function memoStressBlock(test: StressTest | null | undefined): MemoStress
   return {
     read: pdfSafe(stressReadLine(test)),
     count: pdfSafe(count),
-    headline: pdfSafe(headlineShort(test) ?? ""),
+    headline: pdfSafe(headlineShort(test, false) ?? ""),
+    rerun: pdfSafe(rerunWords(test)),
     rows: leadRows(test, MEMO_STRESS_ROWS).map((r) => {
       const w = rowWords(r);
       return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move) };
@@ -1663,7 +1669,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
             })}
             {data.stressTest.rows.length > 0 ? (
               <Text style={s.stressKey}>
-                {"Ticks: the OM's figure in the row's tone, the evidence's in ink. Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row."}
+                {`Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun || "from the model as it runs, this input alone set to the OM's figure, then to the evidence's"}; the report has every row.`}
               </Text>
             ) : null}
           </Section>

@@ -70,6 +70,26 @@ export function fitScoreLabel(
   return `Fit ${score} · ${count ?? MANDATE_WORD[call]}`;
 }
 
+/**
+ * Whose figures a fit is read on, ONE short label each, where a page shows
+ * two fits for one deal: the deal header's chip and the Buy box tab's gauge
+ * read the memorandum's own figures, while the sensitivity playground puts
+ * the model's returns in their place. On the sample the header read "Fit
+ * 63" and the playground "Fit 36" with nothing saying why the two differ.
+ */
+export const FIT_ON_MEMORANDUM = "on the memorandum's figures";
+
+/** The playground's half: "with the model's IRR and cash-on-cash". */
+export function fitWithModel(scored: string[]): string {
+  return `with the model's ${listOf(scored)}`;
+}
+
+/** Where the memorandum states no IRR, the box could not check its target
+ *  return from the screen; a page that runs the model says where the
+ *  model's own IRR is scored against it (the Buy box tab). */
+export const MODEL_RETURN_POINTER =
+  "Where the model's returns stand, the sensitivity playground on the Overview scores the model's own IRR against this target.";
+
 /** The tones a fit is drawn in, by what it says. */
 export type FitTone = "pass" | "caution" | "kill" | "muted";
 

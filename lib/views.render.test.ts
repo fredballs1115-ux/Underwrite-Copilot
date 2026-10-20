@@ -3127,8 +3127,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toMatch(/Sponsor\s*Go/);
     for (const r of SAMPLE_DEAL.verdict.screen?.ranges ?? []) expect(text, r.label).toContain(r.label);
     // Each range carries the deal page's positional read of where the base
-    // sits, in one neutral colour: the vacancy base at 9.0% between 6.0% and
-    // 9.5% hugs the high end, which on a vacancy is the buyer's end, not the
+    // sits, in one neutral colour: the vacancy base at 9.1% between 6.0% and
+    // 9.3% hugs the high end, which on a vacancy is the buyer's end, not the
     // sponsor's — so nothing calls it optimistic or paints it in caution.
     expect(html).not.toContain("optimistic end");
     expect(html.match(/aria-label="Where the base sits inside the range"/g)?.length).toBe(SAMPLE_DEAL.verdict.screen?.ranges.length);
@@ -3143,7 +3143,9 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // but still on the page.
     expect(html).toContain("<details");
     expect(text).toContain("sell-side selections usually do.");
-    expect(text).toContain("the $274k ask is 7% rich");
+    // The ask against the one comp graded clean, the stress test's own
+    // figure: 8.8% over The Brixton, never "the two clean trades".
+    expect(text).toContain("the $274k ask is 8.8% rich");
     // Nothing editable, nothing of the buyer's.
     expect(text).not.toMatch(/Buy box|Notes|Documents/);
     expect(html).not.toMatch(/<(button|input|textarea|select)\b/);
@@ -9132,7 +9134,16 @@ describe("ValueAddPanel — the doors, the premium against its break-even, and t
     expect(html).toContain('data-qa="value-add-panel"');
     expect(text).toContain("Value-add program");
     expect(text).toContain("20% on cost");
-    expect(text).toContain("Premium proven on renovated units");
+    // The renovated doors achieve $235 of the $250 priced: a shortfall,
+    // never "proven" (the walkthrough: the chip read proven beside a stress
+    // row calling the premium unsupported).
+    expect(text).toContain("Achieved $235, $15 under the $250 priced");
+    expect(text).not.toContain("Premium proven on renovated units");
+    // At or over the priced premium, the doors prove it.
+    const over = readValueAdd(program([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250"), row("Achieved renovation premium", "$260")]))!;
+    expect(visibleText(render(React.createElement(ValueAddPanel, { program: over })))).toContain("Premium proven on renovated units");
+    const none = readValueAdd(program([row("Units to renovate", "192"), row("Renovation cost per unit", "$15,000"), row("Renovation premium", "$250")]))!;
+    expect(visibleText(render(React.createElement(ValueAddPanel, { program: none })))).toContain("Premium not yet proven");
     // The doors: one bar, the done filled and the rest light — one program,
     // said one way: 248 in all, 56 done and 192 to go, and the read
     // renovates the 192 still to do (research pass 36: a bar headed "248 in

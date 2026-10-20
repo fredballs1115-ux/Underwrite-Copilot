@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildingSfFromMetrics,
+  cocUnstatedDetail,
+  irrUnstatedDetail,
   buyBoxCheckSource,
   evaluateBuyBox,
   occupancyPctFromMetrics,
@@ -647,10 +649,32 @@ describe("findGoingInCap — never the finished project's figure", () => {
     // pass 34).
     expect(c.detail).toMatch(/a conversion deal is judged on its yield on total cost, not on a going-in cap/);
     expect(c.detail).not.toMatch(/has no going-in cap/);
-    // A stabilized asset with the same missing figure keeps the plain wording.
+    // A stabilized asset with the same missing figure says the memorandum
+    // states none — no "yet" on a finished screen.
     const plain = check(evaluateBuyBox("multifamily", ex([["Purchase price", "$20,000,000"]]), box), "Going-in cap")!;
     expect(plain.status).toBe("unknown");
-    expect(plain.detail).toMatch(/no parseable cap rate yet/);
+    expect(plain.detail).toBe("Mandate wants ≥5% going-in; the memorandum states no going-in cap, so the screen could not check it.");
+  });
+
+  it("says a row in words is no figure the screen could read, never that the memorandum states none (audit of PR #482, L8)", () => {
+    const box: BuyBox = { minCapPct: 5.0, minIrrPct: 15 };
+    const words = ex([
+      ["Purchase price", "$20,000,000"],
+      ["Going-in cap rate", "mid-5s"],
+      ["Levered IRR", "mid-teens"],
+    ]);
+    const res = evaluateBuyBox("multifamily", words, box);
+    expect(check(res, "Going-in cap")!.detail).toBe("Mandate wants ≥5% going-in; the memorandum's going-in cap (“mid-5s”) is no figure the screen could read.");
+    expect(check(res, "Target return")!.detail).toBe("Mandate targets ≥15% IRR; the memorandum's IRR (“mid-teens”) is no figure the screen could read.");
+    // The mandate score says it the same way.
+    const fit = scoreMandateFit("multifamily", words, box);
+    expect(fit.dimensions.find((d) => d.key === "irr")!.detail).toBe(check(res, "Target return")!.detail);
+    expect(fit.dimensions.find((d) => d.key === "cap")!.detail).toBe(check(res, "Going-in cap")!.detail);
+    // A row that states nothing is no row.
+    expect(irrUnstatedDetail(15, null, "N/A")).toBe("Mandate targets ≥15% IRR; the memorandum states no IRR, so the screen could not check it.");
+    // A first read keeps its wording: the memorandum is still to be read.
+    expect(irrUnstatedDetail(15, { firstRead: true })).toBe("Mandate targets ≥15% IRR; the first read states none, and the memorandum is still to be read.");
+    expect(cocUnstatedDetail(6, null)).toBe("Mandate wants ≥6% cash-on-cash; the memorandum states no cash-on-cash, so the screen could not check it.");
   });
 });
 

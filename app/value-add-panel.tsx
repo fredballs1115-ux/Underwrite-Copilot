@@ -30,6 +30,29 @@ const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (par
 // to the cent as the model's line says it ("$68.75") — never written short.
 const dollars = (n: number) => (Number.isInteger(Math.round(n * 100) / 100) ? `$${Math.round(n).toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 
+/**
+ * The premium's proof, as the chip says it. Proven only where the renovated
+ * doors achieve at least the premium the program is priced on (or where the
+ * achieved premium is the only one stated); an achieved premium under the
+ * priced one is said as a shortfall in dollars, "Achieved $140, $60 under
+ * the $200 priced" — the chip had read "Premium proven on renovated units" beside a
+ * stress row calling the same premium unsupported.
+ */
+export function premiumProof(r: Pick<ValueAddRead, "premium" | "achievedPremium">): { proven: boolean; text: string } {
+  if (r.achievedPremium == null) return { proven: false, text: "Premium not yet proven" };
+  if (r.premium == null || Math.round(r.achievedPremium * 100) >= Math.round(r.premium * 100)) {
+    return { proven: true, text: "Premium proven on renovated units" };
+  }
+  // The shortfall in dollars a month, as the stress row's gap says the same
+  // premium ("$60 a month … over the achieved $140"): a share here beside a
+  // dollar gap there read as two different figures.
+  const under = Math.round((r.premium - r.achievedPremium) * 100) / 100;
+  return {
+    proven: false,
+    text: `Achieved ${dollars(r.achievedPremium)}, ${under < 1 ? "less than $1" : dollars(under)} under the ${dollars(r.premium)} priced`,
+  };
+}
+
 export function ValueAddPanel({
   program,
   exitCapPct = null,
@@ -47,6 +70,7 @@ export function ValueAddPanel({
   const premiums = [r.premium, r.achievedPremium, breakEven].filter((n): n is number => n != null);
   const scale = premiums.length ? Math.max(...premiums) * 1.15 : 1;
   const total = r.doors != null ? r.doors + (r.renovated ?? 0) : null;
+  const proof = premiumProof(r);
 
   return (
     <section
@@ -58,10 +82,10 @@ export function ValueAddPanel({
         {r.returnOnCostPct != null && <span className="text-sm font-semibold">{`${Math.round(r.returnOnCostPct)}% on cost`}</span>}
         <span
           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-            r.achievedPremium != null ? "border-pass/40 text-pass" : "border-caution/40 text-caution"
+            proof.proven ? "border-pass/40 text-pass" : "border-caution/40 text-caution"
           }`}
         >
-          {r.achievedPremium != null ? "Premium proven on renovated units" : "Premium not yet proven"}
+          {proof.text}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </PanelHead>

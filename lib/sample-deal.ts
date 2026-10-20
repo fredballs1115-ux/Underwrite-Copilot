@@ -370,6 +370,31 @@ const extraction: ExtractionResult = {
  *  the pro forma's premium is held to. */
 const T12_INSURANCE = 385_000;
 
+/** The T-12's collected rent and its vacancy loss (the statement below
+ *  carries both), and the rent roll's units and those occupied (its summary
+ *  below): the two ways the building's vacancy is said. */
+const T12_COLLECTED = 6_499_500;
+const T12_VACANCY_LOSS = 650_500;
+const ROLL_UNITS = 248;
+const ROLL_OCCUPIED_UNITS = 225;
+
+/** The building's vacancy today, said the two ways the documents state it,
+ *  never one for the other: `inPlace` is the T-12's vacancy loss over gross
+ *  potential rent — the building's operating figure, and the 9.1% the
+ *  derived model runs (lib/sample-derive: the rent roll's 90.9% occupancy by
+ *  area, the same figure) — and `unitsPct` the rent roll's units empty, by
+ *  count, the 9.3% the stress test's vacancy row shows as today's gap. The
+ *  T-12's figure is a trailing year's, so the prose says it over the
+ *  trailing twelve months, never as today's; "today" is the rent roll's.
+ *  The stabilized 6% is the OM's: the prose sets it against a rule of thumb
+ *  only, since the stress test reads today's published vacancy on its own. */
+const VACANCY = {
+  inPlace: `${((T12_VACANCY_LOSS / (T12_COLLECTED + T12_VACANCY_LOSS)) * 100).toFixed(1)}%`,
+  unitsEmpty: ROLL_UNITS - ROLL_OCCUPIED_UNITS,
+  units: ROLL_UNITS,
+  unitsPct: `${(((ROLL_UNITS - ROLL_OCCUPIED_UNITS) / ROLL_UNITS) * 100).toFixed(1)}%`,
+};
+
 const dollarsOf = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 /** The memorandum's tax bill re-struck on its price at the rate its own two
@@ -442,8 +467,8 @@ const challenges: ChallengerResult = {
     {
       assumption: "6% stabilized vacancy",
       severity: "medium",
-      challenge: "In-place vacancy runs ~9%; the 6% stabilized figure assumes a lease-up that isn't underwritten.",
-      question: "What's the absorption schedule to get from 9% to 6%?",
+      challenge: `The building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12), with ${VACANCY.unitsEmpty} of ${VACANCY.units} units empty on the rent roll today; the 6% stabilized figure assumes a lease-up the OM never schedules.`,
+      question: `What's the absorption schedule to get from ${VACANCY.inPlace} to 6%?`,
     },
     {
       assumption: `Insurance at ${dollarsOf(INSURANCE.proForma)}`,
@@ -463,8 +488,14 @@ const challenges: ChallengerResult = {
   // here had been the first-draft model's, beside the engine's other
   // figures for the same levers (2026-10-20).
   stressTest:
-    "The three assumptions fail together. The 6% vacancy needs a lease-up from the 9% the rent roll shows that the OM never schedules, and the $200 premium arrives only as renovated units lease, so a slow lease-up delays both and leaves less income in year five. That smaller income is what the 5.25% exit capitalises, and a buyer five years out has no stated reason to pay a tighter cap than today's 5.45%.",
+    `The three assumptions fail together. The 6% vacancy needs a lease-up from the ${VACANCY.inPlace} the building ran over the trailing twelve months (T-12) that the OM never schedules,` +
+    " and the $200 premium arrives only as renovated units lease, so a slow lease-up delays both and leaves less income in year five. That smaller income is what the 5.25% exit capitalises, and a buyer five years out has no stated reason to pay a tighter cap than today's 5.45%.",
 };
+
+/** The ask a unit over The Brixton's $252k, the one sale comp graded
+ *  `supports` (p. 14), in percent to one place: the stress test's price
+ *  row's own gap (lib/sample-figures.test.ts holds the two equal). */
+const CLEAN_COMP_GAP_PCT = ((TAX.price / numberOf(memoFact("Units").value) / 252_000 - 1) * 100).toFixed(1);
 
 // The memorandum's three sale comps sit on its p. 14, the page the
 // verdict's basis range cites for the $252k and $261k trades.
@@ -488,7 +519,12 @@ const comps: BrokerCompsResult = {
       name: "Parkside — 1.4 mi",
       detail: "$261k/unit · 5.4% cap · Q4'25",
       support: "favorable",
-      note: "Closest comp; lands near the subject's implied basis.",
+      // Graded favorable, so the stress test leaves it out of the figure the
+      // ask is held to and names it so (lib/stress-test, the comps graded
+      // clean): the note says why from its own figures against The
+      // Brixton's, the one comp graded clean (p. 14) — never a fact the
+      // memorandum does not state.
+      note: "Closest by distance and the newest trade, but priced richer than The Brixton — $261k against $252k a unit, a 5.4% cap against 5.6% — so it leans the seller's way.",
       page: "p. 14",
     },
   ],
@@ -506,8 +542,11 @@ const comps: BrokerCompsResult = {
     // gap is read off its own dates (Q1'25 to Q4'25, p. 14).
     "The newest of the three trades is Q4'25: the set states no 2026 sale.",
   ],
-  summary:
-    "The comp set leans on its strongest trade — sell-side selections usually do. Against the two clean trades, $252k and $261k a unit, the $274k ask is 7% rich.",
+  // The ask against the one comp graded `supports`, the figure the stress
+  // test's price row holds it to: one comp, named, never a median, and
+  // Parkside, graded favorable, named apart (lib/sample-figures.test.ts
+  // holds the share to the row's own gap).
+  summary: `The comp set leans on its strongest trade — sell-side selections usually do. Against the one comp graded clean, The Brixton at $252k a unit, the $274k ask is ${CLEAN_COMP_GAP_PCT}% rich; Parkside's $261k, the closest, leans the seller's way.`,
 };
 
 const reconciliation: ReconciliationResult = {
@@ -523,7 +562,9 @@ const reconciliation: ReconciliationResult = {
       metric: "Vacancy",
       omValue: "6.0%",
       myValue: "9.0%",
-      gap: "300 bps higher, in line with in-place",
+      // "Your model" is the first-draft model, which runs 9.0%; the
+      // building's own figure is the T-12's, a trailing year's.
+      gap: `300 bps higher, in line with the T-12's trailing ${VACANCY.inPlace}`,
       direction: "unfavorable",
     },
     {
@@ -546,38 +587,51 @@ const market: MarketResult = {
       assessment: "aggressive",
       note: "At the tight end of the range with no compression catalyst.",
     },
+    // The stored check is fixed prose, so it reads each assumption against a
+    // rule of thumb alone and says so. Which published figure the 4.0% is
+    // held to, and how that comes out, is the stress test's to decide from
+    // today's feeds (lib/rent-growth-decider: Zillow's apartment rents
+    // first); a fixed sentence never states that verdict
+    // (lib/sample-stress.test.ts fails on one that does).
     {
       assumption: "Rent growth 4.0%/yr",
       omSays: "4.0%",
       typicalRange: "2.5–3.5%",
       assessment: "aggressive",
-      note: "Above the top of the rule-of-thumb range.",
+      note: "Above the top of a rule of thumb for apartment rent growth, not a published figure; the stress test sets the 4.0% against today's published rents.",
     },
     {
       assumption: "Vacancy 6%",
       omSays: "6.0%",
       typicalRange: "5–7%",
       assessment: "in-line",
-      note: "Reasonable once stabilized — but not the in-place figure.",
+      note: `Inside a typical stabilized range, a rule of thumb — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it.`,
     },
   ],
   summary:
-    "Two of three headline assumptions sit at or beyond the aggressive end of market norms.",
+    "Two of three headline assumptions, the exit cap and rent growth, sit at or beyond the aggressive end of the rules of thumb; stabilized vacancy sits inside its range.",
 };
 
 const verdict: VerdictResult = {
   verdict: "caution",
   reason:
-    "The going-in basis is rich and the returns lean on an aggressive exit and rent ramp. Worth a closer look only if the seller moves on price or the ramp is de-risked.",
+    // What the documents say, never a verdict a live feed decides: the ask
+    // over the one clean comp, the OM's exit tighter than its going-in cap,
+    // and the premium its pro forma rents carry past what the renovated
+    // doors achieve. The premium is in none of the model's returns (the
+    // model grows today's rent at one rate), so it is said of the rents.
+    `The basis is rich, the OM exits at an aggressive cap, and the pro forma's rents lean on an unproven ${dollarsOf(PREMIUM.priced)} premium. Worth a closer look only if the seller moves on price or the premium is proven.`,
   topRisks: [
     "Exit cap of 5.25% sits 20 bps inside the 5.45% going-in cap, with no catalyst for the compression.",
-    `Taxes ride on the seller's ${dollarsOf(TAX.bill)} bill; at its ${TAX.ratePct.toFixed(2)}% on the ${compactUsd(TAX.price, { trim: true })} price, ${dollarsOf(TAX.reset)} a year.`,
+    // A condition, as the stress test's taxes row says it: whether the sale
+    // resets the assessment is the jurisdiction's to say.
+    `If the sale resets the assessment to the ${compactUsd(TAX.price, { trim: true })} price, the seller's ${dollarsOf(TAX.bill)} tax bill is ${dollarsOf(TAX.reset)} a year.`,
     `Pro forma rents assume ${withArticle(`${dollarsOf(PREMIUM.priced)}/mo premium`)}; the ${PREMIUM.done} renovated doors achieve ${dollarsOf(PREMIUM.achieved)}.`,
-    "Stabilized vacancy of 6% ignores the 9% in-place reality.",
+    `The 6% stabilized vacancy is a typical stabilized figure; the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12), and no lease-up is scheduled.`,
   ],
   nextSteps: [
     "Pull three renovated-comp leases to test the rent premium.",
-    "Re-run returns at a 5.50% exit, 5 bps over the 5.45% going-in, and real in-place vacancy.",
+    `Get the seller's lease-up plan from the T-12's ${VACANCY.inPlace} vacancy to the 6% stabilized.`,
     "Get the seller's post-sale tax estimate and an insurance quote bound for a new owner.",
   ],
   screen: {
@@ -593,38 +647,45 @@ const verdict: VerdictResult = {
       },
       {
         label: "Vacancy",
+        // The base is the building's operating figure, the T-12's (the 9.1%
+        // the model runs); the high, the rent roll's units empty, by count;
+        // the low, the OM's stabilized figure.
         low: "6.0%",
-        base: "9.0%",
-        high: "9.5%",
-        source: "Rent roll (in-place) vs. OM stabilized",
-        basis: "Base reflects in-place; low assumes a completed lease-up.",
+        base: VACANCY.inPlace,
+        high: VACANCY.unitsPct,
+        source: "T-12 (base) and rent roll (high) vs. OM",
+        basis: "Base is the T-12's trailing year; low assumes a completed lease-up to a typical stabilized figure.",
         confidence: "high",
       },
       {
         label: "Exit cap",
+        // The base is the exit the model runs, the going-in cap (lib/sample-
+        // derive, the stress test's re-run): no compression.
         low: "5.25%",
-        base: "5.50%",
+        base: `${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}%`,
         high: "5.75%",
-        source: "Rule-of-thumb range; the OM holds 5.25%",
-        basis: "Base assumes no compression; high reflects a softer exit.",
+        source: "Rule of thumb; model at going-in cap",
+        basis: "Base holds the exit at the going-in cap; high reflects a softer exit.",
         confidence: "medium",
       },
       {
         label: "Basis / unit",
-        // The low end is the lower of the memorandum's two clean trades
-        // (p. 14), never a trade it does not state.
+        // The low and base are the one sale comp graded clean (p. 14), the
+        // figure the stress test's price row holds the ask to; the high is
+        // Parkside, graded favorable (it leans the seller's way). Never a
+        // trade the memorandum does not state.
         low: "$252k",
-        base: "$257k",
-        high: "$274k",
-        source: "Trades $252k, $261k (p. 14)",
-        basis: "Ask sits above clean comps with no renovation premium yet.",
+        base: "$252k",
+        high: "$261k",
+        source: "Trades $252k (clean), $261k (p. 14)",
+        basis: `The $274k ask sits ${CLEAN_COMP_GAP_PCT}% over the one clean comp, with no renovation premium yet.`,
         confidence: "high",
       },
     ],
     dealKillers: [
       {
         lever: "basis",
-        read: "Buying at ~$274k/unit — above the last comparable trades.",
+        read: "Buying at ~$274k/unit — above the one clean comp.",
         risk: "No renovation premium yet justifies the spread.",
       },
       {
@@ -645,21 +706,35 @@ const verdict: VerdictResult = {
         // sizes the loan at 60% of cost, its default, never 60% of value:
         // the demo report's base case says "Loan … · 60% of cost" beside
         // this line (audit C3a, LOW-13), and a test holds both to the model.
-        read: "60% of cost, the model's default, at 6.0%, amortizing over 30 years.",
+        // The memorandum's own 60% is a loan-to-value (p. 44), a different
+        // measure that happens to share the figure, so the line names each
+        // by its own (the memo's card holds 72 characters).
+        read: "Model: 60% of cost at 6.0%, 30-yr amortizing; the OM: 60% LTV, p. 44.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],
     sensitivity: [
+      // One set, in order. The conservative case is worse than the model's
+      // own: a softer exit or a tax reset each lowers the levered IRR from
+      // it (a direction, no figure the engine has not run). The base IS the
+      // model's own case — the exit at the going-in cap and the T-12's
+      // vacancy (lib/sample-derive), its levered IRR the stress test's exit
+      // re-run. The sponsor's is the OM's exit with the premium proven,
+      // which the model's returns carry neither of.
       {
         scenario: "conservative",
         call: "pass_on",
-        note: "Flat exit + real vacancy pushes the IRR into the single digits.",
+        note: `A softer exit toward 5.75% or a tax reset on the sale takes the levered IRR under the model's ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%.`,
       },
-      { scenario: "base", call: "caution", note: "Pencils only if the seller moves on price." },
+      {
+        scenario: "base",
+        call: "caution",
+        note: `The model's own case, ${withArticle(`${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% exit`)} and the T-12's ${VACANCY.inPlace} vacancy, is ${withArticle(`${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}% levered IRR`)}; it pencils only if the seller moves on price.`,
+      },
       {
         scenario: "sponsor",
         call: "pass",
-        note: "If the ramp and exit hold, returns clear the hurdle.",
+        note: `If the OM's 5.25% exit holds and the ${dollarsOf(PREMIUM.priced)} premium is proven, the deal works; the model's returns carry neither.`,
       },
     ],
   },
@@ -686,12 +761,11 @@ const rentRollExtraction: RentRollExtraction = {
   page: "roll p.1–6",
 };
 
-const ROLL_OCCUPIED_UNITS = 225;
 const ROLL_OCCUPIED_SF = 200_635;
 const ROLL_RENT_PSF = 32.4;
 
 const rentRollSummary: RentRollSummary = {
-  unitCount: 248,
+  unitCount: ROLL_UNITS,
   occupiedUnits: ROLL_OCCUPIED_UNITS,
   totalSf: 220_720,
   occupiedSf: ROLL_OCCUPIED_SF,
@@ -712,8 +786,8 @@ const rentRollSummary: RentRollSummary = {
 
 const t12Extraction: T12Extraction = {
   periodEndDate: "2026-05-31",
-  collectedRent: 6_499_500,
-  vacancyLoss: 650_500,
+  collectedRent: T12_COLLECTED,
+  vacancyLoss: T12_VACANCY_LOSS,
   otherIncome: 292_000,
   egi: 6_791_500,
   // The tax line is the memorandum's 2026 bill (p. 27), $727,896 on a
@@ -737,8 +811,8 @@ const t12Extraction: T12Extraction = {
 };
 
 const t12Summary: T12Summary = {
-  collectedRent: 6_499_500,
-  vacancyLoss: 650_500,
+  collectedRent: T12_COLLECTED,
+  vacancyLoss: T12_VACANCY_LOSS,
   otherIncome: 292_000,
   egi: 6_791_500,
   opex: t12Extraction.opex,

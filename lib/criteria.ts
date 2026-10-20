@@ -112,6 +112,10 @@ export interface BuyBoxCheck {
    *  unknown, and a fit judged without it is no green light
    *  (`buyBoxCoverage`) */
   onPrice?: boolean;
+  /** the documents read state no figure for the criterion (the target
+   *  return where the memorandum states no IRR): a page that runs the model
+   *  can point to where the model's own figure is scored against it */
+  unstated?: boolean;
 }
 
 // Near-miss tolerances, per criterion kind. Exported because the mandate-fit
@@ -757,6 +761,9 @@ interface ExtractionLike {
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
+  /** the figures are the first signal's, the memorandum not yet read
+   *  (`buyBoxCheckSource`): a figure missing from them may yet be stated */
+  firstRead?: boolean;
 }
 
 /** What a partial interest holds, where its words say: an undivided
@@ -1603,6 +1610,10 @@ export function buyBoxCheckSource(
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
     screenedOn: extraction?.screenedOn ?? null,
+    // Whether the figures are the first signal's alone: a criterion they
+    // state nothing for may yet be read, where a memorandum read whole that
+    // states none never will be.
+    ...(!stated && firstSignal ? { firstRead: true } : {}),
   };
 }
 
@@ -1749,9 +1760,9 @@ function basisRead(extraction: ExtractionLike | null, cls: string): { dollars: n
 }
 
 /** The going-in cap, and why the deal's cap slot holds none of its own. */
-function capRead(extraction: ExtractionLike | null): { pct: number | null; withheld: CapWithheldKind | null } {
+function capRead(extraction: ExtractionLike | null): { pct: number | null; withheld: CapWithheldKind | null; stated: string | null } {
   const metric = findGoingInCap(extraction?.metrics ?? []);
-  return { pct: metric ? parsePct(metric.value) : null, withheld: capWithheldOf(extraction) };
+  return { pct: metric ? parsePct(metric.value) : null, withheld: capWithheldOf(extraction), stated: metric?.value ?? null };
 }
 
 /** The figures a deal is judged on for each band the box can set, by the
@@ -1765,6 +1776,60 @@ export interface BoxFigures {
   price: { value: number; range: { low: number; high: number } | null } | null;
   basis: { value: number; noun: string } | null;
   cap: number | null;
+}
+
+/** The most of a row's own words a detail quotes. */
+const QUOTED_MAX = 40;
+
+/**
+ * A figure the box asks for that the figures read do not give, said for what
+ * happened. Where no row states it, a finished screen says the memorandum
+ * states none; where a row states it in words no reader takes ("mid-teens"),
+ * it quotes the row and says it is no figure the screen could read — the
+ * first cut said "states no IRR" beside a memorandum that had an IRR row.
+ * Only a first read, the memorandum not yet read, says the figure may yet
+ * come; no finished screen says "yet". `lead` is the mandate's clause
+ * ("Mandate targets ≥15% IRR"), `none` what is missing ("no IRR") and `row`
+ * the figure's name ("IRR"); `stated` the unread row's value, or null.
+ */
+export function unreadFigureDetail(
+  lead: string,
+  what: { none: string; row: string },
+  stated: string | null | undefined,
+  source: Pick<ExtractionLike, "firstRead"> | null,
+): string {
+  // A row that states nothing ("N/A", "Not stated", a dash) is no row.
+  const raw = stated?.trim() ?? "";
+  const words = /^(?:n\/?a|none|not (?:stated|provided|available)|tbd|[-—–])$/i.test(raw) ? "" : raw;
+  const quoted = words ? `“${words.length > QUOTED_MAX ? `${words.slice(0, QUOTED_MAX - 1).trimEnd()}…` : words}”` : "";
+  if (source?.firstRead) {
+    return quoted
+      ? `${lead}; the first read's ${what.row} (${quoted}) is no figure the screen could read, and the memorandum is still to be read.`
+      : `${lead}; the first read states none, and the memorandum is still to be read.`;
+  }
+  return quoted
+    ? `${lead}; the memorandum's ${what.row} (${quoted}) is no figure the screen could read.`
+    : `${lead}; the memorandum states ${what.none}, so the screen could not check it.`;
+}
+
+/**
+ * The target return where the figures read give no IRR
+ * (`unreadFigureDetail`): no row, the memorandum states none; a row in
+ * words, quoted. It had said "no parseable IRR in the screen yet" on a
+ * finished screen whose model printed a levered IRR.
+ */
+export function irrUnstatedDetail(minIrrPct: number, source: Pick<ExtractionLike, "firstRead"> | null, stated?: string | null): string {
+  return unreadFigureDetail(`Mandate targets ≥${minIrrPct}% IRR`, { none: "no IRR", row: "IRR" }, stated, source);
+}
+
+/** The going-in cap where the figures read give none (`unreadFigureDetail`). */
+export function capUnstatedDetail(minCapPct: number, source: Pick<ExtractionLike, "firstRead"> | null, stated?: string | null): string {
+  return unreadFigureDetail(`Mandate wants ≥${minCapPct}% going-in`, { none: "no going-in cap", row: "going-in cap" }, stated, source);
+}
+
+/** The cash-on-cash where the figures read give none (`unreadFigureDetail`). */
+export function cocUnstatedDetail(minCoCPct: number, source: Pick<ExtractionLike, "firstRead"> | null, stated?: string | null): string {
+  return unreadFigureDetail(`Mandate wants ≥${minCoCPct}% cash-on-cash`, { none: "no cash-on-cash", row: "cash-on-cash" }, stated, source);
 }
 
 /** A deal's figures on the box's bands (`BoxFigures`): the buy box page's
@@ -2066,7 +2131,7 @@ export function evaluateBuyBox(
 
   // ---- Going-in cap ------------------------------------------------------
   if (box.minCapPct != null) {
-    const { pct, withheld } = capRead(extraction);
+    const { pct, withheld, stated } = capRead(extraction);
     const planKind = planKindLabel(extraction);
     if (withheld) {
       // A note's price is a loan's: the cap the memorandum states is the
@@ -2088,7 +2153,7 @@ export function evaluateBuyBox(
         status: "unknown",
         detail: planKind
           ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal is judged on its yield on total cost, not on a going-in cap — its stabilized figure is the finished project's, never a cap against the price.`
-          : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
+          : capUnstatedDetail(box.minCapPct, extraction, stated),
       });
     } else if (pct >= box.minCapPct) {
       checks.push({
@@ -2131,7 +2196,8 @@ export function evaluateBuyBox(
         label: "Target return",
         onPrice: true,
         status: "unknown",
-        detail: `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen yet.`,
+        detail: irrUnstatedDetail(box.minIrrPct, extraction, metric?.value),
+        unstated: true,
       });
     } else if (pct >= box.minIrrPct) {
       checks.push({

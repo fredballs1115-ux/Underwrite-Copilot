@@ -1040,9 +1040,10 @@ describe("MemoDocument (redesigned)", () => {
     } as unknown as DealRow;
     const data = buildMemoData(deal, "September 8, 2026", []);
     expect(data.ranges.length).toBe(4);
-    // The vacancy base at 9.0% between 6.0% and 9.5% hugs the high end; the
-    // market rent base at $2,480 between $2,400 and $2,600 does not.
-    expect(basePosition(data.ranges[1])).toBeCloseTo(0.857, 2);
+    // The vacancy base at the T-12's 9.1% between the OM's 6.0% and the rent
+    // roll's 9.3% hugs the high end; the market rent base at $2,480 between
+    // $2,400 and $2,600 does not.
+    expect(basePosition(data.ranges[1])).toBeCloseTo(0.939, 2);
     expect(basePosition(data.ranges[0])).toBeCloseTo(0.4, 2);
     expect(basePosition({ low: "n/a", base: "5%", high: "6%" })).toBeNull();
     // A base below the low end sits at the start of the track; a range with
@@ -1432,11 +1433,14 @@ describe("the memo's wording (research pass 35)", () => {
           React.createElement(MemoDocument, { data: buildMemoData(dealOf(SAMPLE_DEAL.extraction, SAMPLE_DEAL.asset_class), "October 5, 2026", checks) }) as unknown as Parameters<typeof renderToBuffer>[0],
         ),
       )).replace(/\s+/g, " ");
-    // The sample's own mandate: inside, outside and not read yet; no near miss.
+    // The sample's own mandate: inside, outside and not checked — a finished
+    // screen whose memorandum states no IRR, never "not read yet"; no near
+    // miss.
     const sample = await textOf(
       evaluateBuyBox(SAMPLE_DEAL.asset_class, { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics }, SAMPLE_DEMO_BOX),
     );
-    expect(sample).toContain("— Target return + inside · × outside · — not read yet");
+    expect(sample).toContain("— Target return + inside · × outside · — not checked");
+    expect(sample).not.toContain("not read yet");
     expect(sample).not.toContain("near miss");
     const near = await textOf([
       { label: "Price", status: "near", detail: "" },
@@ -1445,7 +1449,7 @@ describe("the memo's wording (research pass 35)", () => {
     expect(near).toContain("+ Units + inside · ± near miss");
     expect(near).not.toContain("outside");
     // No mandate, no row and no key.
-    expect(await textOf([])).not.toContain("not read yet");
+    expect(await textOf([])).not.toContain("not checked");
   }, 30000);
 
   it("costs a value-add per unit, not per planned unit, and a development per planned unit in the memorandum's own noun", () => {
@@ -1554,7 +1558,7 @@ describe("the memo leads with the stress test", () => {
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
     // report than that it prints every row.
-    expect(text).toContain("Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row.");
+    expect(text).toContain(`Re-runs: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's; the report has every row.`);
     expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");

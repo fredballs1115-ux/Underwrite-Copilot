@@ -1010,7 +1010,10 @@ describe("DealView — the sample deal renders every section without a runtime e
     // The vacancy gap, 300 bps on the model's 9.0%, stays outside the band.
     expect(risks.find((r) => r.title.startsWith("Vacancy"))?.severity).toBe("high");
     // The challenger's five (three high, the taxes among them) beside the
-    // reconciliation's and the market's rows.
+    // reconciliation's and the market's rows — the market's two aggressive
+    // reads against the rules of thumb, the exit and the rent growth (the
+    // stress test sets the growth against today's published rents on its
+    // own, and the stored check states no verdict of it).
     expect(html).toContain('title="4 high · 7 med · 2 low"');
     // A row whose size cannot be read on that footing keeps its old grade.
     const unread = deriveRisks({
@@ -1258,6 +1261,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(demo).replace("Sign up to set your own box →", "Edit criteria →")).toBe(
       textOf(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false }))),
     );
+    // The sample's page runs the model, as /demo's does, so its target return
+    // points to the playground's check on all three (page.tsx: `modelScored:
+    // !!playground`).
+    expect(data.buyBox.modelScored).toBe(true);
+    expect(html).toContain('data-qa="model-return-pointer"');
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toContain("modelScored: !!playground,");
     // A deal of the reader's own draws the panel bare.
     expect(render(sampleProps("buybox"))).not.toContain('data-qa="sample-box-caption"');
   });

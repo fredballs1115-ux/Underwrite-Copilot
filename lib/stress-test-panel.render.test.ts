@@ -503,6 +503,62 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(html).not.toContain('data-qa="stress-headline"');
   });
 
+  it("draws the model as it runs as a third mark, says why the evidence's case is not it, and names each re-run's base (the investor's walkthrough)", () => {
+    const headline: StressHeadline = {
+      omIrrPct: 16.67,
+      evidenceIrrPct: 11.53,
+      omMultiple: 2.1,
+      evidenceMultiple: 1.7,
+      omKeys: ["exit_cap", "noi", "vacancy", "rent_growth", "taxes"],
+      parts: [
+        { key: "taxes", label: "Real estate taxes", pts: -3.71, multiple: -0.28 },
+        { key: "exit_cap", label: "Exit cap", pts: -1.43, multiple: -0.12 },
+      ],
+      omitted: [{ key: "noi", label: "NOI", why: HEADLINE_NOI_LEFT_OUT }],
+      unsolved: 0,
+      modelIrrPct: 9.28,
+      keptAtOm: [
+        { key: "noi", label: "NOI", why: "left_out", om: 7_330_000, model: 7_470_000, noi: 3_880_000 },
+        { key: "vacancy", label: "Stabilized vacancy", why: "holds", om: 6, model: 9.1 },
+        { key: "rent_growth", label: "Rent growth", why: "holds", om: 4, model: 3 },
+      ],
+      atEvidence: [{ key: "taxes", label: "Real estate taxes", evidence: 952_000, model: 728_000 }],
+    };
+    const hh = render({ ...TEST, headline });
+    const t = visibleText(hh).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(a11yIssues(hh)).toEqual([]);
+    expect(gluedWords(visibleText(hh))).toEqual([]);
+    // The third mark: an outline from zero, its words beside it, after the
+    // two filled cases.
+    expect(hh.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
+    expect(t).toContain("With the evidence 11.5% The model as it runs 9.3%");
+    expect(hh).toMatch(/class="absolute inset-y-0 rounded-full border border-dashed border-ink\/60" data-bar="stress-headline-model" style="left:0\.00%;width:[\d.]+%"/);
+    // Why the evidence's case is not the model, under the line.
+    expect(t).toContain(
+      "Against the model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
+    );
+    expect(hh.indexOf('data-qa="stress-headline-kept"')).toBeLessThan(hh.indexOf('data-qa="stress-headline-bridge"'));
+    // Each re-run names its base, and the model's dashed tick stands on its
+    // bars, the key saying what it is.
+    expect(t).toContain("From the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's At the OM's figure 9.3% At the evidence's figure 7.1%");
+    expect(hh.match(/data-bar="stress-impact-model"/g)!.length).toBeGreaterThanOrEqual(2);
+    expect(t).toContain("The model as it runs, 9.3%: each re-run changes one input of it");
+    // Nothing past its evidence: the OM's case and the model still drawn.
+    const flat = render({ ...TEST, headline: { ...headline, evidenceIrrPct: 16.67, parts: [], omitted: [], keptAtOm: [], atEvidence: [] } });
+    expect(flat).toContain('data-qa="stress-headline-cases"');
+    expect(flat.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
+    expect(flat).not.toContain('data-qa="stress-headline-kept"');
+    // A headline struck before the model was carried draws no third mark.
+    const { modelIrrPct: _m, keptAtOm: _k, atEvidence: _e, ...older } = headline;
+    void _m;
+    void _k;
+    void _e;
+    const old = render({ ...TEST, headline: older });
+    expect(old).not.toContain("stress-headline-model");
+    expect(old).not.toContain("stress-impact-model");
+    expect(visibleText(old)).toContain("From the model as it runs, this input alone set to the OM");
+  });
+
   it("marks a part struck against a rule of thumb, shows the mixes counted at the floor, and says why an unsolved case is not split (audit M1, M7, M8)", () => {
     const base: StressHeadline = {
       omIrrPct: 13.06,

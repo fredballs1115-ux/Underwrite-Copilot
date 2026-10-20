@@ -2,7 +2,21 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
-import { HEADLINE_WITHHELD, headlineLine, headlineName, liveHeadline, noMoveWhy, partAgainst, ptsText, shownHeadline, unsolvedSentence, type ShownPart } from "@/lib/stress-test-words";
+import {
+  HEADLINE_WITHHELD,
+  headlineLine,
+  headlineName,
+  keptSentence,
+  liveHeadline,
+  modelIrrOf,
+  noMoveWhy,
+  partAgainst,
+  ptsText,
+  rerunWords,
+  shownHeadline,
+  unsolvedSentence,
+  type ShownPart,
+} from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
@@ -13,7 +27,12 @@ import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, Stress
  * the test on the server from what it already holds, and this draws it.
  *
  * THE HEADLINE leads (`HeadlineView`): the levered IRR on the OM's figures
- * against the evidence's, and the bridge between them split by assumption.
+ * against the evidence's, and the bridge between them split by assumption,
+ * with the model as it runs as a third mark (an outline, never a fill) and
+ * one sentence on the figures the evidence's case keeps at the OM's where
+ * the model runs another (lib/stress-test-words `keptSentence`). Each row's
+ * re-run names its base — the model at its own IRR, one input changed
+ * (`rerunWords`) — and draws that IRR as a dashed tick on its bars.
  *
  * One row an assumption, most severe first (unsupported, stretched, holds).
  * Each tested row has its words beside its picture, so nothing rides on
@@ -123,6 +142,8 @@ function figureText(key: StressKey, v: number): string {
       return compactUsd(v, MONEY);
   }
 }
+
+const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
 const pctText = (n: number | null): string => {
   if (n == null) return "does not solve";
@@ -340,10 +361,13 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
 /** The return's move: the pair in words, then the two runs as bars on one
  *  scale — the OM's figure, then the evidence's — each labelled with the
  *  input it ran on. Where the two runs are one, one bar. */
-function ImpactView({ impact }: { impact: StressImpact }) {
+function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }) {
   const base = impact.baseIrrPct;
   const alt = impact.altIrrPct;
-  const top = Math.max(base ?? 0, alt ?? 0, 1) * 1.15;
+  // The model as it runs, the run each re-run changes one input of: a dashed
+  // tick on both bars, the panel's key naming it.
+  const model = modelIrrOf(test);
+  const top = Math.max(base ?? 0, alt ?? 0, model ?? 0, 1) * 1.15;
   const widthOf = (v: number | null) => (v == null ? "0%" : `${Math.max(0, Math.min(100, (v / top) * 100)).toFixed(1)}%`);
   // The two runs are one where the OM's figure IS the evidence's: one
   // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
@@ -357,14 +381,19 @@ function ImpactView({ impact }: { impact: StressImpact }) {
       <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
         {same ? `Levered IRR ${pctText(base)}, run at the evidence's figure` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
       </p>
+      <p className={`mt-0.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-impact-base">
+        {upperFirst(rerunWords(test, impact))}
+      </p>
       <BarRows className="mt-1.5 space-y-1 text-[11px]">
         {!same && (
           <BarRow label="At the OM's figure" figure={pctText(base)}>
             <div className="h-full rounded-full bg-ink/35" data-bar="stress-impact-om" style={{ width: widthOf(base) }} />
+            {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
           </BarRow>
         )}
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
           <div className={`h-full rounded-full ${direction === "down" ? "bg-caution/70" : direction === "up" ? "bg-pass/70" : "bg-muted/40"}`} data-direction={direction} data-bar="stress-impact" style={{ width: widthOf(alt) }} />
+          {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
         </BarRow>
       </BarRows>
       <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink/85`}>
@@ -540,7 +569,7 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
             ) : null}
 
             {row.impact ? (
-              <ImpactView impact={row.impact} />
+              <ImpactView impact={row.impact} test={test} />
             ) : (
               <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-impact">
                 {/* One sentence a row: the reason once at the top where the whole
@@ -619,13 +648,27 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
  * the reasons folded. Where the re-runs are withheld, the panel's note says
  * the headline is withheld with them.
  */
-function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: string }) {
+/** The model as it runs on the headline's track: an outline from zero, its
+ *  figure beside it — the base each row's re-run starts from. */
+function ModelBarRow({ model, style }: { model: number; style: { left: string; width: string } }) {
+  return (
+    <BarRow label="The model as it runs" figure={pctText(model)}>
+      <div className="absolute inset-y-0 rounded-full border border-dashed border-ink/60" data-bar="stress-headline-model" style={style} />
+    </BarRow>
+  );
+}
+
+function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; line: string; kept: string | null }) {
   // The figures as printed (lib/stress-test-words `shownHeadline`): each
   // case at one place and each part rounded so the segments end exactly on
   // the evidence's printed case.
   const shown = shownHeadline(h);
   const om = shown.om;
   const ev = shown.evidence;
+  // The model as it runs, every input its own — the third mark, drawn as an
+  // outline from zero so it reads apart from the two filled cases: the base
+  // every row's re-run starts from, which neither case is.
+  const model = h.modelIrrPct != null && Number.isFinite(h.modelIrrPct) ? Number(h.modelIrrPct.toFixed(1)) : null;
   const walk: { part: ShownPart; from: number; to: number }[] = [];
   if (om != null) {
     let at = om;
@@ -634,7 +677,7 @@ function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: s
       at += part.shown;
     }
   }
-  const points = [0, ...(om != null ? [om] : []), ...(ev != null ? [ev] : []), ...walk.flatMap((w) => [w.from, w.to])];
+  const points = [0, ...(om != null ? [om] : []), ...(ev != null ? [ev] : []), ...(model != null ? [model] : []), ...walk.flatMap((w) => [w.from, w.to])];
   const lo = Math.min(...points);
   const hi = Math.max(...points, lo + 1);
   const span = (hi - lo) * 1.08;
@@ -647,6 +690,19 @@ function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: s
       <p className={`${MEASURE} text-base font-semibold leading-snug tabular-nums text-ink`} data-qa="stress-headline-line">
         {line}
       </p>
+      {kept && (
+        <p className={`mt-1 ${MEASURE} text-xs leading-relaxed text-ink/85`} data-qa="stress-headline-kept">
+          {kept}
+        </p>
+      )}
+      {!(h.parts.length > 0 && om != null && ev != null) && om != null && model != null && (
+        <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-cases">
+          <BarRow label="On the OM's figures" figure={pctText(om)}>
+            <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
+          </BarRow>
+          <ModelBarRow model={model} style={bar(0, model)} />
+        </BarRows>
+      )}
       {h.parts.length > 0 && om != null && ev != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-bridge">
           <BarRow label="On the OM's figures" figure={pctText(om)}>
@@ -684,6 +740,7 @@ function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: s
           <BarRow label="With the evidence" figure={pctText(ev)}>
             <div className="absolute inset-y-0 rounded-full bg-caution/70" data-bar="stress-headline-evidence" style={bar(0, ev)} />
           </BarRow>
+          {model != null && <ModelBarRow model={model} style={bar(0, model)} />}
         </BarRows>
       )}
       <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
@@ -722,6 +779,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         ? { border: "border-caution/30 border-l-caution bg-caution/5", head: "text-caution" }
         : { border: "border-line border-l-brand bg-surface", head: "text-brand" };
   const published = test.rows.some((r) => r.evidence.some((e) => e.kind === "published"));
+  const model = modelIrrOf(test);
   const kindsShown = new Set<EvidenceKind>();
   for (const r of test.rows) for (const e of r.evidence) if (e.value != null && !e.ownYardstick && trackScale(r)) kindsShown.add(e.kind);
 
@@ -738,7 +796,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       {/* The reason is a whole sentence that already says no return is
           re-run; the headline goes with the re-runs, said so. */}
       {test.impactsWithheld && <PanelNote>{`${test.impactsWithheld} ${HEADLINE_WITHHELD}`}</PanelNote>}
-      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} />}
+      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} kept={keptSentence(test)} />}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
@@ -753,6 +811,12 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         <KeyItem mark="tick" tone="bg-ink">
           {"The OM's figure"}
         </KeyItem>
+        {/* The dashed tick on each row's re-run bars: the model as it runs. */}
+        {model != null && test.rows.some((r) => r.impact) && (
+          <KeyItem mark="dashed" tone="border-ink/70">
+            {`The model as it runs, ${pctText(model)}: each re-run changes one input of it`}
+          </KeyItem>
+        )}
         {/* Each kind's own glyph, the one the track and the list draw. */}
         {(["document", "published", "rule_of_thumb", "om_internal"] as const).map((k) =>
           kindsShown.has(k) ? (

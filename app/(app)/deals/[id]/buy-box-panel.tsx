@@ -6,7 +6,7 @@
 // deal view and its server actions. deal-view.tsx re-exports it.
 import Link from "next/link";
 import { buyBoxCoverage, type BuyBoxCheck } from "@/lib/criteria";
-import { MANDATE_TONE } from "@/lib/fit-label";
+import { FIT_ON_MEMORANDUM, MANDATE_TONE, MODEL_RETURN_POINTER } from "@/lib/fit-label";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import { EmptyState } from "./deal-sections-base";
 
@@ -18,6 +18,10 @@ export interface BuyBoxPanelData {
   /** the checks came from the first signal, not the full extraction yet */
   provisional: boolean;
   hasBox: boolean;
+  /** the page runs the model, whose sensitivity playground on the Overview
+   *  scores the model's own returns against the box: a target return the
+   *  memorandum states no IRR for points there */
+  modelScored?: boolean;
 }
 
 const MANDATE_META: Record<
@@ -77,7 +81,7 @@ function MandateScoreHeader({
             >
               {meta.label}
             </span>
-            <span className="text-xs text-muted">mandate fit</span>
+            <span className="text-xs text-muted">mandate fit {FIT_ON_MEMORANDUM}</span>
           </div>
           {/* The bar, with the WATCH (50) and PURSUE (75) thresholds ticked. */}
           <div className="relative mt-2 h-2 w-full overflow-hidden rounded-full bg-line">
@@ -234,10 +238,15 @@ export function BuyBoxPanel({
                     ? "a near-miss against the mandate"
                     : c.status === "pass"
                       ? "inside the mandate"
-                      : "not determinable yet"}
+                      : "not checked"}
               </span>
             </p>
             <p className="mt-1 text-xs leading-relaxed text-muted">{c.detail}</p>
+            {c.unstated && data.modelScored ? (
+              <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="model-return-pointer">
+                {MODEL_RETURN_POINTER}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

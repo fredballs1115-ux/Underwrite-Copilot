@@ -19,6 +19,7 @@ import { type CapSlotProvenance, SHARE_CAP_WORDS, UNDER_WATER_WORDS } from "@/li
 import { type DealStrategy, FORWARD_READING, type PlanSummary, STRATEGY_READING } from "@/lib/deal-strategy";
 import { locatedPage } from "@/lib/facts";
 import type { FigureHow, HeroFigure } from "@/lib/hero-figure";
+import { FIT_ON_MEMORANDUM } from "@/lib/fit-label";
 import { PLAN_YOC_TITLE, planFacts } from "@/lib/plan-facts";
 
 /** A row a reader found: its label as the memorandum states it, its value,
@@ -250,10 +251,14 @@ export function fitHow(read: BuyBoxRead): FigureHow {
   if (/Outside box/.test(read.chip.label)) notes.push("A criterion missed outright reads “Outside box”, whatever the score's call.");
   if (read.mandate?.dealbreakerTripped) notes.push("A red line the buy box sets is crossed.");
   if (read.chip.note) notes.push(read.chip.note);
+  // A criterion the memorandum states no figure for (its IRR) is left out
+  // of this fit; a fit with the model's return in its place, where a page
+  // runs the model, is a different number, and the chip says which it is.
+  if (score != null && read.checks.some((c) => c.unstated)) notes.push("A fit with the model's IRR scored in its place can read differently.");
   return withAny({
     source:
       score != null
-        ? `Fit ${score} is the mandate-fit score out of 100, over the buy box's criteria the screen could read.`
+        ? `Fit ${score} is the mandate-fit score out of 100, ${FIT_ON_MEMORANDUM}: the buy box's criteria the screen could read from them.`
         : "Your buy box's criteria, each set against what the screen read.",
     inputs: [...read.checks.map((c) => ({ label: c.label, value: c.detail })), ...beyondChecks(read)],
     notes,

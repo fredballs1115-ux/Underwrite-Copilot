@@ -34,13 +34,25 @@ function tally<K extends string>(items: K[], order: [K, string][]): string {
     .join(" · ");
 }
 
+/** What the sample's market check read its assumptions against, from its
+ *  own stored result: the published figures only where the check carries a
+ *  brief of them (`MarketResult.liveBrief`), else the rules of thumb alone.
+ *  The sample's stored check carries none, so the trace never credits it
+ *  with figures it did not read (the stress test reads today's figures on
+ *  its own, beside it). */
+export function sampleMarketAgainst(): string {
+  const brief = SAMPLE_DEAL.market.liveBrief;
+  return brief && brief.lines.length > 0 ? "beside the published figures and the rules of thumb" : "against rules of thumb";
+}
+
 /** The trace's lines, one a stage, each crediting the stage with what IT
  *  writes on the sample: the signal what a signal reads (the sample has no
  *  first signal, so none of its figures is credited to one — audit C7,
  *  L5), the extraction
  *  its cited figures, the challenger its challenges and their questions for
  *  the broker, the comp scrutiny its ratings, the market check its reads
- *  against rules of thumb, and the verdict its ranges and the three
+ *  against what its stored result read them against (`sampleMarketAgainst`),
+ *  counted off its own checks, and the verdict its ranges and the three
  *  deal-killers (lib/anthropic/prompts `verdictInstruction` — they had been
  *  credited to the challenger). */
 export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
@@ -90,7 +102,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
       `${plural(challenges.length, "assumption")} challenged (${severities}), ${asked === challenges.length ? "each" : asked} with a question for the broker`,
     ],
     ["comps", `${plural(comps.length, "broker comp")} rated: ${ratings}${flags ? ` · ${plural(flags, "selection flag")}` : ""}`],
-    ["market", `${plural(checks.length, "assumption")} read against rules of thumb: ${reads}`],
+    ["market", `${plural(checks.length, "assumption")} read ${sampleMarketAgainst()}: ${reads}`],
     [
       "verdict",
       `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} named first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
@@ -116,6 +128,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
  *  an unlayered rule in globals.css that no utility can reach. */
 export function ScreenRunStrip() {
   const LINES = screenRunLines();
+  const marketAgainst = sampleMarketAgainst();
   return (
     <section
       aria-label="A replay of the six analysis stages on the sample deal"
@@ -138,7 +151,7 @@ export function ScreenRunStrip() {
           The test runs in order: a first read of the headline figures,
           extraction with page cites, the assumptions challenged with a
           question for the broker, the broker&apos;s comps rated, the market
-          check against rules of thumb, and a verdict with sourced ranges and
+          check {marketAgainst}, and a verdict with sourced ranges and
           the three deal-killers named first; when you add your own model,
           a reconciliation against it re-runs the verdict.
         </p>

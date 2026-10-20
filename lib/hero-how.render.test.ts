@@ -197,7 +197,10 @@ describe("the deal header's figures say how each is read", () => {
     expect(html).toContain(`<span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${h.fit!.cls}"`);
     const at = html.indexOf(`<div id="${b![1]}"`);
     const panel = visibleText(html.slice(at, html.indexOf("</span>", html.indexOf("</div>", at)))).replace(/\s+/g, " ");
-    expect(panel).toContain("Fit 63 is the mandate-fit score out of 100");
+    // Whose figures the header's fit is read on, so the playground's fit
+    // with the model's IRR (36 on the sample) is not a contradiction.
+    expect(panel).toContain("Fit 63 is the mandate-fit score out of 100, on the memorandum's figures");
+    expect(panel).toContain("A fit with the model's IRR scored in its place can read differently.");
     for (const c of h.fit!.how!.inputs!) expect(panel).toContain(c.value);
     expect(panel).toContain("“Outside box”");
     expect(panel).toContain(h.fit!.note!);

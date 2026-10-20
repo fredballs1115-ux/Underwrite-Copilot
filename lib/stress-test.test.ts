@@ -41,7 +41,7 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { headlineLine, headlineName, headlineSentence, headlineShort, ptsText, shownHeadline } from "./stress-test-words";
+import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, ptsText, rerunWords, shownHeadline } from "./stress-test-words";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -302,7 +302,10 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.omSays.value).toBe(120_000);
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
     expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED" });
-    expect(i.evidence[1].label).toContain("insurance premiums");
+    // The index's figure is the OM's own premium moved by it, labelled so —
+    // never set out as a premium of its own.
+    expect(i.evidence[1].label).toBe("The OM's $120k moved by the national premium index (PPI, commercial multiple peril)");
+    expect(i.evidence[1].text).toMatch(/^\$\d+k \(the index [+-−]?\d+\.\d% over the year to .+\); the nation's carriers' move on the OM's own figure, not this building's quote$/);
     expect(i.gap).toMatchObject({ value: 30_000, unit: "usd" });
     expect(i.verdict).toBe("unsupported");
     expect(i.impact!.input).toBe("expenseLines");
@@ -421,6 +424,36 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(d.verdict).toBe("stretched");
     expect(d.impact!.input).toBe("allInRatePct");
     expect(d.impact!.evidenceIndex).toBe(1);
+  });
+
+  it("names the OM's own leverage beside the lender tests' screening defaults, by its own measure, and runs nothing on it", () => {
+    // The walkthrough: the row quoted the sizer's 65% LTV while the OM
+    // states its own loan-to-value, which the row named nowhere.
+    const lender = (rows: { label: string; value: string; page: string }[]) => {
+      const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics, ...rows.map((r) => row(r.label, r.value, r.page))] };
+      return rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "debt");
+    };
+    const plain = rowOf(test, "debt");
+    const textOf = (d: typeof plain) => d.evidence.find((e) => e.label.startsWith("Lender tests"))!.text;
+    // The model's loan said by its own measure, a share of cost.
+    expect(textOf(plain)).toMatch(/; the model's loan, 60% of cost, is \$[\d.]+M — 65% LTV, 1\.25x and 8% debt yield are screening defaults$/);
+    const ltv = lender([{ label: "Loan-to-value", value: "60%", page: "p. 44" }]);
+    expect(textOf(ltv)).toMatch(/are screening defaults, beside the OM's own 60% loan-to-value \(p\. 44\)$/);
+    // A loan-to-cost is a loan-to-cost, never a loan-to-value.
+    const ltc = lender([{ label: "Loan-to-cost", value: "70%", page: "p. 31" }]);
+    expect(textOf(ltc)).toMatch(/beside the OM's own 70% loan-to-cost \(p\. 31\)$/);
+    expect(textOf(ltc)).not.toContain("70% loan-to-value");
+    // Both stated: the value measure, the one the defaults' 65% LTV is.
+    expect(textOf(lender([{ label: "LTC", value: "70%", page: "p. 31" }, { label: "LTV", value: "62.5%", page: "p. 32" }]))).toMatch(/the OM's own 62\.5% loan-to-value \(p\. 32\)$/);
+    // An assumable loan's or an exit's leverage is not the OM's financing.
+    expect(textOf(lender([{ label: "Assumable loan LTV", value: "48%", page: "p. 33" }]))).not.toContain("the OM's own");
+    // Words only: the row's figure, gap, verdict and re-run are as before.
+    for (const d of [ltv, ltc]) {
+      expect(d.omSays).toEqual(plain.omSays);
+      expect(d.gap).toEqual(plain.gap);
+      expect(d.verdict).toBe(plain.verdict);
+      expect(d.impact).toEqual(plain.impact);
+    }
   });
 
   it("reads the index off the DebtIndex where one is handed in, the same as off the note, and reads a rate under the bare index unsupported", () => {
@@ -1163,7 +1196,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
-  insurance: ["Commercial property insurance premiums", "The deal's T-12 insurance line"],
+  insurance: ["moved by the national premium index", "The deal's T-12 insurance line"],
   renovation_premium: ["Achieved premium", "classic and renovated rents"],
   other: ["The challenger's own critique"],
 };
@@ -1618,6 +1651,50 @@ describe("the headline", () => {
     expect(h.unsolved).toBe(0);
   });
 
+  it("carries the model as it runs and the figures the evidence's case keeps at the OM's, display only", () => {
+    // The model's own run, every input its own: the base of every re-run.
+    expect(h.modelIrrPct!).toBeCloseTo(computeUnderwrite(model).returns.leveredIrrPct! * 100, 9);
+    // Each kept row is in the OM's case, carries no part, and its OM figure
+    // is not the model's; a part is never kept.
+    const parts = new Set(h.parts.map((p) => p.key));
+    for (const k of h.keptAtOm!) {
+      expect(h.omKeys).toContain(k.key);
+      expect(parts.has(k.key)).toBe(false);
+      expect(Math.abs(k.om - k.model)).toBeGreaterThan(1e-9);
+      const r = rowOf(test, k.key);
+      expect(k.why).toBe(r.verdict === "holds" ? "holds" : h.omitted.some((o) => o.key === k.key) ? "left_out" : k.why);
+    }
+    // The sentence names each kept row with both figures, in the documents'
+    // words, and the headline's whole sentence ends on it.
+    const kept = keptSentence(test);
+    if (h.keptAtOm!.length > 0) {
+      expect(kept).toMatch(/^Against the model as it runs \([-−]?\d+\.\d%\), the evidence's case keeps the OM's figure where /);
+      // The NOI row keeps the rent line that makes the OM's NOI, never the
+      // NOI itself, and says so (audit of PR #482, H2).
+      for (const k of h.keptAtOm!) expect(kept).toContain(k.key === "noi" ? "the rent line " : `${headlineName(k.key)} `);
+      expect(headlineSentence(test)!.endsWith(kept!)).toBe(true);
+    } else if ((h.atEvidence ?? []).length === 0) expect(kept).toBeNull();
+    // The other half of why: each evidence figure the evidence's case runs
+    // where the model runs another is a part, its figure not the model's.
+    for (const e of h.atEvidence!) {
+      expect(parts.has(e.key)).toBe(true);
+      expect(Math.abs(e.evidence - e.model)).toBeGreaterThan(1e-9);
+      expect(kept).toContain(`${headlineName(e.key)} `);
+    }
+    if (h.atEvidence!.length > 0) expect(kept).toContain("runs the evidence's figure where the model runs another: ");
+    // Display only: carrying it changes neither case.
+    const again = stressHeadline(test.rows, model)!;
+    expect([again.omIrrPct, again.evidenceIrrPct]).toEqual([h.omIrrPct, h.evidenceIrrPct]);
+    // Every re-run's words name the model's figure as its base.
+    // The figure is named as a levered IRR, so it never reads as a vacancy
+    // beside a rent roll's (audit of PR #482, M3).
+    expect(rerunWords(test)).toBe(`from the model's own ${h.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's`);
+    const same = { ...rowOf(test, "vacancy").impact!, altValue: rowOf(test, "vacancy").impact!.omValue };
+    expect(rerunWords(test, same)).toMatch(/, this input alone set to the OM's figure, which is the evidence's$/);
+    // A test with no headline names no figure.
+    expect(rerunWords({ ...test, headline: null })).toBe("from the model as it runs, this input alone set to the OM's figure, then to the evidence's");
+  });
+
   it("with one row past its evidence, the whole gap is that row's, struck on the OM's case — which is the row's own re-run only where no other row is in the OM's case (audit H2)", () => {
     // Every other re-run row held at the OM's figure, its impact kept: the
     // OM's case puts each of them at the OM's figure, so the one part is the
@@ -1791,7 +1868,9 @@ describe("the headline", () => {
     const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
     expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
     expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\. Left out: /);
-    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
+    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the model as it runs: ${h.modelIrrPct!.toFixed(1)}%).`);
+    // The one-page memo's line leaves the model to its legend.
+    expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
     const omNull = { ...test, headline: { ...h, omIrrPct: null, omMultiple: null, parts: [], unsolved: 0 } };
     expect(headlineLine(omNull)).toBe(`The levered IRR does not solve on the OM's figures; with the evidence it is ${h.evidenceIrrPct!.toFixed(1).replace("-", "\u2212")}%`);
     const both = { ...test, headline: { ...h, omIrrPct: null, evidenceIrrPct: null, parts: [], unsolved: 0 } };

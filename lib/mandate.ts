@@ -43,6 +43,9 @@ import {
   NEAR_IRR_PT,
   planKindLabel,
   returnWithheldDetail,
+  irrUnstatedDetail,
+  capUnstatedDetail,
+  cocUnstatedDetail,
   returnWithheldOf,
   screenYearOf,
   unitCountRow,
@@ -158,6 +161,9 @@ interface ExtractionLike {
    *  share of no stated percentage's IRR is never scored, and a tenancy in
    *  common's words name the property's loan */
   shareRead?: ShareRead | null;
+  /** the figures are the first signal's alone (lib/criteria
+   *  `buyBoxCheckSource`) */
+  firstRead?: boolean;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;
@@ -168,6 +174,11 @@ type Pattern = { readonly inc: RegExp; readonly exc?: RegExp };
 function pctOf(metrics: MetricLike[], pat: Pattern): number | null {
   const m = findMetric(metrics, pat.inc, pat.exc);
   return m ? parsePct(m.value) : null;
+}
+/** The row a pattern finds, its value as stated: what a detail quotes where
+ *  the row states a figure in words no reader takes. */
+function rowValueOf(metrics: MetricLike[], pat: Pattern): string | null {
+  return findMetric(metrics, pat.inc, pat.exc)?.value ?? null;
 }
 function moneyOf(metrics: MetricLike[], pat: Pattern): number | null {
   const m = findMetric(metrics, pat.inc, pat.exc);
@@ -488,7 +499,7 @@ export function scoreMandateFit(
       s.status === "unknown"
         ? withheld
           ? capWithheldDetail(box.minCapPct, withheld, extraction)
-          : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
+          : capUnstatedDetail(box.minCapPct, extraction, findGoingInCap(metrics)?.value)
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${cap!.toFixed(2)}%. Clears the floor.`
           : s.status === "partial"
@@ -503,7 +514,7 @@ export function scoreMandateFit(
     const s = scoreFloor(coc, box.minCoCPct, NEAR_IRR_PT, WEIGHTS.coc);
     const detail =
       s.status === "unknown"
-        ? `Mandate wants ≥${box.minCoCPct}% cash-on-cash; no parseable figure in the screen.`
+        ? cocUnstatedDetail(box.minCoCPct, extraction, rowValueOf(metrics, METRIC_FIND.coc))
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCoCPct}% cash-on-cash — the OM shows ${coc!.toFixed(1)}%. On target (verify).`
           : s.status === "partial"
@@ -523,7 +534,7 @@ export function scoreMandateFit(
       s.status === "unknown"
         ? withheld
           ? returnWithheldDetail(box.minIrrPct, withheld, extraction)
-          : `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen.`
+          : irrUnstatedDetail(box.minIrrPct, extraction, withheld ? null : rowValueOf(metrics, METRIC_FIND.irr))
         : s.status === "pass"
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${irr!.toFixed(1)}%. On target (broker figure — verify).`
           : s.status === "partial"
