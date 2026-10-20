@@ -2108,7 +2108,9 @@ export default async function DealPage({
           dealId={id}
           result={publicComps}
           hasAddress={!!dealAddress?.label}
-          subject={compsCallSubject}
+          // The sample's price is invented: its neighbourhood's recorded
+          // sales are shown, never set against it.
+          subject={isSampleDeal ? null : compsCallSubject}
           today={todayIso}
           dbMarketsLine={compsDbMarketsLine}
         />

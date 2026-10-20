@@ -19,6 +19,8 @@ import { modelVsMarketFor } from "./model-vs-market";
 import { buildStressTest } from "./stress-test";
 import type { StressTest } from "./stress-test-types";
 import type { TodayReads } from "./model-vs-market-read";
+import { readValueAdd } from "./value-add";
+import { modelReadsWithheld } from "./underwrite/report-grid";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
 // deal's page (app/(app)/deals/[id]/page.tsx), /demo's Overview
@@ -67,7 +69,7 @@ const TODAY = "2026-09-21";
  * seeded), the model's read against today's figures, and `buildStressTest`
  * with no recorded sales or past screens on the sample.
  */
-function signedInSample(reads: TodayReads | null): StressTest {
+function signedInParts(reads: TodayReads | null): { stress: StressTest; derived: ReturnType<typeof deriveUnderwriteInputs> } {
   const extraction = SAMPLE_DEAL.extraction;
   const strategy = inferStrategy(extraction, null);
   const readClass = shownAssetClass(SAMPLE_DEAL.asset_class, extraction) || null;
@@ -103,7 +105,7 @@ function signedInSample(reads: TodayReads | null): StressTest {
         regulation,
       })
     : null;
-  return buildStressTest({
+  const stress = buildStressTest({
     extraction,
     firstSignal: null,
     challenger: SAMPLE_DEAL.challenges,
@@ -117,7 +119,9 @@ function signedInSample(reads: TodayReads | null): StressTest {
     pastScreens: null,
     readOn: TODAY,
   });
+  return { stress, derived };
 }
+const signedInSample = (reads: TodayReads | null): StressTest => signedInParts(reads).stress;
 
 /** The homepage's walkthrough, as app/page.tsx builds it: /demo's build,
  *  picked for the walkthrough. */
@@ -199,6 +203,30 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(bare.omKeys).not.toContain("rent_growth");
     expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
     expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
+  });
+
+  it("draws one renovation program under the header on all three: the deal page's props, /demo's and the homepage's", () => {
+    // The deal page (page.tsx `ValueAddPanel`): the stored memorandum's
+    // program, the derived model's exit cap and read where its reads stand.
+    const { derived } = signedInParts(READS);
+    const shown = modelReadsWithheld(derived.inputs, derived.sources, false) ? null : derived;
+    const page = {
+      program: readValueAdd(SAMPLE_DEAL.extraction),
+      exitCapPct: shown ? shown.inputs.exitCapPct : null,
+      modelLine: shown?.meta.valueAdd?.read ?? "",
+    };
+    expect(page.program).not.toBeNull();
+    expect(page.modelLine).toMatch(/exit cap a door's premium is worth/);
+    const { data } = sampleDemoData({ today: TODAY, reads: READS, debt: NO_DEBT_SEEDS });
+    expect(data.valueAdd).toEqual(page);
+    // The deal page hands the panel those three, /demo draws it under the
+    // sample's header and the homepage at its walkthrough's head, each from
+    // /demo's one build.
+    expect(src("app/(app)/deals/[id]/page.tsx")).toMatch(
+      /<ValueAddPanel\s+program=\{readValueAdd\(extraction\)\}\s+exitCapPct=\{shown \? shown\.inputs\.exitCapPct : null\}\s+modelLine=\{shown\?\.meta\.valueAdd\?\.read \?\? ""\}/,
+    );
+    expect(src("app/demo/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
+    expect(src("app/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
   });
 
   it("places the sample where the deal page places it", () => {

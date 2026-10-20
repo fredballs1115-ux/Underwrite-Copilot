@@ -47,6 +47,7 @@ import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos
 import { photosOnDisk } from "@/lib/photos-fs";
 import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
 import { SampleDealHero } from "./sample-hero";
+import { ValueAddPanel } from "./value-add-panel";
 import { MemoPreview } from "./memo-preview";
 import { SamplePipelineCard } from "./sample-pipeline-card";
 import { sampleMemoData } from "@/lib/sample-memo";
@@ -1515,7 +1516,15 @@ async function DealPreview({ header }: { header: HeaderFacts }) {
 async function SampleWalkthrough() {
   const reads = await sampleTodayReads();
   const { data } = sampleDemoData({ today: fmrToday(), reads, debt: NO_DEBT_SEEDS });
-  return <DemoTabs {...walkthroughData(data)} />;
+  // The renovation program the deal page and /demo draw under the sample's
+  // header, from the same build, at the walkthrough's head: the homepage's
+  // header is the hero's compact preview.
+  return (
+    <div className="flex flex-col gap-4">
+      <ValueAddPanel {...data.valueAdd} />
+      <DemoTabs {...walkthroughData(data)} />
+    </div>
+  );
 }
 
 // ── Footer trust line ────────────────────────────────────────────────────────

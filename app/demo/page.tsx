@@ -10,6 +10,7 @@ import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";
 import { SampleDealHero } from "@/app/sample-hero";
+import { ValueAddPanel } from "@/app/value-add-panel";
 import { DemoSections } from "./sections";
 import { sampleDemoData } from "./demo-data";
 import { verdictCounts } from "@/lib/stress-test-words";
@@ -123,7 +124,12 @@ export default async function DemoPage() {
             header={sampleHeader(new Date(`${today}T12:00:00Z`))}
             titleAs="h2"
             stress={data.stressTest && data.stressTest.rows.length > 0 ? verdictCounts(data.stressTest) : null}
-          />
+          >
+            {/* The panels the deal page draws under the sample's header: of
+                them only the renovation program reads anything on the
+                sample (lib/sample-tabs.test.ts names the rest). */}
+            <ValueAddPanel {...data.valueAdd} />
+          </SampleDealHero>
 
           <DemoSections data={data} />
 

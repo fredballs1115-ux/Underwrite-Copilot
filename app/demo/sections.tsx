@@ -9,6 +9,7 @@ import { TermsView } from "../(app)/deals/[id]/deal-sections-view";
 import { PropertyActuals, type ActualsData } from "../(app)/deals/[id]/property-actuals";
 import type { BuyBoxPanelData } from "../(app)/deals/[id]/buy-box-panel";
 import { SampleBuyBox } from "../sample-buy-box";
+import type { ValueAddRead } from "@/lib/value-add";
 import { SampleModelCard } from "../sample-model-card";
 import { SensitivityPlayground, type PlaygroundData } from "../(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
@@ -86,6 +87,18 @@ export interface DemoData {
   /** the OM's assumptions tested on the sample (lib/sample-stress), which
    *  the Overview leads with after the call */
   stressTest: StressTest | null;
+  /** the renovation program's panel under the header, as the deal page
+   *  hands it on the sample (page.tsx `ValueAddPanel`) */
+  valueAdd: SampleValueAdd;
+}
+
+/** The value-add panel's props on the sample (app/value-add-panel): the
+ *  memorandum's program, and the derived model's exit cap and read of it
+ *  where the model's reads stand. */
+export interface SampleValueAdd {
+  program: ValueAddRead | null;
+  exitCapPct: number | null;
+  modelLine: string;
 }
 
 /**
