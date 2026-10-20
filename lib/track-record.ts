@@ -39,6 +39,7 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { statedDay } from "@/lib/actuals/actuals-read";
 import { t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
+import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
@@ -140,6 +141,11 @@ export interface ScoreDealArgs {
   /** the memorandum's asking price (lib/deal-strategy `askingPriceOf`), so
    *  a trade can be put on the OM figure's basis; null where none is stated */
   askingPrice?: number | null;
+  /** the class the deal shows (lib/asset-class `shownAssetClass`), so a rent
+   *  roll's vacancy is read as the stress test reads it: by count on a class
+   *  priced by the unit, by area on one priced by the foot; absent, by area
+   *  where the roll carries it */
+  assetClass?: string | null;
   /** the previous screen's snapshot (the deal row's `prior_screen`), whose
    *  challenges are scored against what arrived after ITS verdict — a
    *  document that arrived between the two screens scores the challenge
@@ -210,11 +216,15 @@ function t12Line(summary: T12Summary, re: RegExp, key: string, not: RegExp): num
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** The rent roll's vacancy as a percent: by area where the roll carries
- *  it, else by units; null where the roll counts nothing. */
-function rollVacancyPct(s: RentRollSummary): number | null {
-  if (s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy)) return round1((1 - s.sfWeightedOccupancy) * 100);
-  if (s.unitCount > 0) return round1((1 - s.occupiedUnits / s.unitCount) * 100);
+/** The rent roll's vacancy as a percent, the stress test's own reading: by
+ *  count on a class priced by the unit, by area on one priced by the foot,
+ *  each falling to the other where the roll lacks it; null where the roll
+ *  counts nothing. */
+function rollVacancy(s: RentRollSummary, perUnit: boolean): { pct: number; by: "by units" | "by area" } | null {
+  const area = s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy) ? s.sfWeightedOccupancy : null;
+  const units = s.unitCount > 0 ? s.occupiedUnits / s.unitCount : null;
+  if (units != null && (perUnit || area == null)) return { pct: round1((1 - units) * 100), by: "by units" };
+  if (area != null) return { pct: round1((1 - area) * 100), by: "by area" };
   return null;
 }
 
@@ -399,7 +409,7 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
 
     if (T == null) return unscored("the verdict carries no screen time, so nothing can be said to have come after it.");
 
-    const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null });
+    const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null, perUnit: args.assetClass !== undefined && assetWords(args.assetClass).basis === "unit" });
     if (!later) return unscored("nothing that arrived after the screen speaks to it.");
 
     if (later.decision) {
@@ -458,15 +468,15 @@ function laterFor(
     trade: { price: number; at: string; text: string } | null;
     omFigure: number | null;
     askingPrice: number | null;
+    perUnit: boolean;
   },
 ): Later | null {
   const t12When = ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12";
   switch (key) {
     case "vacancy": {
-      const rv = ev.roll ? rollVacancyPct(ev.roll.summary) : null;
+      const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
       if (rv != null) {
-        const by = ev.roll!.summary.sfWeightedOccupancy != null ? "by area" : "by units";
-        return { source: "rent_roll", value: rv, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.toFixed(1)}% vacant ${by}` };
+        return { source: "rent_roll", value: rv.pct, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}` };
       }
       // Over gross potential rent, the statement's own EGI saying whether
       // its rent line is gross or net (lib/actuals/analyze, the stress

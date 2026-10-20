@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { shownAssetClass } from "@/lib/asset-class";
 import {
   analyticsScope,
   deriveAnalytics,
@@ -244,6 +245,7 @@ export default async function AnalyticsPage() {
         stage: r.stage ?? null,
         history: parseStageHistory(r.stage_history),
         askingPrice: askingPriceOf(extraction),
+        assetClass: shownAssetClass(r.asset_class as string | null, extraction),
       });
     }),
   );

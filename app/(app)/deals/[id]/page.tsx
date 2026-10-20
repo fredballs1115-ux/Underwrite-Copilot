@@ -968,6 +968,9 @@ export default async function DealPage({
     stage: ((deal as { stage?: string }).stage as string) ?? null,
     history: stageHistory,
     askingPrice: askingPriceOf(extraction),
+    // The class the page shows, so the roll's vacancy is read as the
+    // stress test reads it (by count on a class priced by the unit).
+    assetClass: shownAssetClass(deal.asset_class as string | null, extraction),
   });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's

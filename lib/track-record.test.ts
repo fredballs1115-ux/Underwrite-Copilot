@@ -112,6 +112,13 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(r.rows[0].landing).toBe("between");
   });
 
+  it("reads the roll's vacancy as the stress test does: by count on an apartment building, by area on an office", () => {
+    const rentRoll = { arrivedAt: AFTER, dated: "2026-09-30", summary: roll };
+    // 218 of 240 units is 9.2% by count; 90.6% of the area is 9.4%.
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "multifamily" }).rows[0].later).toMatchObject({ value: 9.2, text: "the rent roll as of Sep 30, 2026 ran 9.2% vacant by units" });
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "office" }).rows[0].later).toMatchObject({ value: 9.4, text: "the rent roll as of Sep 30, 2026 ran 9.4% vacant by area" });
+  });
+
   it("a T-12 the screen read is unscored, said as before the screen, and never evidence", () => {
     const r = scoreDeal({ screenedAt: T, challenges: [vacancy, insurance], t12: { arrivedAt: BEFORE, dated: "2026-08-31", summary: t12 } });
     expect(r.evidence).toEqual([]);
