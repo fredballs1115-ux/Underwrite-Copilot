@@ -1,5 +1,6 @@
 import "server-only";
 import { compactUsd, scaledText } from "@/lib/money";
+import { reconciledAgainst } from "@/lib/reconciliation-words";
 import { Document, Page, View, Text, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
@@ -3278,14 +3279,15 @@ export function ReportDocument({
 
       {rows.length > 0 && (
         <PageChrome
-          title="Reconciliation vs. your model"
+          title={`Reconciliation vs. ${reconciledAgainst(reconciliation).name}`}
           count={`${rows.length} metrics${unfavCount ? ` \u00b7 ${unfavCount} unfavorable` : ""}`}
           dealName={dealName}
           branding={memo.branding}
         >
           <Text style={s.sub}>
-            Where the OM and your own underwriting disagree, framed from your
-            side of the table.
+            {reconciliation?.against === "first_draft"
+              ? "Where the OM and the first-draft model built from the documents disagree, framed from the buyer's side of the table."
+              : "Where the OM and your own underwriting disagree, framed from your side of the table."}
           </Text>
           {/* The table's own View: its header repeats on a page the rows
               run onto. */}
@@ -3293,7 +3295,7 @@ export function ReportDocument({
           <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "26%" }]}>Metric</Text>
             <Text style={[s.headText, { width: "22%" }]}>OM</Text>
-            <Text style={[s.headText, { width: "22%" }]}>Your model</Text>
+            <Text style={[s.headText, { width: "22%" }]}>{reconciledAgainst(reconciliation).label}</Text>
             <Text style={[s.headText, { width: "30%" }]}>Gap</Text>
           </View>
           {rows.map((r, i) => {

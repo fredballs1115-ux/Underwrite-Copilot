@@ -867,6 +867,7 @@ export function DealView({
               staleWhy={staleWhy}
               stopped={stopped != null}
               stressTest={stressTest}
+              sample={isSample}
               // Under the call and the stress test, never above them (the
               // first-run audit of 2026-10-20: after a re-screen with actuals
               // the diff and the reconciliation had opened the page): first

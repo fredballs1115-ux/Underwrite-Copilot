@@ -1937,7 +1937,7 @@ describe("the sensitivity playground says whose figures it runs", () => {
   it("names its model — the workbook's and the report's — beside the Financials tab's first-draft model (research pass 34)", () => {
     // The Overview's 9.3% and the Financials tab's 8.72% for one deal, with
     // no word on either which model it was.
-    expect(textOf(playground(null))).toContain("The screening model, read off the memorandum's terms: the one the stress test re-runs and the Excel workbook and the full report carry.");
+    expect(textOf(playground(null))).toContain("The screening model: the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and screening defaults for growth and the exit: rent and expense growth at 3.0% a year whatever the memorandum projects, and the exit at its going-in cap (6.0% where it states none). It is the one the stress test re-runs on a stabilized deal, and the one the Excel workbook and the full report carry.");
   });
 
   it("says a plan deal's returns are the screening model's, not the plan's", () => {
@@ -2335,7 +2335,7 @@ describe("the sample's downloads are free, as the public pages promise (lib/samp
     expect(textOf(docs)).toMatch(/Upgrade for the PDF memo/);
     expect(docs).not.toContain('href="/api/deals/sample/memo"');
     const fin = render({ ...own, initialTab: "financials" } as Props);
-    expect(textOf(fin)).toMatch(/Upgrade to Pro to download the OM underwrite model/);
+    expect(textOf(fin)).toMatch(/Upgrade to Pro to download the screening model/);
   });
 });
 

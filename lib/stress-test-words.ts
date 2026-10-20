@@ -469,12 +469,13 @@ export function headlineShort(test: StressTest, withModel = true): string | null
 
 // ── The model as it runs: the base every re-run starts from ─────────────
 
-/** "the model as it runs: 9.3%" — the derived model's own levered IRR, every
- *  input its own, as the headline carries it; "" on a headline struck before
- *  it was carried. */
+/** "the screening model as it runs: 9.3%" — the derived model's own
+ *  levered IRR, every input its own, as the headline carries it, named as
+ *  the screening model (lib/screening-model-words) where a surface first
+ *  meets it; "" on a headline struck before it was carried. */
 export function modelClause(h: StressHeadline): string {
   if (h.modelIrrPct === undefined) return "";
-  return h.modelIrrPct == null ? "the model as it runs: its levered IRR does not solve" : `the model as it runs: ${irrText(h.modelIrrPct)}`;
+  return h.modelIrrPct == null ? "the screening model as it runs: its levered IRR does not solve" : `the screening model as it runs: ${irrText(h.modelIrrPct)}`;
 }
 
 /** The model's own levered IRR where the test's headline carries it: a
@@ -526,7 +527,7 @@ function keptText(k: StressKept): string {
  * keeps at the OM's figure where the model has another, and the rows it runs
  * at the evidence's figure where the model has another, each named with both
  * figures, read off the headline's own `keptAtOm` and `atEvidence` — "Against
- * the model as it runs (9.3%), the evidence's case keeps the OM's figure
+ * the screening model as it runs (9.3%), the evidence's case keeps the OM's figure
  * where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr
  * (the model's 3.0%/yr); and where a row is left out: the rent line $7.62M
  * that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the
@@ -547,7 +548,7 @@ export function keptSentence(test: StressTest): string | null {
     return [`${KEPT_LEAD[why]}: ${joinAnd(items.map(keptText))}`];
   });
   const model = h.modelIrrPct == null ? "its levered IRR does not solve" : irrText(h.modelIrrPct);
-  const lead = `Against the model as it runs (${model}), the evidence's case`;
+  const lead = `Against the screening model as it runs (${model}), the evidence's case`;
   const evidenceSaid = atEvidence.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.evidence)} (the model's ${figureText(k.key, k.model)})`);
   const evidenceClause = evidenceSaid.length > 0 ? `the evidence's figure where the model runs another: ${joinAnd(evidenceSaid)}` : "";
   if (clauses.length === 0) return `${lead} runs ${evidenceClause}.`;
@@ -558,6 +559,14 @@ export function keptSentence(test: StressTest): string | null {
 /** The sentence a document prints where the headline is withheld: the
  *  test's own reason, then that the headline goes with it. */
 export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.";
+
+/** Under the sample's panel (/demo, the homepage's walkthrough and the
+ *  signed-in sample): the sample is read as stabilized, so its rows re-run
+ *  the return, and a plan deal's do not — in the plan rule's own words
+ *  (lib/stress-test's reason for a plan deal; lib/sample-stress.test.ts
+ *  holds the two to one another). */
+export const SAMPLE_PLAN_NOTE =
+  "Read as stabilized, the sample re-runs each row's return. A value-add, lease-up, conversion or development OM is set against the same evidence with no re-run: the model runs today's income with the budget in year one, not the business plan.";
 
 /**
  * The headline in whole sentences, for the memo, the report and the

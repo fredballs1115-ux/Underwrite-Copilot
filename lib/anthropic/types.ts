@@ -472,6 +472,12 @@ export interface ReconRow {
 export interface ReconciliationResult {
   rows: ReconRow[];
   takeaway: string;
+  /** Which model the OM was reconciled against, where it is not a model of
+   *  the reader's own: "first_draft" on the sample, whose "your model" is
+   *  the first-draft model built from its documents. Absent (the
+   *  reconciler's output) is the buyer's own uploaded model
+   *  (lib/reconciliation-words). */
+  against?: "first_draft";
 }
 
 /** Step 5 — Market plausibility check */

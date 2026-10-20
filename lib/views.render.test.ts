@@ -1412,11 +1412,11 @@ describe("ModelView — the sample model renders every panel", () => {
     // download is a separate model.
     expect(text).not.toMatch(/Conflicts sheet/);
     expect(text).not.toMatch(/same math as the Excel/);
-    expect(text).toMatch(/Upgrade to Pro to download the OM underwrite model \(\.xlsx\)/);
-    expect(text).toMatch(/The workbook is a separate model, built from the memorandum’s terms/);
+    expect(text).toMatch(/Upgrade to Pro to download the screening model \(\.xlsx\)/);
+    expect(text).toMatch(/The workbook is the screening model, a separate one built on the memorandum's price and terms/);
     // Research pass 34: the card named only the workbook as the other model,
     // never the playground beside it on the Overview tab, which runs it.
-    expect(text).toContain("The Overview’s sensitivity playground runs the workbook’s model, not this one.");
+    expect(text).toContain("The Overview’s sensitivity playground runs the screening model, not this one.");
     expect(text).toContain("Projected returns · first-draft model");
   });
 
@@ -1530,7 +1530,7 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
       expect(row).toContain('data-qa="stress-impact"');
       expect(data.stressTest!.rows.find((r) => r.key === "vacancy")!.evidence.some((e) => e.kind === "document" && e.publisher === "the deal's T-12")).toBe(true);
-      expect(text).toContain("The screening model, read off the memorandum's terms: the one the stress test re-runs and the Excel workbook and the full report carry.");
+      expect(text).toContain("The screening model: the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and screening defaults for growth and the exit: rent and expense growth at 3.0% a year whatever the memorandum projects, and the exit at its going-in cap (6.0% where it states none). It is the one the stress test re-runs on a stabilized deal, and the one the Excel workbook and the full report carry.");
       expect(text).toContain("Levered IRR 9.3%, the base case");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(text)).toEqual([]);
@@ -1560,16 +1560,16 @@ describe("ModelView — the sample model renders every panel", () => {
       // Which model the card is, beside the Overview's stress test and
       // playground, and why the two models' returns differ.
       expect(text).toContain(
-        "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, read off the memorandum's terms, so their returns can differ.",
+        "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so their returns can differ.",
       );
       expect(text).toContain("Projected returns · first-draft model");
       expect(text).toContain("Add more to the model");
       expect(html).not.toContain('aria-label="Model views"');
       expect(html).toContain('data-qa="workbook-note"');
       expect(text).toContain(
-        "The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above. The Overview’s sensitivity playground runs the workbook’s model, not this one.",
+        "The workbook is the screening model, a separate one built on the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and screening defaults for growth and the exit: rent and expense growth at 3.0% a year whatever the memorandum projects, and the exit at its going-in cap (6.0% where it states none) — its returns can differ from the ones above. The Overview’s sensitivity playground runs the screening model, not this one.",
       );
-      expect(html).toMatch(/<a href="\/api\/demo\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the OM underwrite model \(\.xlsx\)<\/a>/);
+      expect(html).toMatch(/<a href="\/api\/demo\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the screening model \(\.xlsx\)<\/a>/);
       // Nothing that needs an account: no document form, no regenerate.
       expect(html).not.toContain("<form");
       expect(text).not.toContain("or regenerate");
@@ -1706,7 +1706,7 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(page).not.toContain("kind is read first");
   });
 
-  it("labels its download as the OM underwrite, a separate model from the card's returns", () => {
+  it("labels its download as the screening model, a separate model from the card's returns", () => {
     const html = render(
       React.createElement(ModelView, {
         dealId: "d1",
@@ -1718,9 +1718,9 @@ describe("ModelView — the sample model renders every panel", () => {
     );
     expect(a11yIssues(html)).toEqual([]);
     expect(html).toMatch(
-      /<a href="\/api\/deals\/d1\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the OM underwrite model \(\.xlsx\)<\/a>/,
+      /<a href="\/api\/deals\/d1\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the screening model \(\.xlsx\)<\/a>/,
     );
-    expect(visibleText(html)).toMatch(/The workbook is a separate model/);
+    expect(visibleText(html)).toMatch(/The workbook is the screening model/);
   });
 
   it("renders the no-model state without a runtime error", () => {

@@ -671,7 +671,7 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
  *  figure beside it — the base each row's re-run starts from. */
 function ModelBarRow({ model, style }: { model: number; style: { left: string; width: string } }) {
   return (
-    <BarRow label="The model as it runs" figure={pctText(model)}>
+    <BarRow label="The screening model as it runs" figure={pctText(model)}>
       <div className="absolute inset-y-0 rounded-full border border-dashed border-ink/60" data-bar="stress-headline-model" style={style} />
     </BarRow>
   );
@@ -841,7 +841,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         {/* The dashed tick on each row's re-run bars: the model as it runs. */}
         {model != null && test.rows.some(drawsRerun) && (
           <KeyItem mark="dashed" tone="border-ink/70">
-            {`The model as it runs, ${pctText(model)}: each re-run changes one input of it`}
+            {`The screening model as it runs, ${pctText(model)}: each re-run changes one input of it`}
           </KeyItem>
         )}
         {/* Each kind's own glyph, the one the track and the list draw. */}

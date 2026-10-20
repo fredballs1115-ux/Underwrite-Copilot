@@ -1,6 +1,6 @@
 // The sensitivity grids of the first-draft model, defined ONCE for the
 // in-app Model tab. The first-draft workbook that shared them was retired
-// (2d036c4); the one Excel download is the OM underwrite
+// (2d036c4); the one Excel download is the screening model
 // (lib/underwrite/workbook.ts), a separate model with its own grids
 // (lib/underwrite/sensitivity), so nothing here is "the Excel's math". No
 // `server-only` import: the Model tab renders this client-side.

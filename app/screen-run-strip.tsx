@@ -108,8 +108,10 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
       `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} named first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
     ],
     // A run of its own, made when the buyer adds their model, after which
-    // the verdict is synthesized again (lib/anthropic/pipeline).
-    ["reconcile", `when you add your model: ${plural(gapCount, "gap")} called against it, verdict re-run`],
+    // the verdict is synthesized again (lib/anthropic/pipeline). The
+    // sample's gaps are called against its first-draft model, since no
+    // reader's model is on it (lib/reconciliation-words), and said so.
+    ["reconcile", `when you add your model, verdict re-run · the sample: ${plural(gapCount, "gap")} called against its first-draft model`],
   ];
 }
 

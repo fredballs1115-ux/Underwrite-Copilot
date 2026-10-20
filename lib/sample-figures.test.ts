@@ -212,6 +212,35 @@ describe("the sample's documents tie to one another", () => {
     for (const k of named(`${basis.source}`)) expect(stated, `$${k}k`).toContain(k);
   });
 
+  it("lays the reconciliation's NOI gap on the vacancy gap that more than covers it, never on an expense load the OM does not state", () => {
+    // The investor's walkthrough (2026-10-20): the row said "heavier expense
+    // load" and the first-draft model's conflict "the OM understates the
+    // expense load", while the memorandum states no expense total and the
+    // 300 bps vacancy gap alone is worth more than the whole NOI gap.
+    const rec = SAMPLE_DEAL.reconciliation;
+    expect(rec.against).toBe("first_draft");
+    const noiRow = rec.rows.find((r) => r.metric === "Year-1 NOI")!;
+    const vacRow = rec.rows.find((r) => r.metric === "Vacancy")!;
+    const noiGap = parseUsd(noiRow.omValue)! - parseUsd(noiRow.myValue)!;
+    expect(noiGap).toBe(usd("NOI (pro forma)") - SAMPLE_DEAL.t12.summary.noi!);
+    const m = SAMPLE_DEAL.model.inputs;
+    const bps = Math.round((parseFloat(vacRow.myValue) - parseFloat(vacRow.omValue)) * 100);
+    expect(parseFloat(vacRow.omValue)).toBe(parseFloat(metric("Vacancy (pro forma)").value));
+    expect(parseFloat(vacRow.myValue)).toBe(m.vacancyPct);
+    const vacancyUsd = (bps / 10_000) * m.year1Gpr;
+    expect(vacancyUsd).toBeGreaterThan(noiGap);
+    // The sentence's figures are those: the gap, the bps, the dollars, the rent.
+    const said = `${bps} bps more vacancy, $${vacancyUsd.toLocaleString("en-US")} on $${(m.year1Gpr / 1e6).toFixed(2)}M of rent`;
+    expect(said).toBe("300 bps more vacancy, $214,500 on $7.15M of rent");
+    expect(noiRow.gap).toBe(`$${Math.round(noiGap / 1000)}k below the OM — the ${said}, more than covers it`);
+    expect(rec.takeaway).toContain(`its ${said} more than covers the gap`);
+    // No expense total is stated, so none is blamed.
+    expect(SAMPLE_DEAL.extraction.metrics.some((x) => /expense|opex/i.test(x.label))).toBe(false);
+    const year1 = SAMPLE_DEAL.model.metrics.find((x) => x.key === "year1Noi")!;
+    for (const s of [noiRow.gap, rec.takeaway, year1.rationale]) expect(s, s).not.toMatch(/expense load/i);
+    expect(rec.takeaway).toMatch(/^The first-draft model /);
+  });
+
   it("the first-draft model's reserve is a rule of thumb, never a lender's norm", () => {
     const reserve = SAMPLE_DEAL.model.metrics.find((m) => m.key === "capexReserve")!;
     expect(reserve.authority).toBe("Rule of thumb");

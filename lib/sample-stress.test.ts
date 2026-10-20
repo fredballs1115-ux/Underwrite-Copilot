@@ -22,7 +22,7 @@ import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
-import { HOLDS_NO_RERUN, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
+import { HOLDS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
 import { stressSection } from "./anthropic/verdict";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
@@ -260,7 +260,7 @@ describe("the sample's stress test, one build on every surface", () => {
     // evidence's case runs the reset tax bill where the model runs the
     // seller's (M4), so the sentence says every figure the two differ on.
     const kept =
-      "Against the model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M); and where a row is unchecked: insurance $310k (the model's $385k). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M); and where a row is unchecked: insurance $310k (the model's $385k). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
     expect(h.atEvidence!.map((e) => e.key)).toEqual(["taxes"]);
     // Complete: the model with the kept figures and the evidence's figures
@@ -278,7 +278,7 @@ describe("the sample's stress test, one build on every surface", () => {
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
-    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 12.5% with the evidence (the model as it runs: 9.3%); the report splits the gap by assumption.");
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 12.5% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
     expect(rerunWords(page, row("insurance").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");
@@ -474,5 +474,26 @@ describe("/demo's Overview, in the deal page's order", () => {
     const deal = src("app/(app)/deals/[id]/deal-view.tsx");
     const slot = deal.slice(deal.indexOf("afterStress={"), deal.indexOf("<SensitivityPlayground"));
     expect(slot).toContain("<ActualsPrompt");
+  });
+
+  it("says under the sample's panel, on all three, that its re-runs are a stabilized deal's and a plan deal's OM gets none, in the plan rule's words", () => {
+    // The investor's walkthrough (2026-10-20): the sample re-runs every row,
+    // and nothing on it said a value-add OM would not.
+    const home = src("app/landing-interactive.tsx");
+    expect(home).toMatch(/<OverviewView [^>]*stressTest=\{stressTest\} sample \/>/);
+    expect(src("app/demo/sections.tsx")).toMatch(/<OverviewView [^>]*stressTest=\{data\.stressTest\} sample \/>/);
+    expect(src("app/(app)/deals/[id]/deal-view.tsx")).toMatch(/stressTest=\{stressTest\}\s*sample=\{isSample\}/);
+    // The sample re-runs; the same memorandum read as a value-add re-runs
+    // nothing, for the reason the note gives in its own words.
+    expect(sampleStressTest({ today: "2026-10-20" }).impactsWithheld).toBeNull();
+    const ex = { ...SAMPLE_DEAL.extraction, strategy: { ...SAMPLE_DEAL.extraction.strategy!, kind: "value_add" as const } };
+    const derived = deriveUnderwriteInputs(ex, SAMPLE_DEAL.name);
+    const plan = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: null, actuals: null, derived, storedAssetClass: "multifamily", readOn: "2026-10-20" });
+    expect(plan.impactsWithheld).toMatch(/no return is re-run\.$/);
+    const why = "the model runs today's income with the budget in year one, not the business plan";
+    expect(plan.impactsWithheld).toContain(why);
+    expect(SAMPLE_PLAN_NOTE).toContain(why);
+    expect(plan.impactsWithheld).toMatch(/^On a value-add, lease-up, conversion or development deal /);
+    expect(SAMPLE_PLAN_NOTE).toContain("A value-add, lease-up, conversion or development OM");
   });
 });

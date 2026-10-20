@@ -1701,7 +1701,7 @@ describe("the headline", () => {
     // words, and the headline's whole sentence ends on it.
     const kept = keptSentence(test);
     if (h.keptAtOm!.length > 0) {
-      expect(kept).toMatch(/^Against the model as it runs \([-−]?\d+\.\d%\), the evidence's case keeps the OM's figure where /);
+      expect(kept).toMatch(/^Against the screening model as it runs \([-−]?\d+\.\d%\), the evidence's case keeps the OM's figure where /);
       // The NOI row keeps the rent line that makes the OM's NOI, never the
       // NOI itself, and says so (audit of PR #482, H2).
       for (const k of h.keptAtOm!) expect(kept).toContain(k.key === "noi" ? "the rent line " : `${headlineName(k.key)} `);
@@ -1963,7 +1963,7 @@ describe("the headline", () => {
     const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
     expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
     expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\.( This headline does not test [^.]*\.)? Left out: /);
-    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the model as it runs: ${h.modelIrrPct!.toFixed(1)}%).`);
+    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the screening model as it runs: ${h.modelIrrPct!.toFixed(1)}%).`);
     // The one-page memo's line leaves the model to its legend.
     expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
     const omNull = { ...test, headline: { ...h, omIrrPct: null, omMultiple: null, parts: [], unsolved: 0 } };

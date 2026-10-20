@@ -11,6 +11,8 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
+import { reconciledAgainst } from "@/lib/reconciliation-words";
+import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
 import { StressTestPanel } from "@/app/stress-test-panel";
@@ -317,8 +319,9 @@ export function deriveRisks(results: Results): RiskItem[] {
         severity: share != null && share <= NOI_IN_LINE_BAND ? "low" : "high",
         // "Your model": the reader's own underwriting, which the reconciler
         // reads — never the OM's pro forma nor the site's engine, which the
-        // same page also calls a model (research pass 32).
-        title: `${r.metric}: your model less favorable than the OM`,
+        // same page also calls a model (research pass 32); on the sample,
+        // the first-draft model, said so (lib/reconciliation-words).
+        title: `${r.metric}: ${reconciledAgainst(results.reconciliation).name} less favorable than the OM`,
         detail: r.gap,
         source: "Reconciler",
         tab: "reconciler",
@@ -389,9 +392,15 @@ export function OverviewView({
   stopped = false,
   stressTest = null,
   afterStress = null,
+  sample = false,
 }: {
   results: Results;
   active: boolean;
+  /** the sample deal, on every surface that draws it (the deal page, /demo
+   *  and the homepage's walkthrough): a line under the stress test says the
+   *  sample re-runs its rows because it is read as stabilized, and a plan
+   *  deal's do not (`SAMPLE_PLAN_NOTE`) */
+  sample?: boolean;
   /** the OM's assumptions tested (lib/stress-test), built on the server
    *  from what the page holds — drawn first after the call, before the
    *  risk digest, since the test is what the call rests on; null draws
@@ -481,6 +490,13 @@ export function OverviewView({
               How each assumption is tested
             </Link>
           </p>
+          {/* A re-run is the stabilized deal's: the sample says so, so its
+              re-runs are never read as what every OM gets. */}
+          {sample && !stressTest.impactsWithheld && (
+            <p className="mt-1 max-w-2xl px-1 text-xs leading-relaxed text-muted" data-qa="sample-plan-note">
+              {SAMPLE_PLAN_NOTE}
+            </p>
+          )}
         </div>
       )}
       {afterStress}

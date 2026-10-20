@@ -43,6 +43,7 @@ import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
 import { sampleStressTest } from "./sample-stress";
 import { sampleDemoData, walkthroughData } from "@/app/demo/demo-data";
 import { NO_DEBT_SEEDS } from "./debt-index";
+import { SCREENING_MODEL_IS } from "./screening-model-words";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -74,7 +75,7 @@ describe("the homepage, as a screen reader hears it", () => {
     // the chip on screen and nothing spaced it for a screen reader.
     const html = await renderHome();
     const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
-    expect(text).toContain("The model, included — Excel, live formulas Pro");
+    expect(text).toContain("The screening model, included — Excel, live formulas Pro");
     expect(text).toContain("IC memo Pro");
     expect(text).not.toMatch(/formulasPro|memoPro/);
   }, 60_000);
@@ -86,7 +87,7 @@ describe("the homepage, as a screen reader hears it", () => {
     const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
     const text = visibleText(html).replace(/\s+/g, " ");
     expect(text).toContain("IC memo");
-    expect(text).toContain("Underwrite model");
+    expect(text).toContain("Screening model");
     expect(text).not.toMatch(/\bPro\b/);
     for (const href of ["/api/demo/memo", "/api/demo/report", "/api/demo/underwrite.xlsx"]) {
       const a = new RegExp(`<a href="${href.replace(/\./g, "\\.")}" title="([^"]*)"`).exec(html);
@@ -347,7 +348,7 @@ describe("the homepage's sample figures are the surfaces' own", () => {
 
   it("the Excel tile prints the workbook it links: its base case and two cells of its Sensitivity tab", async () => {
     const html = await renderHome();
-    const at = html.indexOf("The model, included — Excel, live formulas");
+    const at = html.indexOf("The screening model, included — Excel, live formulas");
     expect(at).toBeGreaterThan(-1);
     const tile = words(html.slice(at, html.indexOf("/api/demo/underwrite.xlsx", at)));
     for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
@@ -489,8 +490,8 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     // The walkthrough's Overview draws the sensitivity playground, as /demo's
     // does (audit C10, L2 had left it out, and the card's note with it), so
     // the card's note names it.
-    expect(visibleText(card)).toContain("The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above.");
-    expect(card).toContain("The Overview’s sensitivity playground runs the workbook’s model, not this one.");
+    expect(visibleText(card)).toContain(`The workbook is the screening model, a separate one built on ${SCREENING_MODEL_IS} — its returns can differ from the ones above.`);
+    expect(card).toContain("The Overview’s sensitivity playground runs the screening model, not this one.");
     expect(html).toContain(sizer);
     expect(html).toContain(card);
     expect(html.indexOf("Extracted terms")).toBeLessThan(html.indexOf(sizer));

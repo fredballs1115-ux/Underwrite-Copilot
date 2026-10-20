@@ -439,7 +439,7 @@ function OverviewTab({
   return (
     <div className="flex flex-col gap-6">
       <SampleGuide onNavigate={onNavigate} />
-      <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} stressTest={stressTest} />
+      <OverviewView results={RESULTS} active={false} onNavigate={onNavigate} stressTest={stressTest} sample />
       {overview && (w ? <w.PropertyActuals data={overview.actuals} /> : <PartLoading />)}
       {overview && (w ? <w.SensitivityPlayground data={overview.playground} /> : <PartLoading tall />)}
     </div>

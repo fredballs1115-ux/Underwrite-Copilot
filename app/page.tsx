@@ -54,6 +54,7 @@ import { MemoPreview } from "./memo-preview";
 import { SamplePipelineCard } from "./sample-pipeline-card";
 import { sampleMemoData } from "@/lib/sample-memo";
 import { compRating, inCompOrder } from "@/lib/comp-rating";
+import { SCREENING_MODEL_IS } from "@/lib/screening-model-words";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -376,7 +377,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does the test make me more accurate?",
-    a: "It cannot say yet. It checks each OM assumption against evidence that exists on the day and shows what the gap does to the return; whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
+    a: "It cannot say yet. It checks each OM assumption against evidence that exists on the day and, on a stabilized deal, shows what the gap does to the return; a value-add, lease-up, conversion or development plan is checked against the same evidence without re-runs, since the model runs today's income, not the plan. Whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
   },
   {
     q: "Are my documents private?",
@@ -388,7 +389,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: "Included with every Pro test: a live-formula workbook — a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
+    a: `Included with every Pro test: the screening model as a live-formula workbook, built on ${SCREENING_MODEL_IS}. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.`,
   },
   {
     q: "Can my team share one pipeline?",
@@ -1099,7 +1100,7 @@ export default async function Home() {
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                      The model, included — Excel, live formulas
+                      The screening model, included — Excel, live formulas
                       {/* On your own deals the exports are Pro, as the hero's
                           card marks them; the samples download free
                           (research pass 32). The space keeps "Pro" a word of

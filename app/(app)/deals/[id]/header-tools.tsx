@@ -1,5 +1,5 @@
-// The deal header's tools — the IC memo, the full report, the underwrite
-// workbook, the rent roll engine, the valuations reconciler and the bridge —
+// The deal header's tools — the IC memo, the full report, the screening
+// model's workbook, the rent roll engine, the valuations reconciler and the bridge —
 // as the deal page draws them (page.tsx, `DealHero`'s actions), and as the
 // public pages draw the sample's (app/sample-hero `SampleHeroTools`), so a
 // visitor's tool row is the product's own: one markup, one icon and one
@@ -17,7 +17,7 @@ export type DealToolKind = "memo" | "report" | "model" | "rentRoll" | "valuation
 export const DEAL_TOOL_LABEL: Record<DealToolKind, string> = {
   memo: "IC memo",
   report: "Full report",
-  model: "Underwrite model",
+  model: "Screening model",
   rentRoll: "Rent roll",
   valuations: "Valuations",
   bridge: "Bridge",
@@ -27,7 +27,7 @@ export const DEAL_TOOL_LABEL: Record<DealToolKind, string> = {
 export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = {
   memo: "IC screening memo, one page where it fits — verdict, buy-box fit, flags, next steps",
   report: "The full screening report — memo plus every term, challenge, comp, and market check",
-  model: "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates",
+  model: "The screening model (Excel): the memorandum's price and terms, with screening defaults for growth and the exit — live formulas; change the exit cap and levered IRR recalculates",
   rentRoll: "Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model",
   valuations: "BOV reconciler — decompose the gap between two opinions of value",
 };
@@ -36,7 +36,7 @@ export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = 
 export const DEAL_TOOL_PRO_TITLE: Record<"memo" | "report" | "model", string> = {
   memo: "IC screening memo — part of Pro",
   report: "The full screening report — part of Pro",
-  model: "Institutional acquisition model (Excel) — part of Pro",
+  model: "The screening model (Excel) — part of Pro",
 };
 
 const ICON: Record<DealToolKind, ReactNode> = {

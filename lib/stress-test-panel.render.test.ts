@@ -553,18 +553,18 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // The third mark: an outline from zero, its words beside it, after the
     // two filled cases.
     expect(hh.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
-    expect(t).toContain("With the evidence 11.5% The model as it runs 9.3%");
+    expect(t).toContain("With the evidence 11.5% The screening model as it runs 9.3%");
     expect(hh).toMatch(/class="absolute inset-y-0 rounded-full border border-dashed border-ink\/60" data-bar="stress-headline-model" style="left:0\.00%;width:[\d.]+%"/);
     // Why the evidence's case is not the model, under the line.
     expect(t).toContain(
-      "Against the model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
     );
     expect(hh.indexOf('data-qa="stress-headline-kept"')).toBeLessThan(hh.indexOf('data-qa="stress-headline-bridge"'));
     // Each re-run names its base, and the model's dashed tick stands on its
     // bars, the key saying what it is.
     expect(t).toContain("From the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's At the OM's figure 9.3% At the evidence's figure 7.1%");
     expect(hh.match(/data-bar="stress-impact-model"/g)!.length).toBeGreaterThanOrEqual(2);
-    expect(t).toContain("The model as it runs, 9.3%: each re-run changes one input of it");
+    expect(t).toContain("The screening model as it runs, 9.3%: each re-run changes one input of it");
     // Nothing past its evidence: the OM's case and the model still drawn.
     const flat = render({ ...TEST, headline: { ...headline, evidenceIrrPct: 16.67, parts: [], omitted: [], keptAtOm: [], atEvidence: [] } });
     expect(flat).toContain('data-qa="stress-headline-cases"');
