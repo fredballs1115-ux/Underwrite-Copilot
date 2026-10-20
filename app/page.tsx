@@ -431,7 +431,7 @@ const JSON_LD = {
       operatingSystem: "Web",
       // The layout's own description (app/layout.tsx), word for word.
       description:
-        "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the price, the exit and the debt are named first; a Go / Caution / No-go that shows its work. The model is included.",
+        "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },
