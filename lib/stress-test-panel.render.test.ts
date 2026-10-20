@@ -168,7 +168,7 @@ const WITHHELD: StressTest = {
   rows: [{ ...VACANCY, impact: null }, { ...EXIT, impact: null }, GROWTH],
   readOn: "2026-09-21",
   publishedRead: true,
-  impactsWithheld: "The model runs on the $10,000,000 placeholder price, which no memorandum stated — enter the price.",
+  impactsWithheld: "No return is re-run: the model runs on the $10,000,000 placeholder price, which no memorandum stated — enter the price.",
 };
 
 /** Every app/ and lib/ source, for the marker scan. */
@@ -366,7 +366,8 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(w).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(a11yIssues(w)).toEqual([]);
     expect(gluedWords(visibleText(w))).toEqual([]);
-    expect(t.match(/No return struck: The model runs on the \$10,000,000 placeholder price/g)).toHaveLength(1);
+    expect(t.match(/No return is re-run: the model runs on the \$10,000,000 placeholder price/g)).toHaveLength(1);
+    expect(t).not.toContain("No return struck: No return");
     // The two tested rows point up; the unchecked row's reason is its own.
     expect(w.match(/data-qa="stress-no-impact"/g)).toHaveLength(2);
     expect(t).toContain("No return struck: the model's reads are withheld (see above).");

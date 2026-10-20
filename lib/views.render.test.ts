@@ -3056,7 +3056,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     const panel = html.indexOf('data-qa="stress-test-panel"');
     expect(panel).toBeGreaterThan(html.indexOf("First-pass verdict"));
     expect(text).toContain("The OM's assumptions, tested");
-    expect(text).toContain("No return struck: The shared screen carries no model, so no return is re-run here.");
+    expect(text).toContain("The shared screen carries no model, so no return is re-run here.");
+    expect(text).not.toContain("No return struck: The shared screen");
     expect(text).not.toContain("No model was derived");
     expect(html).not.toContain('data-bar="stress-impact"');
     // The exit cap against the going-in cap, the OM against itself, stands

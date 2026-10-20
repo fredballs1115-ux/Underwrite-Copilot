@@ -2973,7 +2973,7 @@ describe("the report's stress-test page", () => {
     expect(page).toMatch(/The return: If the tax line is the \$952k its own figures imply on the price, not the OM's \$728k, the levered IRR moves from 9\.3% to 5\.9%/);
     // An unchecked row says why, and that no return was re-run.
     expect(page).toContain("Unchecked: The OM states no loan rate.");
-    expect(page).toContain("The return: No return re-run: No figure to swap.");
+    expect(page).toContain("The return: No return is re-run: no figure to swap.");
     expect(page).not.toMatch(/→/);
     // Page one carries the memo's lead rows.
     expect(pages[0]).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8)");
@@ -3003,8 +3003,10 @@ describe("the report's stress-test page", () => {
     const test = sampleStressTest("2026-10-19");
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
-    expect(text).toContain("No return is re-run: no model was derived for this deal, so no return is re-run.");
-    expect(text).toContain("The return: No return re-run: No model was derived for this deal, so no return is re-run.");
+    // The reason is one whole sentence, never behind a second "No return re-run".
+    expect(text).toContain("5 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
+    expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");
   }, 90000);
 });

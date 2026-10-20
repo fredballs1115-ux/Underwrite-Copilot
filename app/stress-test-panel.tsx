@@ -413,7 +413,8 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       <PanelHead title="The OM's assumptions, tested" tone={tone.head}>
         <span className="text-sm font-semibold" data-qa="stress-read">{stressReadLine(test.rows)}</span>
       </PanelHead>
-      {test.impactsWithheld && <PanelNote>{`No return struck: ${test.impactsWithheld}`}</PanelNote>}
+      {/* The reason is a whole sentence that already says no return is re-run. */}
+      {test.impactsWithheld && <PanelNote>{test.impactsWithheld}</PanelNote>}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">

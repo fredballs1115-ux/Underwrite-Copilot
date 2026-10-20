@@ -398,7 +398,7 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
   const ticks = tickPositions(row);
   const track = 120;
   const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";
-  const move = row.impact ? row.impact.note : `No return re-run: ${noMoveWhy(test, row)}`;
+  const move = row.impact ? row.impact.note : noMoveWhy(test, row);
   return (
     <View style={[s.block, { marginBottom: 11 }]} wrap={false}>
       <View style={s.blockTitleRow}>

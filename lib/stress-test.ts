@@ -1588,11 +1588,19 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const plan = isPlanDeal(strategy.kind);
   const derived = args.derived;
   const withheld = basisWithheldOf(ex);
+  // One whole sentence that says no return is re-run and why, which every
+  // surface prints as it stands — never behind a "No return …" of its own.
+  const readsWithheld = derived == null ? null : modelReadsWithheld(derived.inputs, derived.sources, plan);
   const impactsWithheld =
     derived == null
       ? (args.withheldReason?.trim() || "No model was derived for this deal, so no return is re-run.")
-      : (modelReadsWithheld(derived.inputs, derived.sources, plan) ??
-        (plan ? PLAN_REASON : withheld ? `No return is re-run: ${withheld.why}.` : null));
+      : readsWithheld
+        ? `No return is re-run: ${lowerFirst(readsWithheld.trim())}${/[.!?]$/.test(readsWithheld.trim()) ? "" : "."}`
+        : plan
+          ? PLAN_REASON
+          : withheld
+            ? `No return is re-run: ${withheld.why}.`
+            : null;
   const ctx: Ctx = {
     ex,
     rows: rowsOf(ex),

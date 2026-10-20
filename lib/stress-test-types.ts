@@ -123,7 +123,9 @@ export interface StressTest {
    *  published figures are the stored market check's, read on the screen's
    *  day, so no surface dates them `readOn` */
   publishedRead: boolean;
-  /** the model's reads are withheld, so no impact is struck (the reason) */
+  /** the model's reads are withheld, so no impact is struck: one whole
+   *  sentence that says so and why ("No return is re-run: …"), printed as it
+   *  stands on every surface */
   impactsWithheld: string | null;
 }
 

@@ -2738,6 +2738,6 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
     expect(input.stressTest?.impactsWithheld).toBe("No model was derived for this deal, so no return is re-run.");
     const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
-    expect(buildBrief(input)).toContain("No return was re-run for this deal — No model was derived for this deal, so no return is re-run.");
+    expect(buildBrief(input)).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone");
   });
 });
