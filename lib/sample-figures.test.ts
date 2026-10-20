@@ -56,7 +56,10 @@ describe("the sample's stress test", () => {
       "The OM's 6.0% is 3.3 points under the evidence's 9.3%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide.",
     );
     expect(irr("taxes")).toEqual([9.3, 5.9]);
-    expect(irr("insurance")).toEqual([9.3, 8.2]);
+    // The OM's $310k in place of the T-12's $385k inside the model's one
+    // expense line, the T-12's total; the evidence's run is the model's own
+    // (audit H3: the gap had been added on top of the T-12's premium).
+    expect(irr("insurance")).toEqual([10.3, 9.3]);
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
     expect(row("renovation_premium").gap?.text).toBe(
