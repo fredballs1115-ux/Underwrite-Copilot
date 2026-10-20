@@ -3020,9 +3020,10 @@ import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult }
 
 describe("ShareView — the read-only screen a partner or lender opens", () => {
   it("draws the OM's assumptions tested under the call, from the stored results alone, no return re-run and said so (2026-10-19)", async () => {
-    const { buildStressTest } = await import("@/lib/stress-test");
+    const { SHARE_NO_MODEL, buildStressTest } = await import("@/lib/stress-test");
     // As the loader builds it: the extraction, the challenger, the comps and
-    // the market check, no model and no figure read today.
+    // the market check, no model and no figure read today — and why there is
+    // no model: the shared screen carries none by design.
     const stressTest = buildStressTest({
       extraction: SAMPLE_DEAL.extraction,
       firstSignal: null,
@@ -3033,8 +3034,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
       derived: null,
       storedAssetClass: SAMPLE_DEAL.asset_class,
       brokerComps: SAMPLE_DEAL.comps,
+      withheldReason: SHARE_NO_MODEL,
       readOn: "2026-09-21",
     });
+    expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("withheldReason: SHARE_NO_MODEL");
     const props = {
       dealName: SAMPLE_DEAL.name,
       assetClass: SAMPLE_DEAL.asset_class,
@@ -3053,7 +3056,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     const panel = html.indexOf('data-qa="stress-test-panel"');
     expect(panel).toBeGreaterThan(html.indexOf("First-pass verdict"));
     expect(text).toContain("The OM's assumptions, tested");
-    expect(text).toContain("No return struck: No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("No return struck: The shared screen carries no model, so no return is re-run here.");
+    expect(text).not.toContain("No model was derived");
     expect(html).not.toContain('data-bar="stress-impact"');
     // The exit cap against the going-in cap, the OM against itself, stands
     // without a model; the loader reads the challenger's words for it.

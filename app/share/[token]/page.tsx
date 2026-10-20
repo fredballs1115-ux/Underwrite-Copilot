@@ -22,7 +22,7 @@ import { SITE_NAME } from "@/lib/page-meta";
 import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
 import { regulationForDeal } from "@/lib/rent-regulation";
-import { buildStressTest } from "@/lib/stress-test";
+import { SHARE_NO_MODEL, buildStressTest } from "@/lib/stress-test";
 
 /** The aerial's credit on the public screen: The National Map is a US
  *  federal work in the public domain, and the line says so. */
@@ -160,6 +160,10 @@ export default async function SharePage({
     derived: null,
     storedAssetClass: (deal.asset_class as string | null) ?? null,
     brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+    // The shared screen carries no model by design (its reader sees the
+    // screen, not the sender's underwriting), so the test says that, never
+    // that no model was derived.
+    withheldReason: SHARE_NO_MODEL,
     readOn: today,
   });
 

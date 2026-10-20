@@ -166,6 +166,10 @@ export interface StressTestArgs {
    *  the debt row's evidence, never handed to a model (lib/sample-derive's
    *  guard) */
   indexGiven?: DebtIndex | null;
+  /** why no model is handed in, where the surface carries none BY DESIGN
+   *  (the shared screen) — said ahead of the default "No model was derived
+   *  for this deal", which would read as a failure */
+  withheldReason?: string | null;
   /** ISO day the published figures were read */
   readOn: string;
 }
@@ -1563,7 +1567,11 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
 
 // ── The test ─────────────────────────────────────────────────────────────
 
-const PLAN_REASON = "A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.";
+/** The shared screen's reason (`withheldReason`): it carries no model by
+ *  design, which is not a model that failed to derive. */
+export const SHARE_NO_MODEL = "The shared screen carries no model, so no return is re-run here.";
+
+const PLAN_REASON ="A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.";
 
 /**
  * The stress test for a deal, from what the deal page already holds. One
@@ -1579,7 +1587,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const withheld = basisWithheldOf(ex);
   const impactsWithheld =
     derived == null
-      ? "No model was derived for this deal, so no return is re-run."
+      ? (args.withheldReason?.trim() || "No model was derived for this deal, so no return is re-run.")
       : (modelReadsWithheld(derived.inputs, derived.sources, plan) ??
         (plan ? PLAN_REASON : withheld ? `No return is re-run: ${withheld.why}.` : null));
   const ctx: Ctx = {

@@ -20,7 +20,7 @@ import { inferStrategy } from "./deal-strategy";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
-import { CHALLENGE_KEYWORDS, buildStressTest, challengeKey, type StressTestArgs } from "./stress-test";
+import { CHALLENGE_KEYWORDS, SHARE_NO_MODEL, buildStressTest, challengeKey, type StressTestArgs } from "./stress-test";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -344,6 +344,12 @@ describe("a stabilized apartment deal with a T-12", () => {
     // stored market check's figures are the screen's, never today's.
     expect(test.publishedRead).toBe(true);
     expect(buildStressTest(apartmentArgs({ modelVsMarket: null })).publishedRead).toBe(false);
+    // With no model, the caller's own reason leads (a surface that carries
+    // none by design), else the default.
+    expect(buildStressTest(apartmentArgs({ derived: null })).impactsWithheld).toBe("No model was derived for this deal, so no return is re-run.");
+    expect(buildStressTest(apartmentArgs({ derived: null, withheldReason: SHARE_NO_MODEL })).impactsWithheld).toBe(SHARE_NO_MODEL);
+    // A reason never stands in for a model that was handed in.
+    expect(buildStressTest(apartmentArgs({ withheldReason: SHARE_NO_MODEL })).impactsWithheld).toBeNull();
   });
 
   it("re-runs the engine with exactly ONE input changed, the one the impact names", () => {
