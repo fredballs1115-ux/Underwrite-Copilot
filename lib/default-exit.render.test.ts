@@ -9,6 +9,9 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { modelEvidenceFor } from "@/lib/model-evidence";
+import { modelMarketFor } from "@/lib/model-market";
+import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { defaultExitGap } from "@/lib/underwrite/cost-note";
 import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { visibleText } from "@/lib/render-lint";
@@ -18,8 +21,10 @@ import { ex, m } from "@/lib/pass38.fixture";
 const noCap75 = ex({ assetClass: "Office", dealName: "Corporate Plaza", metrics: [m("Asking price", "10,000,000"), m("NOI (in-place)", "800,000", "in_place"), m("Total SF", "60,000 SF")] });
 const noCap45 = ex({ assetClass: "Multifamily", dealName: "Bayview", metrics: [m("Asking price", "20,000,000"), m("NOI (in-place)", "900,000", "in_place"), m("Units", "70")] });
 
-const drawn = (e: ExtractionResult, extra: Partial<PlaygroundData> = {}) => {
-  const d = deriveUnderwriteInputs(e, "x");
+const drawn = (e: ExtractionResult, extra: Partial<PlaygroundData> = {}, real = false) => {
+  const d = real
+    ? deriveUnderwriteInputs(e, "x", undefined, modelMarketFor(false, NO_DEBT_SEEDS, modelEvidenceFor({ extraction: e, storedAssetClass: e.assetClass ?? null, metro: null, reads: null })))
+    : deriveUnderwriteInputs(e, "x");
   const data: PlaygroundData = {
     inputs: d.inputs,
     dealAssetClass: e.assetClass ?? "auto",
@@ -47,6 +52,22 @@ describe("the default exit set against the model's own entry (research pass 38, 
       "Default 6.00%; the model's own year-1 NOI over its price is 4.50%: 150 bps of expansion ride in these returns — set your exit view",
     );
     expect(text).toContain("150 bps of expansion ride in these returns.");
+  });
+
+  it("names the gap on every exit that is not the going-in cap: the OM's own stated exit, in the note and under the tiles (2026-10-20)", () => {
+    // No going-in cap, a stated 6.50% exit on an 8.00% entry: 150 bps of
+    // compression ride in the returns, said where the guard had fired on the
+    // 6.00% default alone.
+    const statedExit = ex({ ...noCap75, metrics: [...noCap75.metrics, m("Exit cap", "6.50%")] });
+    const { d, text } = drawn(statedExit, {}, true);
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.065, 10);
+    expect(d.sources.exitCapPct?.offGoingIn).toBe(true);
+    expect(d.sources.exitCapPct?.note).toMatch(/^6\.50% — the OM's exit cap as stated: .*; the model's own year-1 NOI over its price is 8\.00%: 150 bps of compression ride in these returns — set your exit view$/);
+    expect(text).toContain("Exit cap — 6.50%; the model's own year-1 NOI over its price is 8.00%: 150 bps of compression ride in these returns.");
+    // On the going-in cap, nothing new under the tiles.
+    const onCap = drawn(ex({ ...noCap75, metrics: [...noCap75.metrics, m("Going-in cap rate", "8.00%")] }), {}, true);
+    expect(onCap.d.sources.exitCapPct?.offGoingIn).toBeUndefined();
+    expect(onCap.text).not.toContain("Exit cap —");
   });
 
   it("says nothing new where a cap is stated, the NOI is assumed, or the price is not the building's", () => {

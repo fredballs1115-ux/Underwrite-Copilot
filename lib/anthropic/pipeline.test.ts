@@ -2758,6 +2758,26 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
       expect(state.reads!.filter((id) => id === "CPIAUCSL_YOY")).toHaveLength(1);
     });
 
+    it("where the market step's read failed, the verdict reads the figures bare, so its model is the deal page's (2026-10-20)", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      washington();
+      // The market step's reads fail; by the verdict's, the tables answer.
+      state.failFigureReads = true;
+      vi.mocked(checkMarket).mockImplementationOnce(async () => {
+        state.failFigureReads = false;
+        return MARKET;
+      });
+      await run();
+      expect(job().status).toBe("done");
+      expect((state.deals.d1.market as MarketResult).liveReadFailed).toEqual({ market: "Washington DC", grain: "metro" });
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      const vacancy = input.stressTest?.rows.find((r) => r.key === "vacancy");
+      expect(vacancy?.evidence).toContainEqual(expect.objectContaining({ kind: "published", label: "Rental vacancy, metro area", value: 6.2 }));
+      const expense = input.stressTest?.rows.find((r) => r.key === "expense_growth");
+      expect(expense?.evidence.some((e) => e.kind === "published" && /CPI, all items/i.test(e.label))).toBe(true);
+      warn.mockRestore();
+    });
+
     it("a read that fails leaves the published figures out of the test, and the screen finishes", async () => {
       washington();
       state.failFigureReads = true;

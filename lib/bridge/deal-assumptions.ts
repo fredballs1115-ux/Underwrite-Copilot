@@ -48,7 +48,7 @@ export async function currentDealModel(
    *  caller reads the time-zone cookie (the rent-roll workbook), else the
    *  UTC day's noon (research pass 40) */
   asOf: Date = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`),
-): Promise<DerivedModel | null> {
+): Promise<(DerivedModel & { readFailed: boolean }) | null> {
   if (!extraction) return null;
 
   // The same rate read as the deal page: the current set's all-in rate is
@@ -92,10 +92,12 @@ export async function currentDealModel(
   const address = addressUpgrade(row?.address, extraction) ?? (row?.address as StructuredAddress | null) ?? null;
   const metro = placeDeal(address, countyOf(address, row?.site_flags ?? null)).live;
   let reads: TodayReads | null = null;
+  let readFailed = false;
   if (!isSample) {
     try {
       reads = await todayReads(metro);
     } catch (err) {
+      readFailed = true;
       console.warn(`bridge live figures read failed for ${dealId}:`, err instanceof Error ? err.message : err);
     }
   }
@@ -110,7 +112,7 @@ export async function currentDealModel(
   const rrSummary = (rrRes.data?.summary as RentRollSummary | null) ?? null;
   const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
 
-  return deriveUnderwriteInputs(
+  const derived = deriveUnderwriteInputs(
     extraction,
     dealName,
     {
@@ -124,4 +126,9 @@ export async function currentDealModel(
     modelMarketFor(isSample, debt, evidence),
     { asOf },
   );
+  // `readFailed`: today's published figures did not read, so the growth and
+  // exit stand on the memorandum's figures or the defaults — a caller that
+  // snapshots a version skips this one (the deal page's rule), or the next
+  // good read would record a move no input of the deal's made.
+  return { ...derived, readFailed };
 }

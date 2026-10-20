@@ -6,6 +6,7 @@
 // tooltip a tool. Plain markup: no state, no server action.
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SCREENING_GROWTH_EXIT_SAMPLE, SCREENING_GROWTH_EXIT_SHORT } from "@/lib/screening-model-words";
 
 /** A tool in the deal header's row. */
 export const DEAL_TOOL_CLS =
@@ -27,10 +28,14 @@ export const DEAL_TOOL_LABEL: Record<DealToolKind, string> = {
 export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = {
   memo: "IC screening memo, one page where it fits — verdict, buy-box fit, flags, next steps",
   report: "The full screening report — memo plus every term, challenge, comp, and market check",
-  model: "The screening model (Excel): the memorandum's price and terms, with its growth and exit at the published figures the stress test decides by, else the memorandum's, else screening defaults — live formulas; change the exit cap and levered IRR recalculates",
+  model: `The screening model (Excel): the memorandum's price and terms, with ${SCREENING_GROWTH_EXIT_SHORT} — live formulas; change the exit cap and levered IRR recalculates`,
   rentRoll: "Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model",
   valuations: "BOV reconciler — decompose the gap between two opinions of value",
 };
+
+/** The sample's model tool (app/sample-hero): its growth and exit are
+ *  pinned, so its tooltip never says it runs a published figure. */
+export const SAMPLE_MODEL_TOOL_TITLE = `The screening model (Excel): the memorandum's price and terms, with ${SCREENING_GROWTH_EXIT_SAMPLE} — live formulas; change the exit cap and levered IRR recalculates`;
 
 /** A download's tooltip where the reader's plan does not include it. */
 export const DEAL_TOOL_PRO_TITLE: Record<"memo" | "report" | "model", string> = {

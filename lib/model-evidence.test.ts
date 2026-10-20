@@ -1,7 +1,9 @@
-// The screening model runs its growth and its exit at the figure the stress
-// test decides each row by, else the memorandum's stated figure, else the
-// default (the owner's rule of 2026-10-20) — on a real deal; the sample is
-// never seeded. Held here on the sample's own memorandum read as a real
+// The screening model runs its growth and its exit never more optimistic
+// than the OM (the owner's rule of 2026-10-20): the more cautious of the
+// figure the stress test decides each row by and the memorandum's stated
+// figure where both stand — the lower rent growth, the higher expense
+// growth, the higher exit cap — else the one that stands, else the default;
+// on a real deal; the sample is never seeded. Held here on the sample's own memorandum read as a real
 // deal's (it states a 4.0% rent growth, a 5.45% going-in cap and a 5.25%
 // exit, and no expense growth), on Philadelphia's figures as a page reads
 // them.
@@ -11,7 +13,7 @@ import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { SAMPLE_ACTUALS, sampleDerivedInputs } from "./sample-derive";
 import { NO_DEBT_SEEDS } from "./debt-index";
-import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import { cellPct, deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
 import { modelMarketFor } from "./model-market";
 import { modelEvidenceFor, type ModelEvidence } from "./model-evidence";
@@ -62,25 +64,260 @@ const evidenceOf = (extraction: ExtractionResult, reads: MarketReads | null, sto
 const derive = (extraction: ExtractionResult, evidence: ModelEvidence | null, isSample = false) =>
   deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS, modelMarketFor(isSample, NO_DEBT_SEEDS, evidence));
 
-describe("the screening model's growth and exit, published evidence first", () => {
-  it("a real deal runs the stress test's deciding figures, each named in its note", () => {
+const without = (re: RegExp, e: ExtractionResult = ex): ExtractionResult => ({ ...e, metrics: e.metrics.filter((m) => !re.test(m.label)) });
+const withRow = (label: string, value: string, e: ExtractionResult = ex, page = "p. 41"): ExtractionResult => ({
+  ...e,
+  metrics: [...e.metrics.filter((m) => m.label !== label), { label, value, flagged: false, page }],
+});
+const NO_GOING_IN = /going-in|pro forma cap/i;
+const ZILLOW_NOTE = `Zillow's apartment asking rents, the figure for this kind of rent: +2.4% over the year to Aug 2026 (Zillow Research; ${metro!.name})`;
+const CPI_NOTE = (n: string) =>
+  `consumer prices, all items (the CPI), the broad price level the expense base moves with: ${n} over the year to Aug 2026 (BLS via FRED; national)`;
+const TRACKER = "the low end of the research tracker's 5.00–5.70% apartment cap range (Northmarq, late 2025 / early 2026, read Aug 25, 2026; a research print, not a feed)";
+
+describe("the screening model's growth and exit, never more optimistic than the OM", () => {
+  it("a real deal runs the more cautious of the deciding figure and the OM's own, each named in its note", () => {
     const evidence = evidenceOf(ex, READS);
     const d = derive(ex, evidence);
-    // Rent growth: Zillow's apartment asking rents, the first in an
-    // apartment building's order — not the OM's 4.0%, not the flat 3.0%.
+    // Rent growth: Zillow's +2.4% is under the OM's 4.0%, so it runs.
     expect(d.inputs.rentGrowthPct).toBeCloseTo(0.024, 10);
     expect(d.sources.rentGrowthPct).toMatchObject({
       provenance: "derived",
-      note: `2.4%/yr — Zillow's apartment asking rents: +2.4% over the year to Aug 2026 (Zillow Research; ${metro!.name}); the stress test's deciding figure — enter your own`,
+      note: `2.4%/yr — ${ZILLOW_NOTE}, more cautious than the OM's rent growth of 4.0%/yr (p. 40); the stress test's deciding figure — enter your own`,
       published: { label: "Asking rent, apartments", publisher: "Zillow Research", asOf: "2026-08-31" },
     });
-    // Expense growth: consumer prices, all items.
+    // Expense growth: the CPI, the OM stating none — the note at the
+    // cell's own two places, never 3.4% beside a 3.35% cell.
     expect(d.inputs.expenseGrowthPct).toBeCloseTo(CPI.value / 100, 10);
-    expect(d.sources.expenseGrowthPct?.note).toMatch(/^\d+\.\d%\/yr — consumer prices, all items \(the CPI\): [+−-]?\d+\.\d% over the year to [A-Z][a-z]{2} \d{4} \(BLS via FRED; national\); the stress test's deciding figure — enter your own$/);
-    // The exit: the going-in cap decides, so the model stays at it, never
-    // the OM's stated 5.25%.
+    expect(d.sources.expenseGrowthPct?.note).toBe(
+      `${(Math.round(CPI.value * 100) / 100).toFixed(2)}%/yr — ${CPI_NOTE(`+${CPI.value.toFixed(1)}%`)}; the stress test's deciding figure, the OM stating no expense growth — enter your own`,
+    );
+    // The exit: the 5.45% going-in cap over the OM's own 5.25% exit.
     expect(d.inputs.exitCapPct).toBeCloseTo(0.0545, 10);
-    expect(d.sources.exitCapPct?.note).toMatch(/^Defaulted to the OM's stated going-in cap.*; the stress test's deciding figure for the exit — set your exit view$/);
+    expect(d.sources.exitCapPct).toMatchObject({
+      provenance: "derived",
+      page: "p. 8",
+      note: "5.45% — the OM's stated going-in cap, more cautious than the OM's exit cap of 5.25% (p. 41); the stress test's deciding figure for the exit, never tighter than the OM's own — set your exit view",
+    });
+    expect(d.sources.exitCapPct?.offGoingIn).toBeUndefined();
+  });
+
+  it("rent growth: the OM's lower figure runs where the published one is higher (the audit's office at 7.2% against 4.0%)", () => {
+    const hot = { ...READS, zori: { ...ZORI, mfrYoyPct: 7.2 } };
+    const d = derive(ex, evidenceOf(ex, hot));
+    expect(d.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+    expect(d.sources.rentGrowthPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 40",
+      note: `4.0%/yr — the OM's rent growth as stated, the more cautious of it and Zillow's apartment asking rents, the figure for this kind of rent: +7.2% over the year to Aug 2026 (Zillow Research; ${metro!.name}); the model runs no figure more optimistic than the OM's — enter your own`,
+    });
+    // No more optimistic than the OM's own: the levered IRR at the OM's
+    // figure, never at the hotter index.
+    const atIndex = computeUnderwrite({ ...d.inputs, rentGrowthPct: 0.072 }).returns.leveredIrrPct!;
+    expect(computeUnderwrite(d.inputs).returns.leveredIrrPct!).toBeLessThan(atIndex);
+    // A tie runs the published figure, which is the OM's too.
+    const tie = derive(ex, evidenceOf(ex, { ...READS, zori: { ...ZORI, mfrYoyPct: 4 } }));
+    expect(tie.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+    expect(tie.sources.rentGrowthPct?.note).toContain(", the same as the OM's rent growth (p. 40); the stress test's deciding figure");
+  });
+
+  it("expense growth: the higher of the two runs, either way", () => {
+    // The OM's 2.5% is under the CPI: the CPI runs.
+    const low = withRow("Expense growth", "2.5%/yr");
+    const dLow = derive(low, evidenceOf(low, READS));
+    expect(dLow.inputs.expenseGrowthPct).toBeCloseTo(CPI.value / 100, 10);
+    expect(dLow.sources.expenseGrowthPct?.note).toContain(", more cautious than the OM's expense growth of 2.5%/yr (p. 41); the stress test's deciding figure — enter your own");
+    // The OM's 4.0% is over it: the OM's runs.
+    const high = withRow("Expense growth", "4.0%/yr");
+    const dHigh = derive(high, evidenceOf(high, READS));
+    expect(dHigh.inputs.expenseGrowthPct).toBeCloseTo(0.04, 10);
+    expect(dHigh.sources.expenseGrowthPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 41",
+      note: `4.0%/yr — the OM's expense growth as stated, the more cautious of it and ${CPI_NOTE(`+${CPI.value.toFixed(1)}%`)}; the model runs no figure more optimistic than the OM's — enter your own`,
+    });
+    // A value with words past its figure keeps them, once.
+    const worded = withRow("Expense growth", "3.5% years 1–2, then 3.0%");
+    expect(derive(worded, evidenceOf(worded, READS)).sources.expenseGrowthPct?.note).toMatch(/^3\.5%\/yr — the OM's expense growth \("3\.5% years 1–2, then 3\.0%"\) as stated, the more cautious of it and /);
+  });
+
+  it("the exit: the higher of the deciding cap and the OM's own stated exit, either way", () => {
+    // The OM's 5.75% exit over its 5.45% going-in cap: the OM's runs, and
+    // the expansion against the model's own entry is said.
+    const wide = withRow("Exit cap", "5.75%");
+    const d = derive(wide, evidenceOf(wide, READS));
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.0575, 10);
+    expect(d.sources.exitCapPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 41",
+      offGoingIn: true,
+      note: "5.75% — the OM's exit cap as stated, the more cautious of it and the OM's 5.45% going-in cap; the model runs no exit tighter than the OM's; the model's own year-1 NOI over its price is 5.45%: 30 bps of expansion ride in these returns — set your exit view",
+    });
+    // With no going-in cap, the tracker's 5.00% low end against the OM's
+    // 5.25%: the OM's runs (the audit's 5.00% against 5.25%), the
+    // compression against the model's own entry said.
+    const noGoingIn = without(NO_GOING_IN);
+    const evidence = evidenceOf(noGoingIn, READS);
+    expect(evidence.exitCap.decided).toMatchObject({ kind: "published", pct: 5 });
+    const d2 = derive(noGoingIn, evidence);
+    expect(d2.inputs.exitCapPct).toBeCloseTo(0.0525, 10);
+    expect(d2.sources.exitCapPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 41",
+      note: `5.25% — the OM's exit cap as stated, the more cautious of it and ${TRACKER}; the model runs no exit tighter than the OM's; the model's own year-1 NOI over its price is 5.45%: 20 bps of compression ride in these returns — set your exit view`,
+    });
+    expect(d2.sources.exitCapPct?.published).toBeUndefined();
+    // And an OM exit under the tracker's low end: the tracker's runs, said as
+    // research, with the true reason the going-in cap does not decide.
+    const tight = withRow("Exit cap", "4.75%", noGoingIn);
+    const d3 = derive(tight, evidenceOf(tight, READS));
+    expect(d3.inputs.exitCapPct).toBeCloseTo(0.05, 10);
+    expect(d3.sources.exitCapPct).toMatchObject({
+      provenance: "derived",
+      offGoingIn: true,
+      note: `5.00% — ${TRACKER}, more cautious than the OM's exit cap of 4.75% (p. 41); the stress test's deciding figure for the exit, since the OM states no going-in cap; the model's own year-1 NOI over its price is 5.45%: 45 bps of compression ride in these returns — set your exit view`,
+      published: { publisher: "research tracker: Northmarq", research: true },
+    });
+    expect(d3.sources.exitCapPct!.note).not.toContain("where the OM states no going-in cap it is held to");
+    // The plan page's reference cap says whose it is.
+    expect(refCapNote(d3.sources.exitCapPct!.provenance, d3.sources.exitCapPct!.published != null)).toBe(
+      "the research tracker's cap range at its low end, the stress test's deciding figure, which the model also exits at",
+    );
+    // The stress row, decided by the tracker, re-runs one input apart.
+    const mvm = modelVsMarketFor({ derived: d3, extraction: tight, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS });
+    const row = buildStressTest({ extraction: tight, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: d3, storedAssetClass: SAMPLE_DEAL.asset_class, readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap")!;
+    expect(decidingFigureOf(row)?.figure).toBe(5);
+    expect(row.impact!.note).toContain("The model itself already runs at it.");
+  });
+
+  it("with no reads, the memorandum's own figures, with the true reason no published figure stands", () => {
+    const evidence = evidenceOf(ex, null);
+    expect(evidence.rentGrowth.decided).toBeNull();
+    const d = derive(ex, evidence);
+    expect(d.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+    // One figure, never "4.0%/yr — the OM's Rent growth, 4.0%/yr".
+    expect(d.sources.rentGrowthPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 40",
+      note: "4.0%/yr — the OM's rent growth as stated: today's published figures were not read — enter your own",
+    });
+    expect(d.inputs.expenseGrowthPct).toBe(0.03);
+    expect(d.sources.expenseGrowthPct).toMatchObject({
+      provenance: "assumption",
+      note: "Default 3.0%/yr — today's published figures were not read and the OM states none — set your view",
+    });
+    // The going-in cap decides the exit with no read at all.
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.0545, 10);
+    // With no going-in cap, the OM's stated exit, said why.
+    const noGoingIn = without(NO_GOING_IN);
+    const d2 = derive(noGoingIn, evidenceOf(noGoingIn, null));
+    expect(d2.inputs.exitCapPct).toBeCloseTo(0.0525, 10);
+    expect(d2.sources.exitCapPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 41",
+      note: "5.25% — the OM's exit cap as stated: the OM states no going-in cap, and today's published figures were not read; the model's own year-1 NOI over its price is 5.45%: 20 bps of compression ride in these returns — set your exit view",
+    });
+    // And with neither stated, the default.
+    const bare = without(/cap/i);
+    expect(derive(bare, evidenceOf(bare, null)).inputs.exitCapPct).toBe(0.06);
+  });
+
+  it("a stale or absent figure falls through, never to zero", () => {
+    // No Zillow read and no national table: the CPI rent decides the rent
+    // row at +5.0%, over the OM's 4.0% — so the OM's runs; nothing decides
+    // the expenses, and the memorandum states none.
+    const evidence = evidenceOf(ex, { ...READS, zori: null, national: [] });
+    const d = derive(ex, evidence);
+    expect(evidence.rentGrowth.decided?.label).toBe("Rent paid by sitting tenants (CPI rent)");
+    expect(evidence.rentGrowth.decided!.pct).toBeGreaterThan(4);
+    expect(d.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+    expect(d.sources.rentGrowthPct?.note).toContain("the more cautious of it and the rent sitting tenants pay (CPI rent)");
+    expect(d.inputs.expenseGrowthPct).toBe(0.03);
+    expect(d.sources.expenseGrowthPct?.note).toBe("Default 3.0%/yr — no fresh published figure decides the expense growth and the OM states none — set your view");
+    // A national table read long after: every figure stale, none decides.
+    const late = new Date("2027-12-01T12:00:00Z");
+    const stale = evidenceOf(ex, { rates: readMetroRates("philadelphia", ROWS, late), zori: null, national: readRates(REAL_ROWS, late), now: late });
+    expect(stale.rentGrowth.decided).toBeNull();
+    expect(stale.expenseGrowth.decided).toBeNull();
+    expect(derive(ex, stale).inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+  });
+
+  it("a fresh figure past the band says so, never that no fresh figure decides", () => {
+    const d = derive(ex, evidenceOf(ex, { ...READS, zori: { ...ZORI, mfrYoyPct: 17 } }));
+    expect(d.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
+    expect(d.sources.rentGrowthPct?.note).toBe(
+      "4.0%/yr — the OM's rent growth as stated: Zillow's apartment asking rents, 17.0% (Zillow Research), is past the −5% to +15% a year the model runs — enter your own",
+    );
+  });
+
+  it("a hotel and land: the class has no published rent index", () => {
+    const hotel: ExtractionResult = { ...ex, assetClass: "hotel" };
+    const h = derive(hotel, evidenceOf(hotel, READS, "hospitality_str"));
+    expect(h.sources.rentGrowthPct?.note).toBe("4.0%/yr — the OM's rent growth as stated: the class has no published rent index — enter your own");
+    const land: ExtractionResult = { ...ex, assetClass: "land" };
+    const evidence = evidenceOf(land, READS, "land");
+    expect(evidence.rentGrowth.decided).toBeNull();
+    expect(evidence.expenseGrowth.decided).toBeNull();
+    expect(evidence.rentGrowth.absent).toBe("the class has no published rent index");
+    expect(derive(land, evidence).sources.expenseGrowthPct?.note).toBe(
+      "Default 3.0%/yr — land has no expense base a published figure speaks to and the OM states none — set your view",
+    );
+  });
+
+  it("land's exit evidence is the stress row's own: the going-in cap it states, and no published range", () => {
+    const land: ExtractionResult = { ...ex, assetClass: "land" };
+    const evidence = evidenceOf(land, READS, "land");
+    // The stress test's exit row reads its pieces with no class gate; the
+    // model reads the same pieces, so the two agree.
+    const mvm = modelVsMarketFor({ derived: null, extraction: land, firstSignal: null, storedAssetClass: "land", metro, reads: READS });
+    const row = buildStressTest({ extraction: land, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: null, storedAssetClass: "land", readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap");
+    const rowFigure = row ? decidingFigureOf(row)?.figure ?? null : null;
+    expect(evidence.exitCap.decided?.pct ?? null).toBe(rowFigure);
+    expect(evidence.exitCap.decided?.kind ?? "om_internal").toBe("om_internal");
+  });
+
+  it("a park's note carries why its figure decides: the closest published figure, not a park's own kind of rent", () => {
+    const park: ExtractionResult = { ...ex, assetClass: "manufactured housing" };
+    const evidence = evidenceOf(park, READS, "manufactured_housing");
+    expect(evidence.rentGrowth.decided?.why).toMatch(/^the closest published figure, not a park's own kind of rent/);
+    const d = derive(park, evidence);
+    expect(d.sources.rentGrowthPct?.note).toContain("Zillow's asking rents across all home types, the closest published figure, not a park's own kind of rent");
+  });
+
+  it("the workbook's Sources column says whose figure each input is, and a research range as research", async () => {
+    const sourcesOf = async (d: ReturnType<typeof derive>) => {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load((await buildUnderwriteWorkbook(d, null)) as unknown as ArrayBuffer);
+      const assum = wb.getWorksheet("Assumptions")!;
+      return (label: string): { value: unknown; note: string; name?: string } => {
+        for (let r = 1; r <= assum.rowCount; r++) {
+          if (assum.getCell(r, 1).value === label) return { value: assum.getCell(r, 2).value, note: String(assum.getCell(r, 3).value), name: assum.getCell(r, 2).name };
+        }
+        throw new Error(label);
+      };
+    };
+    const d = derive(ex, evidenceOf(ex, READS));
+    const at = await sourcesOf(d);
+    // The input stays a typed value the model's formulas read.
+    expect(at("Rent Growth %").value).toBeCloseTo(0.024, 10);
+    expect(at("Rent Growth %").name).toBe("RentGrowth");
+    expect(at("Rent Growth %").note).toBe(`Published — ${d.sources.rentGrowthPct!.note}`);
+    expect(at("Expense Growth %").note).toBe(`Published — ${d.sources.expenseGrowthPct!.note}`);
+    expect(at("Exit Cap").note).toBe(`Derived — ${d.sources.exitCapPct!.note}`);
+    // The tracker's range: Research, never Published.
+    const tight = withRow("Exit cap", "4.75%", without(NO_GOING_IN));
+    const dt = derive(tight, evidenceOf(tight, READS));
+    expect((await sourcesOf(dt))("Exit Cap").note).toBe(`Research — ${dt.sources.exitCapPct!.note}`);
+    // With no reads the memorandum's own figure, credited to it with its page.
+    const om = derive(ex, evidenceOf(ex, null));
+    expect((await sourcesOf(om))("Rent Growth %").note).toBe("OM p. 40 — 4.0%/yr — the OM's rent growth as stated: today's published figures were not read — enter your own");
+  });
+
+  it("prints a growth note at the cell's own precision", () => {
+    expect(cellPct(3.35302)).toBe("3.35%");
+    expect(cellPct(4)).toBe("4.0%");
+    expect(cellPct(2.4)).toBe("2.4%");
+    expect(cellPct(-1.25)).toBe("-1.25%");
   });
 
   it("runs the very figure each stress-test row is decided by", () => {
@@ -123,112 +360,6 @@ describe("the screening model's growth and exit, published evidence first", () =
     expect(rent.impact!.altIrrPct).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
     // The exit row: the model already runs the going-in cap that decides it.
     expect(row("exit_cap").impact!.note).toContain("The model itself already runs at it.");
-  });
-
-  it("with no reads, falls through to the memorandum's stated figures, then the default", () => {
-    const evidence = evidenceOf(ex, null);
-    expect(evidence.rentGrowth.decided).toBeNull();
-    const d = derive(ex, evidence);
-    expect(d.inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
-    expect(d.sources.rentGrowthPct).toMatchObject({
-      provenance: "extracted",
-      page: "p. 40",
-      note: "4.0%/yr — the OM's Rent growth, 4.0%/yr, as stated: no fresh published figure decides the rent growth — enter your own",
-    });
-    expect(d.inputs.expenseGrowthPct).toBe(0.03);
-    expect(d.sources.expenseGrowthPct).toMatchObject({
-      provenance: "assumption",
-      note: "Default 3.0%/yr — no fresh published figure decides the expense growth and the OM states none — set your view",
-    });
-    // The going-in cap decides the exit with no read at all.
-    expect(d.inputs.exitCapPct).toBeCloseTo(0.0545, 10);
-  });
-
-  it("a stale or absent figure falls through, never to zero", () => {
-    // No Zillow read and no national table: the CPI rent decides the rent;
-    // nothing decides the expenses, and the memorandum states none.
-    const evidence = evidenceOf(ex, { ...READS, zori: null, national: [] });
-    const d = derive(ex, evidence);
-    expect(evidence.rentGrowth.decided?.label).toBe("Rent paid by sitting tenants (CPI rent)");
-    expect(d.inputs.rentGrowthPct).toBeCloseTo(evidence.rentGrowth.decided!.pct / 100, 10);
-    expect(d.inputs.expenseGrowthPct).toBe(0.03);
-    // A national table read long after: every figure stale, none decides.
-    const late = new Date("2027-12-01T12:00:00Z");
-    const stale = evidenceOf(ex, { rates: readMetroRates("philadelphia", ROWS, late), zori: null, national: readRates(REAL_ROWS, late), now: late });
-    expect(stale.rentGrowth.decided).toBeNull();
-    expect(stale.expenseGrowth.decided).toBeNull();
-    expect(derive(ex, stale).inputs.rentGrowthPct).toBeCloseTo(0.04, 10);
-  });
-
-  it("with no going-in cap, the exit runs the research tracker's cap range at its low end, the row's deciding figure", () => {
-    const noGoingIn: ExtractionResult = { ...ex, metrics: ex.metrics.filter((m) => !/going-in|pro forma cap/i.test(m.label)) };
-    const evidence = evidenceOf(noGoingIn, READS);
-    expect(evidence.exitCap.decided).toMatchObject({ kind: "published", pct: 5 });
-    const d = derive(noGoingIn, evidence);
-    expect(d.inputs.exitCapPct).toBeCloseTo(0.05, 10);
-    expect(d.sources.exitCapPct).toMatchObject({
-      provenance: "derived",
-      note: `5.00% — the research tracker's cap range, at its low end: ${evidence.exitCap.decided!.label}, late 2025 / early 2026 (research tracker: Northmarq; ${metro!.name}); the stress test's deciding figure for the exit, where the OM states no going-in cap it is held to — set your exit view`,
-      published: { publisher: "research tracker: Northmarq" },
-    });
-    const mvm = modelVsMarketFor({ derived: d, extraction: noGoingIn, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS });
-    const row = buildStressTest({ extraction: noGoingIn, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: d, storedAssetClass: SAMPLE_DEAL.asset_class, readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap")!;
-    expect(decidingFigureOf(row)?.figure).toBe(5);
-    expect(row.impact!.note).toContain("The model itself already runs at it.");
-    // The plan page's reference cap says whose it is, never the OM's.
-    expect(refCapNote(d.sources.exitCapPct!.provenance, d.sources.exitCapPct!.published != null)).toBe(
-      "the research tracker's cap range at its low end, the stress test's deciding figure, which the model also exits at",
-    );
-  });
-
-  it("the exit runs the memorandum's stated exit only where no going-in cap or cap range decides", () => {
-    const noGoingIn: ExtractionResult = { ...ex, metrics: ex.metrics.filter((m) => !/going-in|pro forma cap/i.test(m.label)) };
-    const evidence = evidenceOf(noGoingIn, null);
-    expect(evidence.exitCap.decided).toBeNull();
-    const d = derive(noGoingIn, evidence);
-    expect(d.inputs.exitCapPct).toBeCloseTo(0.0525, 10);
-    expect(d.sources.exitCapPct).toMatchObject({
-      provenance: "extracted",
-      page: "p. 41",
-      note: "The OM's Exit cap, 5.25%, as stated: no going-in cap or published cap range decides the exit — set your exit view",
-    });
-    // And with neither stated, the default.
-    const bare: ExtractionResult = { ...ex, metrics: ex.metrics.filter((m) => !/cap/i.test(m.label)) };
-    expect(derive(bare, evidenceOf(bare, null)).inputs.exitCapPct).toBe(0.06);
-  });
-
-  it("land reads no figure of the wrong kind", () => {
-    const land: ExtractionResult = { ...ex, assetClass: "land" };
-    const evidence = evidenceOf(land, READS, "land");
-    expect(evidence.rentGrowth.decided).toBeNull();
-    expect(evidence.expenseGrowth.decided).toBeNull();
-    expect(evidence.exitCap.decided).toBeNull();
-  });
-
-  it("the workbook's Sources column says whose figure each input is", async () => {
-    const d = derive(ex, evidenceOf(ex, READS));
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load((await buildUnderwriteWorkbook(d, null)) as unknown as ArrayBuffer);
-    const assum = wb.getWorksheet("Assumptions")!;
-    const rowOf = (label: string): number => {
-      for (let r = 1; r <= assum.rowCount; r++) if (assum.getCell(r, 1).value === label) return r;
-      throw new Error(label);
-    };
-    const rent = rowOf("Rent Growth %");
-    // The input stays a typed value the model's formulas read.
-    expect(assum.getCell(rent, 2).value).toBeCloseTo(0.024, 10);
-    expect(assum.getCell(rent, 2).name).toBe("RentGrowth");
-    expect(String(assum.getCell(rent, 3).value)).toBe(`Published — ${d.sources.rentGrowthPct!.note}`);
-    expect(String(assum.getCell(rowOf("Expense Growth %"), 3).value)).toBe(`Published — ${d.sources.expenseGrowthPct!.note}`);
-    expect(String(assum.getCell(rowOf("Exit Cap"), 3).value)).toMatch(/^Derived — Defaulted to the OM's stated going-in cap.*the stress test's deciding figure for the exit — set your exit view$/);
-    // With no reads the memorandum's own figure, credited to it with its page.
-    const om = derive(ex, evidenceOf(ex, null));
-    const wb2 = new ExcelJS.Workbook();
-    await wb2.xlsx.load((await buildUnderwriteWorkbook(om, null)) as unknown as ArrayBuffer);
-    const a2 = wb2.getWorksheet("Assumptions")!;
-    let r2 = 1;
-    while (a2.getCell(r2, 1).value !== "Rent Growth %") r2++;
-    expect(String(a2.getCell(r2, 3).value)).toBe("OM p. 40 — 4.0%/yr — the OM's Rent growth, 4.0%/yr, as stated: no fresh published figure decides the rent growth — enter your own");
   });
 
   it("the sample is never seeded: handed the evidence, its model is the demo's", () => {

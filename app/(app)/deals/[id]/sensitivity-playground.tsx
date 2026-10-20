@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { costAssumptionsLine, defaultExitGap, yearOneCapitalLine } from "@/lib/underwrite/cost-note";
+import { costAssumptionsLine, defaultExitGap, exitEntryGap, yearOneCapitalLine } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { NO_IRR_WHY, noIrrText } from "@/lib/underwrite/no-irr";
 import { modelLoanCoverageLine } from "@/lib/sizer-terms";
@@ -79,8 +79,9 @@ export interface PlaygroundData {
   /** whether the price is the building's (lib/deal-strategy
    *  `buildingPriceOf`; the derived model's `meta.interest.basisWithheld` is
    *  none): only then is the model's own entry — its year-1 NOI over its
-   *  price — set against a default exit cap under the tiles (lib/underwrite/
-   *  cost-note `defaultExitGap`), as the exit's SOURCE note sets it; absent,
+   *  price — set against an exit that is not the going-in cap under the
+   *  tiles (lib/underwrite/cost-note `exitEntryGap`), as the exit's SOURCE
+   *  note sets it; absent,
    *  it is */
   buildingPriced?: boolean;
   /** the model's name for its price where it is not the price as stated for
@@ -369,22 +370,32 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // What the multiple and the year-1 return are net of, where the model
   // spends capital in year 1 (lib/underwrite/cost-note).
   const capitalLine = yearOneCapitalLine(inputs.capitalImprovementsYr1);
-  // Where the memorandum states no going-in cap, the exit at rest is the
-  // model's default: its gap to the model's own entry — the year-1 NOI over
-  // the price the tiles run on, both the memorandum's — said under the tiles
-  // as the exit's SOURCE note says it (research pass 38: a 25.1% IRR rode
-  // 200 bps of compression nobody chose). Only while the exit lever sits on
-  // the default, and never over withheld tiles.
-  const exitDefault =
+  // Where the exit at rest is not the going-in cap — the model's 6.00%
+  // default, a research range's low end, the memorandum's own stated exit
+  // (the derived model marks it `offGoingIn`) — its gap to the model's own
+  // entry, the year-1 NOI over the price the tiles run on, both the
+  // memorandum's, is said under the tiles as the exit's SOURCE note says it
+  // (research pass 38: a 25.1% IRR rode 200 bps of compression nobody
+  // chose). Only while the exit lever sits at rest, and never over withheld
+  // tiles.
+  const exitOffGoingIn =
     !withheld &&
     capIdx === caps.baseIdx &&
     data.buildingPriced !== false &&
-    sources?.exitCapPct?.provenance === "assumption" &&
-    sources.purchasePrice?.provenance !== "assumption" &&
-    sources.inPlaceRentAnnual?.provenance !== "assumption";
+    (sources?.exitCapPct?.offGoingIn === true || sources?.exitCapPct?.provenance === "assumption") &&
+    sources?.purchasePrice?.provenance !== "assumption" &&
+    sources?.inPlaceRentAnnual?.provenance !== "assumption";
   const atPrice = priceOverride ?? inputs.purchasePrice;
-  const entry = exitDefault && atPrice > 0 ? noiY1 / atPrice : null;
-  const exitGap = entry != null ? defaultExitGap(caps.values[capIdx], entry) : null;
+  const entry = exitOffGoingIn && atPrice > 0 ? noiY1 / atPrice : null;
+  const exitGap =
+    entry != null
+      ? sources?.exitCapPct?.provenance === "assumption"
+        ? defaultExitGap(caps.values[capIdx], entry)
+        : (() => {
+            const gap = exitEntryGap(caps.values[capIdx], entry);
+            return gap ? `${(caps.values[capIdx] * 100).toFixed(2)}%; ${gap}` : null;
+          })()
+      : null;
   // Why the tiles are withheld, said over them: what the price buys (the
   // first-draft card's own line), then the report's placeholder reason.
   const interestLine =

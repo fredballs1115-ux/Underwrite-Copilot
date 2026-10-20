@@ -51,22 +51,32 @@ export function yearOneCapitalLine(capitalImprovementsYr1: number): string | nul
 }
 
 /**
- * Where the memorandum states no going-in cap, the exit is the model's
- * default: the gap between it and the model's own entry — its year-1 NOI over
- * its price — said, so the compression or expansion the default carries is
- * seen (research pass 38: a $10M office at an 8.00% entry read a 25.1% IRR on
- * the 6.00% default exit, 200 bps of compression nobody chose). "Default
- * 6.00%; the model's own year-1 NOI over its price is 8.00%: 200 bps of
- * compression ride in these returns". Null under 5 bps, or without an entry.
- * The exit's SOURCE note and the line under the playground's tiles read this
- * one sentence; which default the exit takes is the owner's.
+ * Where the exit is not the going-in cap — the 6.00% default where the
+ * memorandum states none, a published cap range's low end, the
+ * memorandum's own stated exit — the gap between it and the model's own
+ * entry, its year-1 NOI over its price, said, so the compression or
+ * expansion the exit carries is seen (research pass 38: a $10M office at an
+ * 8.00% entry read a 25.1% IRR on the 6.00% default exit, 200 bps of
+ * compression nobody chose). "the model's own year-1 NOI over its price is
+ * 8.00%: 200 bps of compression ride in these returns". Null under 5 bps,
+ * or without an entry. The exit's SOURCE note and the line under the
+ * playground's tiles read this one clause; which exit the model takes is
+ * the owner's rule (lib/model-evidence).
  */
-export function defaultExitGap(exitDec: number, entryDec: number | null | undefined): string | null {
+export function exitEntryGap(exitDec: number, entryDec: number | null | undefined): string | null {
   if (entryDec == null || !Number.isFinite(entryDec) || !(entryDec > 0) || !Number.isFinite(exitDec)) return null;
   const bps = Math.round((entryDec - exitDec) * 10_000);
   if (Math.abs(bps) < 5) return null;
   const two = (d: number) => `${(d * 100).toFixed(2)}%`;
-  return `Default ${two(exitDec)}; the model's own year-1 NOI over its price is ${two(entryDec)}: ${Math.abs(bps).toLocaleString("en-US")} bps of ${
+  return `the model's own year-1 NOI over its price is ${two(entryDec)}: ${Math.abs(bps).toLocaleString("en-US")} bps of ${
     bps > 0 ? "compression" : "expansion"
   } ride in these returns`;
+}
+
+/** The same gap with the default it is of: "Default 6.00%; the model's own
+ *  year-1 NOI over its price is 8.00%: 200 bps of compression ride in these
+ *  returns". Null where `exitEntryGap` is. */
+export function defaultExitGap(exitDec: number, entryDec: number | null | undefined): string | null {
+  const gap = exitEntryGap(exitDec, entryDec);
+  return gap ? `Default ${(exitDec * 100).toFixed(2)}%; ${gap}` : null;
 }

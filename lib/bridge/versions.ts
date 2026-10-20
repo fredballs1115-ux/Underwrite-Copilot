@@ -11,7 +11,10 @@ import { VERSION_LIST_MAX, needsSnapshot, nextAutoLabel, saveFailure, type SaveF
  *
  * A snapshot is taken automatically whenever a deal's derived assumptions
  * actually MOVE from its latest base snapshot (re-screen, a supplement that
- * changes NOI, an address/price correction, the rate index moving), and
+ * changes NOI, an address/price correction, the rate index moving, or the
+ * published figures the growth and exit run at moving — lib/model-evidence;
+ * never on a model derived after those figures failed to read, which fell
+ * back to the memorandum's and would make a phantom move), and
  * manually when the user saves a scenario. A scenario is never a base, so
  * saving one takes no automatic copy of the base after it — a version list
  * full of duplicates is a version list nobody reads. The rules are pure and

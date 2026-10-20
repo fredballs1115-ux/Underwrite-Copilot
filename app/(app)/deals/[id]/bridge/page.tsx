@@ -95,7 +95,11 @@ export default async function BridgePage({
   // Every visit snapshots the deal's live assumptions — but only when they
   // moved from its latest base snapshot (a saved scenario is never one), so
   // the list is a record of changes rather than a record of page views.
-  if (current) {
+  // Never on a model derived after today's published figures failed to
+  // read (lib/bridge/deal-assumptions `readFailed`): its growth and exit
+  // fell back, and the next good read would be a second version and a move
+  // no input of the deal's made.
+  if (current && !model?.readFailed) {
     await snapshotVersion(supabase, {
       dealId: id,
       userId: user.id,

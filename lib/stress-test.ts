@@ -33,9 +33,10 @@
 //     key's own threshold, `unchecked` where nothing carries a figure;
 //   - the impact swaps ONE input of the model, twice: the OM's figure in for
 //     the base run and the best evidence's for the alternative, so the move
-//     is the gap's own and never the model's default's (which reads no
-//     growth rate off the OM, exits at the going-in cap and borrows at the
-//     seed); it is struck only where the model's reads stand
+//     is the gap's own and never the model's (whose growth and exit run at
+//     the more cautious of the row's deciding figure and the OM's own,
+//     lib/model-evidence, and which borrows at the seed); it is struck only
+//     where the model's reads stand
 //     (lib/underwrite/report-grid `modelReadsWithheld`), the price buys the
 //     building and the deal is no plan deal;
 //   - a plan deal (a value-add, lease-up, conversion or development) is
@@ -1430,8 +1431,10 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   const judged = judge(om.pct, alt, "low", "bps", EXIT_CAP_UNSUPPORTED_BPS / 100 - SAME, SAME, (gap) =>
     onGoingIn
       ? // Flat to the entry holds: the code carries no expansion default (the
-        // model itself exits at the going-in cap), so none is invented here;
-        // the sentence says what most underwriting does.
+        // model exits at the higher of the going-in cap and the OM's own
+        // exit, lib/model-evidence, never at an expansion of its own), so
+        // none is invented here; the sentence says what most underwriting
+        // does.
         Math.abs(diffBps) < SAME * 100
         ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; most underwriting adds expansion over a hold.`
         : diffBps > 0

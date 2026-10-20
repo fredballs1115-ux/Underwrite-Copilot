@@ -38,10 +38,10 @@ import { allowanceSentence, dayText, pctText, type AllowanceRead, type RegimeRea
  * The model's assumptions against the published figures — pure, no model
  * call. The screening model runs on four numbers that decide its return
  * more than any others: rent growth, expense growth, stabilized vacancy
- * and the exit cap. The growth rates and the exit run at the figure the
- * stress test decides each by where one is fresh (lib/model-evidence), else
- * the memorandum's, else a default (3.0%/yr, "set your view"; the sample
- * keeps the defaults), and the market brief beside the deal shows what the
+ * and the exit cap. The growth rates and the exit run at the more cautious
+ * of the figure the stress test decides each by, where one is fresh, and
+ * the memorandum's own (lib/model-evidence), else the one that stands, else
+ * a default (3.0%/yr, "set your view"; the sample keeps the defaults), and the market brief beside the deal shows what the
  * metro has actually done — so this sets each assumption against the
  * figure that speaks to it, dated and sourced, and says which way the
  * assumption runs. It does NOT say the assumption is wrong: a trailing
@@ -447,7 +447,7 @@ const SAME = 0.05;
 function sourceWords(s: InputSource | undefined): string {
   // The figure the stress test decides the row by, run as the model's own
   // (lib/model-evidence): a published figure, never a screening default.
-  if (s?.published) return "the published figure the stress test decides by";
+  if (s?.published) return s.published.research ? "the research tracker's figure the stress test decides by" : "the published figure the stress test decides by";
   switch (s?.provenance) {
     case "extracted":
       return "from the documents";

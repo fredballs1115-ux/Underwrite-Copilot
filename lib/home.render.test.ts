@@ -30,7 +30,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
 import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
-import { DEAL_TOOL_TITLE, DealTool, type DealToolKind } from "@/app/(app)/deals/[id]/header-tools";
+import { DEAL_TOOL_TITLE, DealTool, SAMPLE_MODEL_TOOL_TITLE, type DealToolKind } from "@/app/(app)/deals/[id]/header-tools";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
 import { skylineSrcSetOf } from "./skyline-srcset";
@@ -107,7 +107,7 @@ describe("the homepage, as a screen reader hears it", () => {
       [
         tool("memo", "/api/demo/memo", `${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`),
         tool("report", "/api/demo/report", `${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`),
-        tool("model", "/api/demo/underwrite.xlsx", `${DEAL_TOOL_TITLE.model}. ${SAMPLE_DOWNLOAD_NOTE}`),
+        tool("model", "/api/demo/underwrite.xlsx", `${SAMPLE_MODEL_TOOL_TITLE}. ${SAMPLE_DOWNLOAD_NOTE}`),
         tool("rentRoll", "/login?mode=signup", `${DEAL_TOOL_TITLE.rentRoll} — on a deal of your own`, true),
         tool("valuations", "/login?mode=signup", `${DEAL_TOOL_TITLE.valuations} — on a deal of your own`, true),
       ].join(""),

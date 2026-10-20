@@ -92,8 +92,8 @@ import { readSandwichLease, sandwichModelLine, sandwichShortLine } from "@/lib/s
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
-import type { EvidenceFigure, ModelEvidence, StatedFigure } from "@/lib/model-evidence";
-import { defaultExitGap } from "./cost-note";
+import type { EvidenceFigure, EvidenceFor, ModelEvidence, StatedFigure } from "@/lib/model-evidence";
+import { exitEntryGap } from "./cost-note";
 import { LEVER_STEPS } from "./playground";
 
 /** Property actuals fed into the model (Feature 1): when present, the rent
@@ -108,9 +108,11 @@ export interface ActualsForModel {
  *  permanent loan is quoted over, read off the rates table by the caller.
  *  Absent or null, the rate keeps its flat default and the old note — the
  *  sample deal, a test, a read that failed. And the figures the growth and
- *  the exit run at (lib/model-evidence `modelEvidenceFor`): the stress
- *  test's deciding figure where one is fresh, else the memorandum's stated
- *  figure, else the default. Absent or null — the sample, whose figures are
+ *  the exit run at (lib/model-evidence `modelEvidenceFor`): never more
+ *  optimistic than the memorandum — the more cautious of the stress test's
+ *  deciding figure, where one is fresh, and the memorandum's stated figure
+ *  where both stand, else the one that stands, else the default. Absent or
+ *  null — the sample, whose figures are
  *  pinned (lib/model-market) — the growth runs at 3.0% and the exit at the
  *  going-in cap whatever the memorandum states, as before. */
 export interface MarketForModel {
@@ -165,9 +167,15 @@ export interface InputSource {
   noPrice?: { label: string; value: number };
   /** the published figure the input runs at, where it is the one the stress
    *  test decides the row by (lib/model-evidence): the workbook's SOURCE
-   *  column says "Published", and the model's read against the market says
-   *  it is that figure, never a screening default */
-  published?: { label: string; publisher: string; asOf: string | null };
+   *  column says "Published" — "Research" for a research tracker's range
+   *  (`research`), a print rather than a feed — and the model's read
+   *  against the market says it is that figure, never a screening default */
+  published?: { label: string; publisher: string; asOf: string | null; research?: boolean };
+  /** on the exit: it is not the going-in cap — the flat default, a research
+   *  range's low end, the OM's own stated exit — so the playground sets it
+   *  against the model's own entry as the note does (lib/underwrite/
+   *  cost-note `exitEntryGap`) */
+  offGoingIn?: boolean;
 }
 
 export interface WorkbookMeta {
@@ -784,42 +792,121 @@ const exitRunnable = (pct: number): boolean => Number.isFinite(pct) && pct > 0.5
 /** "(Zillow Research; Philadelphia PA)", "(BLS via FRED; national)" */
 const evidenceWhose = (f: EvidenceFigure): string => `(${f.publisher}${f.where ? `; ${f.where === "the nation" ? "national" : f.where}` : ""})`;
 
-/** The source note for a growth rate run at the stress test's deciding
- *  figure: "2.4%/yr — Zillow's apartment asking rents: +2.4% over the year
- *  to Aug 2026 (Zillow Research; Philadelphia PA); the stress test's
- *  deciding figure — enter your own". */
-export function publishedGrowthNote(f: EvidenceFigure): string {
-  return `${f.pct.toFixed(1)}%/yr — ${f.name}: ${f.text} ${evidenceWhose(f)}; the stress test's deciding figure — enter your own`;
+/** A growth rate, percent, at the workbook cell's own precision (two
+ *  places, the Assumptions tab's format), a trailing zero dropped: 3.353
+ *  reads "3.35%" as the cell shows it, 4 reads "4.0%". */
+export function cellPct(pct: number): string {
+  const two = pct.toFixed(2);
+  return `${two.endsWith("0") ? pct.toFixed(1) : two}%`;
 }
 
-/** The source note for a growth rate run at the memorandum's own figure. */
-export function statedGrowthNote(what: string, f: StatedFigure): string {
-  return `${f.pct.toFixed(1)}%/yr — the OM's ${f.label}, ${f.value}, as stated: no fresh published figure decides the ${what} — enter your own`;
+/** A memorandum's label as it reads inside a sentence: "Rent growth" →
+ *  "rent growth"; an acronym ("NOI growth") kept. */
+const midSentence = (label: string): string => (/^[A-Z]{2}/.test(label) ? label : `${label.charAt(0).toLowerCase()}${label.slice(1)}`);
+
+/** Whether the memorandum's value says nothing past its figure ("4.0%/yr",
+ *  "3%", "2.5% per year", "5.25%"), so a note leading with the figure never
+ *  prints it twice. */
+const valueIsFigure = (value: string): boolean =>
+  /^\s*\+?\d+(?:\.\d+)?\s*%\s*(?:\/\s*(?:yr|year)|(?:per|a)\s+(?:year|annum)|annually|p\.?\s?a\.?)?\s*$/i.test(value);
+
+/** "the OM's rent growth", or with words past the figure, those too: "the
+ *  OM's rent growth ("3% years 1–2, 4% after")" */
+const omWords = (f: StatedFigure): string => `the OM's ${midSentence(f.label)}${valueIsFigure(f.value) ? "" : ` ("${f.value}")`}`;
+
+/** "Zillow's apartment asking rents, the figure for this kind of rent: +2.4%
+ *  over the year to Aug 2026 (Zillow Research; Philadelphia PA)" — why it
+ *  decides said as the stress row says it, a park's "the closest published
+ *  figure, not a park's own kind of rent" included. */
+const publishedWords = (f: EvidenceFigure): string => `${f.name}${f.why ? `, ${f.why}` : ""}: ${f.text} ${evidenceWhose(f)}`;
+
+/** The source note for a growth rate run at the stress test's deciding
+ *  figure — the OM stating none, or the published figure the more cautious:
+ *  "2.4%/yr — Zillow's apartment asking rents, the figure for this kind of
+ *  rent: +2.4% over the year to Aug 2026 (Zillow Research; Philadelphia
+ *  PA), more cautious than the OM's rent growth of 4.0%/yr (p. 40); the
+ *  stress test's deciding figure — enter your own". */
+export function publishedGrowthNote(f: EvidenceFigure, what: string, om: StatedFigure | null): string {
+  const page = om?.page ? ` (${om.page})` : "";
+  const beside = !om
+    ? `; the stress test's deciding figure, the OM stating no ${what}`
+    : Math.abs(om.pct - f.pct) < 1e-9
+      ? `, the same as ${omWords(om)}${page}; the stress test's deciding figure`
+      : `, more cautious than ${omWords(om)} of ${cellPct(om.pct)}/yr${page}; the stress test's deciding figure`;
+  return `${cellPct(f.pct)}/yr — ${publishedWords(f)}${beside} — enter your own`;
+}
+
+/** The source note for a growth rate run at the memorandum's own figure:
+ *  the more cautious of it and the published figure, or the one that
+ *  stands, with the true reason no published figure does. */
+export function statedGrowthNote(f: StatedFigure, beside: { cautious: EvidenceFigure } | { why: string }): string {
+  const tail =
+    "cautious" in beside
+      ? `, the more cautious of it and ${publishedWords(beside.cautious)}; the model runs no figure more optimistic than the OM's`
+      : `: ${beside.why}`;
+  return `${cellPct(f.pct)}/yr — ${omWords(f)} as stated${tail} — enter your own`;
 }
 
 /** The source note for a growth rate at the default where the deal was
- *  read for evidence and none stood. */
-export function defaultGrowthNote(what: string): string {
-  return `Default ${(DEFAULT_GROWTH * 100).toFixed(1)}%/yr — no fresh published figure decides the ${what} and the OM states none — set your view`;
+ *  read for evidence and none stood, with the reason. */
+export function defaultGrowthNote(why: string): string {
+  return `Default ${(DEFAULT_GROWTH * 100).toFixed(1)}%/yr — ${why} and the OM states none — set your view`;
 }
+
+/** Why a published figure past the band the model runs is not run: the
+ *  true reason, never "no fresh published figure". */
+const pastBand = (f: EvidenceFigure): string => `${f.name}, ${cellPct(f.pct)} (${f.publisher}), is past the −5% to +15% a year the model runs`;
 
 type GrowthRun = { pct: number; provenance: Provenance; note: string; page?: string; published?: InputSource["published"] };
 
-/** Rent or expense growth, in the owner's order: the stress test's deciding
- *  figure, else the OM's stated figure, else the default. With no evidence
- *  handed in (the sample, a test), the default and its old note. */
-function growthRun(what: "rent growth" | "expense growth", e: ModelEvidence["rentGrowth"] | null | undefined): GrowthRun {
+/** Rent or expense growth, never more optimistic than the OM (the owner's
+ *  rule of 2026-10-20): where the stress test's deciding figure and the
+ *  OM's stated figure both stand, the more cautious of the two — the lower
+ *  rent growth, the higher expense growth; else the one that stands; else
+ *  the default. With no evidence handed in (the sample, a test), the
+ *  default and its old note. */
+function growthRun(what: "rent growth" | "expense growth", e: EvidenceFor | null | undefined): GrowthRun {
   if (!e) return { pct: DEFAULT_GROWTH, provenance: "assumption", note: `Default ${(DEFAULT_GROWTH * 100).toFixed(1)}%/yr — set your view` };
-  if (e.decided && growthRunnable(e.decided.pct)) {
+  const pub = e.decided && growthRunnable(e.decided.pct) ? e.decided : null;
+  const om = e.stated && growthRunnable(e.stated.pct) ? e.stated : null;
+  const runPublished = (f: EvidenceFigure): GrowthRun => ({
+    pct: f.pct / 100,
+    provenance: "derived",
+    note: publishedGrowthNote(f, what, om),
+    published: { label: f.label, publisher: f.publisher, asOf: f.asOf },
+  });
+  const runOm = (f: StatedFigure, beside: { cautious: EvidenceFigure } | { why: string }): GrowthRun => ({
+    pct: f.pct / 100,
+    provenance: "extracted",
+    note: statedGrowthNote(f, beside),
+    page: f.page,
+  });
+  // The cautious side: the lower rent growth, the higher expense growth; a
+  // tie runs the published figure, which is the OM's too.
+  if (pub && om) return (what === "rent growth" ? pub.pct <= om.pct : pub.pct >= om.pct) ? runPublished(pub) : runOm(om, { cautious: pub });
+  if (pub) return runPublished(pub);
+  const why = e.decided ? pastBand(e.decided) : (e.absent ?? `no fresh published figure decides the ${what}`);
+  if (om) return runOm(om, { why });
+  if (e.stated) {
     return {
-      pct: e.decided.pct / 100,
-      provenance: "derived",
-      note: publishedGrowthNote(e.decided),
-      published: { label: e.decided.label, publisher: e.decided.publisher, asOf: e.decided.asOf },
+      pct: DEFAULT_GROWTH,
+      provenance: "assumption",
+      note: `Default ${(DEFAULT_GROWTH * 100).toFixed(1)}%/yr — ${why}, and the OM's ${cellPct(e.stated.pct)} is past the −5% to +15% a year the model runs — set your view`,
     };
   }
-  if (e.stated && growthRunnable(e.stated.pct)) return { pct: e.stated.pct / 100, provenance: "extracted", note: statedGrowthNote(what, e.stated), page: e.stated.page };
-  return { pct: DEFAULT_GROWTH, provenance: "assumption", note: defaultGrowthNote(what) };
+  return { pct: DEFAULT_GROWTH, provenance: "assumption", note: defaultGrowthNote(why) };
+}
+
+/** The research tracker's cap range as an exit note says it: "the low end
+ *  of the research tracker's 5.00–5.70% apartment cap range (Northmarq,
+ *  late 2025 / early 2026, read Aug 25, 2026; a research print, not a
+ *  feed)". Without the range's own read, the figure as the row reads it. */
+function researchWords(f: EvidenceFigure): string {
+  const r = f.research;
+  if (!r) return `${f.name}: ${f.label}, ${f.asOf ?? "undated"} ${evidenceWhose(f)}; a research print, not a feed`;
+  const point = Math.abs(r.high - r.low) < 0.005;
+  const span = point ? `${r.low.toFixed(2)}%` : `${r.low.toFixed(2)}–${r.high.toFixed(2)}%`;
+  return `${point ? "" : "the low end of "}the research tracker's ${span} ${r.sector} cap ${point ? "figure" : "range"} (${r.house}, ${r.period}${r.readOn ? `, read ${r.readOn}` : ""}; a research print, not a feed)`;
 }
 
 export function deriveUnderwriteInputs(
@@ -1458,22 +1545,37 @@ export function deriveUnderwriteInputs(
         }
       : null;
 
-  // The growth and the exit, in the owner's order (lib/model-evidence): the
-  // stress test's deciding figure, else the OM's stated figure, else the
-  // default — on a real deal only; with no evidence handed in (the sample,
-  // whose figures are pinned) 3.0% and the going-in cap, as before.
+  // The growth and the exit, never more optimistic than the OM (the owner's
+  // rule of 2026-10-20, lib/model-evidence): the more cautious of the stress
+  // test's deciding figure and the OM's stated figure where both stand, else
+  // the one that stands, else the default — on a real deal only; with no
+  // evidence handed in (the sample, whose figures are pinned) 3.0% and the
+  // going-in cap, as before.
   const evidence = market?.evidence ?? null;
   const rentRun = growthRun("rent growth", evidence?.rentGrowth);
   const expenseRun = growthRun("expense growth", evidence?.expenseGrowth);
   // The exit: the deciding figure is the going-in cap (the model's own
   // `capPct`, the same reader in the same band) or, where none stands, the
-  // research tracker's cap range at its low end; then the OM's stated exit;
-  // then the default — the going-in cap the OM states, else 6.0%.
+  // research tracker's cap range at its low end. Where it and the OM's stated
+  // exit both stand, the higher of the two — the cautious cap; else the one
+  // that stands; else the default — the going-in cap the OM states, else
+  // 6.0%.
   const exitDecided = evidence?.exitCap.decided ?? null;
   const exitOnGoingIn = exitDecided != null && exitDecided.kind === "om_internal" && capPct != null;
   const exitOnTracker = exitDecided != null && exitDecided.kind === "published" && exitRunnable(exitDecided.pct);
-  const exitStated = evidence && !exitOnGoingIn && !exitOnTracker && evidence.exitCap.stated && exitRunnable(evidence.exitCap.stated.pct) ? evidence.exitCap.stated : null;
-  const exitCapRun = exitOnTracker ? exitDecided!.pct / 100 : exitStated ? exitStated.pct / 100 : (capPct ?? DEFAULT_EXIT_CAP);
+  const decidedExit = exitOnGoingIn ? capPct! : exitOnTracker ? exitDecided!.pct / 100 : null;
+  const statedExit = evidence?.exitCap.stated && exitRunnable(evidence.exitCap.stated.pct) ? evidence.exitCap.stated : null;
+  const exitPick: "decided" | "stated" | "default" =
+    decidedExit != null && statedExit != null
+      ? statedExit.pct / 100 > decidedExit + 1e-12
+        ? "stated"
+        : "decided"
+      : decidedExit != null
+        ? "decided"
+        : statedExit != null
+          ? "stated"
+          : "default";
+  const exitCapRun = exitPick === "decided" ? decidedExit! : exitPick === "stated" ? statedExit!.pct / 100 : (capPct ?? DEFAULT_EXIT_CAP);
 
   const inputs: UnderwriteInputs = {
     purchasePrice: price,
@@ -1657,55 +1759,81 @@ export function deriveUnderwriteInputs(
   // charged). What a class should carry is the owner's.
   mark("tiPsf", "assumption", "None modelled — enter it to carry tenant improvements: the returns carry no leasing capital");
   mark("lcPct", "assumption", "None modelled — enter it to carry leasing commissions: the returns carry none");
-  // The exit defaults to the OM's stated going-in cap (which cap it defaults
-  // to is the owner's call). Where the model's own entry — its year-1 NOI
-  // over its price, the Deal Summary's "Going-In Cap (Yr-1 NOI / Price)" —
-  // sits 5 bps or more from it, the note names that too, so a compression
-  // the default carries is seen (research pass 34). Never on a price that
-  // did not buy the building, where no cap is struck on the price.
+  // Where the exit is the OM's stated going-in cap and the model's own entry
+  // — its year-1 NOI over its price, the Deal Summary's "Going-In Cap (Yr-1
+  // NOI / Price)" — sits 5 bps or more from it, the note names that too, so
+  // a compression the exit carries is seen (research pass 34). Never on a
+  // price that did not buy the building, where no cap is struck on the price.
   const ownEntry = capPct && price > 0 && buildingPriceOf(extraction, price) != null ? noi / price : null;
   const ownEntryClause =
     capPct && ownEntry != null && Math.abs(ownEntry - capPct) >= 0.0005
       ? `; the model's own year-1 NOI over its price is ${(ownEntry * 100).toFixed(2)}%`
       : "";
-  // With no cap stated the exit is the flat default, and where the model's
-  // own entry — a stated price and a stated NOI, the price the building's —
-  // sits 5 bps or more from it, the note names the gap (research pass 38;
-  // lib/underwrite/cost-note `defaultExitGap`, which the playground says
-  // under its tiles too). The default itself is the owner's.
-  const defaultEntry =
-    !capPct &&
+  // Every exit that is not the going-in cap — the flat default, a research
+  // range's low end, the OM's own stated exit — is set against the model's
+  // own entry (a stated price and a stated NOI, the price the building's),
+  // and where the two sit 5 bps or more apart the note names the compression
+  // or expansion that rides in the returns (research pass 38; lib/underwrite/
+  // cost-note `exitEntryGap`, which the playground says under its tiles
+  // too). Which exit the model takes is the owner's rule (lib/model-evidence).
+  const exitOffGoingIn = exitPick === "stated" || (exitPick === "decided" && !exitOnGoingIn) || (exitPick === "default" && !capPct);
+  const gapEntry =
+    exitOffGoingIn &&
     price > 0 &&
     sources.purchasePrice?.provenance !== "assumption" &&
     sources.inPlaceRentAnnual?.provenance !== "assumption" &&
     buildingPriceOf(extraction, price) != null
       ? noi / price
       : null;
-  const defaultGap = capPct ? null : defaultExitGap(DEFAULT_EXIT_CAP, defaultEntry);
-  // Where the exit runs at the stress test's deciding figure, the note says
-  // so; on the going-in cap that figure IS the old default, and its note
-  // keeps the range and the model's own entry.
-  const decidedClause = evidence ? "; the stress test's deciding figure for the exit" : "";
-  if (exitOnTracker) {
+  const entryGap = exitEntryGap(exitCapRun, gapEntry);
+  const gapClause = entryGap ? `; ${entryGap}` : "";
+  const two = (d: number) => `${(d * 100).toFixed(2)}%`;
+  const goingInWords = capPct != null ? (capRangeWords ? `${capRangeWords}, ${two(capPct)}` : `the OM's ${two(capPct)} going-in cap`) : "";
+  const statedExitWords = (f: StatedFigure): string => `${omWords(f)}${statesRange(f.value) ? " (a range, read at its first figure)" : ""}`;
+  const statedPage = (f: StatedFigure): string => (f.page ? ` (${f.page})` : "");
+  const goingInAbsent = evidence?.exitCap.goingInAbsent ?? null;
+  if (exitPick === "decided" && exitOnGoingIn) {
+    // The going-in cap the exit is decided by: where the OM states an exit
+    // too, it is the tighter of the two, or the same.
+    const besides = !statedExit
+      ? "the stress test's deciding figure for the exit; the OM states no exit cap"
+      : Math.abs(statedExit.pct / 100 - capPct!) < 1e-12
+        ? `the same as ${statedExitWords(statedExit)}${statedPage(statedExit)}; the stress test's deciding figure for the exit`
+        : `more cautious than ${statedExitWords(statedExit)} of ${statedExit.pct.toFixed(2)}%${statedPage(statedExit)}; the stress test's deciding figure for the exit, never tighter than the OM's own`;
+    mark("exitCapPct", "derived", `${two(capPct!)} — ${capRangeWords ?? "the OM's stated going-in cap"}, ${besides}${ownEntryClause} — set your exit view`, pageOf(capMetric));
+  } else if (exitPick === "decided") {
+    // The research tracker's cap range at its low end, where no going-in cap
+    // decides — said as research, with the true reason the going-in cap
+    // does not decide.
     const f = exitDecided!;
-    mark("exitCapPct", "derived", `${f.pct.toFixed(2)}% — ${f.name}: ${f.label}, ${f.asOf ?? "undated"} ${evidenceWhose(f)}; the stress test's deciding figure for the exit, where the OM states no going-in cap it is held to — set your exit view`);
-    sources.exitCapPct = { ...sources.exitCapPct!, published: { label: f.label, publisher: f.publisher, asOf: f.asOf } };
-  } else if (exitStated) {
-    mark(
-      "exitCapPct",
-      "extracted",
-      `The OM's ${exitStated.label}, ${exitStated.value}${statesRange(exitStated.value) ? " (a range, read at its first figure)" : ""}, as stated: no going-in cap or published cap range decides the exit — set your exit view`,
-      exitStated.page,
-    );
+    const since = goingInAbsent ? `, since ${goingInAbsent}` : "";
+    const besides = !statedExit
+      ? `the stress test's deciding figure for the exit${since}; the OM states no exit cap`
+      : Math.abs(statedExit.pct - f.pct) < 1e-9
+        ? `the same as ${statedExitWords(statedExit)}${statedPage(statedExit)}; the stress test's deciding figure for the exit${since}`
+        : `more cautious than ${statedExitWords(statedExit)} of ${statedExit.pct.toFixed(2)}%${statedPage(statedExit)}; the stress test's deciding figure for the exit${since}`;
+    mark("exitCapPct", "derived", `${f.pct.toFixed(2)}% — ${researchWords(f)}, ${besides}${gapClause} — set your exit view`);
+    sources.exitCapPct = { ...sources.exitCapPct!, published: { label: f.label, publisher: f.publisher, asOf: f.asOf, ...(f.research ? { research: true } : {}) } };
+  } else if (exitPick === "stated") {
+    // The OM's own exit: the more cautious of it and the figure the stress
+    // test decides by, or the one that stands, with the true reason.
+    const f = statedExit!;
+    const tail =
+      decidedExit != null
+        ? `, the more cautious of it and ${exitOnGoingIn ? goingInWords : researchWords(exitDecided!)}; the model runs no exit tighter than the OM's`
+        : `: ${exitDecided ? `${exitDecided.name}, ${exitDecided.pct.toFixed(2)}%, is outside the band the model runs a cap at` : (evidence?.exitCap.absent ?? "no going-in cap or published cap range decides the exit")}`;
+    mark("exitCapPct", "extracted", `${f.pct.toFixed(2)}% — ${statedExitWords(f)} as stated${tail}${gapClause} — set your exit view`, f.page);
   } else {
+    const why = evidence?.exitCap.absent ? `; ${evidence.exitCap.absent}, and the OM states no exit cap` : "";
     mark("exitCapPct", capPct ? "derived" : "assumption",
       capPct
-        ? `Defaulted to ${capRangeWords ?? "the OM's stated going-in cap"}${ownEntryClause}${exitOnGoingIn ? decidedClause : ""} — set your exit view`
-        : defaultGap
-          ? `${defaultGap} — set your exit view`
-          : "Default 6.0% — set your exit view",
+        ? `Defaulted to ${capRangeWords ?? "the OM's stated going-in cap"}${ownEntryClause} — set your exit view`
+        : entryGap
+          ? `Default ${two(DEFAULT_EXIT_CAP)}${gapClause}${why} — set your exit view`
+          : `Default 6.0%${why} — set your exit view`,
       capPct ? pageOf(capMetric) : undefined);
   }
+  if (exitOffGoingIn) sources.exitCapPct = { ...sources.exitCapPct!, offGoingIn: true };
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 
   return {

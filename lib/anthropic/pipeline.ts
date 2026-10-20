@@ -490,7 +490,8 @@ interface MarketFigures {
  * county that places the deal, the rent rules' municipality) and what the
  * market step read in this attempt — `undefined` where it did not run in
  * it (an attempt resumed past it, a reconciliation), so the verdict reads
- * the same tables bare; `null` where it ran and a read failed.
+ * the same tables bare; `null` where it ran and a read failed, and the
+ * verdict reads them bare then too.
  */
 interface VerdictReads {
   flags: SiteFlagsResult | null;
@@ -506,30 +507,33 @@ interface VerdictReads {
  * the metro's series and Zillow's rent as the market step read them where
  * it ran in this attempt — never a second read of a figure in hand — topped
  * up with the national series the checks read and the brief did not ask
- * for; or, where the step did not run in this attempt, the deal placed
- * again and every series read once. Null where the market step's read
- * failed, or where a read here fails: the model then runs on the
- * memorandum's own figures, the
- * test then carries the documents' and the rules of thumb's evidence alone,
- * as it did before, and the screen never fails for it.
+ * for; or, where the step did not run in this attempt or its read failed,
+ * the deal placed again and every series read once — so the verdict's model
+ * is the one the deal page derives, never the memorandum's fallbacks for a
+ * read the step lost. Null where a read here fails: the model then runs on
+ * the memorandum's own figures, the test then carries the documents' and
+ * the rules of thumb's evidence alone, as it did before, and the screen
+ * never fails for it.
  */
 async function verdictMarketReads(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   row: { extraction?: unknown; first_signal?: unknown; address?: unknown; asset_class?: unknown },
   reads: VerdictReads | undefined,
 ): Promise<{ metro: { id: string; name: string; placedBy?: unknown } | null; reads: MarketReads; regulation: RegulationRead | null } | null> {
-  if (!reads || reads.market === null) return null;
   try {
     const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
     let failed = false;
     const fail = () => {
       failed = true;
     };
-    let market = reads.market;
+    // The market step's own reads where they stood; where the step did not
+    // run in this attempt (`undefined`) or its read failed (`null`, or a
+    // read marked failed), the same tables bare, as the deal page reads them.
+    let market = reads?.market && !reads.market.failed ? reads.market : null;
     if (!market) {
       const now = new Date();
       const address = dealAddressOf(row.address, extraction);
-      const metro = placeDeal(address, countyOf(address, reads.flags)).live ?? null;
+      const metro = placeDeal(address, countyOf(address, reads?.flags ?? null)).live ?? null;
       const [rateRows, bench] = await Promise.all([
         metro ? fetchSeriesRows(admin, metroSeriesFor(metro.id).series, fail) : Promise.resolve([] as RateRow[]),
         metro ? fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS], fail) : Promise.resolve([]),
@@ -555,7 +559,7 @@ async function verdictMarketReads(
       metro: market.metro,
       reads: { rates: market.rates, zori: market.zori, national: readRates([...market.nationalRows, ...more], market.now), now: market.now },
       // The rent rules on the UTC day the worker keeps, as every step reads them.
-      regulation: screenRegulation(row, reads.flags),
+      regulation: screenRegulation(row, reads?.flags ?? null),
     };
   } catch (err) {
     console.warn(`[pipeline] the model's published-figure read was not made for the verdict:`, err instanceof Error ? err.message : err);
