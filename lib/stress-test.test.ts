@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The engine, spied: the stress test may run it again on the model's inputs
@@ -35,6 +36,7 @@ import {
   challengeKey,
   headlinePrice,
   stabilizedVacancyStated,
+  vacancyDecidedBy,
   stressHeadline,
   type StressTestArgs,
 } from "./stress-test";
@@ -630,6 +632,18 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(stabilizedVacancyStated(withVacancy("6.0%", "value_add"))).toBe(false);
     expect(stabilizedVacancyStated(APARTMENT)).toBe(false);
     expect(stabilizedVacancyStated(null)).toBe(false);
+  });
+
+  it("says which kind decided the vacancy row, so the track record holds back a later document only where the market decided (audit M5)", () => {
+    // The survey held the stabilized 6.0%: the market decided.
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"))))).toBe("published");
+    // No fresh published figure: the documents decided, and a later rent roll
+    // or T-12 scores the challenge.
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null })))).toBe("document");
+    expect(vacancyDecidedBy(null)).toBeNull();
+    // The deal page asks it of its own built test, never of the extraction alone.
+    const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    expect(page).toContain('stabilizedVacancyStated(extraction, firstSignal) && vacancyDecidedBy(stressTest) === "published"');
   });
 
   it("an occupancy the OM states for today is held to the documents, today's figures too", () => {

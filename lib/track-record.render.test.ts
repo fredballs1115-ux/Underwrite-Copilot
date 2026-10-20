@@ -11,7 +11,7 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { T12Summary } from "@/lib/actuals/types";
 import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
-import { RECORD_NONE_LINE, accountRecord, scoreDeal, type DealRecord } from "./track-record";
+import { ACCOUNT_VACANCY_NOTE, RECORD_NONE_LINE, accountRecord, scoreDeal, type DealRecord } from "./track-record";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const T = "2026-10-01T12:00:00Z";
@@ -92,6 +92,10 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(text).toContain(RECORD_NONE_LINE);
     expect(text).toContain("0 deals tested · 0 with later evidence · 0 rows scored");
     expect(out).not.toContain("data-bar=");
+    // The account's record holds every stated stabilized vacancy back as the
+    // market's, which a deal's own page does only where the market decided:
+    // said where the record is drawn (audit M5).
+    expect(text.replace(/&#x27;/g, "'")).toContain(ACCOUNT_VACANCY_NOTE);
   });
 
   it("few: the counts, a bar a key, and 'a start, not a record' with no share", () => {

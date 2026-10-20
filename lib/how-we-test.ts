@@ -268,6 +268,7 @@ export const TRACK_RECORD = {
   lines: [
     "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 by the day it was uploaded, a Dead decision with its reason, a reported trade.",
     "A document the screen itself read is never scored: the challenger was handed it.",
+    "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",

@@ -216,6 +216,8 @@ describe("/how-we-test draws every method from the table", () => {
     expect(text).toContain(TRACK_RECORD.heading);
     for (const line of TRACK_RECORD.lines) expect(text).toContain(line);
     expect(TRACK_RECORD.lines.join(" ")).toContain(`under ${RECORD_FLOOR} scored rows`);
+    // A stabilized vacancy the market decided is not scored by a later document (audit L5).
+    expect(TRACK_RECORD.lines).toContain("A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.");
     // The marker keeps the sentence live-verify greps, whole.
     expect(HOW_WE_TEST_MARKER).toContain("The arithmetic is run in code, never by the AI.");
     expect(readFileSync(".github/workflows/live-verify.yml", "utf8")).toContain("The arithmetic is run in code, never by the AI.");

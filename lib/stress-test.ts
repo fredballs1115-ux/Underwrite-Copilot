@@ -611,6 +611,22 @@ export function stabilizedVacancyStated(extraction: ExtractionResult | null, fir
 }
 
 /**
+ * The kind of evidence that decided a built test's vacancy row: the figure
+ * its re-run swapped in, else the first piece with a figure (the row prints
+ * the kind that decides first) — "published" where the market's figure held
+ * a stabilized assumption, "document" where the deal's rent roll or T-12
+ * decided it. Null with no vacancy row, or one left unchecked. The track
+ * record reads it (audit M5): a later document scores no vacancy challenge
+ * only where the market decided it, never where the documents did.
+ */
+export function vacancyDecidedBy(test: StressTest | null | undefined): StressEvidence["kind"] | null {
+  const row = test?.rows.find((r) => r.key === "vacancy");
+  if (!row || row.verdict === "unchecked") return null;
+  const e = row.impact ? row.evidence[row.impact.evidenceIndex] : row.evidence.find((x) => x.value != null);
+  return e?.kind ?? null;
+}
+
+/**
  * Where a published vacancy figure stands in the order a stabilized
  * assumption is held to them — the order lib/model-vs-market's vacancy check
  * anchors in: the metro area's survey, inside its own margin; for a

@@ -96,7 +96,7 @@ import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest, stabilizedVacancyStated } from "@/lib/stress-test";
+import { buildStressTest, stabilizedVacancyStated, vacancyDecidedBy } from "@/lib/stress-test";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
@@ -966,7 +966,9 @@ export default async function DealPage({
   // A document the screen read is named and never scored — and the
   // previous screen's challenges (the re-screen's snapshot) are scored
   // against what arrived after THAT verdict, since the re-screen read it.
-  const trackRecord = scoreDeal({
+  // Scored once the stress test is built (below), which says whether the
+  // market or the documents decided the vacancy row.
+  const scoreTrackRecord = (vacancyHeldToMarket: boolean) => scoreDeal({
     screenedAt: verdict?.generatedAt ?? null,
     challenges: challenges?.challenges,
     priorScreen,
@@ -990,9 +992,11 @@ export default async function DealPage({
     // The class the page shows, so the roll's vacancy is read as the
     // stress test reads it (by count on a class priced by the unit).
     assetClass: shownAssetClass(deal.asset_class as string | null, extraction),
-    // A stabilized assumption the stress test holds to the market: a later
-    // document's vacancy is today's and scores no vacancy challenge.
-    vacancyHeldToMarket: stabilizedVacancyStated(extraction, firstSignal),
+    // A stabilized assumption the stress test held to the market: a later
+    // document's vacancy is today's and scores no vacancy challenge — only
+    // where the market's figure decided the row, never where the documents
+    // did (audit M5).
+    vacancyHeldToMarket,
   });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
@@ -1461,6 +1465,7 @@ export default async function DealPage({
   // The test at a glance beside the call, and in the bar that keeps the deal
   // in view: the panel's own counts (lib/stress-test-words), linking to it.
   const stressCounts = stressTest && stressTest.rows.length > 0 ? verdictCounts(stressTest) : null;
+  const trackRecord = scoreTrackRecord(stabilizedVacancyStated(extraction, firstSignal) && vacancyDecidedBy(stressTest) === "published");
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
