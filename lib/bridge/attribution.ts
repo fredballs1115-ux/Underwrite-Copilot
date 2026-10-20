@@ -163,9 +163,38 @@ function shapleyWalk(
 ): Walk {
   const n = paths.length;
   const targets: LeafValue[] = paths.map((p) => getPath(to, p));
-
   // v(S): the model with exactly the fields in S switched from A's value to
-  // B's. Memoized on the coalition bitmask — permutations reuse coalitions
+  // B's.
+  const scenarioAt = (mask: number): Assumptions => {
+    let scenario = from;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) scenario = setPath(scenario, paths[i], targets[i]);
+    }
+    return scenario;
+  };
+  return shapleyOver(paths, scenarioAt, run, EXACT_FIELD_LIMIT);
+}
+
+/**
+ * The walk itself, over any set of PLAYERS whose scenario at a coalition
+ * the caller builds: `scenarioAt(mask)` is the model's inputs with exactly
+ * the players whose bit is set in `mask` switched. The bridge's players are
+ * leaf paths (`shapleyWalk`); the stress test's headline (lib/stress-test
+ * `stressHeadline`) plays one assumption a player, since one assumption can
+ * move a leaf another also moves (the tax line and the insurance line are
+ * both the expense lines) or move it by an amount that depends on the
+ * coalition (a reset tax bill struck on the price the coalition pays).
+ * Exact up to `exactLimit` players, sampled above.
+ */
+function shapleyOver(
+  paths: FieldPath[],
+  scenarioAt: (mask: number) => Assumptions,
+  run: ModelRunner,
+  exactLimit: number,
+): Walk {
+  const n = paths.length;
+
+  // Memoized on the coalition bitmask — permutations reuse coalitions
   // heavily, and this is what keeps the exact walk to 2^n runs.
   const memo = new Map<number, BridgeMetrics>();
   let evaluated = 0;
@@ -173,11 +202,7 @@ function shapleyWalk(
   const evaluate = (mask: number): BridgeMetrics => {
     const hit = memo.get(mask);
     if (hit) return hit;
-    let scenario = from;
-    for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) scenario = setPath(scenario, paths[i], targets[i]);
-    }
-    const metrics = run(scenario);
+    const metrics = run(scenarioAt(mask));
     evaluated++;
     // The floor is an exact sentinel (model.ts), so an equality test is a
     // reliable "this scenario's cash flows had no IRR root".
@@ -203,7 +228,7 @@ function shapleyWalk(
     };
   }
 
-  if (n <= EXACT_FIELD_LIMIT) {
+  if (n <= exactLimit) {
     // Exact: Σ over coalitions S not containing i of
     //   |S|!(n−|S|−1)!/n! · [v(S∪{i}) − v(S)]
     for (let mask = 0; mask <= fullMask; mask++) {
@@ -285,6 +310,49 @@ function popcount(x: number): number {
     c++;
   }
   return c;
+}
+
+export interface PlayerAttribution {
+  /** the model at the empty coalition and at the full one */
+  base: BridgeMetrics;
+  full: BridgeMetrics;
+  /** each player's Shapley share, in `players`' order (decimals for the
+   *  IRRs); they sum to full − base on every metric (efficiency) */
+  shares: BridgeMetrics[];
+  method: "exact" | "sampled";
+  scenariosEvaluated: number;
+  /** coalitions whose IRR had no root and was floored (model.ts) */
+  flooredScenarios: number;
+}
+
+/**
+ * Shapley attribution over caller-built coalitions: the bridge's own walk
+ * (memoized on the coalition, exact up to `exactLimit` players, sampled
+ * past it) with the scenario at each coalition built by the caller rather
+ * than by switching leaf paths. `scenarioAt(inCoalition)` returns the
+ * model's inputs with exactly the players `inCoalition` answers true for
+ * switched. Players are distinct names.
+ */
+export function attributeOverPlayers(
+  players: string[],
+  scenarioAt: (inCoalition: (player: number) => boolean) => Assumptions,
+  options: { run?: ModelRunner; exactLimit?: number } = {},
+): PlayerAttribution {
+  if (new Set(players).size !== players.length) throw new Error("attributeOverPlayers: the players must be distinct");
+  const walk = shapleyOver(
+    players,
+    (mask) => scenarioAt((i) => (mask & (1 << i)) !== 0),
+    options.run ?? defaultRunner,
+    options.exactLimit ?? EXACT_FIELD_LIMIT,
+  );
+  return {
+    base: walk.base,
+    full: walk.full,
+    shares: players.map((p) => ({ ...walk.contributions.get(p)! })),
+    method: walk.method,
+    scenariosEvaluated: walk.scenariosEvaluated,
+    flooredScenarios: walk.flooredScenarios,
+  };
 }
 
 /** A leaf as the step carries it: a number or a string as it is; a
