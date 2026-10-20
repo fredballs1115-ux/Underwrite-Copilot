@@ -1616,4 +1616,25 @@ describe("the memo leads with the stress test", () => {
     expect(text).not.toContain("T-12 NOI");
     expect(text).toContain("SUBMARKET CHECKS OVERRIDDEN");
   }, 60000);
+
+  it("gives the deal-killers and the flips back in the step that cuts the block under two rows, and prints the count beside the title", async () => {
+    const { sampleStressTest, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const { MEMO_FIT_STEPS } = await import("./memo-document");
+    const data = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, sampleStressTest("2026-10-19"));
+    // Emptied for the block's rows, and kept to give back.
+    expect(data.dealKillers).toEqual([]);
+    expect(data.stressDisplaced?.dealKillers.length).toBeGreaterThan(0);
+    const toTwo = MEMO_FIT_STEPS[1](data)!;
+    expect(toTwo.stressTest?.rows).toHaveLength(2);
+    expect(toTwo.dealKillers).toEqual([]);
+    const toOne = MEMO_FIT_STEPS[2](toTwo)!;
+    expect(toOne.stressTest?.rows).toHaveLength(1);
+    expect(toOne.dealKillers).toEqual(data.stressDisplaced!.dealKillers);
+    expect(toOne.sensitivity).toEqual(data.stressDisplaced!.sensitivity);
+    expect(toOne.stressDisplaced).toBeNull();
+    // The block's count, beside its title.
+    expect(data.stressTest?.count).toBe("1 unsupported · 2 stretched");
+    const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
+    expect(text.toLowerCase()).toContain("the om's assumptions, tested 1 unsupported · 2 stretched");
+  }, 60000);
 });
