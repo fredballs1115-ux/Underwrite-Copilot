@@ -69,6 +69,18 @@ tested and whether that is right. So:
   `#stress-test`), the sample's public headers take the same chip from the
   same build, and the rent roll / T-12 prompt sits under the panel saying
   which rows the documents turn into tests.
+- **The headline** (2026-10-20, `stressHeadline` in `lib/stress-test.ts`,
+  `HEADLINE_METHOD`): the levered IRR the ask earns on every re-run row at
+  the OM's figure at once, against the same model with every stretched or
+  unsupported row at its evidence, the gap split by Shapley values
+  (`attributeOverPlayers`, lib/bridge). Both cases pay the ask (the price
+  row is named left out); the NOI is left out wherever vacancy, taxes or
+  insurance moves on its own. Rent growth is held to the deal's own kind of
+  rent (Zillow's apartment asking rents first), a stabilized vacancy to the
+  market's published figure (the rent roll shown as today's lease-up gap),
+  and the price only to comps graded `supports` or recorded sales the comps
+  tab would call, through one builder (`lib/stress-basis-evidence.ts`) on
+  every surface.
 - **The challenger's downside paragraph is a scenario in words**: its prompt
   asks for no return figures and the verdict does not read it; every return
   on a page is the engine's.
