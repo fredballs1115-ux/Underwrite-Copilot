@@ -29,11 +29,12 @@ const withTarget = (html: string) => `${html}<div id="${STRESS_TEST_ANCHOR}"></d
 describe("the stress-test chip", () => {
   it("counts the rows as the panel's own read line does, in its words, most severe first", () => {
     const line = stressChipLine(counts)!;
-    // The panel's line is "N assumptions tested: …"; the chip's parts are its.
-    expect(line.replace(/^Stress test: /, "")).toBe(stressReadLine(test.rows).replace(/^\d+ assumptions? tested: /, ""));
+    // The panel's line is "N assumptions: …; M could not be checked"; the
+    // chip's parts are its.
+    expect(line.replace(/^Stress test: /, "")).toBe(stressReadLine(test.rows).replace(/^\d+ assumptions?: /, ""));
     const html = renderToStaticMarkup(h(StressChip, { counts }));
     const text = visibleText(html).replace(/\s+/g, " ").trim();
-    for (const part of line.replace(/^Stress test: /, "").split(", ")) expect(text).toContain(part);
+    for (const part of line.replace(/^Stress test: /, "").split(/, |; /)) expect(text).toContain(part);
     expect(text.startsWith("Stress test")).toBe(true);
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(a11yIssues(withTarget(html))).toEqual([]);
@@ -54,7 +55,7 @@ describe("the stress-test chip", () => {
   it("draws nothing without a struck row, and says one hold as 'holds', more as 'hold'", () => {
     expect(renderToStaticMarkup(h(StressChip, { counts: null }))).toBe("");
     expect(renderToStaticMarkup(h(StressChip, { counts: { holds: 0, stretched: 0, unsupported: 0, unchecked: 0 } }))).toBe("");
-    expect(stressChipLine({ holds: 1, stretched: 0, unsupported: 0, unchecked: 2 })).toBe("Stress test: 1 holds, 2 unchecked");
+    expect(stressChipLine({ holds: 1, stretched: 0, unsupported: 0, unchecked: 2 })).toBe("Stress test: 1 holds; 2 could not be checked");
     expect(stressChipLine({ holds: 3, stretched: 1, unsupported: 0, unchecked: 0 })).toBe("Stress test: 1 stretched, 3 hold");
   });
 

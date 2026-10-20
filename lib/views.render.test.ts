@@ -1505,18 +1505,20 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(row).toContain('data-verdict="unsupported"');
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
-      // The engine at the OM's 6.0% against the engine at the roll's 9.1%.
-      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.3%");
+      // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
+      // by count (225 of 248 doors).
+      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.1%");
       // The sample's two unchecked rows are one folded group at the end: the
       // memorandum states no loan rate, and no figure was read today for
       // rent growth. Its taxes, insurance and premium are tested.
-      expect(visibleText(html)).toContain("2 assumptions unchecked: debt, rent growth");
+      expect(visibleText(html)).toContain("2 could not be checked: debt, rent growth");
       expect(visibleText(html)).toContain("Read why (2)");
-      for (const k of ["taxes", "insurance", "renovation_premium"]) {
+      // The taxes' reset is the jurisdiction's to make: stretched at most.
+      for (const [k, v] of [["taxes", "stretched"], ["insurance", "unsupported"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);
         expect(at, k).toBeGreaterThan(0);
         expect(at, k).toBeLessThan(html.indexOf('data-qa="stress-unchecked-group"'));
-        expect(html.slice(at, at + 400), k).toContain('data-verdict="unsupported"');
+        expect(html.slice(at, at + 400), k).toContain(`data-verdict="${v}"`);
       }
       expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-noi"'));
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));

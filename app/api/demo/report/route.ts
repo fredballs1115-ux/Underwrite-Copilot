@@ -17,6 +17,7 @@ import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
 import { sampleActuals, sampleCover, sampleDocumentChecks, sampleDocumentRow, sampleModelVsMarket, sampleStressTest } from "@/lib/sample-cover";
+import { sampleTodayReads } from "@/lib/sample-stress-read";
 
 export const runtime = "nodejs";
 
@@ -122,12 +123,13 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   // the market the sample sits in — the signed-in sample's report prints
   // this block, so the visitor's does too. Its own try, as there (lib/
   // sample-cover `sampleModelVsMarket`): a failed live read leaves the
-  // grids in place and the block out.
-  const assumptions = await sampleModelVsMarket(readerDay);
-  // The OM's assumptions tested in code, as the signed-in report builds it
-  // for the sample: the same derivation, actuals and published-figure read
-  // (lib/sample-cover `sampleStressTest`).
-  const stressTest = sampleStressTest(readerDay, assumptions);
+  // grids in place and the block out. Read once, for the block and the test.
+  const reads = await sampleTodayReads();
+  const assumptions = sampleModelVsMarket(readerDay, reads);
+  // The OM's assumptions tested in code: the sample's one build
+  // (lib/sample-stress, through lib/sample-cover `sampleStressTest`), on the
+  // same figures.
+  const stressTest = sampleStressTest(readerDay, reads);
 
   // What a visitor's copy has none of, by design: no firm's branding (a
   // visitor has no account to brand it), no dismissed submarket checks (the

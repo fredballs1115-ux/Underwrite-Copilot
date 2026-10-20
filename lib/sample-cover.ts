@@ -9,7 +9,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
-import type { BrokerCompsResult, ChallengerResult, ExtractionResult, FirstSignal, MarketResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
 import type { MemoCover } from "@/lib/memo/memo-document";
@@ -18,14 +18,10 @@ import { actualsFromRows, actualsShortLine, type ActualsRead } from "@/lib/actua
 import { inferStrategy } from "@/lib/deal-strategy";
 import { shownAssetClass } from "@/lib/asset-class";
 import { pdfSafe } from "@/lib/memo/pdf-text";
-import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildStressTest } from "@/lib/stress-test";
 import type { StressTest } from "@/lib/stress-test-types";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
-import { modelVsMarketFor } from "@/lib/model-vs-market";
-import { countyOf, placeDeal } from "@/lib/market-county";
-import { todayReads } from "@/lib/model-vs-market-read";
-import { regulationForDeal } from "@/lib/rent-regulation";
+import type { MarketReads } from "@/lib/model-vs-market";
+import { sampleModelReads, sampleStressTest as buildSampleStressTest } from "@/lib/sample-stress";
 
 /** The sample is placed at neighbourhood level on purpose (lib/sample-deal:
  *  never a street address), so its cover is the USGS frame of Brewerytown
@@ -145,27 +141,16 @@ export function sampleActualsLine(): string {
 
 /**
  * The sample's model against today's published figures, as the signed-in
- * report route reads it for the sample (lib/model-vs-market-read
- * `todayReads` through `modelVsMarketFor`, on the market the sample's
- * stored address places it in): the public report prints the same block.
- * Null where the read fails — the report keeps its grids and leaves the
- * block out, there as here. Never throws.
+ * routes read it for the sample — through lib/sample-stress's
+ * `sampleModelReads` (the sample's place, rent rules and one derivation, the
+ * deal page's own readers), on figures the caller read once
+ * (lib/sample-stress-read `sampleTodayReads`). Null where the read failed —
+ * the report keeps its grids and leaves the block out, there as here.
  */
-export async function sampleModelVsMarket(readerDay: string): Promise<ModelVsMarket | null> {
-  const deal = sampleDocumentRow();
-  const extraction = SAMPLE_DEAL.extraction as ExtractionResult;
-  const address = SAMPLE_DEAL.address as unknown as StructuredAddress;
+export function sampleModelVsMarket(readerDay: string, reads: MarketReads | null): ModelVsMarket | null {
+  if (!reads) return null;
   try {
-    const metro = placeDeal(address, countyOf(address, null)).live;
-    return modelVsMarketFor({
-      derived: sampleDerivedInputs(),
-      extraction,
-      firstSignal: null,
-      storedAssetClass: deal.asset_class as string | null,
-      metro,
-      reads: await todayReads(metro),
-      regulation: regulationForDeal({ extraction, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class }, readerDay),
-    });
+    return sampleModelReads({ today: readerDay, reads }).modelVsMarket;
   } catch (err) {
     console.warn("sample report assumptions read failed:", err instanceof Error ? err.message : err);
     return null;
@@ -173,26 +158,11 @@ export async function sampleModelVsMarket(readerDay: string): Promise<ModelVsMar
 }
 
 /**
- * The sample's stress test (lib/stress-test), as the signed-in routes build
- * it for the sample: the stored results (the challenger, the market check,
- * the memorandum's comps), the stored rent roll and T-12 (`sampleActuals`)
- * and the one derivation every public entry point runs
- * (lib/sample-derive). The memo reads no published figure today, so its
- * test takes none (`modelVsMarket` null); the report hands in the read it
- * already makes. `readOn` is the reader's day.
+ * The sample's stress test for its public documents: lib/sample-stress's
+ * one build (the page's, /demo's and the homepage's), never a second way —
+ * on the reader's day and the figures the caller read once (null where the
+ * read failed or none was made, which leaves the published rows unchecked).
  */
-export function sampleStressTest(readOn: string, modelVsMarket: ModelVsMarket | null = null): StressTest {
-  const deal = sampleDocumentRow();
-  return buildStressTest({
-    extraction: SAMPLE_DEAL.extraction as ExtractionResult,
-    firstSignal: null,
-    challenger: SAMPLE_DEAL.challenges as ChallengerResult,
-    market: SAMPLE_DEAL.market as MarketResult,
-    modelVsMarket,
-    actuals: sampleActuals(),
-    derived: sampleDerivedInputs(),
-    storedAssetClass: deal.asset_class as string | null,
-    brokerComps: SAMPLE_DEAL.comps as BrokerCompsResult,
-    readOn,
-  });
+export function sampleStressTest(readOn: string, reads: MarketReads | null = null): StressTest {
+  return buildSampleStressTest({ today: readOn, reads });
 }

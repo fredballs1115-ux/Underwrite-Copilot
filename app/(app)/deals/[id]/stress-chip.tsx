@@ -25,15 +25,21 @@ const PARTS: { verdict: StressVerdict; word: (n: number) => string; dot: string;
   { verdict: "unsupported", word: () => "unsupported", dot: "bg-kill", text: "text-kill" },
   { verdict: "stretched", word: () => "stretched", dot: "bg-caution", text: "text-caution" },
   { verdict: "holds", word: (n) => (n === 1 ? "holds" : "hold"), dot: "bg-pass", text: "text-pass" },
-  { verdict: "unchecked", word: () => "unchecked", dot: "border border-muted", text: "text-muted" },
+  // The panel's own words (app/stress-test-panel `stressReadLine`): a row
+  // nothing tested "could not be checked", never "unchecked".
+  { verdict: "unchecked", word: () => "could not be checked", dot: "border border-muted", text: "text-muted" },
 ];
 
-/** "Stress test: 1 unsupported, 2 stretched, 1 holds, 5 unchecked" — null
- *  where no row was struck. */
+/** "Stress test: 1 unsupported, 2 stretched, 1 holds; 5 could not be
+ *  checked" — the panel's read line less its head; null where no row was
+ *  struck. */
 export function stressChipLine(counts: StressCounts | null): string | null {
   const said = PARTS.filter((p) => (counts?.[p.verdict] ?? 0) > 0);
   if (!counts || said.length === 0) return null;
-  return `Stress test: ${said.map((p) => `${counts[p.verdict]} ${p.word(counts[p.verdict])}`).join(", ")}`;
+  const words = (p: (typeof PARTS)[number]) => `${counts[p.verdict]} ${p.word(counts[p.verdict])}`;
+  const tested = said.filter((p) => p.verdict !== "unchecked").map(words);
+  const unchecked = said.find((p) => p.verdict === "unchecked");
+  return `Stress test: ${[tested.join(", "), unchecked ? words(unchecked) : ""].filter(Boolean).join("; ")}`;
 }
 
 /** The panel's tone, by the worst verdict a row was given. */

@@ -1520,12 +1520,14 @@ describe("the memo leads with the stress test", () => {
     const test = sampleStressTest("2026-10-19");
     const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
     // The four rows the memo has room for, unsupported first in the test's
-    // own order; the basis and the exit, stretched, are the report's.
+    // own order, then the first stretched (the basis); the exit, the NOI and
+    // the taxes — stretched, the taxes' reset being the jurisdiction's to
+    // make — are the report's.
     expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["vacancy", "unsupported"],
-      ["taxes", "unsupported"],
       ["insurance", "unsupported"],
       ["renovation_premium", "unsupported"],
+      ["basis", "stretched"],
     ]);
     const pdf = await renderMemoPdf(data);
     // One page, every row on it: the block takes the room the screen's
@@ -1534,15 +1536,15 @@ describe("the memo leads with the stress test", () => {
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (4 unsupported, 2 stretched, 1 holds), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (3 unsupported, 4 stretched), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
-    // against the engine at the rent roll's 9.1%, one input apart.
-    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.1% (the deal's rent roll, May 31, 2026) · gap 3.1 pts · IRR 12.4% to 9.3%");
-    // The taxes row: the seller's bill against the bill its own rate makes
-    // on the price, and the engine's move, spelled, since standard
+    // against the engine at the rent roll's 9.3% by count, one input apart.
+    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.3% (the deal's rent roll, May 31, 2026) · gap 3.3 pts · IRR 12.4% to 9.1%");
+    // The basis row: the ask against the median of the comps the comps step
+    // graded clean, and the engine's move, spelled, since standard
     // Helvetica has no arrow.
-    expect(text).toContain("UNSUPPORTED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · IRR 9.3% to 5.9%");
+    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $257k/unit (the offering memorandum) · gap 6.9% · IRR 9.3% to 12.7%");
     expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
@@ -1631,10 +1633,15 @@ describe("the memo leads with the stress test", () => {
     expect(toOne.stressTest?.rows).toHaveLength(1);
     expect(toOne.dealKillers).toEqual(data.stressDisplaced!.dealKillers);
     expect(toOne.sensitivity).toEqual(data.stressDisplaced!.sensitivity);
-    expect(toOne.stressDisplaced).toBeNull();
+    // Where even that does not fit, the last step empties them again.
+    const tight = MEMO_FIT_STEPS[3](toOne)!;
+    expect(tight.stressTest?.rows).toHaveLength(1);
+    expect(tight.dealKillers).toEqual([]);
+    expect(tight.sensitivity).toEqual([]);
+    expect(MEMO_FIT_STEPS[3](tight)).toBeNull();
     // The block's count, beside its title.
-    expect(data.stressTest?.count).toBe("1 unsupported · 3 stretched");
+    expect(data.stressTest?.count).toBe("3 unsupported · 4 stretched");
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text.toLowerCase()).toContain("the om's assumptions, tested 1 unsupported · 3 stretched");
+    expect(text.toLowerCase()).toContain("the om's assumptions, tested 3 unsupported · 4 stretched");
   }, 60000);
 });

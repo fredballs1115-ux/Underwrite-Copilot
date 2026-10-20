@@ -232,7 +232,7 @@ describe("the sample's public documents are the signed-in sample's", () => {
       storedAssetClass: string;
       firstSignal: unknown;
     };
-    expect(args.metro).toBe(metro);
+    expect(args.metro).toEqual(metro);
     expect(args.reads).toBe(reads);
     expect(args.storedAssetClass).toBe("multifamily");
     expect(args.firstSignal).toBeNull();

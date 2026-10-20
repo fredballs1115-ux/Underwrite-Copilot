@@ -1367,7 +1367,8 @@ export function pdfPageCount(buf: Buffer): number {
  * lead. The step that cuts the block under two rows gives back the
  * deal-killer cards and the flips strip the block had emptied for its rows
  * (`stressDisplaced`): a block of one holds none of their room, and a memo
- * that dropped both would print the call with neither. A memo that still
+ * that dropped both would print the call with neither — unless they no
+ * longer fit, when the last step empties them again. A memo that still
  * cannot fit flows to a second page with everything on it. Exported for
  * its test.
  */
@@ -1381,8 +1382,14 @@ export const MEMO_FIT_STEPS: readonly ((d: MemoData) => MemoData | null)[] = [
           stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 1) },
           dealKillers: d.stressDisplaced?.dealKillers ?? d.dealKillers,
           sensitivity: d.stressDisplaced?.sensitivity ?? d.sensitivity,
-          stressDisplaced: null,
         }
+      : null,
+  // Where the page still runs over with them given back, the one-row block
+  // keeps the room after all: the memo stays one page with the test's lead
+  // row rather than flowing to a second.
+  (d) =>
+    d.stressDisplaced && d.stressTest && d.stressTest.rows.length === 1 && d.dealKillers.length + d.sensitivity.length > 0
+      ? { ...d, dealKillers: [], sensitivity: [] }
       : null,
 ];
 
