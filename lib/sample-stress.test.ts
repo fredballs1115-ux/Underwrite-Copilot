@@ -177,8 +177,8 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(demoData).not.toContain("buildStressTest");
     expect(demoData).not.toMatch(/modelVsMarketFor\(|sampleDerivedInputs\(/);
     const page = src("app/(app)/deals/[id]/page.tsx");
-    expect(page).toContain("recordedSales: isSampleDeal ? null : recordedSales,");
-    expect(page).toContain("pastScreens: isSampleDeal ? null : pastScreens,");
+    // The one builder hands the sample neither (lib/stress-basis-evidence).
+    expect(page).toMatch(/stressBasisEvidence\(\{[^}]*isSample: isSampleDeal,/);
     // The sample is never seeded from today's rates (lib/model-market).
     expect(page).toContain("modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt)");
   });

@@ -23,6 +23,8 @@ import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
 import { regulationForDeal } from "@/lib/rent-regulation";
 import { SHARE_NO_MODEL, buildStressTest } from "@/lib/stress-test";
+import { PAST_SCREENS_ON_SHARE } from "@/lib/stress-basis-evidence";
+import { readStressBasisEvidence } from "@/lib/stress-basis-read";
 
 /** The aerial's credit on the public screen: The National Map is a US
  *  federal work in the public domain, and the line says so. */
@@ -148,8 +150,11 @@ export default async function SharePage({
   );
   // The OM's assumptions, tested (lib/stress-test), from the stored results
   // the token resolves: the extraction, the challenger, the memorandum's
-  // comps and the market check. A shared screen carries no model and reads
-  // no figures today, so no return is re-run, and the panel says so.
+  // comps, the recorded sales the deal's public-record pull stored and the
+  // market check. A shared screen carries no model and reads no figures
+  // today, so no return is re-run, and the panel says so. The sender's own
+  // past screens are their other deals: never read here, and said so.
+  const { recordedSales } = await readStressBasisEvidence(admin, { ...deal, id: dealId }, { readerId: null, pastScreens: false });
   const stressTest = buildStressTest({
     extraction,
     firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
@@ -160,6 +165,9 @@ export default async function SharePage({
     derived: null,
     storedAssetClass: (deal.asset_class as string | null) ?? null,
     brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+    recordedSales,
+    pastScreens: null,
+    pastScreensWithheld: PAST_SCREENS_ON_SHARE,
     // The shared screen carries no model by design (its reader sees the
     // screen, not the sender's underwriting), so the test says that, never
     // that no model was derived.

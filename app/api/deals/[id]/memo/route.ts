@@ -35,6 +35,7 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
 import { buildStressTest } from "@/lib/stress-test";
+import { readStressBasisEvidence } from "@/lib/stress-basis-read";
 import type { StressTest } from "@/lib/stress-test-types";
 import type { BrokerCompsResult, ChallengerResult, MarketResult } from "@/lib/anthropic/types";
 
@@ -299,6 +300,10 @@ export async function GET(
           console.warn(`memo assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
           modelVsMarket = null;
         }
+        // The recorded sales and the reader's own past screens, as the deal
+        // page sets the basis against them (lib/stress-basis-read, the one
+        // builder): the memo is the reader's own document.
+        const { recordedSales, pastScreens } = await readStressBasisEvidence(supabase, deal, { readerId: user.id, pastScreens: true });
         stressTest = buildStressTest({
           extraction,
           firstSignal,
@@ -309,6 +314,8 @@ export async function GET(
           derived,
           storedAssetClass: deal.asset_class as string | null,
           brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+          recordedSales,
+          pastScreens,
           readOn: readerDay,
         });
       }
