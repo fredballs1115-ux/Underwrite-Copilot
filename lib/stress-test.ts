@@ -109,7 +109,7 @@ import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, t
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
-import { NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
+import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
   type StressEvidence,
@@ -122,6 +122,7 @@ import {
   headlineBasisLeftOut,
   HEADLINE_NOI_LEFT_OUT,
   type StressHeadline,
+  type StressKept,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
 
@@ -1617,6 +1618,10 @@ function expenseImpact(
 
 // — Insurance —
 
+/** "The OM's $310k moved by the national premium index" — the insurance
+ *  row's index figure where the OM states a premium. */
+export const INSURANCE_MOVED_LABEL = (premium: string): string => `The OM's ${premium} moved by the national premium index`;
+
 function insuranceRow(ctx: Ctx): StressRow | null {
   const premiumRow =
     ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
@@ -1645,10 +1650,16 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${proseDay(stored.asOf)}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
   if (index) {
     const moved = premium != null ? Math.round(premium * (1 + index.pct / 100)) : null;
+    // Where the OM states a premium, the figure is the OM's own premium moved
+    // by the index — the memorandum's figure grown by the nation's carriers'
+    // year, not a figure of its own — and its label says so.
     evidence.push({
       kind: "published",
-      label: "Commercial property insurance premiums, national (PPI, commercial multiple peril)",
-      text: `${index.text}${moved != null ? ` — the OM's ${money(premium!)} moved by it is ${money(moved)}` : ""}; the nation's carriers, not this building's quote`,
+      label: moved != null ? `${INSURANCE_MOVED_LABEL(money(premium!))} (PPI, commercial multiple peril)` : "Commercial property insurance premiums, national (PPI, commercial multiple peril)",
+      text:
+        moved != null
+          ? `${money(moved)} (the index ${index.text}); the nation's carriers' move on the OM's own figure, not this building's quote`
+          : `${index.text}; the nation's carriers, not this building's quote`,
       value: moved,
       asOf: index.asOf,
       publisher: index.publisher,
@@ -2192,6 +2203,22 @@ function finishRow(row: StressRow): void {
       };
     }
   }
+  // A rent growth that holds against the CPI's rent holds against a lagging
+  // measure: the re-run's note says what it was held to and that it lags,
+  // so a row that holds with the return rising on the evidence is never read
+  // as the evidence endorsing the OM's rate.
+  const decider = i ? row.evidence[i.evidenceIndex] : null;
+  if (row.key === "rent_growth" && row.verdict === "holds" && i && decider?.label === CPI_RENT_LABEL && row.omSays.value != null) {
+    row.impact = { ...i, note: `${i.note} ${cpiRentHeld(row.omSays.value)}` };
+  }
+}
+
+/** "Held to the rent paid by sitting tenants (CPI rent), which averages
+ *  every lease in place, so it lags the rents new leases sign at: neither
+ *  the row holding nor this re-run endorses the OM's 4.0%/yr." */
+export function cpiRentHeld(omPct: number): string {
+  const label = `${CPI_RENT_LABEL[0].toLowerCase()}${CPI_RENT_LABEL.slice(1)}`;
+  return `Held to the ${label}, which ${CPI_RENT_LAGS.replace(/^it /, "")}: neither the row holding nor this re-run endorses the OM's ${pct1(omPct)}/yr.`;
 }
 
 /** The shared screen's reason (`withheldReason`): it carries no model by
@@ -2519,6 +2546,11 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
   const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
+  // The model as it runs, every input its own: the run each row's re-run
+  // swaps one input on (`runImpact`'s inputs are the model's with that one
+  // input replaced). Display only — neither case reads it.
+  const own = computeUnderwrite(model).returns;
+  const modelIrrPct = own.leveredIrrPct == null ? null : own.leveredIrrPct * 100;
   return {
     omIrrPct,
     evidenceIrrPct,
@@ -2528,5 +2560,56 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
     parts,
     omitted: omitted.sort((a, b) => order(a.key) - order(b.key)),
     unsolved,
+    modelIrrPct,
+    keptAtOm: keptAtOm(inCase, players, omitted, model, modelExpense).sort((a, b) => order(a.key) - order(b.key)),
   };
+}
+
+/**
+ * The rows both cases run at the OM's figure where the model as it runs has
+ * another (`StressHeadline.keptAtOm`): every row in the OM's case that is no
+ * player, so the evidence's case keeps the OM's figure too, with its figure
+ * and the model's in the row's own unit. The price is not among them: both
+ * cases pay the model's price, which the omitted price row says. Read off
+ * the same swaps the cases are struck on, never derived apart.
+ */
+function keptAtOm(
+  inCase: readonly HeadlineSwap[],
+  players: readonly HeadlineSwap[],
+  omitted: StressHeadline["omitted"],
+  model: UnderwriteInputs,
+  modelExpense: number,
+): StressKept[] {
+  const out: StressKept[] = [];
+  for (const s of inCase) {
+    if (players.includes(s) || s.row.key === "basis") continue;
+    let om: number;
+    let own: number;
+    if (s.kind === "scalar") {
+      // A percent input in the engine's decimal, said as a percent.
+      om = s.om * 100;
+      own = model[s.input] * 100;
+    } else if (s.kind === "expense") {
+      // The row's own bill or premium, and the model's: the line each run
+      // sets, less the rest of the model's line.
+      const om0 = s.row.omSays.value;
+      if (om0 == null) continue;
+      om = om0;
+      own = om0 + (modelExpense - s.om);
+    } else {
+      om = s.omNoi;
+      own = year1Noi(model);
+    }
+    const tol = s.kind === "scalar" ? 1e-9 : 0.5;
+    if (!Number.isFinite(om) || !Number.isFinite(own) || Math.abs(om - own) < tol) continue;
+    const why: StressKept["why"] = passed(s.row)
+      ? omitted.some((o) => o.key === s.row.key)
+        ? "left_out"
+        : "same"
+      : s.row.verdict === "holds"
+        ? "holds"
+        : "unchecked";
+    out.push({ key: s.row.key, label: s.row.title, why, om, model: own });
+  }
+  return out;
 }

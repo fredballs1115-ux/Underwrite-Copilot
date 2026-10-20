@@ -20,6 +20,7 @@ import {
   type StressHeadline,
   type StressHeadlinePart,
   type StressImpact,
+  type StressKept,
   type StressKey,
   type StressRow,
   type StressTest,
@@ -377,6 +378,8 @@ export function unsolvedSentence(h: StressHeadline): string {
   return `${h.unsolved} mix${h.unsolved === 1 ? "" : "es"} of the swaps had no IRR and ${h.unsolved === 1 ? "was" : "were"} counted at the engine's floor in the split.`;
 }
 
+const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
+
 function joinAnd(parts: string[]): string {
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
@@ -390,10 +393,74 @@ function joinAnd(parts: string[]): string {
  * The report prints `headlineSentence`, the split and what is left out
  * with why. Null with no headline.
  */
-export function headlineShort(test: StressTest): string | null {
+export function headlineShort(test: StressTest, withModel = true): string | null {
   const h = liveHeadline(test);
   if (!h) return null;
-  return `${headlineLine(test)!}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
+  const model = withModel ? modelClause(h) : "";
+  return `${headlineLine(test)!}${model ? ` (${model})` : ""}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
+}
+
+// ── The model as it runs: the base every re-run starts from ─────────────
+
+/** "the model as it runs: 9.3%" — the derived model's own levered IRR, every
+ *  input its own, as the headline carries it; "" on a headline struck before
+ *  it was carried. */
+export function modelClause(h: StressHeadline): string {
+  if (h.modelIrrPct === undefined) return "";
+  return h.modelIrrPct == null ? "the model as it runs: its levered IRR does not solve" : `the model as it runs: ${irrText(h.modelIrrPct)}`;
+}
+
+/** The model's own levered IRR where the test's headline carries it: a
+ *  figure, null where it does not solve, undefined where it is not carried. */
+export function modelIrrOf(test: StressTest): number | null | undefined {
+  const h = liveHeadline(test);
+  return h ? h.modelIrrPct : undefined;
+}
+
+/**
+ * What a row's re-run is, in the words every surface prints beside it: "the
+ * model at 9.3%, this input alone at the OM's figure, then at the
+ * evidence's" — each run the model as it runs with ONE input changed, never
+ * the OM's case. Where the OM's figure is the evidence's, the two runs are
+ * one, said so. Without the model's figure, "the model as it runs".
+ */
+export function rerunWords(test: StressTest, impact?: StressImpact | null): string {
+  const m = modelIrrOf(test);
+  const base = m === undefined ? "the model as it runs" : m == null ? "the model as it runs (its levered IRR does not solve)" : `the model at ${irrText(m)}`;
+  const same = impact != null && Math.abs(impact.altValue - impact.omValue) < 1e-9;
+  return same ? `${base}, this input alone at the OM's figure, which is the evidence's` : `${base}, this input alone at the OM's figure, then at the evidence's`;
+}
+
+const KEPT_LEAD: Record<StressKept["why"], string> = {
+  holds: "where a row holds",
+  left_out: "where a row is left out",
+  same: "where the evidence is the OM's own figure",
+  unchecked: "where a row is unchecked",
+};
+
+/**
+ * Why the evidence's case is not the model as it runs: the rows it keeps at
+ * the OM's figure where the model has another, named with both figures, read
+ * off the headline's own `keptAtOm` — "Against the model as it runs (9.3%),
+ * the evidence's case keeps the OM's figure where a row holds: vacancy 6.0%
+ * (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and
+ * where a row is left out: the NOI $3.88M (the model's $3.71M)." Null where
+ * nothing is kept at a figure of the OM's the model does not run, or where
+ * the headline does not carry the model.
+ */
+export function keptSentence(test: StressTest): string | null {
+  const h = liveHeadline(test);
+  if (!h || h.modelIrrPct === undefined || !h.keptAtOm || h.keptAtOm.length === 0) return null;
+  const order: StressKept["why"][] = ["holds", "left_out", "same", "unchecked"];
+  const clauses = order.flatMap((why) => {
+    const items = h.keptAtOm!.filter((k) => k.why === why);
+    if (items.length === 0) return [];
+    const said = items.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.om)} (the model's ${figureText(k.key, k.model)})`);
+    return [`${KEPT_LEAD[why]}: ${joinAnd(said)}`];
+  });
+  const model = h.modelIrrPct == null ? "its levered IRR does not solve" : irrText(h.modelIrrPct);
+  const joined = clauses.length === 1 ? clauses[0] : `${clauses.slice(0, -1).join("; ")}; and ${clauses[clauses.length - 1]}`;
+  return `Against the model as it runs (${model}), the evidence's case keeps the OM's figure ${joined}.`;
 }
 
 /** The sentence a document prints where the headline is withheld: the
@@ -426,7 +493,11 @@ export function headlineSentence(test: StressTest): string | null {
           : ".";
   const unsolved = h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
-  return `${line}${multiples}${split}${unsolved}${left}`;
+  // The model as it runs, and why the evidence's case is not it.
+  const kept = keptSentence(test);
+  const clause = modelClause(h);
+  const model = kept ? ` ${kept}` : clause ? ` ${upperFirst(clause)}.` : "";
+  return `${line}${multiples}${split}${unsolved}${left}${model}`;
 }
 
 /** The rows in STRESS_KEYS' order, as the test holds them. */

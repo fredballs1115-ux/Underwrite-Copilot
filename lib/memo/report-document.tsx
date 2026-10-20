@@ -110,7 +110,7 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, rerunWords, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -399,7 +399,9 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
   const ticks = tickPositions(row);
   const track = 120;
   const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";
-  const move = row.impact ? row.impact.note : noMoveWhy(test, row);
+  // A re-run is the model as it runs with this one input changed, said so
+  // with the model's own figure (lib/stress-test-words `rerunWords`).
+  const move = row.impact ? `${rerunWords(test, row.impact)}. ${row.impact.note}` : noMoveWhy(test, row);
   return (
     <View style={[s.block, { marginBottom: 11 }]} wrap={false}>
       <View style={s.blockTitleRow}>

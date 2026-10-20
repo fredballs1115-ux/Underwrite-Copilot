@@ -1557,7 +1557,7 @@ describe("the memo leads with the stress test", () => {
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
     // report than that it prints every row.
-    expect(text).toContain("Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row.");
+    expect(text).toContain(`Each row's IRR: the model at ${test.headline!.modelIrrPct!.toFixed(1)}%, this input alone at the OM's figure, then at the evidence's; the report prints every row.`);
     expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");

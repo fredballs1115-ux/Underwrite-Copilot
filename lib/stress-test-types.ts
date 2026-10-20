@@ -185,6 +185,32 @@ export interface StressHeadline {
   /** mixes of the swaps (coalitions) whose levered IRR had no root, each
    *  counted at the engine's floor in the split; 0 in the normal case */
   unsolved: number;
+  /** the derived model as it runs, every input its own — the base each
+   *  row's re-run starts from (`computeUnderwrite` on the model's inputs,
+   *  the run every row's one-input swap is made on). Null where its
+   *  cash flows have no root; absent on a headline struck before it was
+   *  carried. Display only: neither case is changed by it. */
+  modelIrrPct?: number | null;
+  /** the rows the OM's case runs at the OM's figure and the evidence's case
+   *  KEEPS there, where the model as it runs has another figure — why the
+   *  evidence's case is not the model's own run. Each in the row's own unit
+   *  (a percent as a percent; the year-one NOI, a tax bill or a premium in
+   *  dollars), with why it stays: the row holds, is unchecked, is left out
+   *  of the swaps, or its evidence is the OM's own figure. Absent where
+   *  `modelIrrPct` is. */
+  keptAtOm?: StressKept[];
+}
+
+/** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
+export interface StressKept {
+  key: StressKey;
+  /** the row's own title */
+  label: string;
+  why: "holds" | "unchecked" | "left_out" | "same";
+  /** the OM's figure the two cases run on, in the row's own unit */
+  om: number;
+  /** the model's own figure for the same input, in the same unit */
+  model: number;
 }
 
 /** Why the NOI's own swap is left out of the headline where a component
@@ -223,6 +249,7 @@ export const HEADLINE_METHOD = {
   evidenceCase: [
     "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
     "One that holds or is unchecked stays at the OM's figure.",
+    "So the evidence's case is not the model as it runs: the headline draws the model's own levered IRR beside the two cases, and names each figure it keeps at the OM's where the model runs another.",
     "The price stays at the model's in both cases: the ask, a share's price grossed up to the whole, or an auction's floor.",
     "The headline asks what that price earns, and the price row says how far the ask sits from the comps.",
   ],
@@ -398,7 +425,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Insurance",
     claim: "The premium stays at the seller's expiring policy.",
     against: [
-      "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers",
+      "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's own premium: the OM's figure moved by the national premium index, not a figure of its own",
       "The deal's T-12 premium against the pro forma's",
     ],
     engine: "The insurance line is an expense input: the return is re-run at the T-12's premium where one is on file, else at the OM's premium moved by the index's year.",

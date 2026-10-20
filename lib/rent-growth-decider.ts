@@ -34,7 +34,9 @@ export const ALL_HOMES_RENT_LABEL = "Asking rent, all home types";
 export const CPI_RENT_LABEL = "Rent paid by sitting tenants (CPI rent)";
 const LESSOR_INDEX = /^Rents charged by .+, national \(PPI\)$/;
 
-const LAGS = "it averages every lease in place, so it lags the rents new leases sign at";
+/** Why the CPI's rent is a lagging measure, in the order's own words. */
+export const CPI_RENT_LAGS = "it averages every lease in place, so it lags the rents new leases sign at";
+const LAGS = CPI_RENT_LAGS;
 
 type Step = { label: string | RegExp; name: (label: string) => string; why: string };
 

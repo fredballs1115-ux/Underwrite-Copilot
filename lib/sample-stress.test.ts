@@ -21,6 +21,8 @@ import type { StressTest } from "./stress-test-types";
 import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
+import { computeUnderwrite } from "./underwrite/engine";
+import { headlineSentence, headlineShort, keptSentence, rerunWords } from "./stress-test-words";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
 // deal's page (app/(app)/deals/[id]/page.tsx), /demo's Overview
@@ -203,6 +205,44 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(bare.omKeys).not.toContain("rent_growth");
     expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
     expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
+  });
+
+  it("names the model as it runs beside the two cases, and why the evidence's case is not it, on every surface (the investor's walkthrough)", () => {
+    const { stress: page, derived } = signedInParts(READS);
+    const h = page.headline!;
+    expect(homepage(READS)!.headline).toEqual(h);
+    expect(demo(READS)!.headline).toEqual(h);
+    // The model as it runs: the derived model's own run, every input its
+    // own — the base each row's re-run changes one input of. The price row's
+    // re-run starts at it, since the model runs the ask, and the exit cap's
+    // lands on it, since the model runs the going-in cap.
+    expect(h.modelIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
+    expect(Math.round(h.modelIrrPct! * 10) / 10).toBe(9.3);
+    const row = (k: string) => page.rows.find((r) => r.key === k)!;
+    expect(row("basis").impact!.baseIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
+    expect(row("exit_cap").impact!.altIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
+    // The evidence's case sits above it because it keeps the OM's figure
+    // where a row holds or is left out: read off the rows, never typed.
+    expect(h.keptAtOm!.map((k) => [k.key, k.why])).toEqual([
+      ["noi", "left_out"],
+      ["vacancy", "holds"],
+      ["rent_growth", "holds"],
+    ]);
+    const kept =
+      "Against the model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the NOI $3.88M (the model's $3.71M).";
+    expect(keptSentence(page)).toBe(kept);
+    expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 11.5% with the evidence (the model as it runs: 9.3%); the report splits the gap by assumption.");
+    // Each re-run is the model at 9.3% with one input changed.
+    expect(rerunWords(page, row("insurance").impact)).toBe("the model at 9.3%, this input alone at the OM's figure, then at the evidence's");
+    // The rent growth holds against the CPI's rent, a lagging measure, and
+    // its re-run says so rather than reading as an endorsement.
+    expect(row("rent_growth").verdict).toBe("holds");
+    expect(row("rent_growth").impact!.note).toContain(
+      "Held to the rent paid by sitting tenants (CPI rent), which averages every lease in place, so it lags the rents new leases sign at: neither the row holding nor this re-run endorses the OM's 4.0%/yr.",
+    );
+    // The insurance row's index figure is the OM's own premium moved by it.
+    expect(row("insurance").evidence[1]).toMatchObject({ kind: "published", label: "The OM's $310k moved by the national premium index (PPI, commercial multiple peril)", value: 324_994 });
   });
 
   it("draws one renovation program under the header on all three: the deal page's props, /demo's and the homepage's", () => {
