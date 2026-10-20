@@ -175,7 +175,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
       "The going-in cap: an exit tighter than the entry is cap compression, said as such",
-      "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread",
+      "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread where the exit is held to it",
       "The research tracker's cap range for the class and market, with its period, where one is on file",
     ],
     engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
@@ -207,13 +207,13 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The NOI",
     claim: "The pro forma's net operating income is what the building earns.",
     against: [
-      "The deal's own T-12, read in the same period, with the sign of every deduction read once",
+      "The deal's own T-12 NOI, with its period printed beside it and the sign of every deduction read once",
       "The rent roll's in-place rent against the pro forma's",
       "The memorandum's own in-place figures against its stabilized ones",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
     limits: [
-      "A T-12 and a pro forma for different periods are said to differ, never scaled to one another.",
+      "The T-12's period is not matched to the OM's figure: it is printed beside the T-12's NOI, and neither figure is scaled to the other's period.",
       "A stated figure is never dropped for a derived one.",
     ],
   },
@@ -294,8 +294,11 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The memorandum's own classic and renovated rents against its comps' rents",
       "The break-even premium at the model's exit cap: the premium that pays for a door's cost",
     ],
-    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, and the pace against the building's turnover.",
-    limits: ["The model grows today's rent at one rate, so the premium is in none of its returns, said so."],
+    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost.",
+    limits: [
+      "The model grows today's rent at one rate, so the premium is in none of its returns, said so.",
+      "The program's pace against the building's turnover is not tested here.",
+    ],
   },
   {
     key: "other",

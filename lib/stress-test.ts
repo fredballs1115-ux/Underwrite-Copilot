@@ -115,9 +115,9 @@ export const PREMIUM_UNSUPPORTED_SHARE = 0.15;
 export const IRR_MOVE_STRETCH_BPS = 100;
 
 /** Two percent figures within this are one figure (lib/model-vs-market's own). */
-const SAME = 0.05;
+export const SAME = 0.05;
 /** A dollar figure within this share of another is the same figure. */
-const SAME_SHARE = 0.02;
+export const SAME_SHARE = 0.02;
 
 /** Recorded sales from public property records, as the page already read
  *  them (lib/public-comps): a median only where the count reaches the
@@ -198,6 +198,9 @@ function joinWords(parts: string[]): string {
 }
 
 /** "The OM's" → "the OM's"; an acronym ("NOI") keeps its letters. */
+/** "the deal's T-12's $385k", or "$385k (BLS via FRED)" — a publisher named
+ *  with its channel takes no possessive. */
+const whose = (publisher: string, figure: string) => (/ via /.test(publisher) ? `${figure} (${publisher})` : `${publisher}'s ${figure}`);
 const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}\b/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 function pageOf(row: Row | null | undefined, ex: ExtractionResult | null): number | null {
@@ -317,7 +320,9 @@ function runImpact(
   const alt = computeUnderwrite(altInputs).returns;
   const same = Math.abs(altValue - omValue) < 1e-9;
   const omSide = words.omSide ?? "the OM's";
-  const altSaid = words.evidence ? `${words.evidence}'s ${words.alt}` : words.alt;
+  // A publisher named with its channel ("BLS via FRED") takes no
+  // possessive: the figure, then whose it is.
+  const altSaid = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
   const modelClause =
     Math.abs(modelValue - omValue) < 1e-9 ? "" : Math.abs(modelValue - altValue) < 1e-9 ? " The model itself already runs at it." : ` The model itself runs ${words.model}.`;
   const note = same
@@ -813,6 +818,11 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
         const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
+        // The going-in cap's spread over the same yield, beside the exit's,
+        // where the going-in cap is one the exit is held to.
+        const entry = goingInOk && spread != null ? Math.round((goingIn! - f.value) * 100) : null;
+        const entryWords =
+          entry == null ? "" : entry === 0 ? "; the going-in cap sits at it" : `; the going-in cap's spread ${entry > 0 ? "over" : "under"} it is ${bps(entry)}`;
         // A yield, not a cap: no figure on the cap's track (the panel would
         // draw a 4.9% tick beside a 5.5% exit), the spread said in words.
         evidence.push({
@@ -822,8 +832,8 @@ function exitCapRow(ctx: Ctx): StressRow | null {
             spread == null
               ? f.text
               : spread === 0
-                ? `${f.text} — the exit sits at it`
-                : `${f.text} — the exit's spread ${spread > 0 ? "over" : "under"} it is ${bps(spread)}`,
+                ? `${f.text} — the exit sits at it${entryWords}`
+                : `${f.text} — the exit's spread ${spread > 0 ? "over" : "under"} it is ${bps(spread)}${entryWords}`,
         });
       }
     }
@@ -1391,10 +1401,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     unit: "usd",
     text:
       Math.abs(share) <= SAME_SHARE
-        ? `The OM's ${money(premium)} is at ${best.publisher}'s ${money(best.value!)}.`
+        ? `The OM's ${money(premium)} is at ${whose(best.publisher, money(best.value!))}.`
         : share > 0
-          ? `The OM's ${money(premium)} is ${money(best.value! - premium)} (${pct1(share * 100)}) under ${best.publisher}'s ${money(best.value!)}.`
-          : `The OM's ${money(premium)} is over ${best.publisher}'s ${money(best.value!)} — the conservative side.`,
+          ? `The OM's ${money(premium)} is ${money(best.value! - premium)} (${pct1(share * 100)}) under ${whose(best.publisher, money(best.value!))}.`
+          : `The OM's ${money(premium)} is over ${whose(best.publisher, money(best.value!))} — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
   const impact =

@@ -72,6 +72,17 @@ describe("modelVsMarket — the model's four assumptions against the published f
     expect(read.checks.map((c) => c.key)).toEqual(["rent_growth", "expense_growth", "vacancy", "exit_cap"]);
   });
 
+  it("credits a FRED-carried CPI rent to the BLS, with FRED as the channel", () => {
+    // Philadelphia's CPI rent comes through FRED (CUURA102SEHA), never the
+    // BLS's own API: the BLS publishes it, FRED carries it.
+    const phl = rentIndex.map((r) => ({ ...r, series_id: "CUURA102SEHA" }));
+    const c = check({ ...base, metro: { id: "philadelphia", name: "Philadelphia" }, zori: null, rates: readMetroRates("philadelphia", phl, FIXTURE_NOW) }, "rent_growth")!;
+    expect(c.published).toEqual([
+      expect.objectContaining({ label: "Rent paid by sitting tenants (CPI rent)", value: 5, publisher: "BLS via FRED" }),
+    ]);
+    expect(c.read).toContain("(CPI rent, BLS via FRED)");
+  });
+
   it("rent growth: the asking rents and the sitting tenants' rents, each dated and sourced, and the model placed inside the range", () => {
     const c = check(base, "rent_growth")!;
     expect(c.model).toBe("3.0%/yr");
@@ -1286,10 +1297,12 @@ describe("a deal outside the covered metros anchors its vacancy check on the sta
   it("publishes the state's figure by its year, reads it as the state's rental stock, and reaches no tracker", () => {
     const c = check(pa, "vacancy")!;
     expect(c.published).toEqual([
-      { label: "Rental vacancy, Pennsylvania (annual)", text: "6.6% (2025)", value: 6.6, asOf: "2025-01-01", publisher: "FRED" },
+      // The Census Bureau's survey, carried by FRED: credited to its
+      // publisher with FRED as the channel.
+      { label: "Rental vacancy, Pennsylvania (annual)", text: "6.6% (2025)", value: 6.6, asOf: "2025-01-01", publisher: "Census Bureau via FRED" },
     ]);
     expect(c.read).toContain(
-      "The state's rental vacancy is 6.6% (2025, the survey's annual figure for the whole of Pennsylvania; FRED) — the deal lies outside the metros the site tracks, so no metro figure is read",
+      "The state's rental vacancy is 6.6% (2025, the survey's annual figure for the whole of Pennsylvania; Census Bureau via FRED) — the deal lies outside the metros the site tracks, so no metro figure is read",
     );
     expect(c.read).toContain("the state's rental stock as a whole");
     expect(c.read).not.toContain("metro's rental stock");

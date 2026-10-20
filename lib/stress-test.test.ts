@@ -182,7 +182,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
     // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
+      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (Census Bureau via FRED) and multifamily vacancy, a rule of thumb.",
     );
   });
 
@@ -494,8 +494,11 @@ describe("the exit cap row", () => {
 
   it("says the exit's spread under the 10-year where it is under it", () => {
     const x = rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.50%") })), "exit_cap");
-    expect(x.evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit's spread under it is 44 bps");
-    expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.94%") })), "exit_cap").evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit sits at it");
+    // The going-in cap's spread over the same yield rides beside the exit's.
+    expect(x.evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit's spread under it is 44 bps; the going-in cap's spread over it is 77 bps");
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.94%") })), "exit_cap").evidence[1].text).toBe(
+      "4.94% on Sep 17, 2026 — the exit sits at it; the going-in cap's spread over it is 77 bps",
+    );
   });
 });
 
