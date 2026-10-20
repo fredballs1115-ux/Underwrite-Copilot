@@ -1192,6 +1192,7 @@ function FinancialsPanel({
             downloadsOpen={downloadsOpen}
             isSample={isSample}
             interest={modelInterest}
+            screening={underwrite}
           />
         </div>
       </details>

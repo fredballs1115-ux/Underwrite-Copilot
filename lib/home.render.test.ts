@@ -43,7 +43,7 @@ import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
 import { sampleStressTest } from "./sample-stress";
 import { sampleDemoData, walkthroughData } from "@/app/demo/demo-data";
 import { NO_DEBT_SEEDS } from "./debt-index";
-import { SCREENING_MODEL_IS } from "./screening-model-words";
+import { SCREENING_BUILT_ON, sampleScreeningPinned } from "./screening-model-words";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -486,11 +486,13 @@ describe("the homepage's sample figures are the surfaces' own", () => {
         strategy,
       }),
     );
-    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }));
+    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest, screening: financials.underwrite }));
     // The walkthrough's Overview draws the sensitivity playground, as /demo's
     // does (audit C10, L2 had left it out, and the card's note with it), so
     // the card's note names it.
-    expect(visibleText(card)).toContain(`The workbook is the screening model, a separate one built on ${SCREENING_MODEL_IS} — its returns can differ from the ones above.`);
+    expect(visibleText(card).replace(/\s+/g, " ")).toContain(
+      `The workbook is the screening model, a separate one — its returns can differ from the ones above. The Overview’s sensitivity playground runs the screening model, not this one. ${SCREENING_BUILT_ON} ${sampleScreeningPinned(financials.underwrite!)} See how it works`,
+    );
     expect(card).toContain("The Overview’s sensitivity playground runs the screening model, not this one.");
     expect(html).toContain(sizer);
     expect(html).toContain(card);

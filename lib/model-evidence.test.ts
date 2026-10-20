@@ -17,7 +17,7 @@ import { cellPct, deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
 import { modelMarketFor } from "./model-market";
 import { modelEvidenceFor, type ModelEvidence } from "./model-evidence";
-import { modelVsMarketFor, type MarketReads } from "./model-vs-market";
+import { SET_FROM_WORDS, modelVsMarketFor, type MarketReads } from "./model-vs-market";
 import { buildStressTest } from "./stress-test";
 import { decidingFigureOf } from "./stress-deciders";
 import { countyOf, placeDeal } from "./market-county";
@@ -360,6 +360,58 @@ describe("the screening model's growth and exit, never more optimistic than the 
     expect(rent.impact!.altIrrPct).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
     // The exit row: the model already runs the going-in cap that decides it.
     expect(row("exit_cap").impact!.note).toContain("The model itself already runs at it.");
+  });
+
+  it("the model read never grades the model against the figure it was set from (an investor's walkthrough)", () => {
+    const evidence = evidenceOf(ex, READS);
+    const derived = derive(ex, evidence);
+    const mvm = modelVsMarketFor({ derived, extraction: ex, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS })!;
+    const check = (k: string) => mvm.checks.find((c) => c.key === k)!;
+    // Rent growth runs Zillow's apartment asking rents: said as the figure
+    // the model runs, no tone, never "sits at it".
+    const rent = check("rent_growth");
+    expect(rent.setFrom).toBe(true);
+    expect(rent.tone).toBe("set_from");
+    expect(rent.toneLabel).toBe("the figure the model runs");
+    expect(rent.read).toContain(
+      `${SET_FROM_WORDS}: Zillow's apartment asking rents, the figure for this kind of rent, so it is not checked against it; the other figures are shown beside it, never held to. Read off a trailing year, it is a cautious stance, not a forecast.`,
+    );
+    expect(rent.read).not.toMatch(/sits at it|runs (ahead of|behind) it|asked to beat/);
+    // Expense growth runs the CPI, the OM stating none: the same.
+    const expense = check("expense_growth");
+    expect(expense.tone).toBe("set_from");
+    expect(expense.read).toContain(`${SET_FROM_WORDS}: consumer prices, all items (the CPI), the broad price level the expense base moves with, so it is not checked against it`);
+    // The exit runs the OM's own going-in cap: a check of the exit against
+    // the entry and the 10-year, as before.
+    const exit = check("exit_cap");
+    expect(exit.setFrom).toBeUndefined();
+    expect(exit.read).not.toContain(SET_FROM_WORDS);
+    // The OM's own figure running: a check, as before.
+    const hot = { ...READS, zori: { ...ZORI, mfrYoyPct: 7.2 } };
+    const dHot = derive(ex, evidenceOf(ex, hot));
+    const hotRent = modelVsMarketFor({ derived: dHot, extraction: ex, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: hot })!.checks.find((c) => c.key === "rent_growth")!;
+    expect(hotRent.setFrom).toBeUndefined();
+    expect(hotRent.tone).toBe("behind");
+    // An exit run at the research range's low end: the range's part says so.
+    const tight = withRow("Exit cap", "4.75%", without(NO_GOING_IN));
+    const d3 = derive(tight, evidenceOf(tight, READS));
+    const exit3 = modelVsMarketFor({ derived: d3, extraction: tight, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS })!.checks.find((c) => c.key === "exit_cap")!;
+    expect(exit3.setFrom).toBe(true);
+    expect(exit3.read).toContain(`${SET_FROM_WORDS}: the exit runs at its low end, so the exit is not checked against the range.`);
+    expect(exit3.read).not.toMatch(/exit cap sits (inside|at) it/);
+  });
+
+  it("the workbook's Market Read tab and the report's block print the same set-from row", async () => {
+    const evidence = evidenceOf(ex, READS);
+    const derived = derive(ex, evidence);
+    const mvm = modelVsMarketFor({ derived, extraction: ex, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS })!;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(derived, null, mvm)) as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Market Read")!;
+    const cells: string[] = [];
+    ws.eachRow((r) => r.eachCell((c) => cells.push(String(c.value ?? ""))));
+    expect(cells).toContain("the figure the model runs");
+    expect(cells.some((c) => c.includes(`${SET_FROM_WORDS}: Zillow's apartment asking rents`))).toBe(true);
   });
 
   it("the sample is never seeded: handed the evidence, its model is the demo's", () => {

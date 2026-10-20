@@ -1142,6 +1142,9 @@ export default async function DealPage({
         priceLabel: derived.meta.priceLabel ?? null,
         sharePct: derived.meta.grossedUpSharePct ?? null,
         shareNoun: isTenancyInCommon(extraction) ? "interest" : "share",
+        // The sample's growth and exit are pinned: the note says its
+        // figures, as /demo's does.
+        ...(isSampleDeal ? { sample: true } : {}),
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own

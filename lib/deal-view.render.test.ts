@@ -1937,7 +1937,15 @@ describe("the sensitivity playground says whose figures it runs", () => {
   it("names its model — the workbook's and the report's — beside the Financials tab's first-draft model (research pass 34)", () => {
     // The Overview's 9.3% and the Financials tab's 8.72% for one deal, with
     // no word on either which model it was.
-    expect(textOf(playground(null))).toContain("The screening model: the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and for growth and the exit: never more optimistic than the memorandum: rent growth at the lower of the memorandum's stated rate and the published figure the stress test decides it by, expense growth at the higher of the two — either only inside −5% to +15% a year, the published one only where it is fresh — either alone where only one stands, else 3.0% a year; the exit at the higher of the memorandum's stated exit and the cap the stress test decides it by — the going-in cap where the price buys the building as it stands, else the research tracker's cap range at its low end where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury — either alone where only one stands, else the going-in cap it states or 6.0%; the sample deal, its figures pinned, keeps 3.0% and its going-in cap. It is the one the stress test re-runs on a stabilized deal, and the one the Excel workbook and the full report carry.");
+    // Three short lines, the whole rule a link away on /how-we-test (an
+    // investor's walkthrough: a 190-word sentence had stood here).
+    const html = playground(null);
+    const real = textOf(html).replace(/\s+/g, " ");
+    expect(real).toContain(
+      "The screening model: the one the stress test re-runs and the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. Growth and the exit run the stress test's deciding figure, never more optimistic than the OM — how it works",
+    );
+    expect(real).not.toContain("never more optimistic than the memorandum: rent growth at the lower");
+    expect(html).toMatch(/<a [^>]*href="\/how-we-test#model"[^>]*>how it works<\/a>/);
   });
 
   it("says a plan deal's returns are the screening model's, not the plan's", () => {

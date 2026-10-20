@@ -32,6 +32,7 @@ import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, t
 import { NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
+import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
 
 export { STRESS_METHODS };
 
@@ -230,11 +231,24 @@ export const CADENCE_RULE = {
   ],
 } as const;
 
+/**
+ * The model each row's return is re-run on (lib/underwrite/inputs, the rule
+ * lib/model-evidence runs): the whole rule, which the playground's and the
+ * workbook note's "how it works" links land on (`SCREENING_RULE_HREF`'s
+ * anchor), a line a thought (lib/screening-model-words, held there to the
+ * model itself).
+ */
+export const SCREENING_MODEL_SECTION = {
+  id: SCREENING_RULE_HREF.split("#")[1],
+  heading: "The model the rows re-run from",
+  lines: SCREENING_MODEL_LINES,
+} as const;
+
 /** What a stress test cannot do, each one line. */
 export const CANNOT: readonly { heading: string; line: string }[] = [
   {
     heading: "Not a forecast",
-    line: "A trailing year is what the assumption is asked to beat; nothing here says where rents, caps or rates go.",
+    line: "A trailing year is what the assumption is asked to beat, and the screening model's growth and exit are a cautious stance read off one; nothing here says where rents, caps or rates go.",
   },
   {
     heading: "Not investment advice",

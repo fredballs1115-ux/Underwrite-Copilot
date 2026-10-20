@@ -17,6 +17,7 @@ import {
 // card's views in model-panels.tsx and the card's body in model-body.tsx
 // (none with a server action); importers keep reading them here.
 import { DownloadRow, InputsNeeded, ModelBody } from "./model-body";
+import type { ScreeningFigures } from "./screening-model-lines";
 import { SCREENING_MODEL_UPGRADE } from "@/lib/screening-model-words";
 export { ReturnsHeadline } from "./returns-headline";
 export { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
@@ -30,6 +31,7 @@ export function ModelView({
   downloadsOpen = isPro,
   isSample = false,
   interest = null,
+  screening = null,
 }: {
   dealId: string;
   model: UnderwritingModel | null;
@@ -46,6 +48,8 @@ export function ModelView({
    *  interest `modelReturnsRead`): a note's, a share's or a preferred
    *  equity position's returns withheld */
   interest?: ModelReturnsRead | null;
+  /** the screening model's inputs: on the sample, its pinned figures */
+  screening?: ScreeningFigures | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -56,6 +60,7 @@ export function ModelView({
           compare={!isSample}
           sample={isSample}
           interest={interest}
+          screening={screening}
           download={
             downloadsOpen ? (
               <DownloadRow href={`/api/deals/${dealId}/underwrite.xlsx`} />

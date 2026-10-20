@@ -7,6 +7,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCREENING_MODEL_SECTION,
   STRESS_METHODS,
   TRACK_RECORD,
   VERDICT_RULES,
@@ -257,6 +258,20 @@ export function HowWeTestView() {
         </ul>
       </section>
       <HeadlineSection />
+
+      {/* The model every row's return is re-run on, and the rule its growth
+          and exit are set by: the one place the whole rule is said. */}
+      <section id={SCREENING_MODEL_SECTION.id} className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6" data-qa="screening-model">
+        <h2 className="text-lg font-semibold tracking-tight">{SCREENING_MODEL_SECTION.heading}</h2>
+        <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-muted">
+          {SCREENING_MODEL_SECTION.lines.map((line) => (
+            <li key={line} className="flex items-start gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <nav aria-label="The assumptions tested" className="mt-8">
         <ul className="flex flex-wrap gap-2 text-xs">

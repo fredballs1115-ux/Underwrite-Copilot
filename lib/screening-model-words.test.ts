@@ -14,7 +14,11 @@ import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { modelMarketFor } from "@/lib/model-market";
 import { modelEvidenceFor } from "@/lib/model-evidence";
 import {
+  SCREENING_BUILT_ON,
   SCREENING_DEFAULTS,
+  SCREENING_GROWTH_EXIT_LINE,
+  SCREENING_MODEL_LINES,
+  sampleScreeningPinned,
   SCREENING_GROWTH_EXIT_SAMPLE,
   SCREENING_GROWTH_EXIT_SHORT,
   SCREENING_MODEL_IS,
@@ -93,6 +97,36 @@ describe("the screening model, as its words say it", () => {
     expect(real(noCap).inputs.exitCapPct).toBeCloseTo(pctOf(/going-in cap it states or (\d+\.\d)%/), 10);
     const { inputs: bare } = deriveUnderwriteInputs(noCap, "No cap");
     expect(bare.exitCapPct).toBeCloseTo(pctOf(/going-in cap it states or (\d+\.\d)%/), 10);
+  });
+
+  it("says the sample's pinned figures off its own derived model, never typed", () => {
+    const { inputs } = sampleDerivedInputs();
+    const goingIn = SAMPLE_DEAL.extraction.metrics.find((m) => m.label === "Going-in cap")!.value;
+    expect(sampleScreeningPinned(inputs)).toBe(`The sample's figures are pinned: 3.0% growth and an exit at its ${goingIn} going-in cap.`);
+    expect(sampleScreeningPinned(inputs)).not.toMatch(/published|stress test decides/);
+    // Two growths apart are said apart.
+    expect(sampleScreeningPinned({ ...inputs, expenseGrowthPct: 0.034 })).toContain("3.0% rent growth, 3.4% expense growth");
+  });
+
+  it("the short lines and /how-we-test's whole rule say what the model runs", () => {
+    expect(SCREENING_GROWTH_EXIT_LINE).toContain("never more optimistic than the OM");
+    expect(SCREENING_BUILT_ON).toMatch(/^Built on the OM's price and terms/);
+    for (const line of SCREENING_MODEL_LINES) expect(line.length, line).toBeLessThanOrEqual(260);
+    const all = SCREENING_MODEL_LINES.join(" ");
+    // The rule's own conditions and defaults, the ones the model runs.
+    expect(all).toContain("lower of the OM's stated rate and the published figure the stress test decides it by; expense growth at the higher of the two");
+    const band = all.match(/inside (−?\d+)% to \+(\d+)% a year/)!;
+    expect(Number(band[1].replace("−", "-")) / 100).toBe(LEVER_STEPS.rentGrowthPct.min);
+    expect(Number(band[2]) / 100).toBe(LEVER_STEPS.rentGrowthPct.max);
+    expect(Number(all.match(/where neither does, (\d+\.\d)% a year/)![1]) / 100).toBeCloseTo(real({ ...SAMPLE_DEAL.extraction, metrics: SAMPLE_DEAL.extraction.metrics.filter((m) => !/growth/i.test(m.label)) }).inputs.rentGrowthPct, 10);
+    const noCap: ExtractionResult = { ...SAMPLE_DEAL.extraction, metrics: SAMPLE_DEAL.extraction.metrics.filter((m) => !/cap/i.test(m.label)) };
+    expect(Number(all.match(/the going-in cap the OM states, or (\d+\.\d)%/)![1]) / 100).toBeCloseTo(real(noCap).inputs.exitCapPct, 10);
+    expect(all).toContain("higher of the OM's stated exit and the cap the stress test decides it by");
+    expect(all).toContain("where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury");
+    expect(all).toContain("a cautious stance read off a trailing year, not a forecast");
+    // The sample's line, held to its model.
+    const { inputs } = sampleDerivedInputs();
+    expect(all).toContain(`it keeps ${(inputs.rentGrowthPct * 100).toFixed(1)}% growth and its going-in cap`);
   });
 
   it("introduces the model with how its growth and exit are set", () => {

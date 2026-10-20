@@ -21,7 +21,8 @@ import {
   sourcingSentence,
 } from "@/lib/model/provenance";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
-import { SCREENING_GROWTH_EXIT_SAMPLE, SCREENING_GROWTH_EXIT_SHORT, SCREENING_MODEL_DOWNLOAD, SCREENING_MODEL_IS } from "@/lib/screening-model-words";
+import { SCREENING_GROWTH_EXIT_SAMPLE, SCREENING_GROWTH_EXIT_SHORT, SCREENING_MODEL_DOWNLOAD } from "@/lib/screening-model-words";
+import { ScreeningModelLines, type ScreeningFigures } from "./screening-model-lines";
 import { ReturnsHeadline } from "./returns-headline";
 import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
 
@@ -41,6 +42,11 @@ const FIRST_DRAFT_MODEL_LINE_PLAYGROUND = firstDraftLine(SCREENING_GROWTH_EXIT_S
 const FIRST_DRAFT_SAMPLE_LINE = firstDraftLine(SCREENING_GROWTH_EXIT_SAMPLE, false);
 const FIRST_DRAFT_SAMPLE_LINE_PLAYGROUND = firstDraftLine(SCREENING_GROWTH_EXIT_SAMPLE, true);
 
+/** The workbook note's first line: the workbook is the other model, and,
+ *  where the page draws one, so is the playground's. One string a branch. */
+const WORKBOOK_LEAD = "The workbook is the screening model, a separate one — its returns can differ from the ones above.";
+const WORKBOOK_LEAD_PLAYGROUND = `${WORKBOOK_LEAD} The Overview’s sensitivity playground runs the screening model, not this one.`;
+
 /** The card's body with a model, as the deal page stacks it. */
 export function ModelBody({
   model,
@@ -50,6 +56,7 @@ export function ModelBody({
   download,
   sample = false,
   playground = true,
+  screening = null,
 }: {
   model: UnderwritingModel;
   documents: Pick<DealDocument, "id" | "kind" | "filename">[];
@@ -67,6 +74,10 @@ export function ModelBody({
    *  name it: the deal page and /demo do, the homepage's walkthrough does
    *  not (audit C10, L2) */
   playground?: boolean;
+  /** the screening model's own growth and exit (the derived model's
+   *  inputs): on the sample, the workbook note states its pinned figures
+   *  off them, never typed */
+  screening?: ScreeningFigures | null;
 }) {
   // Returns the price did not buy are withheld — and so are the stress
   // panel's and the grid's, which recompute the same returns.
@@ -101,10 +112,13 @@ export function ModelBody({
             first draft's; the workbook's are the screening model's, and
             so are the Overview's sensitivity playground's — named only
             where the page draws one. */}
-        <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
-          {`The workbook is the screening model, a separate one built on ${SCREENING_MODEL_IS} — its returns can differ from the ones above.`}
-          {playground ? " The Overview’s sensitivity playground runs the screening model, not this one." : null}
-        </p>
+        <ScreeningModelLines
+          qa="workbook-note"
+          className="max-w-2xl text-xs leading-relaxed text-muted"
+          lead={playground ? WORKBOOK_LEAD_PLAYGROUND : WORKBOOK_LEAD}
+          sample={sample}
+          figures={screening}
+        />
       </div>
     </>
   );

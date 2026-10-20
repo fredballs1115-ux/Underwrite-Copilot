@@ -28,6 +28,9 @@ const TONE_CLASS: Record<CheckTone, string> = {
   // same.
   undated: "bg-caution/10 text-caution",
   old: "bg-caution/10 text-caution",
+  // The model's input was set from the row's deciding figure: no tone, the
+  // figure against itself is no check (lib/model-vs-market `SET_FROM_WORDS`).
+  set_from: "bg-faint text-muted",
 };
 
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {

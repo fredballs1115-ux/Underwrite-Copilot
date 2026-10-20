@@ -25,6 +25,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCREENING_MODEL_SECTION,
   TRACK_RECORD,
   VERDICT_RULES,
   VERDICT_WORDS,
@@ -261,6 +262,24 @@ describe("/how-we-test draws every method from the table", () => {
     expect(html).toContain('<section id="headline"');
     expect(html.indexOf('id="headline"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-qa="headline-picture"/);
+  });
+
+  it("says what the screening model runs, the whole rule, where the deal page's links land (an investor's walkthrough)", () => {
+    const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+    expect(SCREENING_MODEL_SECTION.id).toBe("model");
+    expect(html).toContain('<section id="model"');
+    expect(flat).toContain(SCREENING_MODEL_SECTION.heading);
+    for (const line of SCREENING_MODEL_SECTION.lines) {
+      expect(flat).toContain(line);
+      expect(line.length, line).toBeLessThanOrEqual(260);
+    }
+    // After the headline, before the assumptions' own sections.
+    expect(html.indexOf('id="model"')).toBeGreaterThan(html.indexOf('id="headline"'));
+    expect(html.indexOf('id="model"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
+    // "Not a forecast" agrees with it: the model is a stance off a trailing year.
+    const forecast = CANNOT.find((c) => c.heading === "Not a forecast")!.line;
+    expect(forecast).toContain("the screening model's growth and exit are a cautious stance read off one");
+    expect(forecast).toContain("nothing here says where rents, caps or rates go");
   });
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {

@@ -123,6 +123,8 @@ export function sampleDemoData({
       priceLabel: derived.meta.priceLabel ?? null,
       sharePct: derived.meta.grossedUpSharePct ?? null,
       shareNoun: isTenancyInCommon(ex) ? "interest" : "share",
+      // Its growth and exit are pinned: the playground's note says so.
+      sample: true,
     },
     underwrite: derived.inputs,
     underwriteSources: derived.sources,
