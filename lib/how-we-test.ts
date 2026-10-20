@@ -97,8 +97,8 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   exit_cap: `Held to the going-in cap, else the published cap range's low end. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported; where a published cap range reaches the exit, compression is stretched at worst.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
   noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  vacancy: `Held to the best kind of evidence present, alone: the deal's documents where they state a figure, else the published figures (a survey inside its margin of error), else the rule of thumb. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
-  rent_growth: `Held to the highest trailing published figure, the generous side; an allowance is shown apart. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
+  vacancy: `A stabilized assumption is held to the market: the metro survey inside its margin, else the tracker's band, the region, the state. The rent roll or T-12 shows today's gap; with no fresh market figure, they decide. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
+  rent_growth: `Held to the deal's own kind of rent: Zillow's apartment asking rents, else its all-homes rents, else CPI rent; a commercial building, its lessors' national index. The others are shown beside it. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
   insurance: `Held to the T-12's premium, else the OM's premium moved by the index's year. Holds within ${pctOf(SAME_SHARE)} or over it; unsupported past ${pctOf(INSURANCE_UNSUPPORTED_SHARE)} under it.`,
@@ -272,3 +272,8 @@ export const TRACK_RECORD = {
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
   ],
 } as const;
+
+// The headline's method (lib/stress-test-types `HEADLINE_METHOD`, held to
+// lib/stress-test `stressHeadline` by lib/stress-test.test.ts): the page's
+// "The headline" section draws it, never a copy.
+export { HEADLINE_METHOD } from "@/lib/stress-test-types";

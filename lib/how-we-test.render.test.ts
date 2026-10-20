@@ -20,6 +20,7 @@ import { STRESS_KEYS, STRESS_METHODS } from "@/lib/stress-test-types";
 import {
   CADENCE_RULE,
   CANNOT,
+  HEADLINE_METHOD,
   HOW_WE_TEST_MARKER,
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
@@ -199,8 +200,8 @@ describe("/how-we-test draws every method from the table", () => {
     expect((html.match(/data-qa="verdict-rule"/g) ?? []).length).toBe(STRESS_METHODS.length);
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
-    expect(VERDICT_RULES.vacancy).toMatch(/the deal's documents where they state a figure/);
-    expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the highest trailing published figure/);
+    expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized assumption is held to the market/);
+    expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the deal's own kind of rent/);
     expect(VERDICT_RULES.rent_growth).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.expense_growth).toMatch(/^Held to the lowest price index/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
@@ -218,6 +219,16 @@ describe("/how-we-test draws every method from the table", () => {
     // The closing card names the sample for what it is.
     expect(text).toContain("See it on the sample deal");
     expect(text).not.toContain("real deal");
+  });
+
+  it("says how the headline is struck, in HEADLINE_METHOD's own words, before the assumptions' sections", () => {
+    const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+    const m = HEADLINE_METHOD;
+    for (const s of [m.title, m.claim, ...m.omCase, ...m.evidenceCase, ...m.split, ...m.overlap, ...m.limits]) expect(flat).toContain(s);
+    // The panel's link lands here, ahead of the per-assumption sections.
+    expect(html).toContain('<section id="headline"');
+    expect(html.indexOf('id="headline"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-qa="headline-picture"/);
   });
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {

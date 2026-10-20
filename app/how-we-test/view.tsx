@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   CADENCE_RULE,
   CANNOT,
+  HEADLINE_METHOD,
   HOW_WE_TEST_MARKER,
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
@@ -152,6 +153,62 @@ function MethodSection({ method, index }: { method: StressMethod; index: number 
   );
 }
 
+/**
+ * The headline's schematic: a bar for the OM's case, segments a swap each
+ * stepping from its end, and a bar for the evidence's case ending where the
+ * last segment does. No figures; hidden from a screen reader, which has the
+ * words beneath it.
+ */
+function HeadlinePicture() {
+  const rows: { x: number; w: number; tone: string }[] = [
+    { x: 16, w: 200, tone: "fill-current opacity-40" },
+    { x: 176, w: 40, tone: "fill-kill opacity-70" },
+    { x: 146, w: 30, tone: "fill-kill opacity-70" },
+    { x: 146, w: 22, tone: "fill-pass opacity-70" },
+    { x: 16, w: 152, tone: "fill-caution opacity-70" },
+  ];
+  return (
+    <svg viewBox="0 0 240 78" className="h-20 w-full max-w-xs" aria-hidden="true" focusable="false" data-qa="headline-picture">
+      {rows.map((r, i) => (
+        <rect key={i} x={r.x} y={6 + i * 14} width={r.w} height="8" rx="4" className={r.tone} />
+      ))}
+    </svg>
+  );
+}
+
+/** The headline's section: what each case holds, how the gap is split,
+ *  the overlap rule and what is left out — HEADLINE_METHOD's words. */
+function HeadlineSection() {
+  const m = HEADLINE_METHOD;
+  const lists: { heading: string; items: readonly string[]; tone: string }[] = [
+    { heading: "The two cases", items: [...m.omCase, ...m.evidenceCase], tone: "" },
+    { heading: "The split", items: [m.split, ...m.overlap], tone: "" },
+    { heading: "Not in it", items: m.limits, tone: "text-muted" },
+  ];
+  return (
+    <section id="headline" className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6" data-qa="headline-method">
+      <h2 className="text-lg font-semibold tracking-tight">{m.title}</h2>
+      <p className="mt-2 text-sm italic text-muted">{m.claim}</p>
+      <div className="mt-3 text-ink">
+        <HeadlinePicture />
+      </div>
+      {lists.map((l) => (
+        <div key={l.heading}>
+          <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">{l.heading}</h3>
+          <ul className={`mt-1.5 space-y-1.5 text-sm leading-relaxed ${l.tone}`}>
+            {l.items.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function HowWeTestView() {
   return (
     <div className="mx-auto w-full max-w-3xl" data-qa="how-we-test">
@@ -198,6 +255,7 @@ export function HowWeTestView() {
           ))}
         </ul>
       </section>
+      <HeadlineSection />
 
       <nav aria-label="The assumptions tested" className="mt-8">
         <ul className="flex flex-wrap gap-2 text-xs">

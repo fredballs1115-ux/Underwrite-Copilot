@@ -1584,7 +1584,7 @@ describe("the headline", () => {
   it("names in the method every assumption the OM's case can hold", () => {
     for (const k of STRESS_KEYS) {
       if (k === "renovation_premium" || k === "other") continue;
-      expect(HEADLINE_METHOD.omCase, k).toContain(headlineName(k));
+      expect(HEADLINE_METHOD.omCase[1], k).toContain(headlineName(k));
     }
     for (const c of HEADLINE_NOI_COMPONENTS) expect(HEADLINE_METHOD.overlap[0], c).toContain(headlineName(c).replace(/^the /, ""));
   });

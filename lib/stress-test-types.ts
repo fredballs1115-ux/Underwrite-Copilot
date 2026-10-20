@@ -187,21 +187,31 @@ export interface StressHeadline {
  *  of it is swapped too: one clause, the omitted row's `why` and the
  *  method's own words. */
 export const HEADLINE_NOI_LEFT_OUT =
-  "the NOI already holds the vacancy, the taxes and the insurance, and one of those is swapped on its own here, so swapping the NOI too would count those lines twice";
+  "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
 
 /** The headline's method, as /how-we-test prints it and
  *  lib/stress-test.test.ts holds it to `stressHeadline`. */
 export const HEADLINE_METHOD = {
   title: "The headline: the OM's case against the evidence's",
   claim: "The return the memorandum's figures make, all of them at once.",
-  omCase:
-    "The OM's case is the deal's derived model with every assumption whose return is re-run set to the OM's own figure at once: the price, the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, insurance and the NOI, the last struck as the rent that makes the OM's year-one NOI at the OM's vacancy and expenses. An assumption with no re-run keeps the model's own figure.",
-  evidenceCase:
-    "The evidence's case is the same model with every assumption read stretched or unsupported set to the figure its own row re-runs on; one that holds or is unchecked stays at the OM's figure.",
-  split:
-    "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic: each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap and no order is favoured. With one assumption past its evidence, the headline is that row's own re-run.",
+  omCase: [
+    "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
+    "That is the price, the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, insurance and the NOI.",
+    "The NOI is struck as the rent line that makes the OM's year-one NOI at the OM's own vacancy and expenses.",
+    "An assumption with no re-run keeps the model's own figure.",
+  ],
+  evidenceCase: [
+    "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
+    "One that holds or is unchecked stays at the OM's figure.",
+  ],
+  split: [
+    "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic.",
+    "Each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap.",
+    "With one assumption past its evidence, the headline is that row's own re-run.",
+  ],
   overlap: [
-    `The NOI is left out of the split where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}. The NOI then stays at the OM's figure in both cases, and the component swaps move it; where none of the three is past its evidence, the NOI's own swap stands.`,
+    `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
+    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
     "A reset tax bill is struck on the price: where the price is swapped too, the bill is struck on the evidence's price.",
   ],
   limits: [
