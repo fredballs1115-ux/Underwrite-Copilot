@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { currentSampleRow } from "@/lib/sample-refresh";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
@@ -106,7 +107,9 @@ export async function GET(
     );
   }
 
-  const deal = data as DealRow;
+  // An outdated sample reads as the current fixture (lib/sample-refresh),
+  // as the deal page draws it.
+  const deal = currentSampleRow(data as DealRow);
   if (!deal.verdict) {
     return Response.redirect(
       new URL(`/deals/${id}?error=reportempty`, req.url),

@@ -119,6 +119,8 @@ import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
 import { sampleExportsFree } from "@/lib/sample-exports";
+import { currentSampleRow, sampleRowOutdated } from "@/lib/sample-refresh";
+import { refreshSampleDealWithin } from "@/lib/sample-refresh-run";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -372,7 +374,14 @@ export default async function DealPage({
     notFound();
   }
 
-  const deal = data as DealRow;
+  // A sample seeded from an older fixture is written again whole, waited
+  // for at most a few seconds and never throwing (lib/sample-refresh-run),
+  // so the rent roll and T-12 read below are the fixture's too; and the
+  // page reads the fixture over the row either way (lib/sample-refresh), so
+  // a reader opening the sample from the pipeline sees what the homepage
+  // and /demo show.
+  if (sampleRowOutdated(data as DealRow)) await refreshSampleDealWithin(id);
+  const deal = currentSampleRow(data as DealRow);
   const firstSignal = deal.first_signal
     ? (deal.first_signal as FirstSignal)
     : null;

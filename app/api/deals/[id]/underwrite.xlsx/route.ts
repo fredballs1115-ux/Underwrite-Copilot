@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { currentSampleRow } from "@/lib/sample-refresh";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
@@ -76,7 +77,9 @@ export async function GET(
     return Response.redirect(new URL(`/billing?upsell=underwrite`, req.url), 302);
   }
 
-  const deal = data as DealRow;
+  // An outdated sample reads as the current fixture (lib/sample-refresh),
+  // as the deal page draws it.
+  const deal = currentSampleRow(data as DealRow);
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   // The model needs the OM's terms — only reachable by direct URL before the
   // screen has extracted anything, so bounce home with context.

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { currentSampleRow } from "@/lib/sample-refresh";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
@@ -98,7 +99,9 @@ export async function GET(
     return Response.redirect(new URL(`/billing?upsell=memo`, req.url), 302);
   }
 
-  const deal = data as DealRow;
+  // An outdated sample reads as the current fixture (lib/sample-refresh),
+  // as the deal page draws it.
+  const deal = currentSampleRow(data as DealRow);
   // A memo without a verdict is a near-blank, brand-damaging PDF — refuse it.
   if (!deal.verdict) {
     return Response.redirect(
