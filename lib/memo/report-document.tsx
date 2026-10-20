@@ -1,5 +1,6 @@
 import "server-only";
 import { compactUsd, scaledText } from "@/lib/money";
+import { reconciledAgainst } from "@/lib/reconciliation-words";
 import { Document, Page, View, Text, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
@@ -110,7 +111,7 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, rerunWords, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, rerunWords, rowMoveText, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -400,8 +401,9 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
   const track = 120;
   const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";
   // A re-run is the model as it runs with this one input changed, said so
-  // with the model's own figure (lib/stress-test-words `rerunWords`).
-  const move = row.impact ? `${rerunWords(test, row.impact)}. ${row.impact.note}` : noMoveWhy(test, row);
+  // with the model's own figure (lib/stress-test-words `rerunWords`); a row
+  // that holds prints no re-run (`HOLDS_NO_RERUN`).
+  const move = rowMoveText(test, row, row.impact ? rerunWords(test, row.impact) : undefined);
   return (
     <View style={[s.block, { marginBottom: 11 }]} wrap={false}>
       <View style={s.blockTitleRow}>
@@ -3277,14 +3279,15 @@ export function ReportDocument({
 
       {rows.length > 0 && (
         <PageChrome
-          title="Reconciliation vs. your model"
+          title={`Reconciliation vs. ${reconciledAgainst(reconciliation).name}`}
           count={`${rows.length} metrics${unfavCount ? ` \u00b7 ${unfavCount} unfavorable` : ""}`}
           dealName={dealName}
           branding={memo.branding}
         >
           <Text style={s.sub}>
-            Where the OM and your own underwriting disagree, framed from your
-            side of the table.
+            {reconciliation?.against === "first_draft"
+              ? "Where the OM and the first-draft model built from the documents disagree, framed from the buyer's side of the table."
+              : "Where the OM and your own underwriting disagree, framed from your side of the table."}
           </Text>
           {/* The table's own View: its header repeats on a page the rows
               run onto. */}
@@ -3292,7 +3295,7 @@ export function ReportDocument({
           <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "26%" }]}>Metric</Text>
             <Text style={[s.headText, { width: "22%" }]}>OM</Text>
-            <Text style={[s.headText, { width: "22%" }]}>Your model</Text>
+            <Text style={[s.headText, { width: "22%" }]}>{reconciledAgainst(reconciliation).label}</Text>
             <Text style={[s.headText, { width: "30%" }]}>Gap</Text>
           </View>
           {rows.map((r, i) => {

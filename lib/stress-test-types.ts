@@ -205,6 +205,32 @@ export interface StressHeadline {
    *  case runs that the model does not. Absent where `modelIrrPct` is, and on
    *  a headline struck before it was carried. */
   atEvidence?: StressAtEvidence[];
+  /** where the NOI is left out for its components (`HEADLINE_NOI_LEFT_OUT`),
+   *  what the component swaps leave of the NOI row's gap: that gap (the OM's
+   *  NOI less its evidence's) less the year-one NOI the component swaps move,
+   *  in the model's own year-one terms, in dollars a year — positive where
+   *  that much of the gap is in neither case, negative where the swaps move
+   *  the year-one NOI past the NOI's own gap — with the swapped components.
+   *  Null where the NOI is not left out for them, or where it is within
+   *  1% of the OM's NOI; absent on a headline struck before it was carried. */
+  noiRest?: { usd: number; components: StressKey[] } | null;
+  /** what the headline does not test, where the deal's main risks are
+   *  unchecked: the price, NOI and debt rows that stand unchecked (or that
+   *  no row could be built for), and a tenant roster's worst year before the
+   *  model's sale where it rolls 25% or more (lib/tenant-roster
+   *  `readRoster`). Null where nothing is named; absent on a headline struck
+   *  before it was carried. */
+  untested?: StressUntested | null;
+}
+
+/** What a headline does not test (`StressHeadline.untested`). */
+export interface StressUntested {
+  /** of "basis", "noi" and "debt", in STRESS_KEYS' order */
+  keys: StressKey[];
+  /** the roster's worst year before the model's sale, where it rolls 25% or
+   *  more: its share, what the share is of (the listed rent, else the listed
+   *  area), and the month that year ends ("Oct 2028") */
+  roll: { sharePct: number; basis: "rent" | "area"; through: string } | null;
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -289,6 +315,7 @@ export const HEADLINE_METHOD = {
   overlap: [
     `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
     "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
+    "What the component swaps leave of the NOI's gap, the NOI row's gap less the year-one NOI they move, is in neither case, and the headline says how much wherever it passes 1% of the OM's NOI.",
     "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
@@ -298,6 +325,7 @@ export const HEADLINE_METHOD = {
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
     "Neither case is a forecast: each is the model run once on one set of figures.",
+    "Where the price, the NOI or the debt row stands unchecked, or a tenant roster rolls 25% or more of its listed rent in one year before the model's sale, the headline names what it does not test.",
   ],
 } as const;
 
@@ -401,6 +429,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     limits: [
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
+      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's documents run more than 3 points over the assumption, the row says so.",
     ],
   },
   {
@@ -451,11 +480,14 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Insurance",
     claim: "The premium stays at the seller's expiring policy.",
     against: [
-      "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's own premium: the OM's figure moved by the national premium index, not a figure of its own",
-      "The deal's T-12 premium against the pro forma's",
+      "Nothing: a new owner's quote would test the premium, and none is on file. Shown beside it, the producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, as the national move applied to the OM's own premium, not a test of it",
+      "Shown beside it too: the deal's T-12 premium, the same seller's history, not a test of a new owner's quote",
     ],
-    engine: "The insurance line is an expense input: the return is re-run at the T-12's premium where one is on file, else at the OM's premium moved by the index's year.",
-    limits: ["A quote is the carrier's: the index says how far the market moved, not what this building is quoted."],
+    engine: "No figure decides the row. With a T-12 on file the return is re-run at its premium, said as the seller's history and no test, and both headline cases keep the OM's premium; with none, nothing is re-run.",
+    limits: [
+      "A quote is the carrier's: neither the seller's T-12 nor the national index says what this building will be quoted.",
+      "No quote, binder or carrier's indication is read from the documents yet, so the row has nothing to test the premium against.",
+    ],
   },
   {
     key: "renovation_premium",

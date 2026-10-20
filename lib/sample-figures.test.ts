@@ -24,7 +24,7 @@ describe("the sample's stress test", () => {
     return i ? [Number(i.baseIrrPct!.toFixed(1)), Number(i.altIrrPct!.toFixed(1))] : null;
   };
 
-  it("tests seven of its nine assumptions; the two unchecked are the loan rate no document states and a rent growth no figure was read for", () => {
+  it("tests six of its nine assumptions; the three unchecked are the loan rate no document states, a rent growth no figure was read for and a premium no new owner's quote tests", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["basis", "stretched"],
@@ -37,7 +37,9 @@ describe("the sample's stress test", () => {
       ["rent_growth", "unchecked"],
       // The reset is conditional on the jurisdiction: stretched at most.
       ["taxes", "stretched"],
-      ["insurance", "unsupported"],
+      // The T-12's premium is the same seller's history, and no quote for
+      // a new owner is on file: nothing tests the pro forma's $310k.
+      ["insurance", "unchecked"],
       ["renovation_premium", "unsupported"],
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");
@@ -58,7 +60,8 @@ describe("the sample's stress test", () => {
     expect(irr("taxes")).toEqual([9.3, 5.9]);
     // The OM's $310k in place of the T-12's $385k inside the model's one
     // expense line, the T-12's total; the evidence's run is the model's own
-    // (audit H3: the gap had been added on top of the T-12's premium).
+    // (audit H3: the gap had been added on top of the T-12's premium). The
+    // row is unchecked, so the re-run says it tests nothing.
     expect(irr("insurance")).toEqual([10.3, 9.3]);
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
@@ -86,10 +89,12 @@ describe("the sample's stress test", () => {
     expect(taxes.gap?.text).toMatch(/^If the sale resets the assessment to the price, the bill is/);
   });
 
-  it("holds the pro forma's insurance to the T-12's line", () => {
+  it("shows the T-12's insurance line beside the pro forma's as the seller's history, and holds it to nothing", () => {
     const t12 = SAMPLE_DEAL.t12.summary.opex.find((l) => l.key === "insurance")!.amount;
     expect(row("insurance").omSays.value).toBe(usd("Insurance (pro forma)"));
     expect(row("insurance").evidence[0].value).toBe(t12);
+    expect(row("insurance").verdict).toBe("unchecked");
+    expect(row("insurance").gap).toBeNull();
     expect(row("insurance").omSays.page).toBe(28);
   });
 
@@ -205,6 +210,35 @@ describe("the sample's documents tie to one another", () => {
     const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports").map((c) => Number(c.detail.match(/^\$(\d+)k/)![1]));
     expect(basis.low).toBe(`$${Math.min(...clean)}k`);
     for (const k of named(`${basis.source}`)) expect(stated, `$${k}k`).toContain(k);
+  });
+
+  it("lays the reconciliation's NOI gap on the vacancy gap that more than covers it, never on an expense load the OM does not state", () => {
+    // The investor's walkthrough (2026-10-20): the row said "heavier expense
+    // load" and the first-draft model's conflict "the OM understates the
+    // expense load", while the memorandum states no expense total and the
+    // 300 bps vacancy gap alone is worth more than the whole NOI gap.
+    const rec = SAMPLE_DEAL.reconciliation;
+    expect(rec.against).toBe("first_draft");
+    const noiRow = rec.rows.find((r) => r.metric === "Year-1 NOI")!;
+    const vacRow = rec.rows.find((r) => r.metric === "Vacancy")!;
+    const noiGap = parseUsd(noiRow.omValue)! - parseUsd(noiRow.myValue)!;
+    expect(noiGap).toBe(usd("NOI (pro forma)") - SAMPLE_DEAL.t12.summary.noi!);
+    const m = SAMPLE_DEAL.model.inputs;
+    const bps = Math.round((parseFloat(vacRow.myValue) - parseFloat(vacRow.omValue)) * 100);
+    expect(parseFloat(vacRow.omValue)).toBe(parseFloat(metric("Vacancy (pro forma)").value));
+    expect(parseFloat(vacRow.myValue)).toBe(m.vacancyPct);
+    const vacancyUsd = (bps / 10_000) * m.year1Gpr;
+    expect(vacancyUsd).toBeGreaterThan(noiGap);
+    // The sentence's figures are those: the gap, the bps, the dollars, the rent.
+    const said = `${bps} bps more vacancy, $${vacancyUsd.toLocaleString("en-US")} on $${(m.year1Gpr / 1e6).toFixed(2)}M of rent`;
+    expect(said).toBe("300 bps more vacancy, $214,500 on $7.15M of rent");
+    expect(noiRow.gap).toBe(`$${Math.round(noiGap / 1000)}k below the OM — the ${said}, more than covers it`);
+    expect(rec.takeaway).toContain(`its ${said} more than covers the gap`);
+    // No expense total is stated, so none is blamed.
+    expect(SAMPLE_DEAL.extraction.metrics.some((x) => /expense|opex/i.test(x.label))).toBe(false);
+    const year1 = SAMPLE_DEAL.model.metrics.find((x) => x.key === "year1Noi")!;
+    for (const s of [noiRow.gap, rec.takeaway, year1.rationale]) expect(s, s).not.toMatch(/expense load/i);
+    expect(rec.takeaway).toMatch(/^The first-draft model /);
   });
 
   it("the first-draft model's reserve is a rule of thumb, never a lender's norm", () => {

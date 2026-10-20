@@ -302,7 +302,7 @@ describe("the walkthrough draws /demo's build, part for part", () => {
       expect([...at].sort((a, b) => a - b)).toEqual(at);
     }
     const html = home("Financials");
-    expect(html).toContain("The Overview’s sensitivity playground runs the workbook’s model, not this one.");
+    expect(html).toContain("The Overview’s sensitivity playground runs the screening model, not this one.");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
   });

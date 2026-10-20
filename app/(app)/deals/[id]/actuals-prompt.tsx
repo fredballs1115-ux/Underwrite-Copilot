@@ -19,9 +19,10 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * rows are judged on (its NOI, its vacancy loss over its rent line, its
  * insurance line), a rent roll the vacancy row's (the occupancy it runs at).
  * The T-12's tax line is shown beside the taxes row and judges nothing, so
- * taxes are not named. And a document uploaded after the screen's verdict is
- * what the track record scores the screen's challenges against
- * (lib/track-record).
+ * taxes are not named. And a document dated after the screen's verdict (and
+ * uploaded after it) is what the track record scores the screen's
+ * challenges against (lib/track-record) — never its taxes or insurance,
+ * which a seller's T-12 cannot show for a new owner.
  */
 export function ActualsPrompt({
   dealId,
@@ -47,8 +48,9 @@ export function ActualsPrompt({
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
         A T-12 tests the OM&apos;s NOI, vacancy and insurance against the
         building&apos;s own year; a rent roll tests its vacancy against the
-        occupancy it runs at. Added after this screen, either one lets the
-        track record score its challenges.
+        occupancy it runs at. Dated after this screen (the roll&apos;s as-of,
+        the T-12&apos;s period end), either one lets the track record score
+        its challenges.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

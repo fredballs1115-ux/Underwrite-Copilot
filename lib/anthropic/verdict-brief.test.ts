@@ -556,7 +556,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("9 of the memorandum's assumptions read in code — 7 tested (3 unsupported, 4 stretched), 2 unchecked");
+    expect(brief).toContain("9 of the memorandum's assumptions read in code — 6 tested (2 unsupported, 4 stretched), 3 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
@@ -576,7 +576,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("cite it by figure and date and name its publisher");
     // The headline, one line under the read line, in the words the memo and
     // the report read, and the instruction that its runs are the engine's.
-    expect(brief).toContain(`2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+    expect(brief).toContain(`3 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
     expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence/);
     expect(brief).toContain("The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
@@ -599,7 +599,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const brief = buildBrief({ extraction: null, ...none, stressTest: withheld });
     // One whole sentence, never behind a second "No return re-run".
-    expect(brief).toContain("2 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("3 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
     expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
     expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");

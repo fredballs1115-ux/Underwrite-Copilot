@@ -201,6 +201,30 @@ export function moveShort(impact: StressImpact | null): string {
   return `IRR ${irrText(impact.baseIrrPct)} to ${irrText(impact.altIrrPct)}`;
 }
 
+/** What a row that holds prints in its re-run's place. Its re-run at the
+ *  evidence's figure is the favourable side (an office rent growth holding at
+ *  +7.2% re-runs to 24.7%), which no surface draws as a return; the impact
+ *  stays on the row for the headline's cases. */
+export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run.";
+
+/** Whether a surface draws the row's re-run as a return: a row that holds
+ *  draws none (`HOLDS_NO_RERUN`), an unchecked row's re-run (the insurance
+ *  line at the seller's own premium) is said in its note alone, and a row
+ *  with no impact has none to draw. */
+export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
+
+/**
+ * The row's return in one line, for the report and the verdict's brief: the
+ * re-run's own note (after `lead`, where the surface names the re-run's base)
+ * where the row draws one; `HOLDS_NO_RERUN` on a row that holds; else why no
+ * return is re-run.
+ */
+export function rowMoveText(test: StressTest, row: StressRow, lead?: string): string {
+  if (row.verdict === "holds") return HOLDS_NO_RERUN;
+  if (row.impact) return lead ? `${lead}. ${row.impact.note}` : row.impact.note;
+  return noMoveWhy(test, row);
+}
+
 /** Why a row prints no move, as one whole sentence that says no return is
  *  re-run: the test's reason, else the row's own. Printed as it stands. */
 export function noMoveWhy(test: StressTest, row: StressRow): string {
@@ -217,6 +241,8 @@ export function noMoveWhy(test: StressTest, row: StressRow): string {
  * carries no two figures.
  */
 export function tickPositions(row: StressRow): { om: number; evidence: number } | null {
+  // An unchecked row was set against nothing: no two ticks on one track.
+  if (row.verdict === "unchecked") return null;
   const e = bestEvidence(row);
   const om = row.omSays.value;
   const ev = e?.value ?? null;
@@ -252,7 +278,7 @@ export function rowWords(row: StressRow): StressRowWords {
     om: omShort(row),
     against: evidenceShort(row, bestEvidence(row)),
     gap: gapShort(row),
-    move: moveShort(row.impact),
+    move: row.verdict === "holds" ? "no re-run" : moveShort(row.impact),
     ticks: tickPositions(row),
   };
 }
@@ -380,6 +406,47 @@ export function unsolvedSentence(h: StressHeadline): string {
 
 const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
+/** A component swap named before "swap": "the tax swap". */
+const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance" };
+
+/**
+ * What the component swaps leave of the NOI's gap where the NOI is left out
+ * for them (`StressHeadline.noiRest`), one clause: "the rest of the NOI's
+ * gap ($54k a year) is in neither case"; where the swaps move the year-one
+ * NOI past the NOI's own gap, "the tax swap moves the year-one NOI $54k a
+ * year past the NOI's own gap". "" where the headline carries none.
+ */
+export function noiRestClause(h: StressHeadline): string {
+  const r = h.noiRest;
+  if (!r) return "";
+  if (r.usd > 0) return `the rest of the NOI's gap (${money(r.usd)} a year) is in neither case`;
+  const names = r.components.map((k) => SWAP_NAME[k] ?? headlineName(k));
+  const many = names.length > 1;
+  return `the ${joinAnd(names)} swap${many ? "s" : ""} move${many ? "" : "s"} the year-one NOI ${money(-r.usd)} a year past the NOI's own gap`;
+}
+
+/**
+ * What the headline does not test, where the deal's main risks are unchecked
+ * (`StressHeadline.untested`), one sentence: "This headline does not test
+ * the price, the NOI or the 57% of the listed rent rolling in the year to
+ * Oct 2028." "" where it names nothing, or carries no headline.
+ */
+export function untestedSentence(h: StressHeadline): string {
+  const u = h.untested;
+  if (!u) return "";
+  const items = u.keys.map(headlineName);
+  if (u.roll) items.push(`the ${Math.round(u.roll.sharePct)}% of the listed ${u.roll.basis} rolling in the year to ${u.roll.through}`);
+  if (items.length === 0) return "";
+  const said = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+  return `This headline does not test ${said}.`;
+}
+
+/** `noiRestClause` as a sentence; "" with none. */
+export function noiRestSentence(h: StressHeadline): string {
+  const c = noiRestClause(h);
+  return c ? `${upperFirst(c)}.` : "";
+}
+
 function joinAnd(parts: string[]): string {
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
@@ -402,12 +469,13 @@ export function headlineShort(test: StressTest, withModel = true): string | null
 
 // ── The model as it runs: the base every re-run starts from ─────────────
 
-/** "the model as it runs: 9.3%" — the derived model's own levered IRR, every
- *  input its own, as the headline carries it; "" on a headline struck before
- *  it was carried. */
+/** "the screening model as it runs: 9.3%" — the derived model's own
+ *  levered IRR, every input its own, as the headline carries it, named as
+ *  the screening model (lib/screening-model-words) where a surface first
+ *  meets it; "" on a headline struck before it was carried. */
 export function modelClause(h: StressHeadline): string {
   if (h.modelIrrPct === undefined) return "";
-  return h.modelIrrPct == null ? "the model as it runs: its levered IRR does not solve" : `the model as it runs: ${irrText(h.modelIrrPct)}`;
+  return h.modelIrrPct == null ? "the screening model as it runs: its levered IRR does not solve" : `the screening model as it runs: ${irrText(h.modelIrrPct)}`;
 }
 
 /** The model's own levered IRR where the test's headline carries it: a
@@ -459,7 +527,7 @@ function keptText(k: StressKept): string {
  * keeps at the OM's figure where the model has another, and the rows it runs
  * at the evidence's figure where the model has another, each named with both
  * figures, read off the headline's own `keptAtOm` and `atEvidence` — "Against
- * the model as it runs (9.3%), the evidence's case keeps the OM's figure
+ * the screening model as it runs (9.3%), the evidence's case keeps the OM's figure
  * where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr
  * (the model's 3.0%/yr); and where a row is left out: the rent line $7.62M
  * that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the
@@ -480,7 +548,7 @@ export function keptSentence(test: StressTest): string | null {
     return [`${KEPT_LEAD[why]}: ${joinAnd(items.map(keptText))}`];
   });
   const model = h.modelIrrPct == null ? "its levered IRR does not solve" : irrText(h.modelIrrPct);
-  const lead = `Against the model as it runs (${model}), the evidence's case`;
+  const lead = `Against the screening model as it runs (${model}), the evidence's case`;
   const evidenceSaid = atEvidence.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.evidence)} (the model's ${figureText(k.key, k.model)})`);
   const evidenceClause = evidenceSaid.length > 0 ? `the evidence's figure where the model runs another: ${joinAnd(evidenceSaid)}` : "";
   if (clauses.length === 0) return `${lead} runs ${evidenceClause}.`;
@@ -491,6 +559,14 @@ export function keptSentence(test: StressTest): string | null {
 /** The sentence a document prints where the headline is withheld: the
  *  test's own reason, then that the headline goes with it. */
 export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.";
+
+/** Under the sample's panel (/demo, the homepage's walkthrough and the
+ *  signed-in sample): the sample is read as stabilized, so its rows re-run
+ *  the return, and a plan deal's do not — in the plan rule's own words
+ *  (lib/stress-test's reason for a plan deal; lib/sample-stress.test.ts
+ *  holds the two to one another). */
+export const SAMPLE_PLAN_NOTE =
+  "Read as stabilized, the sample re-runs each row's return. A value-add, lease-up, conversion or development OM is set against the same evidence with no re-run: the model runs today's income with the budget in year one, not the business plan.";
 
 /**
  * The headline in whole sentences, for the memo, the report and the
@@ -517,12 +593,16 @@ export function headlineSentence(test: StressTest): string | null {
           ? ", so the gap is not split."
           : ".";
   const unsolved = h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : "";
+  // What it does not test, where the deal's main risks are unchecked.
+  const untested = untestedSentence(h) ? ` ${untestedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
+  // What the component swaps leave of the NOI's gap, where it is material.
+  const rest = noiRestSentence(h);
   // The model as it runs, and why the evidence's case is not it.
   const kept = keptSentence(test);
   const clause = modelClause(h);
   const model = kept ? ` ${kept}` : clause ? ` ${upperFirst(clause)}.` : "";
-  return `${line}${multiples}${split}${unsolved}${left}${model}`;
+  return `${line}${multiples}${split}${unsolved}${untested}${left}${rest ? ` ${rest}` : ""}${model}`;
 }
 
 /** The rows in STRESS_KEYS' order, as the test holds them. */

@@ -130,7 +130,9 @@ const modelMetrics: ReconciledMetric[] = [
       { doc: "T-12", value: "$3,706,500", locator: "trailing", basis: "actual" },
     ],
     authority: "T-12",
-    rationale: "Actuals beat the pro forma; the OM understates the expense load.",
+    // The OM states no expense total: the gap is its 6% vacancy against the
+    // building's, which more than covers it (the reconciliation below).
+    rationale: "Actuals beat the pro forma; the building's vacancy against the OM's 6% more than covers the gap, and the OM states no expense total.",
     confidence: "medium",
     isConflict: true,
   },
@@ -366,8 +368,9 @@ const extraction: ExtractionResult = {
   totalPages: 48,
 };
 
-/** The T-12's insurance line (the statement below carries it): the figure
- *  the pro forma's premium is held to. */
+/** The T-12's insurance line (the statement below carries it): the seller's
+ *  own history, shown beside the pro forma's premium and held to nothing —
+ *  a new owner's quote would test it, and the sample states none. */
 const T12_INSURANCE = 385_000;
 
 /** The T-12's collected rent and its vacancy loss (the statement below
@@ -549,13 +552,28 @@ const comps: BrokerCompsResult = {
   summary: `The comp set leans on its strongest trade — sell-side selections usually do. Against the one comp graded clean, The Brixton at $252k a unit, the $274k ask is ${CLEAN_COMP_GAP_PCT}% rich; Parkside's $261k, the closest, leans the seller's way.`,
 };
 
+/** The OM's stabilized vacancy (its p. 8 row), against which the first-draft
+ *  model's 9.0% is the reconciliation's 300 bps. */
+const OM_VACANCY_PCT = 6;
+/** What the first-draft model's vacancy over the OM's costs on its own rent
+ *  line: 300 bps of $7.15M, $214,500 — more than the whole $173,500 NOI gap.
+ *  The OM states no expense total, so the gap is never laid on an expense
+ *  load it does not state (an investor's walkthrough, 2026-10-20: the row
+ *  had said "heavier expense load"); lib/sample-figures.test.ts holds the
+ *  sentence to these figures. */
+const VACANCY_GAP_USD = ((inputs.vacancyPct - OM_VACANCY_PCT) / 100) * inputs.year1Gpr;
+const VACANCY_GAP_WORDS = `${Math.round((inputs.vacancyPct - OM_VACANCY_PCT) * 100)} bps more vacancy, ${dollarsOf(VACANCY_GAP_USD)} on ${compactUsd(inputs.year1Gpr, { millions: 2 })} of rent`;
+
 const reconciliation: ReconciliationResult = {
+  // The sample's "your model" is the first-draft model built from its
+  // documents, said so on every surface (lib/reconciliation-words).
+  against: "first_draft",
   rows: [
     {
       metric: "Year-1 NOI",
       omValue: "$3,880,000",
       myValue: "$3,706,500",
-      gap: "$174k below the OM — heavier expense load",
+      gap: `${compactUsd(NOI_GAP)} below the OM — the ${VACANCY_GAP_WORDS}, more than covers it`,
       direction: "unfavorable",
     },
     {
@@ -575,7 +593,7 @@ const reconciliation: ReconciliationResult = {
       direction: "neutral",
     },
   ],
-  takeaway: `Your model lands ~$174k light on NOI and 300 bps higher on vacancy — together roughly ${bpsFrom(irrWith({ year1Opex: inputs.year1Opex - NOI_GAP }))} of IRR versus the OM.`,
+  takeaway: `The first-draft model lands ~${compactUsd(NOI_GAP)} light on NOI, roughly ${bpsFrom(irrWith({ year1Opex: inputs.year1Opex - NOI_GAP }))} of IRR versus the OM: its ${VACANCY_GAP_WORDS} more than covers the gap, and the OM states no expense total to set the rest against.`,
 };
 
 const market: MarketResult = {

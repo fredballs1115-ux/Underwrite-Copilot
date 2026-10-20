@@ -33,7 +33,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
 import type { StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, stressReadLine, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, rowMoveText, stressReadLine, whenWords } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -166,7 +166,8 @@ export function stressSection(test: StressTest): string[] {
           .join("; ")
       : "no evidence with a figure or words could be read";
     const gap = r.gap ? r.gap.text : `unchecked — ${r.unchecked ?? "no figure to set against the OM's"}`;
-    const move = r.impact ? r.impact.note : noMoveWhy(test, r);
+    // A row that holds draws no re-run: its evidence side is the favourable one.
+    const move = rowMoveText(test, r);
     const ask = r.challenge?.question ? ` The challenger asks: ${r.challenge.question}` : "";
     // The OM's text may end in its own full stop ("The OM states no loan rate.").
     lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — OM says: ${r.omSays.text.replace(/\.$/, "")}${page}. Set against: ${evidence}. Gap: ${gap} The levered IRR: ${move}${ask}`);
@@ -175,7 +176,7 @@ export function stressSection(test: StressTest): string[] {
     "",
     test.impactsWithheld
       ? `${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.`
-      : `The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing.${
+      : `The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing. A row that holds carries no re-run: never cite a return for it.${
           liveHeadline(test)
             ? " The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself — each row starts from a different return, which is what the headline's one pair of runs answers."
             : ""

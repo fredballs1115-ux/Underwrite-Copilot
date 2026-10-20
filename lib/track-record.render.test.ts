@@ -11,13 +11,14 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { T12Summary } from "@/lib/actuals/types";
 import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
-import { ACCOUNT_VACANCY_NOTE, RECORD_NONE_LINE, accountRecord, scoreDeal, type DealRecord } from "./track-record";
+import { ACCOUNT_VACANCY_NOTE, CARD_SCOPE, DOCUMENT_DATE_RULE, RECORD_NONE_LINE, TAX_INSURANCE_NOT_SCORED, accountRecord, scoreDeal, type DealRecord } from "./track-record";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const T = "2026-10-01T12:00:00Z";
-const AFTER = "2026-10-05T09:00:00Z";
+const AFTER = "2026-11-05T09:00:00Z";
 const vacancy: Challenge = { assumption: "Stabilized vacancy of 6%", severity: "high", challenge: "", question: "", key: "vacancy", omFigure: 6, altFigure: 9, altBasis: "a rule of thumb" };
 const insurance: Challenge = { assumption: "Insurance at the seller's premium", severity: "medium", challenge: "", question: "", key: "insurance", omFigure: 300_000, altFigure: 400_000, altBasis: "the index's year" };
+const noi: Challenge = { assumption: "Pro forma NOI of $4.0M", severity: "medium", challenge: "", question: "", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000, altBasis: "the trailing year" };
 const basis: Challenge = { assumption: "Asking price of $274k a unit", severity: "high", challenge: "", question: "", key: "basis", omFigure: 274_000, altFigure: 240_000, altBasis: "the comps" };
 const older: Challenge = { assumption: "Exit cap of 5.25%", severity: "high", challenge: "", question: "" };
 const t12: T12Summary = {
@@ -34,8 +35,8 @@ const t12: T12Summary = {
 const withLater = (): DealRecord =>
   scoreDeal({
     screenedAt: T,
-    challenges: [vacancy, insurance, basis, older],
-    t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 },
+    challenges: [vacancy, noi, insurance, basis, older],
+    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
     stage: "dead",
     history: [{ stage: "dead", at: AFTER, outcome: { reason: "price", trade: null } }],
   });
@@ -50,8 +51,8 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("What came after the screen");
     expect(text).toContain("Screened Oct 1, 2026.");
-    expect(text).toContain("T-12 to Sep 30, 2026 (added Oct 5, 2026)");
-    expect(text).toContain("Moved to Dead on price (Oct 5, 2026)");
+    expect(text).toContain("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(text).toContain("Moved to Dead on price (Nov 5, 2026)");
     expect(out).toContain('data-landing="screen_side"');
     expect(out).toContain('data-landing="between"');
     expect(text).toContain("Screen's side");
@@ -60,11 +61,34 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(text).toContain("6.0%");
     expect(text).toContain("9.0%");
     expect(text).toContain("9.1%");
-    expect(text).toContain("$385k");
+    expect(text).toContain("$3.71M");
     // The decision row carries no figures but its sentence.
     expect(text).toContain("a decision on the screen's side, not a figure");
-    expect(text).toContain("1 challenge not scored");
+    expect(text).toContain("2 challenges not scored");
     expect(text).toContain("Exit cap: nothing that arrived after the screen speaks to it.");
+    // What it scores against, and why the insurance challenge is not scored.
+    const words = text.replace(/&#x27;/g, "'");
+    expect(words).toContain(CARD_SCOPE);
+    expect(words).toContain(TAX_INSURANCE_NOT_SCORED);
+    expect(out).toContain('data-qa="track-record-tax-insurance"');
+    expect(words).toContain("Insurance: a seller's T-12 cannot show a new owner's premium");
+    // …and no tax or insurance line is said where no such challenge is.
+    const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } }) }));
+    expect(noTax).not.toContain('data-qa="track-record-tax-insurance"');
+  });
+
+  it("draws the refusal where a document uploaded after the screen is dated before it: history, only uploaded later", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
+    expect(r.evidence).toEqual([]);
+    const out = html(React.createElement(TrackRecordCard, { record: r }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out);
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).not.toContain('data-qa="track-record-evidence"');
+    expect(text).toContain("Nothing that arrived speaks to a challenge with figures of its own, so no row is scored.");
+    expect(text.replace(/&#x27;/g, "'")).toContain(
+      "T-12 to Sep 30, 2026 was added Nov 5, 2026, after the screen, but its period ended on or before the verdict (Oct 1, 2026): it is history the screen could have been handed, only uploaded later, so it is not scored.",
+    );
   });
 
   it("draws nothing where nothing arrived after the screen, or with no record", () => {
@@ -75,7 +99,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
   });
 
   it("says no row is scored where the later evidence speaks to no challenge with figures", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [older], t12: { arrivedAt: AFTER, dated: null, summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [older], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
     const out = html(React.createElement(TrackRecordCard, { record: r }));
     expect(a11yIssues(out)).toEqual([]);
     expect(visibleText(out)).toContain("Nothing that arrived speaks to a challenge with figures of its own, so no row is scored.");
@@ -96,10 +120,12 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // market's, which a deal's own page does only where the market decided:
     // said where the record is drawn (audit M5).
     expect(text.replace(/&#x27;/g, "'")).toContain(ACCOUNT_VACANCY_NOTE);
+    // What a document must be to score, and what no document scores.
+    expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
   });
 
   it("few: the counts, a bar a key, and 'a start, not a record' with no share", () => {
-    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, insurance], t12: { arrivedAt: AFTER, dated: null, summary: t12 } })]);
+    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
     const few = html(React.createElement(TrackRecordSection, { record: fewer }));
     expect(a11yIssues(few)).toEqual([]);
     const text = visibleText(few);
@@ -117,11 +143,11 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     const decided = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
     expect(decided).toContain('data-state="start"');
     expect(visibleText(decided)).toContain("1 deal tested · 1 with later evidence · 3 rows answered, 1 of them a decision · 2 scored");
-    // Three scored rows — vacancy (screen) twice, insurance (between) — is
+    // Three scored rows — vacancy (screen) twice, NOI (between) — is
     // the floor, and the shares are said.
     const atFloor = html(
       React.createElement(TrackRecordSection, {
-        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: null, summary: t12 } })]),
+        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]),
       }),
     );
     expect(atFloor).toContain('data-state="record"');

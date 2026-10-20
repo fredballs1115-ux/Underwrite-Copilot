@@ -30,6 +30,7 @@ import { safeHttpUrl } from "@/lib/safe-url";
 import { basisTracks, compBarsCaption, fmtBasis, type BasisTracks, type SubjectBasis } from "@/lib/comp-detail";
 import { LISTING_NOT_SALE, saysListing } from "@/lib/web-comp-read";
 import { gapDisagreementLine, gapScale, type GapUnit } from "@/lib/gap-detail";
+import { reconciledAgainst, reconciliationHeading } from "@/lib/reconciliation-words";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
 import { factsForMetrics, locatedPage, type DealFact } from "@/lib/facts";
@@ -1093,10 +1094,13 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
     "Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.";
   const counts = { unfavorable: 0, favorable: 0, neutral: 0 };
   for (const r of rows) counts[r.direction] = (counts[r.direction] ?? 0) + 1;
+  // Whose model the rows are: the reader's own, or (on the sample) the
+  // first-draft model built from the documents (lib/reconciliation-words).
+  const mine = reconciledAgainst(result).label;
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Reconciliation — your model vs. the OM"
+        title={reconciliationHeading(result)}
         aside={
           rows.length > 0 ? (
             <SplitBar
@@ -1138,7 +1142,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                   <dd className="font-mono text-sm tabular-nums text-muted">{r.omValue}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] uppercase tracking-wide text-muted">Your model</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">{mine}</dt>
                   <dd className="font-mono text-sm font-medium tabular-nums text-ink">{r.myValue}</dd>
                 </div>
               </dl>
@@ -1156,7 +1160,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
               <th className="px-4 py-2.5 font-medium">Metric</th>
               <th className="px-4 py-2.5 font-medium">OM says</th>
-              <th className="px-4 py-2.5 font-medium">Your model</th>
+              <th className="px-4 py-2.5 font-medium">{mine}</th>
               <th className="px-4 py-2.5 font-medium">Gap</th>
             </tr>
           </thead>

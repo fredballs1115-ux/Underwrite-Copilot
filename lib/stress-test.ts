@@ -56,8 +56,8 @@
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
-//   insurance        INSURANCE_UNSUPPORTED_SHARE 15% under the repriced
-//                    premium or the T-12's
+//   insurance        none: no quote for a new owner is on file, so the row
+//                    stands unchecked (`INSURANCE_NO_QUOTE`)
 //   basis            BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
 //                    the comps' median
 //   premium          PREMIUM_UNSUPPORTED_SHARE 15% over the achieved premium
@@ -109,6 +109,7 @@ import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, t
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
+import { readRoster } from "@/lib/tenant-roster";
 import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
@@ -134,7 +135,6 @@ export const EXIT_CAP_UNSUPPORTED_BPS = 25;
 export const DEBT_UNSUPPORTED_BPS = 50;
 export const NOI_UNSUPPORTED_SHARE = 0.1;
 export const TAX_UNSUPPORTED_SHARE = 0.15;
-export const INSURANCE_UNSUPPORTED_SHARE = 0.15;
 export const BASIS_STRETCH_PCT = 5;
 export const BASIS_UNSUPPORTED_PCT = 15;
 export const PREMIUM_UNSUPPORTED_SHARE = 0.15;
@@ -235,9 +235,6 @@ function joinWords(parts: string[]): string {
 }
 
 /** "The OM's" → "the OM's"; an acronym ("NOI") keeps its letters. */
-/** "the deal's T-12's $385k", or "$385k (BLS via FRED)" — a publisher named
- *  with its channel takes no possessive. */
-const whose = (publisher: string, figure: string) => (/ via /.test(publisher) ? `${figure} (${publisher})` : `${publisher}'s ${figure}`);
 const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}\b/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 function pageOf(row: Row | null | undefined, ex: ExtractionResult | null): number | null {
@@ -632,6 +629,18 @@ export function stabilizedVacancyStated(extraction: ExtractionResult | null, fir
 }
 
 /**
+ * Whether the OM's vacancy is a stated allowance on a plan deal — the
+ * stabilized figure a lease-up, value-add, conversion or development is to
+ * reach. The track record reads it (lib/track-record `vacancyIsPlanTarget`):
+ * a rent roll or T-12 that arrives later is the building before the plan is
+ * done, which cannot speak to the figure it is meant to reach.
+ */
+export function planVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
+  const om = omVacancy(rowsOf(extraction));
+  return om?.from === "vacancy" && isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
  * The kind of evidence that decided a built test's vacancy row: the figure
  * its re-run swapped in, else the first piece with a figure (the row prints
  * the kind that decides first) — "published" where the market's figure held
@@ -661,6 +670,14 @@ function marketVacancyRank(label: string): number {
   if (/metro area/i.test(label)) return 0;
   if (/census region/i.test(label)) return 2;
   return 3;
+}
+
+/** "The lease-up from today's 9.3% to the stabilized 6.0% is not modelled in
+ *  either case: each runs its vacancy from year one." — said on a stabilized
+ *  vacancy the market holds where the deal's documents run more than
+ *  `VACANCY_UNSUPPORTED_PTS` over it today. */
+export function leaseUpNotModelled(todayPct: number, stabilizedPct: number): string {
+  return `The lease-up from today's ${pct1(todayPct)} to the stabilized ${pct1(stabilizedPct)} is not modelled in either case: each runs its vacancy from year one.`;
 }
 
 function vacancyRow(ctx: Ctx): StressRow | null {
@@ -821,7 +838,12 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const edge = band ? band.lo - SAME : bestValue - (moe ?? SAME);
     const doc = docs[0];
     const docLine = doc
-      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.`
+      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+          // Past the row's own threshold, the building today is materially
+          // emptier than the stabilized figure the market holds: whatever
+          // the verdict, neither run models getting from one to the other.
+          doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
+        }`
       : "";
     judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) => {
       const where =
@@ -1623,19 +1645,48 @@ function expenseImpact(
  *  row's index figure where the OM states a premium. */
 export const INSURANCE_MOVED_LABEL = (premium: string): string => `The OM's ${premium} moved by the national premium index`;
 
+/** Why the insurance row stands unchecked wherever the OM states a premium:
+ *  what would test it is a quote for a new owner, and nothing on file is
+ *  one. The T-12's premium is the same seller's policy, and the index is
+ *  the nation's carriers' move. */
+export const INSURANCE_NO_QUOTE =
+  "No quote for a new owner on file: the OM's premium is the seller's expiring policy, the T-12's is the same seller's history, and the national index moves the OM's own figure, so nothing here tests what a buyer will be quoted.";
+
+/** What the T-12's premium is beside the OM's, said on its evidence line. */
+export const INSURANCE_T12_HISTORY = "the seller's history, not a test of a new owner's quote";
+
+/** What the insurance row's re-run is, appended to its note: the T-12's
+ *  premium is a real figure for the building, so the return is re-run at it,
+ *  but it tests nothing. */
+export const INSURANCE_RERUN_NOTE = "The T-12's premium is the seller's own history, not a quote for a new owner, so this re-run is no test of the OM's premium.";
+
+/**
+ * The insurance row. The OM's premium is the seller's expiring policy, and
+ * what would test it is a quote for a new owner, which nothing on file is:
+ * the T-12's premium is the same seller's policy (shown beside the OM's as
+ * its history, never the figure that decides), and the national premium
+ * index applied to the OM's own premium is the OM's figure moved by the
+ * nation's carriers' year (shown, held to nothing, carrying no figure of
+ * its own). So the row stands unchecked (`INSURANCE_NO_QUOTE`). Where a
+ * T-12 is on file its premium is a real figure for the building, and the
+ * return is re-run at it, said as no test (`INSURANCE_RERUN_NOTE`); the
+ * headline keeps the OM's premium in both cases, as it keeps every
+ * unchecked row's. Without a T-12 nothing is re-run: the index-moved
+ * figure is no alternative to the OM's, only the OM's grown.
+ */
 function insuranceRow(ctx: Ctx): StressRow | null {
   const premiumRow =
     ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
   const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
   const evidence: StressEvidence[] = [];
-  // The T-12's own insurance line.
+  // The T-12's own insurance line: the seller's history.
   const t12 = ctx.actuals?.t12;
   const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
   if (t12Ins && t12Ins.amount > 0) {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 insurance line",
-      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
+      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""}); ${INSURANCE_T12_HISTORY}`,
       value: Math.round(t12Ins.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -1643,25 +1694,24 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     });
   }
   // The index: the model-vs-market read's figure, else the stored market
-  // check's. Its value here is the premium moved by its year, in dollars —
-  // the row's own unit — where the OM states a premium.
+  // check's. Where the OM states a premium it is said as the OM's premium
+  // moved by its year, in words — the memorandum's figure grown by the
+  // nation's carriers, not a figure of its own — so it carries no value any
+  // surface could hold the OM's figure to.
   const check = checkOf(ctx.mvm, "expense_growth");
   const idx = check?.published.find((f) => /insurance premiums/i.test(f.label)) ?? null;
   const stored = ctx.market?.liveBrief?.figures?.find((f) => f.key === "insurance_index_yoy") ?? null;
   const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${proseDay(stored.asOf)}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
   if (index) {
     const moved = premium != null ? Math.round(premium * (1 + index.pct / 100)) : null;
-    // Where the OM states a premium, the figure is the OM's own premium moved
-    // by the index — the memorandum's figure grown by the nation's carriers'
-    // year, not a figure of its own — and its label says so.
     evidence.push({
       kind: "published",
       label: moved != null ? `${INSURANCE_MOVED_LABEL(money(premium!))} (PPI, commercial multiple peril)` : "Commercial property insurance premiums, national (PPI, commercial multiple peril)",
       text:
         moved != null
-          ? `${money(moved)} (the index ${index.text}); the nation's carriers' move on the OM's own figure, not this building's quote`
+          ? `${money(moved)} (the index ${index.text}); the national move applied to the OM's own figure, not a test of this premium`
           : `${index.text}; the nation's carriers, not this building's quote`,
-      value: moved,
+      value: null,
       asOf: index.asOf,
       publisher: index.publisher,
       scope: "nation",
@@ -1671,33 +1721,23 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = premiumRow && premium != null
     ? { text: `${premiumRow.label}: ${premiumRow.value}`, value: premium, page: pageOf(premiumRow, ctx.ex) }
     : { text: NO_FIGURE("insurance premium"), value: null, page: null };
-  if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"));
-  const comparables = evidence.filter((e) => e.value != null);
-  if (comparables.length === 0) return unchecked("insurance", omSays, evidence, NO_EVIDENCE);
-  const best = comparables[0];
-  const share = (best.value! - premium) / Math.abs(best.value!);
-  const verdict: StressVerdict = share <= SAME_SHARE ? "holds" : share > INSURANCE_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
-  const gap: StressRow["gap"] = {
-    value: Math.round(best.value! - premium),
-    unit: "usd",
-    text:
-      Math.abs(share) <= SAME_SHARE
-        ? `The OM's ${money(premium)} is at ${whose(best.publisher, money(best.value!))}.`
-        : share > 0
-          ? `The OM's ${money(premium)} is ${money(best.value! - premium)} (${pct1(share * 100)}) under ${whose(best.publisher, money(best.value!))}.`
-          : `The OM's ${money(premium)} is over ${whose(best.publisher, money(best.value!))} — the conservative side.`,
-  };
-  const evidenceIndex = evidence.indexOf(best);
-  const impact =
-    ctx.derived && ctx.impactsWithheld == null
-      ? expenseImpact(ctx, premium, best.value!, t12Ins && t12Ins.amount > 0 ? t12Ins.amount : null, "insurance line", evidenceIndex, {
-          what: "the insurance line",
-          om: money(premium),
-          alt: money(best.value!),
-          evidence: best.publisher,
-        })
-      : null;
-  return { key: "insurance", title: TITLES.insurance, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("insurance", evidence) };
+  // Nothing on file is held against the OM's premium: every piece is shown
+  // beside it.
+  const none = new Set<number>();
+  if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"), none);
+  const row = unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE, none);
+  // The re-run at the seller's own premium, where the T-12 states one.
+  const t12At = t12Ins && t12Ins.amount > 0 ? evidence.findIndex((e) => e.label === "The deal's T-12 insurance line") : -1;
+  if (t12At >= 0 && ctx.derived && ctx.impactsWithheld == null) {
+    const impact = expenseImpact(ctx, premium, evidence[t12At].value!, t12Ins!.amount, "insurance line", t12At, {
+      what: "the insurance line",
+      om: money(premium),
+      alt: money(evidence[t12At].value!),
+      evidence: "the deal's T-12",
+    });
+    if (impact) row.impact = { ...impact, note: `${impact.note} ${INSURANCE_RERUN_NOTE}` };
+  }
+  return row;
 }
 
 // — Basis —
@@ -2345,8 +2385,42 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
   // The headline is struck on the rows as finished: a row `finishRow` reads
   // stretched is swapped in the evidence's case.
-  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
+  const struck = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
+  const headline = struck ? { ...struck, untested: headlineUntested(built, ex, args.readOn) } : null;
   return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
+}
+
+/** The rows whose standing unchecked a headline names, since they carry the
+ *  deal's main risks: the price, the NOI and the debt. */
+export const HEADLINE_UNTESTED_KEYS: readonly StressKey[] = ["basis", "noi", "debt"];
+
+/** A tenant roster's worst year rolling this share of its listed rent (or
+ *  area) before the model's sale is named as untested by the headline — the
+ *  roster panel's own 25% (lib/tenant-roster `rosterModelLine`). */
+export const ROSTER_UNTESTED_PCT = 25;
+
+const MONTH_WORDS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * What the headline does not test (`StressHeadline.untested`): each of the
+ * price, NOI and debt rows that stands unchecked or was built for none, and
+ * a tenant roster's worst year before the model's sale where it rolls
+ * `ROSTER_UNTESTED_PCT` or more — read off the extraction on the read day
+ * (lib/tenant-roster `readRoster`, pure), its year ending that many years
+ * on. Null where nothing is named.
+ */
+function headlineUntested(built: Partial<Record<StressKey, StressRow>>, ex: ExtractionResult | null, readOn: string): StressHeadline["untested"] {
+  const keys = HEADLINE_UNTESTED_KEYS.filter((k) => !built[k] || built[k]!.verdict === "unchecked");
+  const asOf = new Date(`${readOn}T12:00:00Z`);
+  const roster = Number.isFinite(asOf.getTime()) ? readRoster(ex, asOf) : null;
+  const worst = roster?.worst ?? null;
+  let roll: NonNullable<StressHeadline["untested"]>["roll"] = null;
+  if (roster && worst && worst.sharePct >= ROSTER_UNTESTED_PCT) {
+    const end = new Date(asOf);
+    end.setUTCFullYear(end.getUTCFullYear() + worst.year);
+    roll = { sharePct: worst.sharePct, basis: roster.rollBasis, through: `${MONTH_WORDS[end.getUTCMonth()]} ${end.getUTCFullYear()}` };
+  }
+  return keys.length > 0 || roll ? { keys, roll } : null;
 }
 
 // ── The headline: the OM's case against the evidence's ───────────────────
@@ -2355,6 +2429,10 @@ export function buildStressTest(args: StressTestArgs): StressTest {
  *  in the evidence's case, the NOI's own swap is left out of the headline
  *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
 export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
+
+/** The share of the OM's NOI past which the rest of the NOI's gap — what the
+ *  component swaps leave of it (`StressHeadline.noiRest`) — is said. */
+export const HEADLINE_NOI_REST_SHARE = 0.01;
 
 /** The percent and dollar inputs a row's re-run swaps whole, which the two
  *  cases set directly. */
@@ -2546,6 +2624,22 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
       }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
+  // THE NOI'S REST. Where the NOI is left out for its components, the
+  // component swaps move the evidence's case's year-one NOI, but not
+  // necessarily by the NOI row's own gap: what is left of that gap — the NOI
+  // row's gap less the year-one NOI the component swaps move, in the model's
+  // own year-one terms — is in neither case. Said where it passes
+  // `HEADLINE_NOI_REST_SHARE` of the OM's NOI.
+  let noiRest: StressHeadline["noiRest"] = null;
+  if (noi && noiIn === noi && omitted.some((o) => o.key === "noi" && o.why === HEADLINE_NOI_LEFT_OUT)) {
+    const components = players.filter((s) => HEADLINE_NOI_COMPONENTS.includes(s.row.key));
+    const componentCase = scenario((s) => components.includes(s));
+    const moved = year1Noi(omCase) - year1Noi(componentCase);
+    const rest = noi.omNoi - noi.altNoi - moved;
+    if (Number.isFinite(rest) && Math.abs(rest) > HEADLINE_NOI_REST_SHARE * Math.abs(noi.omNoi)) {
+      noiRest = { usd: Math.round(rest), components: components.map((s) => s.row.key).sort((a, b) => STRESS_KEYS.indexOf(a) - STRESS_KEYS.indexOf(b)) };
+    }
+  }
   const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
   // The model as it runs, every input its own: the run each row's re-run
   // swaps one input on (`runImpact`'s inputs are the model's with that one
@@ -2564,6 +2658,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
     modelIrrPct,
     keptAtOm: keptAtOm(inCase, players, omitted, model, modelExpense, noiIn ? anchorRent : null).sort((a, b) => order(a.key) - order(b.key)),
     atEvidence: atEvidence(players, model, modelExpense).sort((a, b) => order(a.key) - order(b.key)),
+    noiRest,
   };
 }
 

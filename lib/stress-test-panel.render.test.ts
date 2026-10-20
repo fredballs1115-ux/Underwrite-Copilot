@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD } from "./stress-test-words";
+import { HEADLINE_WITHHELD, HOLDS_NO_RERUN } from "./stress-test-words";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const h = React.createElement;
@@ -257,7 +257,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
   it("says what would test an unchecked row only where the document named is one the test reads", () => {
     const noi: StressRow = { ...GROWTH, key: "noi", title: "NOI", omSays: { text: "NOI (pro forma): $3,880,000", value: 3_880_000, page: 8 }, unchecked: "No T-12 is on file, and the OM states no second NOI to hold its figure to." };
     expect(testedByHint(noi)).toBe("Add the T-12 to test this.");
-    expect(testedByHint({ ...noi, key: "insurance" })).toBe("Add the T-12 to test this.");
+    // The T-12's premium is the seller's history: it tests no new owner's
+    // quote, so no sentence promises it does.
+    expect(testedByHint({ ...noi, key: "insurance" })).toBeNull();
     expect(testedByHint({ ...noi, key: "vacancy" })).toBe("Add the rent roll or the T-12 to test this.");
     // A figure the OM does not state, a market figure, a tested row: none.
     expect(testedByHint({ ...noi, omSays: { ...noi.omSays, value: null } })).toBeNull();
@@ -348,10 +350,20 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("At the OM's figure 9.3% At the evidence's figure 7.1%");
     // A fall is the warning tone; a re-run the evidence lifts never is.
     expect(row).toContain('class="h-full rounded-full bg-caution/70" data-direction="down" data-bar="stress-impact"');
-    const up: StressRow = { ...VACANCY, verdict: "holds", impact: { ...VACANCY.impact!, altValue: 0.058, altIrrPct: 9.6 } };
+    const up: StressRow = { ...VACANCY, verdict: "stretched", impact: { ...VACANCY.impact!, altValue: 0.058, altIrrPct: 9.6 } };
     const upRow = render({ rows: [up], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(upRow).toContain('class="h-full rounded-full bg-pass/70" data-direction="up" data-bar="stress-impact"');
     expect(upRow).not.toContain("bg-caution/70");
+    // A row that holds draws no re-run: its evidence side is the favourable
+    // one (an office rent growth holding at +7.2% re-ran to 24.7%), so it
+    // says so in one line, with no pair, no bars and no note.
+    const held = render({ rows: [{ ...up, verdict: "holds" }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(held).replace(/&#x27;/g, "'")).toContain(HOLDS_NO_RERUN);
+    expect(HOLDS_NO_RERUN).toBe("The OM's figure is within the evidence; no re-run.");
+    expect(held).not.toContain('data-qa="stress-impact"');
+    expect(held).not.toContain('data-bar="stress-impact"');
+    expect(held).not.toContain("data-bar=\"stress-impact-model\"");
+    expect(visibleText(held).replace(/&#x27;/g, "'")).not.toContain(VACANCY.impact!.note);
     expect(t).toContain(VACANCY.impact!.note);
     // The challenger's words, folded whole under the row.
     expect(t).toContain("The challenge · High severity");
@@ -375,7 +387,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // One figure of evidence: its label and no bracket.
     expect(t).toContain("The OM against the evidence OM $532k Evidence $532k");
     expect(taxes).not.toContain('data-qa="stress-span"');
-    expect(t).toContain("No return is re-run: the model has no input for this figure.");
+    expect(t).toContain(HOLDS_NO_RERUN);
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
 
@@ -495,6 +507,16 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("Left out: the NOI.");
     expect(t).toContain(`NOI: ${HEADLINE_NOI_LEFT_OUT}.`);
     expect(hh).toContain('href="/how-we-test#headline"');
+    // What the component swaps leave of the NOI's gap is said in the note,
+    // after what is left out; a headline that carries none says nothing.
+    expect(t).not.toContain("in neither case");
+    const rest = visibleText(render({ ...TEST, headline: { ...headline, noiRest: { usd: 54_000, components: ["vacancy", "taxes"] } } })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(rest).toContain("Left out: the NOI. The rest of the NOI's gap ($54k a year) is in neither case. How the headline is struck");
+    // What the headline does not test, under its line, in words.
+    expect(hh).not.toContain('data-qa="stress-headline-untested"');
+    const un = render({ ...TEST, headline: { ...headline, untested: { keys: ["basis", "noi"], roll: { sharePct: 57, basis: "rent", through: "Oct 2028" } } } });
+    expect(un.indexOf('data-qa="stress-headline-untested"')).toBeGreaterThan(un.indexOf('data-qa="stress-headline-line"'));
+    expect(visibleText(un).replace(/&#x27;/g, "'")).toContain("This headline does not test the price, the NOI or the 57% of the listed rent rolling in the year to Oct 2028.");
     // With the re-runs withheld there is no headline, and the note says so.
     const w = visibleText(render({ ...WITHHELD, headline: null })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(w).toContain(HEADLINE_WITHHELD.replace(/&#x27;/g, "'"));
@@ -531,18 +553,18 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // The third mark: an outline from zero, its words beside it, after the
     // two filled cases.
     expect(hh.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
-    expect(t).toContain("With the evidence 11.5% The model as it runs 9.3%");
+    expect(t).toContain("With the evidence 11.5% The screening model as it runs 9.3%");
     expect(hh).toMatch(/class="absolute inset-y-0 rounded-full border border-dashed border-ink\/60" data-bar="stress-headline-model" style="left:0\.00%;width:[\d.]+%"/);
     // Why the evidence's case is not the model, under the line.
     expect(t).toContain(
-      "Against the model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
     );
     expect(hh.indexOf('data-qa="stress-headline-kept"')).toBeLessThan(hh.indexOf('data-qa="stress-headline-bridge"'));
     // Each re-run names its base, and the model's dashed tick stands on its
     // bars, the key saying what it is.
     expect(t).toContain("From the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's At the OM's figure 9.3% At the evidence's figure 7.1%");
     expect(hh.match(/data-bar="stress-impact-model"/g)!.length).toBeGreaterThanOrEqual(2);
-    expect(t).toContain("The model as it runs, 9.3%: each re-run changes one input of it");
+    expect(t).toContain("The screening model as it runs, 9.3%: each re-run changes one input of it");
     // Nothing past its evidence: the OM's case and the model still drawn.
     const flat = render({ ...TEST, headline: { ...headline, evidenceIrrPct: 16.67, parts: [], omitted: [], keptAtOm: [], atEvidence: [] } });
     expect(flat).toContain('data-qa="stress-headline-cases"');

@@ -4,17 +4,21 @@ import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
 import {
   HEADLINE_WITHHELD,
+  HOLDS_NO_RERUN,
+  drawsRerun,
   headlineLine,
   headlineName,
   keptSentence,
   liveHeadline,
   modelIrrOf,
   noMoveWhy,
+  noiRestSentence,
   partAgainst,
   ptsText,
   rerunWords,
   shownHeadline,
   unsolvedSentence,
+  untestedSentence,
   type ShownPart,
 } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
@@ -178,15 +182,15 @@ export function stressReadLine(rows: readonly StressRow[]): string {
 /**
  * What would test an unchecked row, in plain words — only where the OM
  * states the figure and the document named is one the test reads when it
- * is on the deal (the T-12's NOI, vacancy and insurance line, the rent
- * roll's occupancy). Null elsewhere: a sentence never promises a test the
- * code does not make.
+ * is on the deal (the T-12's NOI and vacancy, the rent roll's occupancy).
+ * Null elsewhere: a sentence never promises a test the code does not make —
+ * the T-12's insurance line is the seller's history, which tests no premium
+ * a new owner will be quoted.
  */
 export function testedByHint(row: StressRow): string | null {
   if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
   switch (row.key) {
     case "noi":
-    case "insurance":
       return "Add the T-12 to test this.";
     case "vacancy":
       return "Add the rent roll or the T-12 to test this.";
@@ -500,6 +504,14 @@ function UncheckedRow({ row }: { row: StressRow }) {
         </p>
       )}
       <EvidenceList evidence={row.evidence} />
+      {/* A re-run on a row that stands unchecked (the insurance line at the
+          seller's own T-12 premium) is said in its own words, which say it
+          tests nothing; no bars, since nothing decided it. */}
+      {row.impact && (
+        <p className={`mt-1 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-unchecked-rerun">
+          <Dated text={row.impact.note} />
+        </p>
+      )}
       {row.challenge && <ChallengeFold challenge={row.challenge} />}
       <MethodLine row={row} />
     </li>
@@ -568,8 +580,15 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
               <p className={`${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{row.unchecked}</p>
             ) : null}
 
-            {row.impact ? (
-              <ImpactView impact={row.impact} test={test} />
+            {row.verdict === "holds" ? (
+              // A row that holds draws no re-run: the evidence's side is the
+              // favourable one (an office rent growth holding at +7.2% re-runs
+              // to 24.7%), which is no return to show (lib/stress-test-words).
+              <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-rerun">
+                {HOLDS_NO_RERUN}
+              </p>
+            ) : drawsRerun(row) ? (
+              <ImpactView impact={row.impact!} test={test} />
             ) : (
               <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-impact">
                 {/* One sentence a row: the reason once at the top where the whole
@@ -652,7 +671,7 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
  *  figure beside it — the base each row's re-run starts from. */
 function ModelBarRow({ model, style }: { model: number; style: { left: string; width: string } }) {
   return (
-    <BarRow label="The model as it runs" figure={pctText(model)}>
+    <BarRow label="The screening model as it runs" figure={pctText(model)}>
       <div className="absolute inset-y-0 rounded-full border border-dashed border-ink/60" data-bar="stress-headline-model" style={style} />
     </BarRow>
   );
@@ -690,6 +709,13 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
       <p className={`${MEASURE} text-base font-semibold leading-snug tabular-nums text-ink`} data-qa="stress-headline-line">
         {line}
       </p>
+      {/* What the headline does not test, where the deal's main risks are
+          unchecked: said under the line, in the caution tone. */}
+      {untestedSentence(h) && (
+        <p className={`mt-1 ${MEASURE} text-xs font-medium leading-relaxed text-caution`} data-qa="stress-headline-untested">
+          {untestedSentence(h)}
+        </p>
+      )}
       {kept && (
         <p className={`mt-1 ${MEASURE} text-xs leading-relaxed text-ink/85`} data-qa="stress-headline-kept">
           {kept}
@@ -754,7 +780,8 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
                 ? "Nothing past its evidence is a figure the headline swaps, so the two runs are one."
                 : "Nothing the model takes is past its evidence, so the two runs are one."}
         {h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : ""}
-        {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}{" "}
+        {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}
+        {noiRestSentence(h) ? ` ${noiRestSentence(h)}` : ""}{" "}
         <Link href="/how-we-test#headline" className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
           How the headline is struck
         </Link>
@@ -812,9 +839,9 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
           {"The OM's figure"}
         </KeyItem>
         {/* The dashed tick on each row's re-run bars: the model as it runs. */}
-        {model != null && test.rows.some((r) => r.impact) && (
+        {model != null && test.rows.some(drawsRerun) && (
           <KeyItem mark="dashed" tone="border-ink/70">
-            {`The model as it runs, ${pctText(model)}: each re-run changes one input of it`}
+            {`The screening model as it runs, ${pctText(model)}: each re-run changes one input of it`}
           </KeyItem>
         )}
         {/* Each kind's own glyph, the one the track and the list draw. */}

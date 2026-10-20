@@ -28,7 +28,7 @@ import { scoreMandateFit } from "@/lib/mandate";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { getTeam } from "@/lib/teams";
-import { isPlanDeal } from "@/lib/deal-strategy";
+import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { ANALYTICS_MIN_DEALS, AnalyticsEmptyPicture, DotTimeline, VerdictMix, StageFunnel } from "./charts";
 import { MarketTable } from "./market-table";
@@ -40,7 +40,7 @@ import type { RentRollSummary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
-import { stabilizedVacancyStated } from "@/lib/stress-test";
+import { planVacancyStated, stabilizedVacancyStated } from "@/lib/stress-test";
 import { TrackRecordSection } from "./track-record";
 
 /** A stored rent roll or T-12 row as the track record reads it. */
@@ -253,6 +253,10 @@ export default async function AnalyticsPage() {
         // reads): every stated one is held back as the market's, and the
         // section says so (lib/track-record `ACCOUNT_VACANCY_NOTE`).
         vacancyHeldToMarket: stabilizedVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
+        // A plan deal's NOI and stated vacancy are the finished project's,
+        // which no document of the building before the plan scores.
+        plan: isPlanDeal(inferStrategy(extraction, (r.first_signal as FirstSignal | null) ?? null).kind),
+        vacancyIsPlanTarget: planVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
       });
     }),
   );

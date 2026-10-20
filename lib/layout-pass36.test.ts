@@ -121,7 +121,7 @@ describe("the toolbar on a phone (research pass 36, F8)", () => {
         h(ShareControl, { dealId: "d1", shares: [], appUrl: "https://example.com" }),
         tool("/api/deals/d1/memo", "IC memo"),
         tool("/api/deals/d1/report", "Full report"),
-        tool("/api/deals/d1/underwrite.xlsx", "Underwrite model"),
+        tool("/api/deals/d1/underwrite.xlsx", "Screening model"),
         tool("/deals/d1/rent-roll", "Rent roll"),
         tool("/deals/d1/valuations", "Valuations"),
       ),
@@ -148,7 +148,7 @@ describe("the toolbar on a phone (research pass 36, F8)", () => {
     expect(gluedWords(visibleText(html))).toEqual([]);
     const tools = elementWith(html, 'data-hero-row="tools"');
     const controls = elementWith(html, 'data-hero-row="controls"');
-    for (const name of ["Share", "IC memo", "Full report", "Underwrite model", "Rent roll", "Valuations"]) expect(tools, name).toContain(name);
+    for (const name of ["Share", "IC memo", "Full report", "Screening model", "Rent roll", "Valuations"]) expect(tools, name).toContain(name);
     expect(controls).toContain('aria-label="Call-for-offers date"');
     expect(controls).toContain('aria-label="Deal stage"');
     expect(controls).toContain('aria-label="Deal actions"');

@@ -91,7 +91,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     body: [
       "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one stabilized vacancy (reached through a lease-up where the plan has one) and one loan, never lease by lease.",
       "It does not replace ARGUS, a lease-by-lease cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
-      "The model is included so the test has something to re-run; it is not the product.",
+      "The screening model is included so the test has something to re-run on a stabilized deal; it is not the product.",
     ],
   },
 ];

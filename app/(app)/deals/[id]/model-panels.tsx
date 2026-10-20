@@ -59,7 +59,7 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
     <section>
       <h2 className="text-sm font-semibold tracking-tight">
         Return sensitivity{" "}
-        <span className="font-normal text-muted">· levered IRR</span>
+        <span className="font-normal text-muted">· levered IRR, first-draft model</span>
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted">
         IRR by exit cap and price, each cell shaded by its figure; your base case is outlined.
@@ -251,7 +251,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Stress the assumptions{" "}
           <span className="font-normal text-muted">
-            · live, on this model
+            · live, on the first-draft model
           </span>
         </h2>
         {dirty && (
@@ -373,6 +373,26 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
   );
 }
 
+/** The first figure a value states, commas dropped: "9.1%" is 9.1,
+ *  "$2,400/unit" 2400; null where it states none. */
+function firstFigure(v: string): number | null {
+  const m = v.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+/** The figure the chosen document states where the model runs another:
+ *  the sample's first-draft model chose the rent roll, which states 9.1%,
+ *  and runs 9.0% (its whole-point input), so "Chose Rent roll" beside 9.0%
+ *  read as the rent roll's figure. Null where the two are one figure, or
+ *  either states none. */
+function chosenSourceDiffers(m: ReconciledMetric): string | null {
+  const src = m.sources.find((s) => s.doc === m.authority);
+  if (!src) return null;
+  const a = firstFigure(src.value);
+  const b = firstFigure(m.chosenValue);
+  return a != null && b != null && Math.abs(a - b) > 1e-9 ? src.value : null;
+}
+
 function sourceLine(m: ReconciledMetric): string {
   return m.sources
     .map((s) => `${s.doc}: ${s.value}${s.basis ? ` (${s.basis})` : ""}`)
@@ -426,7 +446,11 @@ export function Conflicts({
               {sourceLine(m)}
             </p>
             <p className="mt-2 text-sm leading-relaxed">
-              <span className="font-medium">Chose {m.authority} — </span>
+              <span className="font-medium">
+                {chosenSourceDiffers(m)
+                  ? `Chose ${m.authority}'s ${chosenSourceDiffers(m)}, run as ${m.chosenValue} — `
+                  : `Chose ${m.authority} — `}
+              </span>
               <span className="text-muted">{m.rationale}</span>
             </p>
           </div>
@@ -493,6 +517,7 @@ export function Assumptions({
                   </td>
                   <td className="px-4 py-3 text-muted">
                     {m.authority}
+                    {chosenSourceDiffers(m) ? ` (states ${chosenSourceDiffers(m)})` : null}
                     {!statedByDocument(m, generatedFrom) && (
                       <>
                         {" "}

@@ -18,7 +18,6 @@ import {
   DEBT_UNSUPPORTED_BPS,
   EXIT_CAP_UNSUPPORTED_BPS,
   EXPENSE_GROWTH_UNSUPPORTED_PTS,
-  INSURANCE_UNSUPPORTED_SHARE,
   IRR_MOVE_STRETCH_BPS,
   NOI_UNSUPPORTED_SHARE,
   PREMIUM_UNSUPPORTED_SHARE,
@@ -76,14 +75,14 @@ export const WHO_DOES_WHAT = {
 export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
   {
     word: "holds",
-    line: "The OM's figure sits inside the evidence, or on its conservative side. A row held only to a rule of thumb says so and is never drawn green.",
+    line: "The OM's figure sits inside the evidence, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
   },
   {
     word: "stretched",
     line: `Past the evidence by less than the row's threshold; or inside it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
   },
   { word: "unsupported", line: "Past the evidence by more than the row's threshold, below." },
-  { word: "unchecked", line: "The OM states no figure, or no evidence with a figure could be read for the deal." },
+  { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
 ];
 
 const pctOf = (share: number) => `${Math.round(share * 100)}%`;
@@ -105,7 +104,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
-  insurance: `Held to the T-12's premium, else the OM's premium moved by the index's year. Holds within ${pctOf(SAME_SHARE)} or over it; unsupported past ${pctOf(INSURANCE_UNSUPPORTED_SHARE)} under it.`,
+  insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };
@@ -269,8 +268,10 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
-    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 by the day it was uploaded, a Dead decision with its reason, a reported trade.",
-    "A document the screen itself read is never scored: the challenger was handed it.",
+    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 uploaded after it and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
+    "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
+    "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,

@@ -21,6 +21,7 @@ import {
   sourcingSentence,
 } from "@/lib/model/provenance";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import { SCREENING_MODEL_DOWNLOAD, SCREENING_MODEL_IS } from "@/lib/screening-model-words";
 import { ReturnsHeadline } from "./returns-headline";
 import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
 
@@ -28,11 +29,12 @@ import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow 
  *  the first draft's assumptions are the AI's reconciliation of the
  *  documents (lib/anthropic/model-reconcile), with its own exit, growth or
  *  vacancy where none is stated; the stress test runs the screening model
- *  (lib/underwrite/inputs), read off the memorandum's terms. */
+ *  (lib/underwrite/inputs): the memorandum's price and terms, with
+ *  screening defaults for growth and the exit (lib/screening-model-words). */
 const FIRST_DRAFT_MODEL_LINE =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, read off the memorandum's terms, so its returns can differ.";
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so its returns can differ.";
 const FIRST_DRAFT_MODEL_LINE_PLAYGROUND =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, read off the memorandum's terms, so their returns can differ.";
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so their returns can differ.";
 
 /** The card's body with a model, as the deal page stacks it. */
 export function ModelBody({
@@ -85,13 +87,12 @@ export function ModelBody({
       <div className="flex flex-col gap-1.5">
         {download}
         {/* Two models, said as two: the card's returns are this
-            first draft's; the workbook's are the OM underwrite's, and
+            first draft's; the workbook's are the screening model's, and
             so are the Overview's sensitivity playground's — named only
             where the page draws one. */}
         <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
-          The workbook is a separate model, built from the memorandum’s
-          terms — its returns can differ from the ones above.
-          {playground ? " The Overview’s sensitivity playground runs the workbook’s model, not this one." : null}
+          {`The workbook is the screening model, a separate one built on ${SCREENING_MODEL_IS} — its returns can differ from the ones above.`}
+          {playground ? " The Overview’s sensitivity playground runs the screening model, not this one." : null}
         </p>
       </div>
     </>
@@ -152,7 +153,7 @@ export function InputsNeeded({
 }
 
 // The first-draft workbook this card once exported, and its Conflicts sheet,
-// were retired (2d036c4): the one Excel download is the OM underwrite
+// were retired (2d036c4): the one Excel download is the screening model
 // (lib/underwrite/workbook.ts), a separate model built from the
 // memorandum's figures. The card says so beside its download button.
 //
@@ -255,7 +256,7 @@ export function DownloadRow({ href }: { href: string }) {
         <path d="m7 10 5 5 5-5" />
         <path d="M12 15V3" />
       </svg>
-      Download the OM underwrite model (.xlsx)
+      {SCREENING_MODEL_DOWNLOAD}
     </a>
   );
 }

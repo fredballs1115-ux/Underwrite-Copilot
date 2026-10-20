@@ -168,7 +168,7 @@ export interface ProPlanLine {
 export const PRO_PLAN: readonly ProPlanLine[] = [
   { label: "Unlimited deals", gates: ["deal-cap"] },
   { label: "IC memo, full PDF report, and LOI draft", gates: ["memo", "report", "loi"] },
-  { label: "Excel models with live formulas — the underwrite and the rent roll", gates: ["underwrite", "rentroll"] },
+  { label: "Excel models with live formulas — the screening model and the rent roll", gates: ["underwrite", "rentroll"] },
   { label: "The model, included: a first draft built from your documents", gates: ["model-build"] },
   { label: "Ask the deal — answers cite the OM's pages", gates: ["ask"] },
   { label: "Public-web comp search", gates: ["comp-search"] },
