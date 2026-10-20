@@ -826,7 +826,20 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("exit cap"), value: null, page: null };
   if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"), compared);
-  if (!goingInOk && trackerComparables.length === 0) return unchecked("exit_cap", omSays, evidence, "No going-in cap and no published cap range to set the exit against.", compared);
+  if (!goingInOk && trackerComparables.length === 0) {
+    // Said by what stopped the test, never "no going-in cap" beside one the
+    // OM states: on a value-add, lease-up, conversion or development deal
+    // the going-in cap is struck on today's income, not the stabilized one
+    // the exit sells; on a price that buys no building it is no building's.
+    const stated = goingIn != null && goingIn > 0;
+    const range = check?.published.some((f) => /research tracker/i.test(f.label)) ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
+    const why = !stated
+      ? `The OM states no going-in cap, and ${range}.`
+      : ctx.plan
+        ? `On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and ${range}.`
+        : `The price buys no building, so its going-in cap is no building's to hold the exit to; and ${range}.`;
+    return unchecked("exit_cap", omSays, evidence, why, compared);
+  }
   // Against the going-in cap where one stands: holds at or over it; tighter
   // is stretched, and by 25 bps or more with no published range reaching
   // the exit, unsupported. Where a published range supports the exit (its
@@ -1116,7 +1129,19 @@ function noiRow(ctx: Ctx): StressRow | null {
   // where the figure under test is the pro forma and no T-12 is on file.
   const comparables = evidence.filter((e) => e.value != null && (e.kind === "document" || (e.kind === "om_internal" && omLabel !== e.label && omValue !== e.value)));
   const compared = indexesOf(evidence, (e) => comparables.includes(e));
-  if (comparables.length === 0) return unchecked("noi", omSays, evidence, "No T-12 is on file, and the OM states no second NOI to hold its figure to.", compared);
+  if (comparables.length === 0) {
+    // Said by what stopped the test: a second NOI printed beside the row is
+    // never called absent. On a value-add, lease-up, conversion or
+    // development deal the OM's pro forma is the business plan, not a second
+    // read of today's income, so it is shown and not held to.
+    const second = evidence.some((e) => e.kind === "om_internal");
+    const why = ctx.plan && second
+      ? "No T-12 is on file. On a value-add, lease-up, conversion or development deal the OM's pro forma NOI is the business plan, not today's income, so the in-place figure is not held to it."
+      : second
+        ? "No T-12 is on file, and the OM's other NOI is the figure under test itself."
+        : "No T-12 is on file, and the OM states no second NOI to hold its figure to.";
+    return unchecked("noi", omSays, evidence, why, compared);
+  }
   const best = comparables[0];
   const share = (omValue - best.value!) / Math.abs(best.value!);
   // The memorandum's own in-place figure is the memorandum against itself,

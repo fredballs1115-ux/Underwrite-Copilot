@@ -591,6 +591,22 @@ describe("a value-add plan deal", () => {
     expect(rowOf(test, "vacancy").verdict).not.toBe("unchecked");
   });
 
+  it("says why a row stands unchecked by what stopped it, never that the OM states nothing it prints beside the row", () => {
+    // The OM states a going-in cap; on a value-add it is struck on today's
+    // income, so the exit is not held to it — said so, never "no going-in cap".
+    const x = rowOf(test, "exit_cap");
+    expect(x.verdict).toBe("unchecked");
+    expect(x.unchecked).toBe(
+      "On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and no published cap range was read for this market and class.",
+    );
+    // The pro forma beside the in-place NOI is the business plan, never
+    // called absent.
+    const n = rowOf(test, "noi");
+    expect(n.verdict).toBe("unchecked");
+    expect(n.evidence.map((e) => e.kind)).toEqual(["om_internal"]);
+    expect(n.unchecked).toBe("No T-12 is on file. On a value-add, lease-up, conversion or development deal the OM's pro forma NOI is the business plan, not today's income, so the in-place figure is not held to it.");
+  });
+
   it("reads the renovation premium against the achieved one, the rents and the break-even", () => {
     const p = rowOf(test, "renovation_premium");
     expect(p.omSays).toEqual({ text: "$250 a month a renovated door, as stated", value: 250, page: 22 });
