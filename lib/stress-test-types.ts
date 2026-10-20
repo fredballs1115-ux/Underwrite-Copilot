@@ -191,7 +191,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named",
-      "Negative leverage: a going-in cap under the all-in rate loses money on every borrowed dollar until growth bails it out",
+      "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield",
     ],
     // lib/stress-test's debtRow sizes the tests at the OM's stated rate
     // where one is read, else the derived model's `allInRatePct` (the seed,

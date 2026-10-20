@@ -980,16 +980,20 @@ function debtRow(ctx: Ctx): StressRow | null {
         scope: "class",
       });
     }
-    // Negative leverage: the going-in cap under the all-in rate.
+    // Negative leverage: the model's going-in cap under the rate. It is the
+    // model's own arithmetic, not the memorandum against itself, so it is
+    // filed as the screening read it is; the rate is the OM's where the OM
+    // states one, else the model's, a screening default.
     const cap = (noi / inputs!.purchasePrice) * 100;
     if (Number.isFinite(cap) && cap > 0) {
+      const whose = om ? `the OM's ${pct2(rate)} rate` : `the model's ${pct2(rate)} rate, a screening default`;
       evidence.push({
-        kind: "om_internal",
-        label: "Negative leverage: the going-in cap against the all-in rate",
+        kind: "rule_of_thumb",
+        label: "Negative leverage: the model's going-in cap against the loan's rate",
         text:
           cap < rate - SAME
-            ? `The model's year-1 NOI over its price is ${pct2(cap)}, under ${withAn(rate)} rate by ${bps((rate - cap) * 100)}: the deal loses money on every borrowed dollar until growth bails it out`
-            : `The model's year-1 NOI over its price is ${pct2(cap)}, ${bps((cap - rate) * 100)} over ${withAn(rate)} rate: positive leverage at that rate`,
+            ? `The model's year-1 NOI over its price is ${pct2(cap)}, ${bps((rate - cap) * 100)} under ${whose}: negative leverage — the cap is under the loan's rate, so each borrowed dollar lowers the year-one cash yield`
+            : `The model's year-1 NOI over its price is ${pct2(cap)}, ${bps((cap - rate) * 100)} over ${whose}: positive leverage — each borrowed dollar raises the year-one cash yield`,
         value: null,
         asOf: null,
         publisher: "the model's own figures",
@@ -1032,9 +1036,6 @@ function debtRow(ctx: Ctx): StressRow | null {
   // spread is the site's own default, so the verdict is a rule of thumb's.
   return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("debt", evidence), ruleOfThumbOnly: true };
 }
-
-/** "a 6.78%" / "an 8.00%" — the figure decides (lib/article). */
-const withAn = (rate: number) => withArticle(pct2(rate));
 
 // — NOI —
 

@@ -188,7 +188,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     // negative-leverage read carry no figure.
     expect(rowOf(test, "exit_cap").method).toBe("The OM's exit cap against the OM's going-in cap (the offering memorandum); beside 10-year Treasury (FRED).");
     expect(rowOf(test, "debt").method).toBe(
-      "The OM's debt against the index the model prices off: 5-yr Treasury (FRED), then the class's screening spread over it, a rule of thumb (a screening default); beside 10-year Treasury, as the market check read it (FRED), lender tests at screening defaults, the binding one named (a rule of thumb) and negative leverage: the going-in cap against the all-in rate (the model's own figures).",
+      "The OM's debt against the index the model prices off: 5-yr Treasury (FRED), then the class's screening spread over it, a rule of thumb (a screening default); beside 10-year Treasury, as the market check read it (FRED), lender tests at screening defaults, the binding one named (a rule of thumb) and negative leverage: the model's going-in cap against the loan's rate (the model's own figures).",
     );
     // The T-12 first, then the OM's own in-place figure; "NOI" keeps its letters.
     expect(rowOf(test, "noi").method).toBe("The OM's NOI against the deal's T-12 NOI, then the OM's in-place NOI against its pro forma (the offering memorandum).");
@@ -330,8 +330,13 @@ describe("a stabilized apartment deal with a T-12", () => {
       "The class's screening spread over it, a rule of thumb",
       "10-year Treasury, as the market check read it",
       "Lender tests at screening defaults, the binding one named",
-      "Negative leverage: the going-in cap against the all-in rate",
+      "Negative leverage: the model's going-in cap against the loan's rate",
     ]);
+    // The model's own arithmetic, never "the OM against itself", said as
+    // what it is: a cap under the rate lowers the year-one cash yield.
+    expect(d.evidence[4]).toMatchObject({ kind: "rule_of_thumb", publisher: "the model's own figures" });
+    expect(d.evidence[4].text).toMatch(/^The model's year-1 NOI over its price is \d\.\d\d%, \d+ bps (under the OM's 5\.25% rate: negative leverage — the cap is under the loan's rate, so each borrowed dollar lowers the year-one cash yield|over the OM's 5\.25% rate: positive leverage — each borrowed dollar raises the year-one cash yield)$/);
+    expect(d.evidence[4].text).not.toContain("loses money");
     expect(d.gap).toEqual({ value: 153, unit: "bps", text: "The OM's 5.25% is 153 bps under the index plus the class's spread, 6.78%. Against a rule of thumb only." });
     expect(d.ruleOfThumbOnly).toBe(true);
     // 153 bps under the index plus a default spread, but over the bare
