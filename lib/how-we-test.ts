@@ -48,10 +48,10 @@ export const WHO_DOES_WHAT = {
 
 /**
  * The kind an `against` item is marked by, read off the table's own words
- * — a rule of thumb where the item names itself one, a published figure
- * where it names a publisher, an index, a survey or the reader's own past
- * screens (other memoranda's asks in the market, not this deal's document:
- * lib/stress-test files them so), the deal's documents where it names the
+ * — a rule of thumb where the item names itself one (the reader's
+ * own past asks among them, other memoranda's asking prices: lib/
+ * stress-test files them so), a published figure where it names a
+ * publisher, an index or a survey, the deal's documents where it names the
  * memorandum, the rent roll or the T-12 — and null where the words name
  * none of the three (the lender tests, the break-even, the challenger's
  * words), which the page leaves unmarked rather than guesses.
@@ -59,7 +59,7 @@ export const WHO_DOES_WHAT = {
 export function evidenceKindOf(item: string): EvidenceKind | null {
   if (/rule of thumb|class's norm/i.test(item)) return "rule_of_thumb";
   if (
-    /\bFRED\b|\bBLS\b|Census|Zillow|Realtor|tracker|Treasury|\bindex\b|\bindexes\b|\bCPI\b|breakeven|public property records|published allowance|consumer prices|producer price|past screens/i.test(
+    /\bFRED\b|\bBLS\b|Census|Zillow|Realtor|tracker|Treasury|\bindex\b|\bindexes\b|\bCPI\b|breakeven|public property records|published allowance|consumer prices|producer price/i.test(
       item,
     )
   ) {

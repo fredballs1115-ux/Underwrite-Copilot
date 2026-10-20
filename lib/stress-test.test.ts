@@ -354,7 +354,9 @@ describe("a stabilized apartment deal with a T-12", () => {
   it("strikes the basis on the price over the units, and withholds a verdict with no comp", () => {
     const b = rowOf(test, "basis");
     expect(b.omSays).toEqual({ text: "$275k/unit (Asking price $42,000,000 over 153 units)", value: 274_510, page: 5 });
-    expect(b.evidence.map((e) => e.kind)).toEqual(["rule_of_thumb"]);
+    // No comp with a figure, and no price band: the band any market
+    // delivers in is a misread guard, never pricing evidence.
+    expect(b.evidence).toEqual([]);
     expect(b.verdict).toBe("unchecked");
     expect(b.impact).toBeNull();
   });
@@ -802,7 +804,7 @@ describe("the challenger's words ride beside the rows", () => {
  * hand the reader every source the methodology names.
  */
 const AGAINST_SOURCES: Record<StressKey, string[]> = {
-  basis: ["The memorandum's sale comps", "Recorded sales (", "Your past screens in", "Prices the class trades in"],
+  basis: ["The memorandum's sale comps", "Recorded sales (", "Other memoranda's asking prices in"],
   exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
   debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
@@ -943,12 +945,14 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     });
   }
 
-  it("the basis reads the memorandum's comps, the recorded sales, the past screens and the band, best first", () => {
+  it("the basis reads the memorandum's comps, the recorded sales and the past screens, best first, and no price band", () => {
     const b = rowOf(apartmentTest, "basis");
-    // The reader's past screens are other memoranda's asks, published
-    // under the reader's own name — not this deal's own document.
-    expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "published", "rule_of_thumb"]);
-    expect(b.evidence[2]).toMatchObject({ label: "Your past screens in Washington DC, at the ask", publisher: "your past screens", scope: "metro", value: 255_000 });
+    // The reader's past screens are other memoranda's asks — nobody's
+    // publication and never a trade — filed as a rule of thumb under the
+    // reader's own name; the class's price band is no evidence at all.
+    expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "rule_of_thumb"]);
+    expect(b.evidence[2]).toMatchObject({ label: "Other memoranda's asking prices in Washington DC (your past screens): asks, not trades", publisher: "your past screens", scope: "metro", value: 255_000 });
+    expect(b.evidence.some((e) => /band any market delivers in|Prices the class trades in/.test(`${e.label} ${e.text}`))).toBe(false);
     expect(b.evidence[0].value).toBe(256_500);
     expect(b.evidence[1]).toMatchObject({ value: 240_000, href: "https://example.test/records", asOf: "2026-10-01" });
     expect(b.gap).toMatchObject({ unit: "pct", value: 7 });
@@ -985,6 +989,44 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // Six sales clear the floor; a record states no unit count, so no
     // per-unit median is struck, whatever the count.
     expect(recorded(6, 310)).toMatchObject({ text: "6 recorded sales; no per-unit median is struck on recorded sales", value: null });
+  });
+
+  it("strikes the comps' median only over those the comps step graded clean, naming the rest", () => {
+    const comps = {
+      saleComps: [
+        { name: "The Ellery", detail: "$252,000 per unit, 5.6% cap", support: "supports" as const, note: "" },
+        { name: "Vue", detail: "$298,000 per unit", support: "stretched" as const, note: "" },
+        { name: "Park Place", detail: "$261K/door, 5.4% cap", support: "favorable" as const, note: "" },
+      ],
+      leaseComps: [],
+      redFlags: [],
+      summary: "",
+    };
+    const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps })), "basis");
+    expect(b.evidence[0].value).toBe(256_500);
+    expect(b.evidence[0].text).toBe(
+      "3 of 3 state a figure /unit: The Ellery $252k/unit (supports); Park Place $261k/unit (favorable) — median $257k/unit over the 2 graded clean; left out, graded stretched by the comps step: Vue $298k/unit",
+    );
+    // None graded clean: no median, and the row has nothing to decide on.
+    const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
+    expect(none.evidence[0]).toMatchObject({ value: null, text: "1 of 1 state a figure /unit, none graded clean, so no median is struck; left out, graded stretched by the comps step: Vue $298k/unit" });
+    expect(none.verdict).toBe("unchecked");
+  });
+
+  it("judges the basis on the best kind present: the reader's own past asks never turn a stretched basis into one that holds", () => {
+    const comps = { saleComps: [{ name: "The Ellery", detail: "$256,500 per unit", support: "supports" as const, note: "" }], leaseComps: [], redFlags: [], summary: "" };
+    const pastScreens = { count: 4, perUnitMedian: 300_000, perSfMedian: null, market: "Washington DC" };
+    const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps, pastScreens })), "basis");
+    // 7.0% over the comps; the asks at $300k would have read it under one.
+    expect(b.verdict).toBe("stretched");
+    expect(b.ruleOfThumbOnly).toBeUndefined();
+    expect(b.method).toMatch(/against the memorandum's sale comps \(the offering memorandum\); beside other memoranda's asking prices/);
+    // The asks alone decide only where nothing else carries a figure — and
+    // the row says it was held to a rule of thumb only.
+    const asksOnly = rowOf(buildStressTest(apartmentArgs({ pastScreens })), "basis");
+    expect(asksOnly.verdict).toBe("holds");
+    expect(asksOnly.ruleOfThumbOnly).toBe(true);
+    expect(asksOnly.gap!.text).toBe("The ask's $275k/unit is 8.5% under the median of your past screens' asking prices in Washington DC, $300k/unit — the conservative side. Against a rule of thumb only.");
   });
 
   it("the office deal's vacancy and exit read the tracker as published figures, the metro's", () => {

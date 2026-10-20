@@ -88,9 +88,9 @@ describe("/how-we-test draws every method from the table", () => {
   it("marks each evidence item by its kind, read off the table's own words, and leaves the rest unmarked", () => {
     const byKey = Object.fromEntries(STRESS_METHODS.map((m) => [m.key, m.against.map(evidenceKindOf)]));
     expect(byKey).toEqual({
-      // The reader's past screens are other memoranda's asks, published
-      // under the reader's own name, not this deal's document.
-      basis: ["document", "published", "published", "rule_of_thumb"],
+      // The reader's past screens are other memoranda's asks — asks, not
+      // trades, nobody's publication — filed as a rule of thumb.
+      basis: ["document", "published", "rule_of_thumb"],
       exit_cap: ["document", "published", "published"],
       debt: ["published", null, null],
       noi: ["document", "document", "document"],

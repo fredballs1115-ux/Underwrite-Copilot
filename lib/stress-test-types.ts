@@ -158,10 +158,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, each graded for how hard it supports the ask",
+      "The memorandum's own sale comps, each graded for how hard it supports the ask, the median struck only over those graded clean",
       "Recorded sales from public property records where the site has them, a median only from three sales up",
-      "Your own past screens and pipeline in the same market and class, each at its ask",
-      "The band of prices per unit or per square foot the class trades in, a rule of thumb named as one",
+      "Other memoranda's asking prices from your own past screens in the same market and class: asks, not trades, a rule of thumb that decides only where nothing above carries a figure",
     ],
     engine: "The price is a direct input: the return is re-run at the evidence's price.",
     limits: [

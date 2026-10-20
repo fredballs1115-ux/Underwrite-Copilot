@@ -75,7 +75,7 @@ import { shownAssetClass } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
 import { findGoingInCap, findMetric, findPriceRow, occupancyRow, parsePct, screenYearOf, unitCountFromMetrics, buildingSfFromMetrics } from "@/lib/criteria";
-import { BASIS_PER_SF_BAND, BASIS_PER_UNIT_BAND, askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
@@ -1359,16 +1359,25 @@ function basisRow(ctx: Ctx): StressRow | null {
   const priceRow = findPriceRow(ctx.rows, ctx.kind, screenYear) as Row | null;
   const evidence: StressEvidence[] = [];
   const pick = (c: { perUnit: number | null; perSf: number | null }) => (per === "unit" ? c.perUnit : c.perSf);
-  // The memorandum's own sale comps, each graded by the comps step.
+  // The memorandum's own sale comps, each graded by the comps step: the
+  // median is struck only over the comps it graded clean ("supports",
+  // "favorable"), and one it graded "stretched" is named and left out — the
+  // comps step's own word that it does not hold the ask up.
   const comps = (ctx.brokerComps?.saleComps ?? []).map((c) => ({ comp: c, figure: pick(compFigures(c.detail)) })).filter((c) => c.figure != null);
+  const clean = comps.filter((c) => c.comp.support === "supports" || c.comp.support === "favorable");
+  const left = comps.filter((c) => !clean.includes(c));
   if (comps.length > 0) {
-    const values = comps.map((c) => c.figure!);
-    const med = median(values);
+    const med = clean.length > 0 ? median(clean.map((c) => c.figure!)) : null;
+    const listed = clean.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord} (${c.comp.support})`).join("; ");
+    const leftOut = left.length > 0 ? `; left out, graded ${joinWords([...new Set(left.map((c) => c.comp.support))])} by the comps step: ${left.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord}`).join("; ")}` : "";
     evidence.push({
       kind: "om_internal",
       label: "The memorandum's sale comps",
-      text: `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}: ${comps.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord} (${c.comp.support})`).join("; ")} — median ${money(med)}${perWord}`,
-      value: Math.round(med),
+      text:
+        med != null
+          ? `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}: ${listed} — median ${money(med)}${perWord} over the ${clean.length} graded clean${leftOut}`
+          : `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}, none graded clean, so no median is struck${leftOut}`,
+      value: med != null ? Math.round(med) : null,
       asOf: null,
       publisher: "the offering memorandum",
       scope: "deal",
@@ -1402,36 +1411,28 @@ function basisRow(ctx: Ctx): StressRow | null {
     });
   }
   // The reader's own past screens, each at its ask: other memoranda's
-  // asking prices in the same market, not this deal's own document, so a
-  // published figure of the metro's under the reader's own name.
+  // asking prices in the same market — asks, not trades, and nobody's
+  // publication — so filed as a rule of thumb under the reader's own name,
+  // never a published figure. (The class's price band, which the
+  // plausibility check holds a misread to, is no pricing evidence and is
+  // not read here.)
   const ps = ctx.pastScreens;
   if (ps && ps.count > 0) {
     const v = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
     evidence.push({
-      kind: "published",
-      label: `Your past screens in ${ps.market}, at the ask`,
-      text: v != null ? `median ${money(v)}${perWord} over ${ps.count} screens, each at its memorandum's asking price` : `${ps.count} screens, none with a basis ${perWord}`,
+      kind: "rule_of_thumb",
+      label: `Other memoranda's asking prices in ${ps.market} (your past screens): asks, not trades`,
+      text: v != null ? `median ${money(v)}${perWord} over ${ps.count} screens, each at its memorandum's asking price, never a price anyone paid` : `${ps.count} screens, none with a basis ${perWord}`,
       value: v != null ? Math.round(v) : null,
       asOf: null,
       publisher: "your past screens",
       scope: "metro",
     });
   }
-  // The band the class trades in, a rule of thumb named as one.
-  const band = per === "unit" ? BASIS_PER_UNIT_BAND : BASIS_PER_SF_BAND;
-  if (words.operating) {
-    evidence.push({
-      kind: "rule_of_thumb",
-      label: `Prices the class trades in ${perWord}, a rule of thumb`,
-      text: `${money(band.min)}–${money(band.max)}${perWord}: the band any market delivers in, a rule of thumb, never a comp`,
-      value: null,
-      asOf: null,
-      publisher: "a rule of thumb",
-      scope: "class",
-    });
-  }
-  if (om == null && evidence.length === 0) return null;
   const withheld = basisWithheldOf(ctx.ex);
+  // A price that buys no building keeps its row, to say why no basis is
+  // struck; anything else with nothing stated and nothing found is left out.
+  if (om == null && evidence.length === 0 && !withheld) return null;
   // The basis is the whole building's: on a share, the whole its price
   // implies (lib/comp-detail's own rule), said so rather than the share's
   // price over every unit.
@@ -1447,12 +1448,20 @@ function basisRow(ctx: Ctx): StressRow | null {
       ? { text: `${money(om)}${perWord}${priced}`, value: om, page: pageOf(priceRow, ctx.ex) }
       : { text: withheld ? `No basis is struck: ${withheld.why}.` : ctx.kind === "conversion" || ctx.kind === "development" ? "No price basis on a plan deal: the basis is the all-in cost." : NO_FIGURE(`price ${perWord}`), value: null, page: pageOf(priceRow, ctx.ex) };
   if (om == null) return unchecked("basis", omSays, evidence, omSays.text);
-  const comparables = evidence.filter((e) => e.value != null);
+  // The verdict is struck on the best kind of evidence present: the
+  // memorandum's graded comps and the recorded sales before the reader's
+  // own past asking prices, which decide only where nothing else carries a
+  // figure — another memorandum's ask never turns a stretched basis into
+  // one that holds.
+  const withFigure = evidence.filter((e) => e.value != null);
+  const asks = withFigure.filter((e) => e.publisher === "your past screens");
+  const comparables = withFigure.length > asks.length ? withFigure.filter((e) => !asks.includes(e)) : asks;
   if (comparables.length === 0) return unchecked("basis", omSays, evidence, "No comp with a figure could be read for this deal.");
+  const compared = indexesOf(evidence, (e) => comparables.includes(e));
   const best = comparables[0];
   // "the median of …": every basis comparable is a median, and its label is
   // a phrase no possessive fits ("Recorded sales (Philadelphia OPA)").
-  const ofBest = `the median of ${lowerFirst(best.label)}, ${money(best.value!)}${perWord}`;
+  const ofBest = `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.label)}, ${money(best.value!)}${perWord}`;
   const judged = judge(om, comparables.map((e) => e.value!), "high", "pct", BASIS_UNSUPPORTED_PCT, 0, (gap) =>
     Math.abs(gap) / best.value! < 0.005
       ? `The ask's ${money(om)}${perWord} is at ${ofBest}.`
@@ -1463,11 +1472,9 @@ function basisRow(ctx: Ctx): StressRow | null {
   // The verdict is read in percent of the best figure, so the gap's unit is
   // a share, not a dollar: struck again here on the best figure.
   const sharePct = ((om - best.value!) / best.value!) * 100;
-  const hiPct = Math.max(...comparables.map((e) => ((om - e.value!) / e.value!) * 100));
-  const loPct = Math.min(...comparables.map((e) => ((om - e.value!) / e.value!) * 100));
-  const past = loPct;
+  // Past the nearest of the deciding medians, the generous reading of them.
+  const past = Math.min(...comparables.map((e) => ((om - e.value!) / e.value!) * 100));
   const verdict: StressVerdict = past <= BASIS_STRETCH_PCT ? "holds" : past > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
-  void hiPct;
   const gap = { value: Math.round(sharePct * 10) / 10, unit: "pct" as const, text: judged.gap.text };
   const evidenceIndex = evidence.indexOf(best);
   // The price is a direct input: re-run at the evidence's basis — only
@@ -1480,7 +1487,7 @@ function basisRow(ctx: Ctx): StressRow | null {
     // Whose median the alternative is — the memorandum's comps', the
     // recorded sales' or the reader's past screens' — and that the model's
     // loan is a share of the price, so it re-sizes with it.
-    const median = best.kind === "om_internal" ? "the memorandum's sale comps' median" : best.label.startsWith("Recorded sales") ? `the recorded sales' median (${best.publisher})` : `${lowerFirst(best.label)}' median`;
+    const median = best.kind === "om_internal" ? "the memorandum's sale comps' median" : best.label.startsWith("Recorded sales") ? `the recorded sales' median (${best.publisher})` : "the median of your past screens' asking prices";
     impact = runImpact("purchasePrice", ctx.derived.inputs, { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, price, {
       what: "the price",
       om: `${money(price)} (${money(om)}${perWord})`,
@@ -1489,7 +1496,7 @@ function basisRow(ctx: Ctx): StressRow | null {
       model: money(price),
     });
   }
-  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence) };
+  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(comparables === asks ? { ruleOfThumbOnly: true } : {}) };
 }
 
 function median(nums: number[]): number {
@@ -1596,12 +1603,16 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
  *   - a verdict never contradicts its own re-run: a row whose evidence moves
  *     the levered IRR down by `IRR_MOVE_STRETCH_BPS` or more never reads
  *     "holds" — inside the evidence's band or not, a move that size is to be
- *     priced, so it reads "stretched" and the gap says both.
+ *     priced, so it reads "stretched" and the gap says both — where the OM
+ *     is the more optimistic side.
  */
 function finishRow(row: StressRow): void {
   if (row.ruleOfThumbOnly && row.gap) row.gap = { ...row.gap, text: `${row.gap.text} Against a rule of thumb only.` };
   const i = row.impact;
-  if (row.verdict === "holds" && row.gap && i && i.baseIrrPct != null && i.altIrrPct != null) {
+  // Only where the OM is the more optimistic of the two (a positive gap): a
+  // conservative figure the evidence would make dearer — an ask under the
+  // comps — is the buyer's cushion, not a risk, whatever the re-run does.
+  if (row.verdict === "holds" && row.gap && row.gap.value > 0 && i && i.baseIrrPct != null && i.altIrrPct != null) {
     const moveBps = Math.round((i.baseIrrPct - i.altIrrPct) * 100);
     if (moveBps >= IRR_MOVE_STRETCH_BPS) {
       row.verdict = "stretched";
