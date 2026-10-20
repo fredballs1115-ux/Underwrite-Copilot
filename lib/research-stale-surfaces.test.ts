@@ -27,23 +27,23 @@ describe("the deal page's research panel — its source line", () => {
     render(React.createElement(SourceLink, { source: null, asOf: "2026-08-21", status: "verified", today }));
 
   it("a rule's date is current through its 180th day and stale, with its age, from the next", () => {
-    expect(text(rule("2027-02-17"))).toBe("verified as of 2026-08-21");
+    expect(text(rule("2027-02-17"))).toBe("verified as of Aug 21, 2026");
     const html = rule("2027-02-18");
-    expect(text(html)).toBe("verified as of 2026-08-21 · 181 days old, stale");
+    expect(text(html)).toBe("verified as of Aug 21, 2026 · 181 days old, stale");
     expect(html).toContain('data-qa="research-stale"');
   });
 
   it("a tracker row says the day it was read, and ages by the same rule", () => {
     const row = (today: string) =>
       text(render(React.createElement(SourceLink, { source: null, asOf: "2026-08-25", status: "sourced", today, readOn: true })));
-    expect(row("2027-02-21")).toBe("sourced read 2026-08-25");
-    expect(row("2027-02-22")).toBe("sourced read 2026-08-25 · 181 days old, stale");
+    expect(row("2027-02-21")).toBe("sourced read Aug 25, 2026");
+    expect(row("2027-02-22")).toBe("sourced read Aug 25, 2026 · 181 days old, stale");
   });
 
   it("a fair market rent keeps its fiscal year's rule, never the research rule's", () => {
     const fmr = (yearEnded: boolean) =>
       text(render(React.createElement(SourceLink, { source: null, asOf: "2026-09-30", status: "verified", today: "2027-06-01", yearEnded })));
-    expect(fmr(false)).toBe("verified as of 2026-09-30");
+    expect(fmr(false)).toBe("verified as of Sep 30, 2026");
     expect(fmr(true)).toBe("verified year ended");
   });
 
@@ -52,11 +52,11 @@ describe("the deal page's research panel — its source line", () => {
       "https://www.redfin.com/news/data-center/downloads/ — redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02)";
     const html = render(React.createElement(SourceLink, { source: redfin, asOf: "2026-05-31", status: "sourced", today: "2026-10-01" }));
     expect(html).toContain('<a href="https://www.redfin.com/news/data-center/downloads/" title="redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02)"');
-    expect(text(html)).toBe("sourced as of 2026-05-31 Redfin public dataset");
+    expect(text(html)).toBe("sourced as of May 31, 2026 Redfin public dataset");
     // Any other source keeps its one word, the address alone its link.
     const hud = render(React.createElement(SourceLink, { source: "https://www.huduser.gov/portal/datasets/fmr.html", asOf: "2026-09-30", status: "verified", today: "2026-10-01" }));
     expect(hud).toContain('<a href="https://www.huduser.gov/portal/datasets/fmr.html" target="_blank"');
-    expect(text(hud)).toBe("verified as of 2026-09-30 source");
+    expect(text(hud)).toBe("verified as of Sep 30, 2026 source");
     // A source with no address is never a link.
     expect(render(React.createElement(SourceLink, { source: "HUD FMR dataset", asOf: "2026-09-30", status: "verified", today: "2026-10-01" }))).not.toContain("<a ");
     expect(a11yIssues(html)).toEqual([]);

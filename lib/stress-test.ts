@@ -1261,6 +1261,13 @@ function debtRow(ctx: Ctx): StressRow | null {
 const PRO_FORMA_RENT_ROW = /\b(?:pro ?forma|market|projected|stabili[sz]ed)\s+(?:avg\.?\s+|average\s+)?rents?\b/i;
 const RENT_NOT = /growth|psf|\/\s*sf|per\s+sf|comp/i;
 
+/** A stored day as a sentence writes it: "May 31, 2026" (lib/debt-index
+ *  `datedLong`), never the raw ISO day beside a page's worded dates; any
+ *  other form (a month, a year, a period) is left as written. */
+function proseDay(d: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? datedLong(d) : d;
+}
+
 function noiRow(ctx: Ctx): StressRow | null {
   const c = ctx.actuals?.noiComparison ?? null;
   const picked = pickOmNoi(ctx.rows, ctx.kind);
@@ -1273,7 +1280,7 @@ function noiRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 NOI",
-      text: `${money(t12.summary.noi)}${t12.summary.noiDerived ? " (derived: EGI less expenses)" : ""} (${t12.periodEnd ? `TTM to ${t12.periodEnd}` : "period not stated"})`,
+      text: `${money(t12.summary.noi)}${t12.summary.noiDerived ? " (derived: EGI less expenses)" : ""} (${t12.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated"})`,
       value: t12.summary.noi,
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
@@ -1289,7 +1296,7 @@ function noiRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The rent roll's in-place rent against the OM's pro forma rent",
-      text: `$${Math.round(rr.summary.avgRentMonthly).toLocaleString("en-US")} a unit a month in place${asOf ? ` (as of ${asOf})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
+      text: `$${Math.round(rr.summary.avgRentMonthly).toLocaleString("en-US")} a unit a month in place${asOf ? ` (as of ${proseDay(asOf)})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
       value: null,
       asOf,
       publisher: "the deal's rent roll",
@@ -1436,7 +1443,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 tax line",
-      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${t12.periodEnd}` : ""})`,
+      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
       value: Math.round(t12Tax.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -1535,7 +1542,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 insurance line",
-      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${t12.periodEnd}` : ""})`,
+      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
       value: Math.round(t12Ins.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -1548,7 +1555,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const check = checkOf(ctx.mvm, "expense_growth");
   const idx = check?.published.find((f) => /insurance premiums/i.test(f.label)) ?? null;
   const stored = ctx.market?.liveBrief?.figures?.find((f) => f.key === "insurance_index_yoy") ?? null;
-  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${stored.asOf}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
+  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${proseDay(stored.asOf)}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
   if (index) {
     const moved = premium != null ? Math.round(premium * (1 + index.pct / 100)) : null;
     evidence.push({

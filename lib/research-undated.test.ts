@@ -42,7 +42,7 @@ import { visibleText } from "./render-lint";
 
 describe("a research figure with no date in its file is undated, never given one", () => {
   it("says the file's own date, or 'undated'", () => {
-    expect(asOfLabel("2026-08-21")).toBe("as of 2026-08-21");
+    expect(asOfLabel("2026-08-21")).toBe("as of Aug 21, 2026");
     expect(asOfLabel("")).toBe("undated");
     expect(asOfLabel("  ")).toBe("undated");
     expect(asOfLabel(null)).toBe("undated");

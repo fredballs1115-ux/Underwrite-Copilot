@@ -6780,7 +6780,7 @@ describe("/demo's research panel — the deal page's ResearchPanel on the sample
     expect(text).toMatch(/Covered market:\s+Philadelphia PA/);
     expect(html).toContain('data-picture="covered-market"');
     expect(text).toContain("Negative leverage: going-in cap sits 150 bps below the 30-yr fixed");
-    expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
+    expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of Sep 17, 2026)");
     expect(text).toContain("Against the latest curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
     expect(text).not.toContain("today's curve");
     // The sample's one rule keys off an eviction filing, never the purchase:
@@ -6812,9 +6812,9 @@ describe("/demo's research panel — the deal page's ResearchPanel on the sample
     const none = { ...NO_DEBT_SEEDS };
     const fallback = visibleText(at("2026-09-21", none));
     expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
-    expect(fallback).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(fallback).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of Aug 20, 2026)");
     expect(fallback).not.toContain("10-year");
-    expect(visibleText(at("2027-02-17", none))).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
+    expect(visibleText(at("2027-02-17", none))).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of Aug 20, 2026 (181 days old, stale))");
   });
 });
 

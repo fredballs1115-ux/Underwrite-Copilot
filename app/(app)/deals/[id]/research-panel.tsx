@@ -11,6 +11,7 @@
 import { signedInBenchmarkRows, signedInRuleRows } from "@/lib/research-read";
 import {
   asOfLabel,
+  researchDay,
   evaluateRules,
   OPEN_QUESTION_LABELS,
   type Benchmark,
@@ -215,7 +216,7 @@ export function SourceLink({
   const age = researchAge(asOf, today);
   const undated = age.asOf === null;
   const stale = yearEnded === undefined ? undated || age.stale : yearEnded;
-  const dated = readOn ? `read ${asOf}` : asOfLabel(asOf);
+  const dated = readOn ? `read ${researchDay(asOf)}` : asOfLabel(asOf);
   // A source with a note after its address is split (lib/source-parts): the
   // address is the link, the note its title — the whole string had been the
   // href, an address with spaces in it that goes nowhere. Redfin's figures
