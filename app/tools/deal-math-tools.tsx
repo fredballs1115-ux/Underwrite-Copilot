@@ -4175,8 +4175,10 @@ function CapitalStack() {
             ].map((row) => (
               <div key={row.label}>
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="text-muted">{row.label}</span>
-                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                  {/* Above the threshold line, on the card's own fill, so the
+                      line crosses the bars and never the words. */}
+                  <span className="relative z-10 bg-faint pr-1 text-muted">{row.label}</span>
+                  <span className="relative z-10 shrink-0 bg-faint pl-1 font-mono font-semibold tabular-nums">
                     {pct(row.rate)}
                   </span>
                 </div>
@@ -6122,6 +6124,7 @@ function Rollover() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
+              wrap="off"
               className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
@@ -6322,6 +6325,7 @@ function UnitMix() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
+              wrap="off"
               className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
@@ -7929,6 +7933,7 @@ function CompGrid() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
+              wrap="off"
               className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
