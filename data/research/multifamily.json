@@ -216,8 +216,8 @@
   ],
   "small_investor_verdict": {
     "accessible": true,
-    "entry_vehicle": "Direct purchase as natural person; 2-4 units on residential financing (conventional investor or FHA house-hack on 3-4 units); hold title personally where small-landlord exemptions require it (DC: personal title mandatory for the exemption; PG: natural person or living trust).",
-    "reasoning": "The 2-4 unit tier is the one asset class where a $1-2M cash position buys controlling positions in multiple buildings with residential debt, and where the DC/PG regulatory exemptions specifically reward natural-person ownership. Verified regulation mapping (DC § 42-3502.05 3-0, Philadelphia § 9-811 3-0) plus fetched market depth (Redfin May 2026) support Philadelphia, Albany, Scranton, Providence as expansion metros and the DMV as the exemption-aware home market."
+    "entry_vehicle": "2-4 unit buildings bought directly by a natural person on residential financing (conventional investor loans, or FHA loans where the owner occupies one of 3-4 units). DC's small-landlord exemption requires personal title; PG County's, a natural person or a living trust.",
+    "reasoning": "The 2-4 unit tier is the one asset class in this research where a $1-2M cash position buys several whole buildings with residential debt, and where the DC and PG County regulatory exemptions specifically favor natural-person ownership. The verified regulation mapping (DC § 42-3502.05 and Philadelphia § 9-811, each 3-0) and the fetched market depth (Redfin May 2026) show the depth in Philadelphia, Albany, Scranton and Providence, and in the DMV, where the exemptions decide how a building may be held."
   },
   "gaps": [
     "Cap-rate series for the 2-4 unit segment (no primary source verified)",

@@ -21,8 +21,8 @@
   "top_east_coast_metros": [],
   "small_investor_verdict": {
     "accessible": false,
-    "entry_vehicle": "Only the NNN forms (car wash ~ $2M+ tickets overlap the top of budget) behave like real estate; the rest are operating businesses wearing a real-estate costume.",
-    "reasoning": "A car-wash NNN duplicates the retail-NNN diversification slot with worse residual risk (single-purpose building if the tenant fails in an overbuilt corridor). RV parks/marinas can yield well but demand hospitality operations. Pass at this stage; revisit if the passive-income slot ever needs filling and retail NNN pricing is worse."
+    "entry_vehicle": "Only the NNN forms behave like real estate (a car wash runs about $2M+ a ticket, the top of the range); the rest are operating businesses in a real-estate form.",
+    "reasoning": "A car-wash NNN repeats the retail NNN's role with worse residual risk (a single-purpose building if the tenant fails in an overbuilt corridor). RV parks and marinas can yield well but require hospitality operations."
   },
   "gaps": ["Parking/marina/ground-lease 2026 pricing", "Car-wash corridor saturation screen for any specific deal"]
 }

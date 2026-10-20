@@ -1086,7 +1086,7 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
 // ── Sector explorer (every asset type) ──────────────────────────────────────
 // The full research file for EVERY asset class, rendered: cycle position,
 // cap-rate ranges (ranges, never single numbers), supply/demand, debt terms,
-// the small-investor verdict, and the named gaps — provenance throughout.
+// what $1–2M buys, and the named gaps — provenance throughout.
 // SFR appears as an asset-class OVERVIEW here while staying excluded from
 // multifamily sales aggregates (an overview is not a row in 2-4 unit math).
 function SectorExplorer({ selected }: { selected?: string }) {
@@ -1232,6 +1232,9 @@ function SectorExplorer({ selected }: { selected?: string }) {
           </div>
         )}
 
+        {/* What a $1–2M position buys in the class, as the research reads
+            it: a description of the market, never advice to a reader (the
+            QA of 2026-10-20 — it had read "hold title personally"). */}
         {verdict && (
           <div className="rounded-xl border border-brand/25 bg-brand/[0.04] p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -1240,10 +1243,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
                   verdict.accessible ? "bg-pass/10 text-pass" : "bg-kill/10 text-kill"
                 }`}
               >
-                {verdict.accessible ? "Accessible at $1–2M" : "Not accessible direct"}
+                {verdict.accessible ? "Within reach at $1–2M" : "Mostly out of reach at $1–2M"}
               </span>
               <span className="text-[11px] uppercase tracking-wide text-muted">
-                small-investor verdict
+                What $1–2M buys, per the research
               </span>
             </div>
             {verdict.entry_vehicle && (

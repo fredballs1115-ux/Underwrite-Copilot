@@ -20,8 +20,8 @@
   "top_east_coast_metros": [],
   "small_investor_verdict": {
     "accessible": true,
-    "entry_vehicle": "A Class B/C facility (150-400 units) in a tertiary East Coast market at 7%+, run through third-party management or remote-operated tech.",
-    "reasoning": "No leases longer than a month, no residential tenant law, no rent regulation anywhere — the regulatory opposite of multifamily, at yields that clear the buyer's bar. The risks are REIT price competition bleeding into secondary markets and the operating-business reality (marketing, auctions, delinquency). A real candidate for allocation #2 or #3, and the Excel model's unit-mix/occupancy inputs map onto the app's sector-aware fields."
+    "entry_vehicle": "A Class B/C facility (150-400 units) in a tertiary East Coast market at 7%+, run through third-party management or remote-operated technology.",
+    "reasoning": "No lease longer than a month, no residential tenant law and no rent regulation anywhere: the regulatory opposite of multifamily. The risks are REIT price competition reaching secondary markets and the operating side (marketing, auctions, delinquency). The Excel model's unit-mix and occupancy inputs map onto the app's sector-aware fields."
   },
   "gaps": [
     "East Coast tertiary facility comps at the $1-2M ticket",
