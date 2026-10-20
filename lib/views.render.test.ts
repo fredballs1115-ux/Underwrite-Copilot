@@ -1679,7 +1679,9 @@ describe("ModelView — the sample model renders every panel", () => {
 
   it("/demo draws the deal page's own header on the sample, read by lib/sample-header, never typed", () => {
     const page = readFileSync("app/demo/page.tsx", "utf8");
-    expect(page).toContain("<SampleDealHero header={sampleHeader(new Date(`${today}T12:00:00Z`))} titleAs=\"h2\" />");
+    expect(page).toMatch(/<SampleDealHero\s+header=\{sampleHeader\(new Date\(`\$\{today\}T12:00:00Z`\)\)\}\s+titleAs="h2"/);
+    // and the stress test's counts beside the call, from its own sample build
+    expect(page).toContain("stress={data.stressTest && data.stressTest.rows.length > 0 ? verdictCounts(data.stressTest) : null}");
     // Under the sections, the deal page's own public-record card in the
     // sample's place, then its research panel, in the deal page's order.
     expect(page).toContain('import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";');

@@ -26,6 +26,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
+import { verdictCounts } from "@/lib/stress-test-words";
 import { sampleDemoData, walkthroughData } from "./demo/demo-data";
 import { fmrToday } from "@/lib/fmr";
 import { NO_DEBT_SEEDS } from "@/lib/debt-index";
@@ -1476,7 +1477,13 @@ export default function Home() {
  *  Philadelphia's photograph, the tool row), so the card shows exactly
  *  what the signed-in sample deal shows. Stacked on a second sheet, so it
  *  reads as one deal of a pipeline; the name is an h2 under the hero's h1. */
-function DealPreview({ header }: { header: HeaderFacts }) {
+async function DealPreview({ header }: { header: HeaderFacts }) {
+  // The stress test's counts beside the call, from the walkthrough's own
+  // build of the sample (the same day and the same figures), so the chip and
+  // the panel below can never disagree.
+  const reads = await sampleTodayReads();
+  const { data } = sampleDemoData({ today: fmrToday(), reads, debt: NO_DEBT_SEEDS });
+  const stress = data.stressTest && data.stressTest.rows.length > 0 ? verdictCounts(data.stressTest) : null;
   return (
     <div className="relative text-ink">
       <div
@@ -1484,7 +1491,7 @@ function DealPreview({ header }: { header: HeaderFacts }) {
         aria-hidden
       />
       <div className="relative">
-        <SampleDealHero header={header} titleAs="h2" stamp />
+        <SampleDealHero header={header} titleAs="h2" stamp stress={stress} />
       </div>
     </div>
   );

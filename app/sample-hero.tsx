@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
 import { HowChip } from "@/app/(app)/deals/[id]/figure-how";
 import { DEAL_TOOL_TITLE, DealTool } from "@/app/(app)/deals/[id]/header-tools";
+import { StressChip } from "@/app/(app)/deals/[id]/stress-chip";
+import type { StressVerdict } from "@/lib/stress-test-types";
 import { photographerParts } from "@/lib/credit-parts";
 import type { HeaderFacts } from "@/lib/sample-header";
 import { SampleMarketPicture } from "./sample-market-picture";
@@ -22,6 +24,7 @@ export function SampleDealHero({
   tools = <SampleHeroTools />,
   titleAs = "h1",
   stamp = false,
+  stress = null,
 }: {
   header: HeaderFacts;
   /** the tool row under the facts; the sample's public downloads by default */
@@ -31,6 +34,9 @@ export function SampleDealHero({
   /** the homepage's one flourish: the call stamps in on load (`stamp-in`,
    *  skipped under reduced motion) around the deal page's own chip */
   stamp?: boolean;
+  /** the stress test's counts beside the call, as the deal page draws them
+   *  (lib/stress-test-words `verdictCounts` on the page's own test) */
+  stress?: Record<StressVerdict, number> | null;
 }) {
   const { pill, fit, market } = header;
   // The deal page's chips, class for class (page.tsx, `DealHero`'s chips).
@@ -58,6 +64,7 @@ export function SampleDealHero({
                 {fit.label}
               </span>
             ))}
+          <StressChip counts={stress} />
         </>
       }
       subtitle={header.subtitle}

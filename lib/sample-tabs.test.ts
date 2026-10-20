@@ -106,7 +106,9 @@ const dealParts = (code: string) =>
 
 describe("each walkthrough tab draws /demo's parts, in /demo's order, and /demo the deal page's", () => {
   it("Overview: the guide, the actuals, the call with the stress test, the playground", () => {
-    const deal = dealParts(slice(DEAL_VIEW, 'section === "overview"', 'section === "financials"'));
+    // By the section's JSX: deal-view also names the section in its handler
+    // for the stress-test jump (`const onOverview = section === "overview"`).
+    const deal = dealParts(slice(DEAL_VIEW, '{section === "overview" && (', '{section === "financials" && ('));
     const demo = partsIn(slice(DEMO, 'section === "overview"', 'section === "financials"'));
     const home = partsIn(drawn(HOME, "OverviewTab")).filter((c) => !loading(c));
     expect(deal).toEqual(["SampleGuide", "PropertyActuals", "OverviewView", "SensitivityPlayground"]);
