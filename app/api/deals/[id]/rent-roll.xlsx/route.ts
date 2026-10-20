@@ -140,6 +140,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         : `The deal model's ${vacancySource?.note ?? "vacancy"}, taken off every year's revenue on top of the lease-up — set your own.`,
     reimbursement:
       "0%: this export assumes no tenant reimburses an operating expense. On net or base-year leases, enter the share they recover.",
+    // Whose figure the expense growth and the exit are — the deal model's
+    // SOURCE notes (lib/model-evidence's rule), so neither reads as a bare
+    // number on this tab.
+    ...(model?.sources.expenseGrowthPct?.note ? { expenseGrowth: `The deal model's: ${model.sources.expenseGrowthPct.note}.` } : {}),
+    ...(model?.sources.exitCapPct?.note ? { exitCap: `The deal model's: ${model.sources.exitCapPct.note}.` } : {}),
     ...(priceMark ? { price: priceMark.cell, priceIsNone: priceMark.kind === "none" } : {}),
   };
 

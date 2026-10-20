@@ -492,7 +492,11 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
     <PageChrome title="The stress test" count={count} dealName={dealName} branding={branding}>
       <Text style={s.sub}>
         {str(
-          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question.${readWhen}`,
+          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; ${
+            test.measure === "yield_on_cost"
+              ? "the yield on cost's move, the plan's stabilized NOI over its total cost struck again in code with one figure moved, never an estimate"
+              : "the return's move, the engine's own run of the model with that one input swapped, never an estimate"
+          }; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
       {/* The headline (lib/stress-test-words): the OM's case against the
@@ -1580,6 +1584,9 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
  *  only where it falls inside the memorandum), "derived", "assumption". */
 function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
+  // A published figure the stress test decides the row by (lib/model-
+  // evidence) is its publisher's, never "derived".
+  if (src.published) return src.published.publisher;
   if (src.provenance === "extracted") {
     // A figure read from another document (a rent roll, a T-12) is that
     // document's, never the OM's (research pass 40, M3).
@@ -2650,6 +2657,7 @@ export function ReportDocument({
               // view in the model").
               `Reference cap: ${fmtPct(plan.refCap.pct, 2)}, ${refCapNote(
                 plan.refCap.provenance,
+                plan.refCap.published,
               )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal, and the annual cash flow with it: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
             )}
           </Text>

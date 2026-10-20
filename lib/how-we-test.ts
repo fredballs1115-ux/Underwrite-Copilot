@@ -26,6 +26,7 @@ import {
   SAME_SHARE,
   TAX_UNSUPPORTED_SHARE,
   VACANCY_UNSUPPORTED_PTS,
+  YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
 import { RECORD_FLOOR, marginWords } from "@/lib/track-record";
@@ -80,7 +81,7 @@ export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
   },
   {
     word: "stretched",
-    line: `Past the deciding figure by less than the row's threshold; or at it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
+    line: `Past the deciding figure by less than the row's threshold; or at it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more, or a plan's yield on cost by ${YOC_MOVE_STRETCH_PTS} points or more.`,
   },
   { word: "unsupported", line: "Past the deciding figure by more than the row's threshold, below. Every other piece on the row is shown beside it and decides nothing." },
   { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
@@ -107,7 +108,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   expense_growth: `Held to all-items CPI, the broad price level the expense base moves with; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
   insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
-  renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,
+  renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };
 
@@ -239,13 +240,13 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
     heading: "Not investment advice",
     line: "A first-pass screen for an analyst to check against the documents, never a reason to buy or pass.",
   },
-  // lib/stress-test's `impactsWithheld`: a plan deal (lib/deal-strategy
-  // `isPlanDeal`) re-runs no return, and neither does a placeholder price,
-  // an assumed NOI (`modelReadsWithheld`) or a price that buys no building
-  // (`basisWithheldOf`).
+  // lib/stress-test: a plan deal (lib/deal-strategy `isPlanDeal`) re-runs
+  // its yield on total cost (`measure: "yield_on_cost"`), never the levered
+  // return; a placeholder price, an assumed NOI (`modelReadsWithheld`) or a
+  // price that buys no building (`basisWithheldOf`) re-runs nothing.
   {
-    heading: "No return is re-run on a plan",
-    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and no return is re-run.",
+    heading: "No levered return on a plan",
+    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and the yield is re-run where the OM states its stabilized NOI and total cost, never a levered return.",
   },
   {
     heading: "No return is re-run on a figure nobody stated",

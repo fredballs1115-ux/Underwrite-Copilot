@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
 import { HowChip } from "@/app/(app)/deals/[id]/figure-how";
-import { DEAL_TOOL_TITLE, DealTool } from "@/app/(app)/deals/[id]/header-tools";
+import { DEAL_TOOL_TITLE, DealTool, SAMPLE_MODEL_TOOL_TITLE } from "@/app/(app)/deals/[id]/header-tools";
 import { StressChip } from "@/app/(app)/deals/[id]/stress-chip";
 import type { StressVerdict } from "@/lib/stress-test-types";
 import { photographerParts } from "@/lib/credit-parts";
@@ -115,7 +115,7 @@ export function SampleHeroTools() {
     <>
       <DealTool kind="memo" href="/api/demo/memo" title={`${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`} />
       <DealTool kind="report" href="/api/demo/report" title={`${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`} />
-      <DealTool kind="model" href="/api/demo/underwrite.xlsx" title={`${DEAL_TOOL_TITLE.model}. ${SAMPLE_DOWNLOAD_NOTE}`} />
+      <DealTool kind="model" href="/api/demo/underwrite.xlsx" title={`${SAMPLE_MODEL_TOOL_TITLE}. ${SAMPLE_DOWNLOAD_NOTE}`} />
       <DealTool kind="rentRoll" href="/login?mode=signup" title={`${DEAL_TOOL_TITLE.rentRoll}${ON_YOUR_OWN}`} page />
       <DealTool kind="valuations" href="/login?mode=signup" title={`${DEAL_TOOL_TITLE.valuations}${ON_YOUR_OWN}`} page />
     </>

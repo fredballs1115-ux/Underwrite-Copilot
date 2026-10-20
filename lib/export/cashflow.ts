@@ -77,6 +77,12 @@ export interface WorkbookNotes {
   vacancy?: string;
   /** expense recovery: what this export assumes */
   reimbursement?: string;
+  /** the expense growth and the exit cap the deal model runs: whose figure
+   *  each is (lib/model-evidence — the more cautious of the stress test's
+   *  deciding figure and the OM's own), as the underwrite workbook's SOURCE
+   *  column says it */
+  expenseGrowth?: string;
+  exitCap?: string;
   /** the purchase price where no memorandum stated one: the site's
    *  placeholder, or a figure backed out of an NOI of zero or less, said as
    *  that beside the cell and above the IRR (lib/underwrite/report-grid

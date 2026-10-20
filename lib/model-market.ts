@@ -1,4 +1,5 @@
-// What the day's market lends a deal's model — and the one deal it lends
+// What the day's market lends a deal's model — its loan rate's index, and
+// the figures its growth and its exit run at — and the one deal it lends
 // nothing to.
 //
 // Every surface that derives a deal's model seeds its loan rate from today's
@@ -19,12 +20,19 @@ import {
   type PermanentSpread,
   type RateSeed,
 } from "@/lib/debt-index";
+import type { ModelEvidence } from "@/lib/model-evidence";
 import type { MarketForModel } from "@/lib/underwrite/inputs";
 
 /** The index the model's loan rate is seeded from — today's for a real deal,
- *  none for the sample, whose model keeps the flat default and its note. */
-export function modelMarketFor(isSample: boolean | null | undefined, seeds: DebtSeeds): MarketForModel {
-  return { debtIndex: isSample ? null : seeds.permanent };
+ *  none for the sample, whose model keeps the flat default and its note —
+ *  and the figures its growth and its exit run at (lib/model-evidence
+ *  `modelEvidenceFor`, the stress test's deciding figures, then the
+ *  memorandum's stated ones): a real deal's, never the sample's, whose
+ *  model keeps 3.0% growth and its going-in cap whatever is handed in.
+ *  Required, so no surface derives a real deal's model on the defaults by
+ *  forgetting it; null only where the caller has no extraction to read. */
+export function modelMarketFor(isSample: boolean | null | undefined, seeds: DebtSeeds, evidence: ModelEvidence | null): MarketForModel {
+  return isSample ? { debtIndex: null } : { debtIndex: seeds.permanent, evidence };
 }
 
 /** The construction panel's starting rate: today's floating index plus the

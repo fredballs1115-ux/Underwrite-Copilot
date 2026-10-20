@@ -63,9 +63,25 @@ export interface StressEvidence {
  *  derived model. Null where the model's reads are withheld (a placeholder
  *  price, an assumed NOI), where the price buys no building, or where no
  *  evidence carries a figure the engine can take. */
+/** The plan's two figures a yield-on-cost re-run swaps (a plan deal's
+ *  `StressImpact.input`): the stabilized NOI, or the total cost (the price
+ *  plus the plan's budget). */
+export type PlanYieldInput = "stabilizedNoi" | "totalCost";
+
+/** What a re-run measures: absent, the derived model's levered IRR; on a
+ *  plan deal (a value-add, lease-up, conversion or development), the yield on
+ *  total cost — the stabilized NOI over the price plus the plan's budget
+ *  (lib/plan-sensitivity `yieldOnCost`), the figure a plan deal is judged on. */
+export type StressMeasure = "yield_on_cost";
+
 export interface StressImpact {
-  /** the model input swapped */
-  input: keyof UnderwriteInputs;
+  /** "yield_on_cost" on a plan deal's re-run (the two runs are the plan's
+   *  stabilized NOI over its total cost, ONE of the two figures moved, and
+   *  `baseYocPct` / `altYocPct` carry them, the IRR fields null); absent on
+   *  a levered-IRR re-run */
+  measure?: StressMeasure;
+  /** the model input swapped — on a plan deal's re-run, the plan's figure */
+  input: keyof UnderwriteInputs | PlanYieldInput;
   /** which evidence supplied the alternative (an index into `evidence`) */
   evidenceIndex: number;
   /** the two figures in the engine's own unit (a decimal for a percent) */
@@ -75,6 +91,10 @@ export interface StressImpact {
   altIrrPct: number | null;
   baseMultiple: number | null;
   altMultiple: number | null;
+  /** a plan deal's re-run: the yield on total cost at the OM's figure and at
+   *  the evidence's, in percent; absent on a levered-IRR re-run */
+  baseYocPct?: number | null;
+  altYocPct?: number | null;
   /** "If vacancy is the T-12's 9.1%, not the OM's 6.0%, the levered IRR
    *  moves from 9.3% to 7.1%." */
   note: string;
@@ -125,6 +145,12 @@ export interface StressRow {
   method: string;
   /** why the row is unchecked, where it is */
   unchecked?: string | null;
+  /** why the row carries no re-run where the test re-runs others, in one
+   *  whole sentence: on a plan deal, a row with no yield-on-cost meaning
+   *  (rent growth, an exit cap, the debt) or one whose figure the plan's
+   *  stated figures cannot carry; its verdict stands as struck. Absent
+   *  elsewhere */
+  noRerun?: string | null;
   /** the verdict was struck against a rule of thumb alone (the site's own
    *  screening default, no figure of the deal's, the market's or the OM's):
    *  the gap says so, and no surface draws such a row as a green "holds" */
@@ -144,6 +170,14 @@ export interface StressTest {
    *  sentence that says so and why ("No return is re-run: …"), printed as it
    *  stands on every surface */
   impactsWithheld: string | null;
+  /** what the rows' re-runs and the headline measure: "yield_on_cost" on a
+   *  plan deal, whose rows re-run the plan's yield on total cost; absent, the
+   *  derived model's levered IRR */
+  measure?: StressMeasure;
+  /** a plan deal bought at delivery (lib/deal-strategy `planSummary`'s
+   *  `forward`): its total cost is the price alone, the buyer's whole cost
+   *  at delivery, never the price plus the developer's budget */
+  forward?: true;
   /** the headline: the OM's case against the evidence's, the gap split by
    *  assumption (lib/stress-test `stressHeadline`). Null wherever no return
    *  is re-run (`impactsWithheld` says why, and the headline is withheld
@@ -159,7 +193,8 @@ export interface StressHeadlinePart {
   key: StressKey;
   /** the row's own title */
   label: string;
-  /** levered-IRR points, signed: negative where the evidence lowers the return */
+  /** levered-IRR points, signed: negative where the evidence lowers the
+   *  return — on a yield-on-cost headline, points of yield on cost */
   pts: number;
   /** the equity multiple's share, signed; null where a case's multiple is none */
   multiple: number | null;
@@ -177,6 +212,20 @@ export interface StressHeadlinePart {
  * values (lib/bridge/attribution), so the parts sum to the gap.
  */
 export interface StressHeadline {
+  /** "yield_on_cost" on a plan deal: the two cases are the plan's yield on
+   *  total cost (`omYocPct`, `evidenceYocPct`), the parts in points of it,
+   *  the IRRs and multiples null; absent, the levered IRR */
+  measure?: StressMeasure;
+  /** a plan deal's two cases: the stabilized NOI over the total cost on the
+   *  OM's figures, and with every row past its evidence at the evidence's,
+   *  in percent; absent on a levered-IRR headline */
+  omYocPct?: number | null;
+  evidenceYocPct?: number | null;
+  /** a yield on cost the memorandum states in a row of its own, with its
+   *  page — the OM's own figure, beside the two cases as the model's levered
+   *  IRR is beside a stabilized deal's; null where it states none, absent on
+   *  a levered-IRR headline */
+  statedYoc?: { pct: number; label: string; page: number | null } | null;
   /** levered IRR in percent; null where that case's cash flows have no root */
   omIrrPct: number | null;
   evidenceIrrPct: number | null;
@@ -326,11 +375,26 @@ export const HEADLINE_METHOD = {
     "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
+  plan: [
+    "On a value-add, lease-up, conversion or development deal the headline is the yield on total cost: the stabilized NOI the OM states over the price plus the plan's budget, or on a forward purchase over the price, the buyer's whole cost at delivery.",
+    "The OM's case is that yield on the OM's own figures; the evidence's case moves the stabilized NOI by each row past its evidence, the same move the row's own re-run makes.",
+    "Vacancy moves it through the stabilized gross the OM states, only where the market's figure or a rule of thumb decides it: a rent roll or T-12 is the building before the plan is done.",
+    "A renovation premium moves it through the doors to renovate, and a tax bill only where the OM states it as its pro forma's line, reset at today's bill over today's assessed value.",
+    "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
+    "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
+    "A re-run that moves the stabilized NOI to zero or under, or the yield to 25% or more, is struck nowhere: the figures do not tie.",
+    "A row at its evidence whose re-run lowers the yield on cost 0.5 points or more reads stretched, as a 100-bps move in the levered IRR does on a stabilized deal.",
+    "Rent growth, expense growth, the exit cap and the debt have no yield-on-cost meaning, and the NOI row tests today's income: each keeps its verdict and has no re-run.",
+    "Both cases pay the total cost, so the price row is left out of the split, which is struck by Shapley values as above, in points of yield on cost.",
+    "A yield on cost the OM states in a row of its own is drawn beside the two cases, as the OM's.",
+    "No plan headline where the OM states no stabilized NOI or no total cost, where the yield is 25% or more, or where the all-in basis is outside the band any market delivers at.",
+  ],
   limits: [
-    "An assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
-    "No headline on a plan deal, a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
+    "On a stabilized deal an assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
+    "No headline on a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
+    "On a plan deal it has none: the plan's stabilized NOI is the building's, and over the position's price it is no yield on cost.",
     "Neither case is a forecast: each is the model run once on one set of figures.",
     "Where the price, the NOI or the debt row stands unchecked, or a tenant roster rolls 25% or more of its listed rent in one year before the model's sale, the headline names what it does not test.",
   ],
@@ -365,13 +429,13 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
       "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb that decides only where nothing above carries a figure, and never on a shared screen or in the verdict's brief",
     ],
-    engine: "The price is a direct input: the return is re-run at the evidence's price, each piece judged per unit where the class is, else per SF where it states only that.",
+    engine: "The price is a direct input: the return is re-run at the evidence's price, each piece judged per unit where the class is, else per SF where it states only that. A plan deal's yield on cost is re-run at the evidence's all-in basis.",
     limits: [
       "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
       "Replacement cost only where the memorandum states one.",
       "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
       "A basis outside the band any market trades at is the plausibility check's misread, never judged.",
-      "A value-add, lease-up, conversion or development is judged on its all-in cost (the price plus the plan's budget), a forward purchase on its price, and none of them is re-run.",
+      "A value-add, lease-up, conversion or development is judged on its all-in cost (the price plus the plan's budget), a forward purchase on its price, and its yield on cost is re-run at the evidence's basis.",
     ],
   },
   {
@@ -432,7 +496,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The deal's own rent roll, else its T-12, the occupancy the building runs at today: beside a stabilized assumption it is the gap a lease-up has to close (or support, where the building already runs at or under it); it decides an occupancy the OM states for today, a value-add, lease-up, conversion or development deal, and a stabilized assumption no fresh published figure speaks to, said so",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above carries a figure",
     ],
-    engine: "Vacancy is a direct input: the return is re-run at the figure that decided — the market's for a stabilized assumption, else the documents'.",
+    engine: "Vacancy is a direct input: the return is re-run at the deciding figure, the market's for a stabilized assumption, else the documents'. A plan's yield on cost moves by its stabilized gross times the gap, where the market or a rule of thumb decided.",
     limits: [
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
@@ -478,9 +542,10 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment, the one figure that decides where both are stated",
       "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck, and the T-12's tax line is shown beside it",
     ],
-    engine: "The tax line is an expense input: the return is re-run at the reset bill where the memorandum states both figures.",
+    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures. A plan's yield on cost is re-run on its pro forma line, reset at today's bill and assessment; not on a development, conversion or forward purchase.",
     limits: [
       "No assessment ratio or millage is assumed: with no bill and assessed value stated, the line says the rate is the assessor's to give.",
+      "A bill over its assessed value past 5% is read as a misread or an assessment at a fraction of value, and no reset bill is struck on it.",
     ],
   },
   {
@@ -505,9 +570,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "An achieved premium the memorandum states, against the projected one: the one figure that decides",
       "The memorandum's own classic and renovated rents against its comps' rents, shown beside it",
     ],
-    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, said beside the row as the break-even the program needs, never as evidence of what a door earns.",
+    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, the break-even the program needs. On a value-add the gap is carried to the stabilized NOI on the doors to renovate, and the yield on cost is re-run.",
     limits: [
-      "The model grows today's rent at one rate, so the premium is in none of its returns, said so.",
+      "The model grows today's rent at one rate, so the premium is in none of its levered returns, said so.",
       "The program's pace against the building's turnover is not tested here.",
     ],
   },

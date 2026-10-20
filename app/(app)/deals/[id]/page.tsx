@@ -26,7 +26,7 @@ import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { HowChip } from "./figure-how";
 import { fitHow, heroHow } from "@/lib/hero-how";
 import { typedByHand } from "@/lib/manual-deal";
-import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool } from "./header-tools";
+import { DEAL_TOOL_PRO_TITLE, DEAL_TOOL_TITLE, DealTool, SAMPLE_MODEL_TOOL_TITLE } from "./header-tools";
 import { buildingFacts } from "@/lib/hero-figure";
 import { marketPictureFor, pictureIsCheckedMarket } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
@@ -208,6 +208,7 @@ import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarketFor, wordsOnly, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { modelEvidenceFor } from "@/lib/model-evidence";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
 import { readAll, readByIds } from "@/lib/read-all";
@@ -1042,6 +1043,19 @@ export default async function DealPage({
     { extraction, address: dealAddress, siteFlags, assetClass: deal.asset_class as string | null },
     todayIso,
   );
+  // The figures the model's growth and exit run at (lib/model-evidence):
+  // the stress test's deciding figures, off the very reads its row and the
+  // model's read against the market use below, else the memorandum's own.
+  const modelEvidence = extraction
+    ? modelEvidenceFor({
+        extraction,
+        firstSignal,
+        storedAssetClass: deal.asset_class as string | null,
+        metro: liveMarket,
+        reads,
+        regulation,
+      })
+    : null;
   const derived = extraction
     ? deriveUnderwriteInputs(
         extraction,
@@ -1054,7 +1068,7 @@ export default async function DealPage({
             ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
             : null,
         },
-        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence),
         // The model's lines read the reader's day, as the panels beside
         // them do (research pass 40; lib/reader-day).
         { regulation, asOf: readerNoon },
@@ -1137,6 +1151,7 @@ export default async function DealPage({
     ? {
         pct: derived.inputs.exitCapPct,
         provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const),
+        published: derived.sources.exitCapPct?.published != null,
       }
     : null;
 
@@ -1155,7 +1170,13 @@ export default async function DealPage({
   // after() so it never sits in the render path, and silent on a pre-0030
   // schema — a missing versions table must not break the deal page.
   const versionCount = versionsRes.error ? 0 : (versionsRes.count ?? 0);
-  if (playground && user) {
+  // Never on a model derived after today's published figures failed to
+  // read: its growth and exit fell back to the memorandum's or the defaults
+  // (lib/model-evidence), and the next good view would snapshot again — two
+  // versions and an IRR "move" no input of the deal's made. The sample reads
+  // none, so its model stands either way.
+  const modelReadStood = reads != null || isSampleDeal;
+  if (playground && user && modelReadStood) {
     const snapshotInputs = playground.inputs;
     // The page's own client: a Server Component cannot read cookies inside
     // after() (Next's docs), so a client opened there threw and every
@@ -1745,7 +1766,7 @@ export default async function DealPage({
               <DealTool
                 kind="model"
                 href={`/api/deals/${id}/underwrite.xlsx`}
-                title={downloadsOpen ? DEAL_TOOL_TITLE.model : DEAL_TOOL_PRO_TITLE.model}
+                title={downloadsOpen ? (isSampleDeal ? SAMPLE_MODEL_TOOL_TITLE : DEAL_TOOL_TITLE.model) : DEAL_TOOL_PRO_TITLE.model}
                 pro={!downloadsOpen}
               />
             )}

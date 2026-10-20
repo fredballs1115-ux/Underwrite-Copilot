@@ -26,7 +26,7 @@
 
 import { SCALE_WORDS, compactUsd, minusFor, scaleOf, statesRange } from "@/lib/money";
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
+import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isMasterLeasehold, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -1210,8 +1210,14 @@ export function planSummary(
   // The NOI with its month where the memorandum states it a month at a
   // time: the twelve is where such a misread most often lies (audit C6,
   // LOW-1).
-  const yieldWithheld =
-    rawYield != null && rawYield >= IMPLIED_CAP_CEILING && stabilizedNoi && totalCost != null
+  // A master lease of the building, sublet to its tenants (a sandwich
+  // position, lib/interest `isMasterLeasehold`): the price buys the position
+  // between two rents, so the building's stabilized NOI over it is no yield
+  // on cost — the stress test withholds its plan re-runs on the same read.
+  const masterLease = rawYield != null && isMasterLeasehold(extraction);
+  const yieldWithheld = masterLease
+    ? "No yield on cost is struck: the price buys a master lease of the building, sublet to its tenants — the position between two rents, not the building — so the building's stabilized NOI over it is no yield on cost."
+    : rawYield != null && rawYield >= IMPLIED_CAP_CEILING && stabilizedNoi && totalCost != null
       ? forward
         ? `No yield on cost is struck: the ${planNoiText(stabilizedNoi, money)} NOI at delivery over the ${money(totalCost)} price is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the price or the NOI was most likely misread.`
         : `No yield on cost is struck: the ${planNoiText(stabilizedNoi, money)} stabilized NOI over the ${money(totalCost)} total cost is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the total cost or the NOI was most likely misread.`

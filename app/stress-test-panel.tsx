@@ -9,8 +9,12 @@ import {
   drawsRerun,
   headlineLine,
   headlineName,
+  headlinePlaces,
+  isYieldHeadline,
+  isYieldImpact,
   keptSentence,
   liveHeadline,
+  statedYocSentence,
   modelIrrOf,
   noMoveWhy,
   noiRestSentence,
@@ -38,6 +42,13 @@ import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, Stress
  * the model runs another (lib/stress-test-words `keptSentence`). Each row's
  * re-run names its base — the model at its own IRR, one input changed
  * (`rerunWords`) — and draws that IRR as a dashed tick on its bars.
+ *
+ * ON A PLAN DEAL (a value-add, lease-up, conversion or development) the
+ * re-runs and the headline are the plan's yield on total cost, at two places
+ * and said so ("Yield on cost on the OM's figures 6.05% → 5.85% with the
+ * evidence"), the OM's own stated yield on cost the third mark where it
+ * states one; a row with no yield-on-cost meaning says why in its own words
+ * (`StressRow.noRerun`).
  *
  * One row an assumption, most severe first (unsupported, stretched, holds).
  * Each tested row has its words beside its picture, so nothing rides on
@@ -157,6 +168,13 @@ const pctText = (n: number | null): string => {
   if (n == null) return "does not solve";
   // A negative return with the minus sign (U+2212), none on one that rounds to nothing.
   const t = n.toFixed(1);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
+
+/** A plan deal's yield on cost, at two places as every surface prints one. */
+const yocText = (n: number | null): string => {
+  if (n == null) return "not struck";
+  const t = n.toFixed(2);
   return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
 };
 
@@ -379,36 +397,43 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
  *  scale — the OM's figure, then the evidence's — each labelled with the
  *  input it ran on. Where the two runs are one, one bar. */
 function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }) {
-  const base = impact.baseIrrPct;
-  const alt = impact.altIrrPct;
+  // A plan deal's re-run is its yield on total cost, at two places (the
+  // precision every surface prints a yield on cost at); a stabilized deal's
+  // the levered IRR, at one.
+  const yoc = isYieldImpact(impact);
+  const base = yoc ? (impact.baseYocPct ?? null) : impact.baseIrrPct;
+  const alt = yoc ? (impact.altYocPct ?? null) : impact.altIrrPct;
+  const show = yoc ? yocText : pctText;
+  const name = yoc ? "Yield on cost" : "Levered IRR";
   // The model as it runs, the run each re-run changes one input of: a dashed
-  // tick on both bars, the panel's key naming it.
-  const model = modelIrrOf(test);
+  // tick on both bars, the panel's key naming it. A plan's re-run starts from
+  // the plan's own yield, so it carries no model tick.
+  const model = yoc ? null : modelIrrOf(test);
   const top = Math.max(base ?? 0, alt ?? 0, model ?? 0, 1) * 1.15;
   const widthOf = (v: number | null) => (v == null ? "0%" : `${Math.max(0, Math.min(100, (v / top) * 100)).toFixed(1)}%`);
   // The two runs are one where the OM's figure IS the evidence's: one
   // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
   // as lib/stress-test-words does, never off the note's words.
-  const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
+  const same = Math.abs(impact.altValue - impact.omValue) < (yoc ? 0.5 : 1e-9);
   // A re-run the evidence lifts is the OM's cushion, never a warning: only
   // a fall is drawn in the warning tone (`data-direction`).
-  const direction = base == null || alt == null || Math.abs(alt - base) < 0.05 ? "flat" : alt < base ? "down" : "up";
+  const direction = base == null || alt == null || Math.abs(alt - base) < (yoc ? 0.005 : 0.05) ? "flat" : alt < base ? "down" : "up";
   return (
-    <div className="mt-2.5" data-qa="stress-impact">
+    <div className="mt-2.5" data-qa="stress-impact" data-measure={yoc ? "yield_on_cost" : "levered_irr"}>
       <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
-        {same ? `Levered IRR ${pctText(base)}, run at the evidence's figure` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
+        {same ? `${name} ${show(base)}, run at the evidence's figure` : `${name} ${show(base)} → ${show(alt)}`}
       </p>
       <p className={`mt-0.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-impact-base">
         {upperFirst(rerunWords(test, impact))}
       </p>
       <BarRows className="mt-1.5 space-y-1 text-[11px]">
         {!same && (
-          <BarRow label="At the OM's figure" figure={pctText(base)}>
+          <BarRow label="At the OM's figure" figure={show(base)}>
             <div className="h-full rounded-full bg-ink/35" data-bar="stress-impact-om" style={{ width: widthOf(base) }} />
             {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
           </BarRow>
         )}
-        <BarRow label="At the evidence's figure" figure={pctText(alt)}>
+        <BarRow label="At the evidence's figure" figure={show(alt)}>
           <div className={`h-full rounded-full ${direction === "down" ? "bg-caution/70" : direction === "up" ? "bg-pass/70" : "bg-muted/40"}`} data-direction={direction} data-bar="stress-impact" style={{ width: widthOf(alt) }} />
           {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
         </BarRow>
@@ -696,25 +721,43 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
  */
 /** The model as it runs on the headline's track: an outline from zero, its
  *  figure beside it — the base each row's re-run starts from. */
-function ModelBarRow({ model, style }: { model: number; style: { left: string; width: string } }) {
+function ModelBarRow({ model, style, yoc = false }: { model: number; style: { left: string; width: string }; yoc?: boolean }) {
+  // On a plan deal the third mark is the yield on cost the OM states in a
+  // row of its own, labelled as the OM's.
   return (
-    <BarRow label="The screening model as it runs" figure={pctText(model)}>
-      <div className="absolute inset-y-0 rounded-full border border-dashed border-ink/60" data-bar="stress-headline-model" style={style} />
+    <BarRow label={yoc ? "The OM's stated yield on cost" : "The screening model as it runs"} figure={yoc ? yocText(model) : pctText(model)}>
+      <div
+        className="absolute inset-y-0 rounded-full border border-dashed border-ink/60"
+        data-bar={yoc ? "stress-headline-stated" : "stress-headline-model"}
+        style={style}
+      />
     </BarRow>
   );
 }
 
 function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; line: string; kept: string | null }) {
   // The figures as printed (lib/stress-test-words `shownHeadline`): each
-  // case at one place and each part rounded so the segments end exactly on
-  // the evidence's printed case.
+  // case at its measure's place (a levered IRR at one, a plan's yield on
+  // cost at two) and each part rounded so the segments end exactly on the
+  // evidence's printed case.
+  const yoc = isYieldHeadline(h);
+  const places = headlinePlaces(h);
+  const fig = yoc ? yocText : pctText;
   const shown = shownHeadline(h);
   const om = shown.om;
   const ev = shown.evidence;
   // The model as it runs, every input its own — the third mark, drawn as an
   // outline from zero so it reads apart from the two filled cases: the base
-  // every row's re-run starts from, which neither case is.
-  const model = h.modelIrrPct != null && Number.isFinite(h.modelIrrPct) ? Number(h.modelIrrPct.toFixed(1)) : null;
+  // every row's re-run starts from, which neither case is. On a plan deal,
+  // the yield on cost the OM states, where it states one.
+  const model = yoc
+    ? h.statedYoc && Number.isFinite(h.statedYoc.pct)
+      ? Number(h.statedYoc.pct.toFixed(2))
+      : null
+    : h.modelIrrPct != null && Number.isFinite(h.modelIrrPct)
+      ? Number(h.modelIrrPct.toFixed(1))
+      : null;
+  const stated = statedYocSentence(h);
   const walk: { part: ShownPart; from: number; to: number }[] = [];
   if (om != null) {
     let at = om;
@@ -732,10 +775,15 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
   const zero = lo < 0 ? x(0) : null;
   const left = h.omitted.map((o) => headlineName(o.key));
   return (
-    <div className="mt-3 rounded-lg border border-line/80 bg-surface/80 px-3 py-3" data-qa="stress-headline">
+    <div className="mt-3 rounded-lg border border-line/80 bg-surface/80 px-3 py-3" data-qa="stress-headline" data-measure={yoc ? "yield_on_cost" : "levered_irr"}>
       <p className={`${MEASURE} text-base font-semibold leading-snug tabular-nums text-ink`} data-qa="stress-headline-line">
         {line}
       </p>
+      {stated && (
+        <p className={`mt-1 ${MEASURE} text-xs leading-relaxed text-ink/85`} data-qa="stress-headline-stated">
+          {stated}
+        </p>
+      )}
       {/* What the headline does not test, where the deal's main risks are
           unchecked: said under the line, in the caution tone. */}
       {untestedSentence(h) && (
@@ -750,15 +798,15 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
       )}
       {!(h.parts.length > 0 && om != null && ev != null) && om != null && model != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-cases">
-          <BarRow label="On the OM's figures" figure={pctText(om)}>
+          <BarRow label="On the OM's figures" figure={fig(om)}>
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
-          <ModelBarRow model={model} style={bar(0, model)} />
+          <ModelBarRow model={model} style={bar(0, model)} yoc={yoc} />
         </BarRows>
       )}
       {h.parts.length > 0 && om != null && ev != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-bridge">
-          <BarRow label="On the OM's figures" figure={pctText(om)}>
+          <BarRow label="On the OM's figures" figure={fig(om)}>
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
           {walk.map(({ part, from, to }) => {
@@ -778,7 +826,7 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
                     part.label
                   )
                 }
-                figure={ptsText(part.shown)}
+                figure={ptsText(part.shown, places)}
               >
                 {zero != null && <Tick at={`${zero.toFixed(2)}%`} bar="stress-headline-zero" tone="bg-ink/30" track="secondary" />}
                 <div
@@ -790,22 +838,26 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
               </BarRow>
             );
           })}
-          <BarRow label="With the evidence" figure={pctText(ev)}>
+          <BarRow label="With the evidence" figure={fig(ev)}>
             <div className="absolute inset-y-0 rounded-full bg-caution/70" data-bar="stress-headline-evidence" style={bar(0, ev)} />
           </BarRow>
-          {model != null && <ModelBarRow model={model} style={bar(0, model)} />}
+          {model != null && <ModelBarRow model={model} style={bar(0, model)} yoc={yoc} />}
         </BarRows>
       )}
       <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
         {h.parts.length > 1
-          ? "Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the return."
+          ? `Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the ${yoc ? "yield" : "return"}.`
           : h.parts.length === 1
-            ? "One assumption the model takes is past its evidence, so the whole gap is its own, struck on the OM's case."
+            ? yoc
+              ? "One assumption the plan's yield is struck on is past its evidence, so the whole gap is its own."
+              : "One assumption the model takes is past its evidence, so the whole gap is its own, struck on the OM's case."
             : om == null || ev == null
               ? "One of the two runs has no levered IRR, so the gap is not split."
               : h.omitted.length > 0
                 ? "Nothing past its evidence is a figure the headline swaps, so the two runs are one."
-                : "Nothing the model takes is past its evidence, so the two runs are one."}
+                : yoc
+                  ? "Nothing the plan's yield is struck on is past its evidence, so the two runs are one."
+                  : "Nothing the model takes is past its evidence, so the two runs are one."}
         {h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : ""}
         {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}
         {noiRestSentence(h) ? ` ${noiRestSentence(h)}` : ""}{" "}

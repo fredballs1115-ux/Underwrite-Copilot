@@ -85,7 +85,7 @@ describe("the signed-in sample deal is never seeded — its IRR does not move wi
     survey30: null,
   };
   const derive = (isSample: boolean) =>
-    deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS, modelMarketFor(isSample, seeds));
+    deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, SAMPLE_ACTUALS, modelMarketFor(isSample, seeds, null));
 
   it("derives the sample at the flat, unseeded rate the demo runs it at, with the demo's returns", () => {
     const signedIn = derive(true);
@@ -127,11 +127,23 @@ describe("the signed-in sample deal is never seeded — its IRR does not move wi
     );
     const offenders: string[] = [];
     const seeding: string[] = [];
+    const evidenceReaders: string[] = [];
     for (const rel of files) {
       if (rel === join("lib", "model-market.ts")) continue;
       const src = readFileSync(join(root, rel), "utf8");
       // A debt index handed to a model as an object literal of its own.
       if (/\bdebtIndex:\s*[A-Za-z]/.test(src)) offenders.push(`${rel}: debtIndex literal`);
+      // Nor the growth and exit figures (lib/model-evidence): a model's
+      // evidence object built anywhere but `modelEvidenceFor`, or handed to
+      // a model anywhere but through lib/model-market, could seed the sample
+      // or run a figure the stress test does not decide by.
+      if (rel !== join("lib", "model-evidence.ts") && /\b(rentGrowth|expenseGrowth|exitCap):\s*\{\s*decided\b/.test(src)) offenders.push(`${rel}: evidence literal`);
+      if (/\bevidence:\s*[A-Za-z]/.test(src) && /\bdebtIndex\b/.test(src) && !rel.startsWith(join("lib", "underwrite"))) offenders.push(`${rel}: evidence handed to a model`);
+      // Every surface that seeds a model reads the evidence it hands in (the
+      // argument is required, so the compiler holds each call): a real
+      // deal's model never runs the defaults because a surface forgot it.
+      if (/\bmodelMarketFor\(/.test(src) && !/\bmodelEvidenceFor\(/.test(src)) offenders.push(`${rel}: seeds without reading the evidence (lib/model-evidence)`);
+      if (/\bmodelEvidenceFor\(/.test(src) && rel !== join("lib", "model-evidence.ts")) evidenceReaders.push(rel);
       const derives = src.includes("deriveUnderwriteInputs(") && src.includes("liveDebtSeeds(");
       const lines = /\b(ratesPromptLine|modelRatesLine)\(/.test(src) && src.includes("liveDebtSeeds(");
       if (derives || lines) {
@@ -148,6 +160,19 @@ describe("the signed-in sample deal is never seeded — its IRR does not move wi
         join("app", "api", "deals", "[id]", "underwrite.xlsx", "route.ts"),
         join("lib", "bridge", "deal-assumptions.ts"),
         join("lib", "model", "build-model.ts"),
+      ].sort(),
+    );
+    // The surfaces that derive a deal's model with today's market — the
+    // first-draft model excepted, which takes only the rates line — each
+    // read the figures its growth and exit run at.
+    expect(evidenceReaders.sort()).toEqual(
+      [
+        join("app", "(app)", "deals", "[id]", "page.tsx"),
+        join("app", "api", "deals", "[id]", "memo", "route.ts"),
+        join("app", "api", "deals", "[id]", "report", "route.ts"),
+        join("app", "api", "deals", "[id]", "underwrite.xlsx", "route.ts"),
+        join("lib", "anthropic", "pipeline.ts"),
+        join("lib", "bridge", "deal-assumptions.ts"),
       ].sort(),
     );
   });

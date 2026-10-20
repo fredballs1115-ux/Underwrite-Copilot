@@ -278,7 +278,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
       "On potential gross revenue every year, on top of the vacant space the Cash Flow tab leaves out until its lease-up line absorbs it.",
   );
   row(A.opexPsf, "Operating expenses ($/SF/yr)", inputs.opexPsf, FMT.psf, "");
-  row(A.expenseGrowth, "Expense growth", inputs.expenseGrowthPct, FMT.pct2, "");
+  row(A.expenseGrowth, "Expense growth", inputs.expenseGrowthPct, FMT.pct2, notes.expenseGrowth ?? "");
   row(
     A.reimbursement,
     "Expense recovery (% of opex)",
@@ -291,7 +291,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   row(A.capImprovements, "Capital improvements — Year 1", inputs.capitalImprovementsYr1, FMT.usd, "");
 
   sectionHeader(ws, 35, "Exit", 1, 3);
-  row(A.exitCap, "Exit cap rate", inputs.exitCapPct, FMT.pct2, "Applied to forward (hold + 1) NOI.");
+  row(A.exitCap, "Exit cap rate", inputs.exitCapPct, FMT.pct2, notes.exitCap ? `Applied to forward (hold + 1) NOI. ${notes.exitCap}` : "Applied to forward (hold + 1) NOI.");
   row(A.saleCostPct, "Costs of sale", inputs.saleCostPct, FMT.pct2, "");
 
   sectionHeader(ws, 39, "Debt", 1, 3);

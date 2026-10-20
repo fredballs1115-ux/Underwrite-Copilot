@@ -183,6 +183,7 @@ function HeadlineSection() {
   const lists: { heading: string; items: readonly string[]; tone: string }[] = [
     { heading: "The two cases", items: [...m.omCase, ...m.evidenceCase], tone: "" },
     { heading: "The split", items: [...m.split, ...m.overlap], tone: "" },
+    { heading: "On a plan deal", items: m.plan, tone: "" },
     { heading: "Not in it", items: m.limits, tone: "text-muted" },
   ];
   return (

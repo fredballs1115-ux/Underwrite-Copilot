@@ -21,7 +21,7 @@ import {
   sourcingSentence,
 } from "@/lib/model/provenance";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
-import { SCREENING_MODEL_DOWNLOAD, SCREENING_MODEL_IS } from "@/lib/screening-model-words";
+import { SCREENING_GROWTH_EXIT_SAMPLE, SCREENING_GROWTH_EXIT_SHORT, SCREENING_MODEL_DOWNLOAD, SCREENING_MODEL_IS } from "@/lib/screening-model-words";
 import { ReturnsHeadline } from "./returns-headline";
 import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
 
@@ -29,12 +29,17 @@ import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow 
  *  the first draft's assumptions are the AI's reconciliation of the
  *  documents (lib/anthropic/model-reconcile), with its own exit, growth or
  *  vacancy where none is stated; the stress test runs the screening model
- *  (lib/underwrite/inputs): the memorandum's price and terms, with
- *  screening defaults for growth and the exit (lib/screening-model-words). */
-const FIRST_DRAFT_MODEL_LINE =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so its returns can differ.";
-const FIRST_DRAFT_MODEL_LINE_PLAYGROUND =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so their returns can differ.";
+ *  (lib/underwrite/inputs): the memorandum's price and terms, with its growth
+ *  and exit never more optimistic than the memorandum — or, on the sample,
+ *  pinned (lib/screening-model-words). One string a branch. */
+const firstDraftLine = (growthExit: string, playground: boolean): string =>
+  playground
+    ? `The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with ${growthExit}, so their returns can differ.`
+    : `The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, the memorandum's price and terms with ${growthExit}, so its returns can differ.`;
+const FIRST_DRAFT_MODEL_LINE = firstDraftLine(SCREENING_GROWTH_EXIT_SHORT, false);
+const FIRST_DRAFT_MODEL_LINE_PLAYGROUND = firstDraftLine(SCREENING_GROWTH_EXIT_SHORT, true);
+const FIRST_DRAFT_SAMPLE_LINE = firstDraftLine(SCREENING_GROWTH_EXIT_SAMPLE, false);
+const FIRST_DRAFT_SAMPLE_LINE_PLAYGROUND = firstDraftLine(SCREENING_GROWTH_EXIT_SAMPLE, true);
 
 /** The card's body with a model, as the deal page stacks it. */
 export function ModelBody({
@@ -74,7 +79,13 @@ export function ModelBody({
           runs the screening model, a different set of assumptions. One
           string a branch, one text node. */}
       <p data-qa="model-which" className="-mt-2 max-w-2xl text-xs leading-relaxed text-muted">
-        {playground ? FIRST_DRAFT_MODEL_LINE_PLAYGROUND : FIRST_DRAFT_MODEL_LINE}
+        {sample
+          ? playground
+            ? FIRST_DRAFT_SAMPLE_LINE_PLAYGROUND
+            : FIRST_DRAFT_SAMPLE_LINE
+          : playground
+            ? FIRST_DRAFT_MODEL_LINE_PLAYGROUND
+            : FIRST_DRAFT_MODEL_LINE}
       </p>
       <ReturnsHeadline model={model} interest={interest} />
       {!withheld && <StressPanel model={model} />}
