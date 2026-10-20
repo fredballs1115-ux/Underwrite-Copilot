@@ -21,6 +21,7 @@ import { subjectBasis } from "./comp-detail";
 import { interestOf } from "./interest";
 import { screenYearOf } from "./criteria";
 import { basisTag } from "./pipeline-slots";
+import { compactUsd } from "./money";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
@@ -301,6 +302,44 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.gap).toMatchObject({ value: 30_000, unit: "usd" });
     expect(i.verdict).toBe("unsupported");
     expect(i.impact!.input).toBe("expenseLines");
+  });
+
+  it("swaps a line the T-12's expense load already carries, never adding the gap on top of it (audit H3)", () => {
+    // The model's one expense line is the T-12's $1.75M total, which already
+    // holds the T-12's $150k insurance and $380k taxes.
+    const d = apartmentArgs().derived!;
+    expect(d.sources.expenseLines?.doc).toBe("T-12");
+    const total = d.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    expect(Math.round(total)).toBe(1_750_000);
+    const irrAt = (line: number) =>
+      computeUnderwrite({ ...d.inputs, expenseLines: d.inputs.expenseLines.map((l, k) => (k === 0 ? { ...l, annual: l.annual + (line - total) } : l)) }).returns.leveredIrrPct! * 100;
+    // The OM's run carries the OM's $120k premium in place of the T-12's
+    // $150k; the evidence's run is the T-12's, which the model already runs.
+    const i = rowOf(test, "insurance").impact!;
+    expect(Math.round(i.omValue)).toBe(1_720_000);
+    expect(Math.round(i.altValue)).toBe(1_750_000);
+    expect(i.baseIrrPct!).toBeCloseTo(irrAt(1_720_000), 9);
+    expect(i.altIrrPct!).toBeCloseTo(irrAt(total), 9);
+    expect(i.note).toMatch(/^If the insurance line is the deal's T-12's \$150k, not the OM's \$120k, the levered IRR moves from /);
+    expect(i.note).toMatch(/ The model itself already runs at it\.$/);
+    // The reset tax bill, against the T-12's $380k tax line (the OM's own
+    // figure here): the OM's run is the model's line, the evidence's the line
+    // less the T-12's $380k plus the $532k reset.
+    const t = rowOf(test, "taxes").impact!;
+    expect(Math.round(t.omValue)).toBe(1_750_000);
+    expect(Math.round(t.altValue)).toBe(1_902_000);
+    // Where the T-12's tax line differs from the OM's bill, the OM's run
+    // carries the OM's bill in its place, and the note says what the model runs.
+    const t12Lower = { ...T12, opex: T12.opex.map((l) => (l.key === "taxes" ? { ...l, amount: 350_000 } : l)) };
+    const lowered = summarizeT12({ periodEndDate: "2026-06-30", collectedRent: 4_400_000, vacancyLoss: -400_400, otherIncome: 100_000, egi: 4_099_600, opex: t12Lower.opex, totalOpex: null, noi: null, page: "p. 2" });
+    const actualsIn = { t12: { summary: lowered, periodEnd: "2026-06-30" } };
+    const derived = deriveUnderwriteInputs(APARTMENT, "The Maddox", actualsIn, { debtIndex: FIVE });
+    const actuals = readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), rentRoll: null, t12: actualsIn.t12, assetClass: "multifamily" });
+    const tt = rowOf(buildStressTest(apartmentArgs({ derived, actuals, modelVsMarket: readFor(derived) })), "taxes").impact!;
+    const lineNow = derived.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    expect(Math.round(tt.omValue)).toBe(Math.round(lineNow - 350_000 + 380_000));
+    expect(Math.round(tt.altValue)).toBe(Math.round(lineNow - 350_000 + 532_000));
+    expect(tt.note).toContain(`The model itself runs its one expense line at the T-12's ${compactUsd(lineNow, { millions: 2, trim: true })} total, with the T-12's $350k tax line in it.`);
   });
 
   it("sets the exit cap against the going-in cap, the rent growth against the trailing year and the debt against the seeded rate", () => {
