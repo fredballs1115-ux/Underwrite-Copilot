@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD } from "./stress-test-words";
+import { HEADLINE_WITHHELD, HOLDS_NO_RERUN } from "./stress-test-words";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const h = React.createElement;
@@ -350,10 +350,20 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("At the OM's figure 9.3% At the evidence's figure 7.1%");
     // A fall is the warning tone; a re-run the evidence lifts never is.
     expect(row).toContain('class="h-full rounded-full bg-caution/70" data-direction="down" data-bar="stress-impact"');
-    const up: StressRow = { ...VACANCY, verdict: "holds", impact: { ...VACANCY.impact!, altValue: 0.058, altIrrPct: 9.6 } };
+    const up: StressRow = { ...VACANCY, verdict: "stretched", impact: { ...VACANCY.impact!, altValue: 0.058, altIrrPct: 9.6 } };
     const upRow = render({ rows: [up], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(upRow).toContain('class="h-full rounded-full bg-pass/70" data-direction="up" data-bar="stress-impact"');
     expect(upRow).not.toContain("bg-caution/70");
+    // A row that holds draws no re-run: its evidence side is the favourable
+    // one (an office rent growth holding at +7.2% re-ran to 24.7%), so it
+    // says so in one line, with no pair, no bars and no note.
+    const held = render({ rows: [{ ...up, verdict: "holds" }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(held).replace(/&#x27;/g, "'")).toContain(HOLDS_NO_RERUN);
+    expect(HOLDS_NO_RERUN).toBe("The OM's figure is within the evidence; no re-run.");
+    expect(held).not.toContain('data-qa="stress-impact"');
+    expect(held).not.toContain('data-bar="stress-impact"');
+    expect(held).not.toContain("data-bar=\"stress-impact-model\"");
+    expect(visibleText(held).replace(/&#x27;/g, "'")).not.toContain(VACANCY.impact!.note);
     expect(t).toContain(VACANCY.impact!.note);
     // The challenger's words, folded whole under the row.
     expect(t).toContain("The challenge · High severity");
@@ -377,7 +387,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // One figure of evidence: its label and no bracket.
     expect(t).toContain("The OM against the evidence OM $532k Evidence $532k");
     expect(taxes).not.toContain('data-qa="stress-span"');
-    expect(t).toContain("No return is re-run: the model has no input for this figure.");
+    expect(t).toContain(HOLDS_NO_RERUN);
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
 

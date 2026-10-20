@@ -34,6 +34,8 @@ import {
   INSURANCE_NO_QUOTE,
   INSURANCE_RERUN_NOTE,
   IRR_MOVE_STRETCH_BPS,
+  leaseUpNotModelled,
+  VACANCY_UNSUPPORTED_PTS,
   SHARE_NO_MODEL,
   buildStressTest,
   challengeKey,
@@ -643,8 +645,11 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(v.gap).toEqual({
       value: 0.2,
       unit: "pts",
-      text: "The OM's 6.0% is a stabilized assumption, so it is held to the market's published figure: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. The deal's T-12 ran 9.1% vacant over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close.",
+      text: "The OM's 6.0% is a stabilized assumption, so it is held to the market's published figure: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. The deal's T-12 ran 9.1% vacant over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. The lease-up from today's 9.1% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one.",
     });
+    // The note rides only past the row's own threshold: 3.1 points over.
+    expect(v.gap!.text.endsWith(leaseUpNotModelled(9.1, 6))).toBe(true);
+    expect(STRESS_METHODS.find((m) => m.key === "vacancy")!.limits.join(" ")).toContain(`more than ${VACANCY_UNSUPPORTED_PTS} points over the assumption`);
     expect(v.verdict).toBe("holds");
     expect(v.method).toBe(
       "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau); beside rental vacancy, South Census region (Census Bureau via FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",

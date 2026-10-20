@@ -201,6 +201,30 @@ export function moveShort(impact: StressImpact | null): string {
   return `IRR ${irrText(impact.baseIrrPct)} to ${irrText(impact.altIrrPct)}`;
 }
 
+/** What a row that holds prints in its re-run's place. Its re-run at the
+ *  evidence's figure is the favourable side (an office rent growth holding at
+ *  +7.2% re-runs to 24.7%), which no surface draws as a return; the impact
+ *  stays on the row for the headline's cases. */
+export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run.";
+
+/** Whether a surface draws the row's re-run as a return: a row that holds
+ *  draws none (`HOLDS_NO_RERUN`), an unchecked row's re-run (the insurance
+ *  line at the seller's own premium) is said in its note alone, and a row
+ *  with no impact has none to draw. */
+export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
+
+/**
+ * The row's return in one line, for the report and the verdict's brief: the
+ * re-run's own note (after `lead`, where the surface names the re-run's base)
+ * where the row draws one; `HOLDS_NO_RERUN` on a row that holds; else why no
+ * return is re-run.
+ */
+export function rowMoveText(test: StressTest, row: StressRow, lead?: string): string {
+  if (row.verdict === "holds") return HOLDS_NO_RERUN;
+  if (row.impact) return lead ? `${lead}. ${row.impact.note}` : row.impact.note;
+  return noMoveWhy(test, row);
+}
+
 /** Why a row prints no move, as one whole sentence that says no return is
  *  re-run: the test's reason, else the row's own. Printed as it stands. */
 export function noMoveWhy(test: StressTest, row: StressRow): string {
@@ -254,7 +278,7 @@ export function rowWords(row: StressRow): StressRowWords {
     om: omShort(row),
     against: evidenceShort(row, bestEvidence(row)),
     gap: gapShort(row),
-    move: moveShort(row.impact),
+    move: row.verdict === "holds" ? "no re-run" : moveShort(row.impact),
     ticks: tickPositions(row),
   };
 }

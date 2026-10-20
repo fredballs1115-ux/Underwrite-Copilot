@@ -22,7 +22,8 @@ import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
-import { headlineSentence, headlineShort, keptSentence, rerunWords } from "./stress-test-words";
+import { HOLDS_NO_RERUN, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
+import { stressSection } from "./anthropic/verdict";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
 // deal's page (app/(app)/deals/[id]/page.tsx), /demo's Overview
@@ -153,6 +154,18 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(row("vacancy")).toMatchObject({ verdict: "holds", gap: { value: -0.2, unit: "pts" } });
     expect(row("vacancy").evidence[0].label).toBe("Rental vacancy, metro area");
     expect(row("vacancy").gap!.text).toContain("Today the deal's rent roll runs 9.3% vacant, 3.3 points over the assumption — the gap a lease-up has to close.");
+    // 3.3 points is past the row's own 3-point threshold: neither run
+    // models the lease-up, said so, whatever the verdict.
+    expect(row("vacancy").gap!.text).toContain("The lease-up from today's 9.3% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one.");
+    // A row that holds draws no re-run on any surface: the report and the
+    // verdict's brief print the one line in its place (its impact stays for
+    // the headline's cases).
+    expect(row("vacancy").impact).not.toBeNull();
+    expect(rowMoveText(page, row("vacancy"))).toBe(HOLDS_NO_RERUN);
+    expect(rowMoveText(page, row("rent_growth"), "from the model")).toBe(HOLDS_NO_RERUN);
+    const brief = stressSection(page).find((l) => l.startsWith("- Stabilized vacancy (vacancy)"))!;
+    expect(brief).toContain(`The levered IRR: ${HOLDS_NO_RERUN}`);
+    expect(brief).not.toContain("the levered IRR moves from");
     expect(row("rent_growth")).toMatchObject({ verdict: "holds", gap: { value: -1, unit: "pts" } });
     expect(row("rent_growth").gap!.text).toMatch(/^Held to the rent sitting tenants pay \(CPI rent\)/);
     expect(row("exit_cap").evidence.map((e) => e.label)).toContain("10-year Treasury");

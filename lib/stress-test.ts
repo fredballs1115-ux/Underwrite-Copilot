@@ -671,6 +671,14 @@ function marketVacancyRank(label: string): number {
   return 3;
 }
 
+/** "The lease-up from today's 9.3% to the stabilized 6.0% is not modelled in
+ *  either case: each runs its vacancy from year one." — said on a stabilized
+ *  vacancy the market holds where the deal's documents run more than
+ *  `VACANCY_UNSUPPORTED_PTS` over it today. */
+export function leaseUpNotModelled(todayPct: number, stabilizedPct: number): string {
+  return `The lease-up from today's ${pct1(todayPct)} to the stabilized ${pct1(stabilizedPct)} is not modelled in either case: each runs its vacancy from year one.`;
+}
+
 function vacancyRow(ctx: Ctx): StressRow | null {
   const om = omVacancy(ctx.rows);
   // Each piece is gathered apart and set in order once the row knows which
@@ -829,7 +837,12 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const edge = band ? band.lo - SAME : bestValue - (moe ?? SAME);
     const doc = docs[0];
     const docLine = doc
-      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.`
+      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+          // Past the row's own threshold, the building today is materially
+          // emptier than the stabilized figure the market holds: whatever
+          // the verdict, neither run models getting from one to the other.
+          doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
+        }`
       : "";
     judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) => {
       const where =

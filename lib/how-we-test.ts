@@ -75,7 +75,7 @@ export const WHO_DOES_WHAT = {
 export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
   {
     word: "holds",
-    line: "The OM's figure sits inside the evidence, or on its conservative side. A row held only to a rule of thumb says so and is never drawn green.",
+    line: "The OM's figure sits inside the evidence, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
   },
   {
     word: "stretched",

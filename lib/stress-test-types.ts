@@ -411,6 +411,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     limits: [
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
+      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's documents run more than 3 points over the assumption, the row says so.",
     ],
   },
   {

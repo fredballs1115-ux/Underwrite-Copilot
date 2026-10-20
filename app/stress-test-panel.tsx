@@ -4,6 +4,8 @@ import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
 import {
   HEADLINE_WITHHELD,
+  HOLDS_NO_RERUN,
+  drawsRerun,
   headlineLine,
   headlineName,
   keptSentence,
@@ -577,8 +579,15 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
               <p className={`${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{row.unchecked}</p>
             ) : null}
 
-            {row.impact ? (
-              <ImpactView impact={row.impact} test={test} />
+            {row.verdict === "holds" ? (
+              // A row that holds draws no re-run: the evidence's side is the
+              // favourable one (an office rent growth holding at +7.2% re-runs
+              // to 24.7%), which is no return to show (lib/stress-test-words).
+              <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-rerun">
+                {HOLDS_NO_RERUN}
+              </p>
+            ) : drawsRerun(row) ? (
+              <ImpactView impact={row.impact!} test={test} />
             ) : (
               <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-impact">
                 {/* One sentence a row: the reason once at the top where the whole
@@ -822,7 +831,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
           {"The OM's figure"}
         </KeyItem>
         {/* The dashed tick on each row's re-run bars: the model as it runs. */}
-        {model != null && test.rows.some((r) => r.impact) && (
+        {model != null && test.rows.some(drawsRerun) && (
           <KeyItem mark="dashed" tone="border-ink/70">
             {`The model as it runs, ${pctText(model)}: each re-run changes one input of it`}
           </KeyItem>
