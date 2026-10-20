@@ -910,6 +910,8 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(b.evidence[0].value).toBe(256_500);
     expect(b.evidence[1]).toMatchObject({ value: 240_000, href: "https://example.test/records", asOf: "2026-10-01" });
     expect(b.gap).toMatchObject({ unit: "pct", value: 7 });
+    // "the median of …", never a possessive bolted onto the label.
+    expect(b.gap!.text).toBe("The ask's $275k/unit is 7.0% over the median of the memorandum's sale comps, $257k/unit.");
     expect(b.verdict).toBe("stretched");
     expect(b.impact!.input).toBe("purchasePrice");
     expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 256_500) / 274_510, 0);

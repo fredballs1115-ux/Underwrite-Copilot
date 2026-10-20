@@ -1434,12 +1434,15 @@ function basisRow(ctx: Ctx): StressRow | null {
   const comparables = evidence.filter((e) => e.value != null);
   if (comparables.length === 0) return unchecked("basis", omSays, evidence, "No comp with a figure could be read for this deal.");
   const best = comparables[0];
+  // "the median of …": every basis comparable is a median, and its label is
+  // a phrase no possessive fits ("Recorded sales (Philadelphia OPA)").
+  const ofBest = `the median of ${lowerFirst(best.label)}, ${money(best.value!)}${perWord}`;
   const judged = judge(om, comparables.map((e) => e.value!), "high", "pct", BASIS_UNSUPPORTED_PCT, 0, (gap) =>
     Math.abs(gap) / best.value! < 0.005
-      ? `The ask's ${money(om)}${perWord} is at ${lowerFirst(best.label)}' ${money(best.value!)}${perWord}.`
+      ? `The ask's ${money(om)}${perWord} is at ${ofBest}.`
       : gap > 0
-        ? `The ask's ${money(om)}${perWord} is ${pct1((gap / best.value!) * 100)} over ${lowerFirst(best.label)}' ${money(best.value!)}${perWord}.`
-        : `The ask's ${money(om)}${perWord} is ${pct1((-gap / best.value!) * 100)} under ${lowerFirst(best.label)}' ${money(best.value!)}${perWord} — the conservative side.`,
+        ? `The ask's ${money(om)}${perWord} is ${pct1((gap / best.value!) * 100)} over ${ofBest}.`
+        : `The ask's ${money(om)}${perWord} is ${pct1((-gap / best.value!) * 100)} under ${ofBest} — the conservative side.`,
   );
   // The verdict is read in percent of the best figure, so the gap's unit is
   // a share, not a dollar: struck again here on the best figure.
