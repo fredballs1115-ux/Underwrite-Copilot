@@ -648,7 +648,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       docs.push(piece({
         kind: "document",
         label: "The deal's rent roll: the occupancy it runs at",
-        text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
+        text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${proseDay(asOf)}` : ", no stated as-of"})`,
         value: v,
         asOf,
         publisher: "the deal's rent roll",
@@ -662,7 +662,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     docs.push(piece({
       kind: "document",
       label: "The deal's T-12: vacancy loss over gross potential rent",
-      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${t12.periodEnd}` : "; period not stated"})`,
+      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${proseDay(t12.periodEnd)}` : "; period not stated"})`,
       value: tv.pct,
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
