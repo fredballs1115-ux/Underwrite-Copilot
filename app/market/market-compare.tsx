@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ScrollX } from "../edge-fade";
 import Link from "next/link";
 import { FMR_BEDS, fmrLabel, fmrWhen, type FmrBed } from "@/lib/fmr";
 import { researchAge, staleMark } from "@/lib/research-age";
@@ -245,11 +246,12 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
         ))}
       </div>
       {(a.sectors || b.sectors) && (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4">
           <p className="text-[10px] uppercase tracking-wide text-muted">
             {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b, today)}`}
           </p>
-          <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
+          <ScrollX className="mt-1.5">
+          <table className="w-full min-w-[28rem] text-left text-[11px]">
             <thead>
               <tr className="text-muted">
                 <th className="w-24 py-1 pr-2 font-medium">Sector</th>
@@ -276,6 +278,7 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
               ))}
             </tbody>
           </table>
+          </ScrollX>
           <p className="mt-1 text-[10px] text-muted">
             Tracker spreads shown as ranges; a dash is a recorded gap.
           </p>
