@@ -164,6 +164,9 @@ describe("/how-we-test draws every method from the table", () => {
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {
     expect(gluedWords(text)).toEqual([]);
+    // A coverage label carries its own brackets ("New Jersey (statewide)"):
+    // the page never wraps it in another pair.
+    expect(text).not.toContain("))");
     expect(a11yIssues(html)).toEqual([]);
     // No paragraph past a line of prose on a public page: the longest
     // sentence the page's own words carry is the table's, not a paragraph.

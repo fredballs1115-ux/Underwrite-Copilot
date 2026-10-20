@@ -115,7 +115,7 @@ export const PUBLISHERS: readonly Publisher[] = [
   },
   {
     name: "Census Bureau",
-    reads: "the Housing Vacancy Survey's rental vacancy for each metro area, with its margin of error, and the regions'",
+    reads: "the Housing Vacancy Survey's rental vacancy for each metro area, with its margin of error, and for each Census region",
     href: HVS_RATES_URL,
     notice: null,
   },
@@ -139,7 +139,9 @@ export const PUBLISHERS: readonly Publisher[] = [
   },
   {
     name: "Public property records",
-    reads: `recorded sales from the government records the site reads today (${COVERAGE_SUMMARY}), a median only from three sales up`,
+    // COVERAGE_SUMMARY's labels carry their own brackets ("New Jersey
+    // (statewide)"), so the list follows a colon, never another pair.
+    reads: `recorded sales from the government records the site reads today, a median only from three sales up: ${COVERAGE_SUMMARY}`,
     href: null,
     notice: null,
   },
