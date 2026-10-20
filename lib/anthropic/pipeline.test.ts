@@ -428,7 +428,12 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     // In-process: the action's caller rides in the run's own arguments.
     await runAnalysis("d1", { requestedBy: ASKER.toUpperCase() });
     expect(job().status).toBe("done");
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: ASKER }]);
+    // The email is handed the stress test the verdict's brief was, built
+    // once (nothing is stored on the verdict): its counts lead the email.
+    const handed = vi.mocked(notifyAnalysisReady).mock.calls[0]?.[2]?.stressTest;
+    expect(handed).toBeTruthy();
+    expect(handed).toBe(vi.mocked(synthesizeVerdict).mock.calls.at(-1)?.[0].stressTest);
 
     state = freshState();
     vi.mocked(extractTerms).mockImplementation(async () => {
@@ -444,7 +449,7 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     state.jobs[0].payload = { kind: "screen", requestedBy: ASKER, completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
     vi.mocked(notifyAnalysisReady).mockClear();
     await runAnalysis("d1", { resume: true });
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: ASKER }]);
 
     // A checkpoint written from a payload that had none keeps the run's own.
     state = freshState();
@@ -456,7 +461,7 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     state = freshState();
     vi.mocked(notifyAnalysisReady).mockClear();
     await runAnalysis("d1");
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: null }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: null }]);
   });
 
   it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {

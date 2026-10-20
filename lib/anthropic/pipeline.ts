@@ -957,7 +957,7 @@ async function regenerateVerdict(
   dealId: string,
   dealContext: string | null,
   reads: VerdictReads | undefined,
-): Promise<void> {
+): Promise<StressTest | null> {
   const { data, error: readErr } = await admin
     .from("deals")
     .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps")
@@ -1052,6 +1052,9 @@ async function regenerateVerdict(
   // generatedAt lets consumers (the weekly digest) know when THIS verdict
   // landed — deals.updated_at bumps on any edit and can't be trusted.
   await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString() });
+  // The test the call was reached on, for the screen-complete email's
+  // counts: nothing is stored on the verdict, so the run hands it over.
+  return stressTest;
 }
 
 /**
@@ -1889,7 +1892,7 @@ async function runAnalysisSteps(
     // Step 5 — verdict (synthesizes everything gathered above), told what
     // the screen established, as the comps and the market check were.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });
-    await regenerateVerdict(admin, dealId, dealContext, { flags: siteFlags, market: marketFigures });
+    const stressTest = await regenerateVerdict(admin, dealId, dealContext, { flags: siteFlags, market: marketFigures });
 
     await patchJob(dealId, {
       status: "done",
@@ -1904,7 +1907,7 @@ async function runAnalysisSteps(
     // Heads-up email (paused until RESEND_API_KEY and a sender a customer
     // receives mail from are set, lib/email; best-effort by design — the
     // screen itself is already complete), to whoever asked for the run.
-    await notifyAnalysisReady(admin, dealId, { requestedBy });
+    await notifyAnalysisReady(admin, dealId, stressTest ? { requestedBy, stressTest } : { requestedBy });
   } catch (err) {
     // One sentence the analyst can act on; the raw failure goes to the log.
     const failure = describeRunFailure(err);

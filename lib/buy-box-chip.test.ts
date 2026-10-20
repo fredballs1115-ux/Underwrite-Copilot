@@ -202,7 +202,7 @@ describe("the screen-complete email's chip is the deal header's", () => {
     }
   });
 
-  it("says there is no buy box where the account has none", async () => {
+  it("leaves the buy-box line out where the account has none, never 'Buy box: No buy box set' (the first-run audit of 2026-10-20)", async () => {
     boxes.current = null;
     const chip = await emailedChip({
       name: "Main Street Flats",
@@ -217,7 +217,9 @@ describe("the screen-complete email's chip is the deal header's", () => {
       photo: null,
       om_storage_path: null,
     });
-    expect(chip).toBe("No buy box set");
+    expect(chip).toBe("");
+    expect(sent[0].text).not.toMatch(/buy box/i);
+    expect(JSON.stringify(sent[0])).not.toContain("No buy box set");
   });
 });
 
