@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
-import { HEADLINE_WITHHELD, headlineLine, headlineName, liveHeadline, noMoveWhy, ptsText } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, headlineLine, headlineName, liveHeadline, noMoveWhy, partAgainst, ptsText, shownHeadline, unsolvedSentence, type ShownPart } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
@@ -620,14 +620,18 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
  * the headline is withheld with them.
  */
 function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: string }) {
-  const om = h.omIrrPct;
-  const ev = h.evidenceIrrPct;
-  const walk: { part: StressHeadline["parts"][number]; from: number; to: number }[] = [];
+  // The figures as printed (lib/stress-test-words `shownHeadline`): each
+  // case at one place and each part rounded so the segments end exactly on
+  // the evidence's printed case.
+  const shown = shownHeadline(h);
+  const om = shown.om;
+  const ev = shown.evidence;
+  const walk: { part: ShownPart; from: number; to: number }[] = [];
   if (om != null) {
     let at = om;
-    for (const part of h.parts) {
-      walk.push({ part, from: at, to: at + part.pts });
-      at += part.pts;
+    for (const part of shown.parts) {
+      walk.push({ part, from: at, to: at + part.shown });
+      at += part.shown;
     }
   }
   const points = [0, ...(om != null ? [om] : []), ...(ev != null ? [ev] : []), ...walk.flatMap((w) => [w.from, w.to])];
@@ -648,17 +652,35 @@ function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: s
           <BarRow label="On the OM's figures" figure={pctText(om)}>
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
-          {walk.map(({ part, from, to }) => (
-            <BarRow key={part.key} label={part.label} figure={ptsText(part.pts)}>
-              {zero != null && <Tick at={`${zero.toFixed(2)}%`} bar="stress-headline-zero" tone="bg-ink/30" track="secondary" />}
-              <div
-                className={`absolute inset-y-0 rounded-full ${part.pts < 0 ? "bg-kill/70" : "bg-pass/70"}`}
-                data-bar="stress-headline-part"
-                data-key={part.key}
-                style={bar(from, to)}
-              />
-            </BarRow>
-          ))}
+          {walk.map(({ part, from, to }) => {
+            const against = partAgainst(part);
+            return (
+              <BarRow
+                key={part.key}
+                label={
+                  against ? (
+                    <>
+                      {part.label}{" "}
+                      <span className="text-[10px]" data-qa="stress-headline-against">
+                        ({against})
+                      </span>
+                    </>
+                  ) : (
+                    part.label
+                  )
+                }
+                figure={ptsText(part.shown)}
+              >
+                {zero != null && <Tick at={`${zero.toFixed(2)}%`} bar="stress-headline-zero" tone="bg-ink/30" track="secondary" />}
+                <div
+                  className={`absolute inset-y-0 rounded-full ${part.pts < 0 ? "bg-kill/70" : "bg-pass/70"}`}
+                  data-bar="stress-headline-part"
+                  data-key={part.key}
+                  style={bar(from, to)}
+                />
+              </BarRow>
+            );
+          })}
           <BarRow label="With the evidence" figure={pctText(ev)}>
             <div className="absolute inset-y-0 rounded-full bg-caution/70" data-bar="stress-headline-evidence" style={bar(0, ev)} />
           </BarRow>
@@ -668,8 +690,13 @@ function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: s
         {h.parts.length > 1
           ? "Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the return."
           : h.parts.length === 1
-            ? "One assumption the model takes is past its evidence, so the headline is that row's own re-run."
-            : "Every figure the model takes is at the OM's in both runs."}
+            ? "One assumption the model takes is past its evidence, so the whole gap is its own, struck on the OM's case."
+            : om == null || ev == null
+              ? "One of the two runs has no levered IRR, so the gap is not split."
+              : h.omitted.length > 0
+                ? "Nothing past its evidence is a figure the headline swaps, so the two runs are one."
+                : "Nothing the model takes is past its evidence, so the two runs are one."}
+        {h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : ""}
         {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}{" "}
         <Link href="/how-we-test#headline" className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
           How the headline is struck

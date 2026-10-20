@@ -477,7 +477,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(hh.match(/data-bar="stress-headline-part"/g)).toHaveLength(3);
     expect(hh.match(/data-bar="stress-headline-om"/g)).toHaveLength(1);
     expect(hh.match(/data-bar="stress-headline-evidence"/g)).toHaveLength(1);
-    for (const s of ["−3.2 pts", "−2.5 pts", "+1.4 pts", "16.7%", "12.3%", "On the OM's figures", "With the evidence"]) expect(t).toContain(s);
+    // Each part printed so the three add up to the printed 4.4-point gap
+    // (16.7% to 12.3%), by largest remainder: the exit cap's 1.35 prints
+    // +1.3, never the +1.4 that left the printed parts summing to 4.3.
+    for (const s of ["−3.2 pts", "−2.5 pts", "+1.3 pts", "16.7%", "12.3%", "On the OM's figures", "With the evidence"]) expect(t).toContain(s);
+    expect(t).not.toContain("+1.4 pts");
     // The walk ends where the evidence's case does: the last segment's far
     // end and the evidence's bar's end are one x.
     const style = (re: RegExp) => {
@@ -497,6 +501,37 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(render({ ...WITHHELD, headline: null })).not.toContain('data-qa="stress-headline"');
     // A test built before the headline draws none and says nothing of it.
     expect(html).not.toContain('data-qa="stress-headline"');
+  });
+
+  it("marks a part struck against a rule of thumb, shows the mixes counted at the floor, and says why an unsolved case is not split (audit M1, M7, M8)", () => {
+    const base: StressHeadline = {
+      omIrrPct: 13.06,
+      evidenceIrrPct: 3.55,
+      omMultiple: 1.81,
+      evidenceMultiple: 1.19,
+      omKeys: ["debt", "vacancy"],
+      parts: [
+        { key: "vacancy", label: "Stabilized vacancy", pts: -7.6, multiple: -0.5 },
+        { key: "debt", label: "Debt", pts: -1.91, multiple: -0.12, ruleOfThumb: true },
+      ],
+      omitted: [],
+      unsolved: 2,
+    };
+    const hh = render({ ...TEST, headline: base });
+    const t = visibleText(hh).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(gluedWords(visibleText(hh))).toEqual([]);
+    expect(t).toContain("Debt (against a screening default)");
+    expect(hh.match(/data-qa="stress-headline-against"/g)).toHaveLength(1);
+    expect(t).toContain("2 mixes of the swaps had no IRR and were counted at the engine's floor in the split.");
+    // An evidence's case with no IRR: a clause of its own, and the note says
+    // why nothing is split rather than that both runs are at the OM's.
+    const none = visibleText(render({ ...TEST, headline: { ...base, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } }))
+      .replace(/&#x27;/g, "'")
+      .replace(/\s+/g, " ");
+    expect(none).toContain("Levered IRR on the OM's figures 13.1%; with the evidence it does not solve");
+    expect(none).not.toContain("to does not solve");
+    expect(none).toContain("One of the two runs has no levered IRR, so the gap is not split.");
+    expect(none).not.toContain("at the OM's in both runs");
   });
 
   it("its markers are its own: no other source draws them, and every key has a section on the methodology page", () => {

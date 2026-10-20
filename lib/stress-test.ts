@@ -117,7 +117,8 @@ import {
   type StressRow,
   type StressTest,
   type StressVerdict,
-  HEADLINE_BASIS_LEFT_OUT,
+  HEADLINE_ASK,
+  headlineBasisLeftOut,
   HEADLINE_NOI_LEFT_OUT,
   type StressHeadline,
 } from "@/lib/stress-test-types";
@@ -2169,6 +2170,23 @@ export const SHARE_NO_MODEL = "The shared screen carries no model, so no return 
 const PLAN_REASON = "On a value-add, lease-up, conversion or development deal the model runs today's income with the budget in year one, not the business plan, so a re-run would measure the wrong deal; no return is re-run.";
 
 /**
+ * The price both of the headline's cases pay, in words: the model's own
+ * price, which is the ask as stated except where the model runs another
+ * figure in its place — a share's price grossed up to the whole
+ * (`meta.grossedUpSharePct`), or an auction's floor, the starting bid plus
+ * the buyer's premium (lib/underwrite/inputs' price note).
+ */
+export function headlinePrice(derived: DerivedModel): string {
+  const share = derived.meta.grossedUpSharePct;
+  if (share != null) return `the ${Math.round(share * 10) / 10}% share's price grossed up to the whole the model runs`;
+  const note = derived.sources.purchasePrice?.note ?? "";
+  if (derived.sources.purchasePrice?.provenance === "derived" && / starting bid\b/.test(note)) {
+    return "the auction's floor, the starting bid plus the buyer's premium, which the model runs in place of an asking price";
+  }
+  return HEADLINE_ASK;
+}
+
+/**
  * The stress test for a deal, from what the deal page already holds. One
  * row an assumption, in STRESS_KEYS' order; a row with nothing stated and
  * nothing found is left out, and the challenger's unmatched challenges
@@ -2266,7 +2284,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
   // The headline is struck on the rows as finished: a row `finishRow` reads
   // stretched is swapped in the evidence's case.
-  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs) : null;
+  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
   return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
 }
 
@@ -2356,7 +2374,7 @@ const passed = (r: StressRow) => r.verdict === "stretched" || r.verdict === "uns
  * re-run, which starts from the model's own figures. Null where no row
  * carries a re-run (there is no OM's case to strike).
  */
-export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs): StressHeadline | null {
+export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs, price: string = HEADLINE_ASK): StressHeadline | null {
   // The rows in the OM's case: each re-run row whose swap the cases can make,
   // the first row to swap an input (no two rows swap one input; a second
   // would be left out, said so).
@@ -2390,10 +2408,10 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
 
   // The price is no player: both cases pay the ask, so the headline is what
   // the ask earns on each set of figures (the price row says the rest).
-  const price = players.find((s) => s.row.key === "basis");
-  if (price) {
-    players = players.filter((s) => s !== price);
-    omitted.push({ key: price.row.key, label: price.row.title, why: HEADLINE_BASIS_LEFT_OUT });
+  const basis = players.find((s) => s.row.key === "basis");
+  if (basis) {
+    players = players.filter((s) => s !== basis);
+    omitted.push({ key: basis.row.key, label: basis.row.title, why: headlineBasisLeftOut(price) });
   }
 
   // A case before its NOI: every scalar and expense swap at the side `alt`
@@ -2463,6 +2481,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
         label: s.row.title,
         pts: split.shares[i].leveredIrr * 100,
         multiple: omMultiple != null && evidenceMultiple != null ? split.shares[i].leveredEquityMultiple : null,
+        ...(s.row.ruleOfThumbOnly ? { ruleOfThumb: true } : {}),
       }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }

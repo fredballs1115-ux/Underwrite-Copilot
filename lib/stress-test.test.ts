@@ -32,12 +32,13 @@ import {
   SHARE_NO_MODEL,
   buildStressTest,
   challengeKey,
+  headlinePrice,
   stabilizedVacancyStated,
   stressHeadline,
   type StressTestArgs,
 } from "./stress-test";
-import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT } from "./stress-test-types";
-import { headlineName, headlineSentence } from "./stress-test-words";
+import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
+import { headlineLine, headlineName, headlineSentence, headlineShort, ptsText, shownHeadline } from "./stress-test-words";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -1542,7 +1543,28 @@ describe("the headline", () => {
     expect(h.unsolved).toBe(0);
   });
 
-  it("with one row past its evidence, is that row's own re-run, for every row that re-runs", () => {
+  it("with one row past its evidence, the whole gap is that row's, struck on the OM's case — which is the row's own re-run only where no other row is in the OM's case (audit H2)", () => {
+    // Every other re-run row held at the OM's figure, its impact kept: the
+    // OM's case puts each of them at the OM's figure, so the one part is the
+    // whole gap, but the gap is not the row's own re-run, which starts from
+    // the model's own figures.
+    const held = (k: StressKey) => test.rows.map((r) => (r.key === k ? { ...r, verdict: "stretched" as const } : r.impact ? { ...r, verdict: "holds" as const } : r));
+    let differs = 0;
+    for (const k of ["vacancy", "rent_growth", "debt", "taxes"] as StressKey[]) {
+      const one = stressHeadline(held(k), model)!;
+      const i = rowOf(test, k).impact!;
+      expect(one.parts.map((p) => p.key), k).toEqual([k]);
+      expect(one.parts[0].pts, k).toBeCloseTo(one.evidenceIrrPct! - one.omIrrPct!, 9);
+      if (Math.abs(one.parts[0].pts - (i.altIrrPct! - i.baseIrrPct!)) > 0.05) differs++;
+    }
+    expect(differs).toBeGreaterThan(0);
+    // The method says the true thing, never that the headline is the row's re-run.
+    expect(HEADLINE_METHOD.split.join(" ")).not.toMatch(/headline is that row's own re-run/);
+    expect(HEADLINE_METHOD.split).toContain("With one assumption past its evidence, the whole gap is that assumption's, struck on the OM's case.");
+    expect(HEADLINE_METHOD.split).toContain("That can differ from the row's own re-run, which starts from the model's own figures rather than the OM's.");
+  });
+
+  it("with one row past its evidence and no other re-run in the OM's case, is that row's own re-run, for every row that re-runs", () => {
     const rerun = test.rows.filter((r) => r.impact && Math.abs(r.impact.altValue - r.impact.omValue) > 1e-9);
     expect(rerun.map((r) => r.key).sort()).toEqual(["debt", "exit_cap", "expense_growth", "insurance", "noi", "rent_growth", "taxes", "vacancy"]);
     for (const r of rerun) {
@@ -1625,6 +1647,110 @@ describe("the headline", () => {
     const sentence = headlineSentence(test)!;
     expect(sentence).toMatch(/^Levered IRR on the OM's figures [-−]?\d+\.\d% to [-−]?\d+\.\d% with the evidence \(equity multiple \d\.\d\dx to \d\.\d\dx\): /);
     expect(sentence).toContain("Left out: the NOI (");
+  });
+
+  it("runs the OM's case on the NOI the NOI row tests, its stabilized pro forma here, and says so (audit L1)", () => {
+    const noi = rowOf(test, "noi");
+    expect(noi.omSays.value).toBe(2_650_000);
+    const rent = noi.impact!.omValue;
+    expect(computeUnderwrite({ ...model, inPlaceRentAnnual: rent }).cashFlow[0].noi).toBeCloseTo(2_650_000, 0);
+    expect(HEADLINE_METHOD.omCase.join(" ")).not.toMatch(/year-one NOI/);
+    expect(HEADLINE_METHOD.omCase).toContain("The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.");
+  });
+
+  it("names the price both cases pay as the model runs it — a share's grossed up, an auction's floor — and strikes a master lease's headline, as the method says (audit L2)", () => {
+    expect(headlinePrice(args.derived!)).toBe("the asking price");
+    const share = deriveUnderwriteInputs(SHARE, "x", undefined, { debtIndex: FIVE });
+    expect(headlinePrice(share)).toBe("the 49% share's price grossed up to the whole the model runs");
+    const auction: ExtractionResult = {
+      ...APARTMENT,
+      sale: { method: "auction", terms: "Online auction", condition: "", page: "p. 2" } as ExtractionResult["sale"],
+      metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Asking price"), row("Starting bid", "$30,000,000", "p. 2"), row("Buyer's premium", "5%", "p. 2")],
+    };
+    const floor = deriveUnderwriteInputs(auction, "x", undefined, { debtIndex: FIVE });
+    expect(floor.inputs.purchasePrice).toBe(31_500_000);
+    expect(headlinePrice(floor)).toBe("the auction's floor, the starting bid plus the buyer's premium, which the model runs in place of an asking price");
+    const basis: StressRow = {
+      key: "basis",
+      title: "Basis",
+      omSays: { text: "x", value: 1, page: null },
+      evidence: [],
+      gap: { value: 10, unit: "pct", text: "" },
+      verdict: "stretched",
+      impact: { input: "purchasePrice", evidenceIndex: 0, omValue: model.purchasePrice, altValue: model.purchasePrice * 0.9, baseIrrPct: null, altIrrPct: null, baseMultiple: null, altMultiple: null, note: "" },
+      challenge: null,
+      method: "",
+    };
+    const h2 = stressHeadline([basis, ...test.rows], model, headlinePrice(share))!;
+    expect(h2.omitted.find((o) => o.key === "basis")!.why).toBe(headlineBasisLeftOut("the 49% share's price grossed up to the whole the model runs"));
+    // A master lease's model is the position's own: its headline is struck,
+    // and the method's limits say so rather than withholding it.
+    const master = { ...APARTMENT, interest: { kind: "leasehold", summary: "The master lease of the building, sublet to its tenants", share: "", groundLease: "", loan: "", page: "" } } as ExtractionResult;
+    const md = deriveUnderwriteInputs(master, "x", undefined, { debtIndex: FIVE });
+    expect(buildStressTest({ extraction: master, challenger: null, market: null, modelVsMarket: readFor(md), actuals: null, derived: md, readOn: READ_ON }).headline).not.toBeNull();
+    expect(HEADLINE_METHOD.limits).toContain("A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.");
+  });
+
+  it("prints the gap from the two rounded IRRs and parts that add up to it, by largest remainder (audit M2)", () => {
+    // The sample's bare read: 13.06% to 3.56% prints 13.1% to 3.6%, a
+    // 9.5-point gap, never the 9.6 the unrounded figures make, and the parts
+    // round to sum to it.
+    const hh = { ...h, omIrrPct: 13.06, evidenceIrrPct: 3.56, parts: [
+      { key: "vacancy" as const, label: "Stabilized vacancy", pts: -3.567, multiple: null },
+      { key: "taxes" as const, label: "Real estate taxes", pts: -3.304, multiple: null },
+      { key: "exit_cap" as const, label: "Exit cap", pts: -1.536, multiple: null },
+      { key: "insurance" as const, label: "Insurance", pts: -1.103, multiple: null },
+    ] };
+    const shown = shownHeadline(hh);
+    expect([shown.om, shown.evidence, shown.gap]).toEqual([13.1, 3.6, 9.5]);
+    expect(Math.round(shown.parts.reduce((s, p) => s + p.shown, 0) * 10) / 10).toBe(-9.5);
+    const s = headlineSentence({ ...test, headline: hh })!;
+    expect(s).toContain("of the 9.5-point gap");
+    // Every printed part, summed, is the printed gap, on the apartment deal too.
+    const real = shownHeadline(h);
+    expect(Math.round(real.parts.reduce((t, p) => t + p.shown, 0) * 10) / 10).toBe(Math.round((real.evidence! - real.om!) * 10) / 10);
+    for (const p of real.parts) expect(headlineSentence(test)).toContain(`${headlineName(p.key)} ${ptsText(p.shown)}`);
+  });
+
+  it("says a case whose IRR does not solve in a clause of its own, never as a figure (audit M1)", () => {
+    const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
+    expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
+    expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\. Left out: /);
+    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
+    const omNull = { ...test, headline: { ...h, omIrrPct: null, omMultiple: null, parts: [], unsolved: 0 } };
+    expect(headlineLine(omNull)).toBe(`The levered IRR does not solve on the OM's figures; with the evidence it is ${h.evidenceIrrPct!.toFixed(1).replace("-", "\u2212")}%`);
+    const both = { ...test, headline: { ...h, omIrrPct: null, evidenceIrrPct: null, parts: [], unsolved: 0 } };
+    expect(headlineLine(both)).toBe("The levered IRR does not solve on the OM's figures or with the evidence");
+    for (const t of [evNull, omNull, both]) expect(headlineSentence(t)).not.toMatch(/does not solve with the evidence|to does not solve/);
+  });
+
+  it("with only a row the headline leaves out past its evidence, says nothing past its evidence is swapped, never that nothing is past it (audit M3)", () => {
+    const price = model.purchasePrice;
+    const basis: StressRow = {
+      key: "basis",
+      title: "Basis",
+      omSays: { text: "x", value: 274_000, page: null },
+      evidence: [],
+      gap: { value: 10, unit: "pct", text: "" },
+      verdict: "unsupported",
+      impact: { input: "purchasePrice", evidenceIndex: 0, omValue: price, altValue: price * 0.8, baseIrrPct: null, altIrrPct: null, baseMultiple: null, altMultiple: null, note: "" },
+      challenge: null,
+      method: "",
+    };
+    const rows = [basis, ...test.rows.map((r) => (r.impact ? { ...r, verdict: "holds" as const } : r))];
+    const t = { ...test, rows, headline: stressHeadline(rows, model)! };
+    const s = headlineSentence(t)!;
+    expect(s).toMatch(/^Levered IRR on the OM's figures [\d.]+%, with nothing past its evidence that the headline swaps, so the evidence moves nothing\. Left out: the price \(/);
+    expect(s).not.toContain("no figure the model takes is past its evidence");
+  });
+
+  it("marks a part struck against a rule of thumb alone in the headline's words (audit M7)", () => {
+    const debt = h.parts.find((p) => p.key === "debt");
+    expect(rowOf(test, "debt").ruleOfThumbOnly).toBe(true);
+    expect(debt?.ruleOfThumb).toBe(true);
+    const shownDebt = shownHeadline(h).parts.find((p) => p.key === "debt")!;
+    expect(headlineSentence(test)).toContain(`the loan rate ${ptsText(shownDebt.shown)} (against a screening default)`);
+    for (const p of h.parts.filter((x) => x.key !== "debt")) expect(p.ruleOfThumb, p.key).toBeUndefined();
   });
 
   it("names in the method every assumption the OM's case can hold", () => {
