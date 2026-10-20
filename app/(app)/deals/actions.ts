@@ -611,6 +611,18 @@ export async function createSampleDeal() {
     } catch {
       // pre-0011 schema — carry on
     }
+    // A sample seeded before 2026-10-20 carries the challenger paragraph
+    // that quoted the first-draft model's IRRs beside the stress test's own;
+    // the sample's paragraph is words alone now (lib/sample-deal).
+    try {
+      await supabase
+        .from("deals")
+        .update({ challenges: SAMPLE_DEAL.challenges })
+        .eq("id", existing.id)
+        .like("challenges->>stressTest", "%levered IRR falls to%");
+    } catch {
+      // best-effort, like the address backfill above
+    }
     await seedSampleActuals(existing.id as string);
     await seedSampleWork(existing.id as string);
     redirect(`/deals/${existing.id}`);
