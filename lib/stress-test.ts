@@ -109,6 +109,7 @@ import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, t
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
+import { readRoster } from "@/lib/tenant-roster";
 import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
@@ -2384,8 +2385,42 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
   // The headline is struck on the rows as finished: a row `finishRow` reads
   // stretched is swapped in the evidence's case.
-  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
+  const struck = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
+  const headline = struck ? { ...struck, untested: headlineUntested(built, ex, args.readOn) } : null;
   return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
+}
+
+/** The rows whose standing unchecked a headline names, since they carry the
+ *  deal's main risks: the price, the NOI and the debt. */
+export const HEADLINE_UNTESTED_KEYS: readonly StressKey[] = ["basis", "noi", "debt"];
+
+/** A tenant roster's worst year rolling this share of its listed rent (or
+ *  area) before the model's sale is named as untested by the headline — the
+ *  roster panel's own 25% (lib/tenant-roster `rosterModelLine`). */
+export const ROSTER_UNTESTED_PCT = 25;
+
+const MONTH_WORDS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * What the headline does not test (`StressHeadline.untested`): each of the
+ * price, NOI and debt rows that stands unchecked or was built for none, and
+ * a tenant roster's worst year before the model's sale where it rolls
+ * `ROSTER_UNTESTED_PCT` or more — read off the extraction on the read day
+ * (lib/tenant-roster `readRoster`, pure), its year ending that many years
+ * on. Null where nothing is named.
+ */
+function headlineUntested(built: Partial<Record<StressKey, StressRow>>, ex: ExtractionResult | null, readOn: string): StressHeadline["untested"] {
+  const keys = HEADLINE_UNTESTED_KEYS.filter((k) => !built[k] || built[k]!.verdict === "unchecked");
+  const asOf = new Date(`${readOn}T12:00:00Z`);
+  const roster = Number.isFinite(asOf.getTime()) ? readRoster(ex, asOf) : null;
+  const worst = roster?.worst ?? null;
+  let roll: NonNullable<StressHeadline["untested"]>["roll"] = null;
+  if (roster && worst && worst.sharePct >= ROSTER_UNTESTED_PCT) {
+    const end = new Date(asOf);
+    end.setUTCFullYear(end.getUTCFullYear() + worst.year);
+    roll = { sharePct: worst.sharePct, basis: roster.rollBasis, through: `${MONTH_WORDS[end.getUTCMonth()]} ${end.getUTCFullYear()}` };
+  }
+  return keys.length > 0 || roll ? { keys, roll } : null;
 }
 
 // ── The headline: the OM's case against the evidence's ───────────────────

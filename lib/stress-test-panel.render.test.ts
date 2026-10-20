@@ -512,6 +512,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).not.toContain("in neither case");
     const rest = visibleText(render({ ...TEST, headline: { ...headline, noiRest: { usd: 54_000, components: ["vacancy", "taxes"] } } })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(rest).toContain("Left out: the NOI. The rest of the NOI's gap ($54k a year) is in neither case. How the headline is struck");
+    // What the headline does not test, under its line, in words.
+    expect(hh).not.toContain('data-qa="stress-headline-untested"');
+    const un = render({ ...TEST, headline: { ...headline, untested: { keys: ["basis", "noi"], roll: { sharePct: 57, basis: "rent", through: "Oct 2028" } } } });
+    expect(un.indexOf('data-qa="stress-headline-untested"')).toBeGreaterThan(un.indexOf('data-qa="stress-headline-line"'));
+    expect(visibleText(un).replace(/&#x27;/g, "'")).toContain("This headline does not test the price, the NOI or the 57% of the listed rent rolling in the year to Oct 2028.");
     // With the re-runs withheld there is no headline, and the note says so.
     const w = visibleText(render({ ...WITHHELD, headline: null })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(w).toContain(HEADLINE_WITHHELD.replace(/&#x27;/g, "'"));

@@ -425,6 +425,22 @@ export function noiRestClause(h: StressHeadline): string {
   return `the ${joinAnd(names)} swap${many ? "s" : ""} move${many ? "" : "s"} the year-one NOI ${money(-r.usd)} a year past the NOI's own gap`;
 }
 
+/**
+ * What the headline does not test, where the deal's main risks are unchecked
+ * (`StressHeadline.untested`), one sentence: "This headline does not test
+ * the price, the NOI or the 57% of the listed rent rolling in the year to
+ * Oct 2028." "" where it names nothing, or carries no headline.
+ */
+export function untestedSentence(h: StressHeadline): string {
+  const u = h.untested;
+  if (!u) return "";
+  const items = u.keys.map(headlineName);
+  if (u.roll) items.push(`the ${Math.round(u.roll.sharePct)}% of the listed ${u.roll.basis} rolling in the year to ${u.roll.through}`);
+  if (items.length === 0) return "";
+  const said = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+  return `This headline does not test ${said}.`;
+}
+
 /** `noiRestClause` as a sentence; "" with none. */
 export function noiRestSentence(h: StressHeadline): string {
   const c = noiRestClause(h);
@@ -568,6 +584,8 @@ export function headlineSentence(test: StressTest): string | null {
           ? ", so the gap is not split."
           : ".";
   const unsolved = h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : "";
+  // What it does not test, where the deal's main risks are unchecked.
+  const untested = untestedSentence(h) ? ` ${untestedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
   // What the component swaps leave of the NOI's gap, where it is material.
   const rest = noiRestSentence(h);
@@ -575,7 +593,7 @@ export function headlineSentence(test: StressTest): string | null {
   const kept = keptSentence(test);
   const clause = modelClause(h);
   const model = kept ? ` ${kept}` : clause ? ` ${upperFirst(clause)}.` : "";
-  return `${line}${multiples}${split}${unsolved}${left}${rest ? ` ${rest}` : ""}${model}`;
+  return `${line}${multiples}${split}${unsolved}${untested}${left}${rest ? ` ${rest}` : ""}${model}`;
 }
 
 /** The rows in STRESS_KEYS' order, as the test holds them. */

@@ -218,6 +218,10 @@ describe("the sample's stress test, one build on every surface", () => {
     // the reset's $224k, $50k past the NOI row's own $174k gap over the
     // T-12: said, never swapped.
     expect(h.noiRest).toEqual({ usd: -50_468, components: ["taxes"] });
+    // The memorandum states no loan rate, so the debt row stands unchecked
+    // and the headline says it does not test it.
+    expect(h.untested).toEqual({ keys: ["debt"], roll: null });
+    expect(headlineSentence(page)).toContain(" This headline does not test the loan rate. ");
     expect(headlineSentence(page)).toContain(" The tax swap moves the year-one NOI $50k a year past the NOI's own gap. ");
     // With the read failed: the published rows unchecked, rent growth out of
     // both cases, and the vacancy held to the deal's own rent roll.

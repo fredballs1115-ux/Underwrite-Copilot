@@ -31,6 +31,8 @@ import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
   HEADLINE_NOI_REST_SHARE,
+  HEADLINE_UNTESTED_KEYS,
+  ROSTER_UNTESTED_PCT,
   INSURANCE_NO_QUOTE,
   INSURANCE_RERUN_NOTE,
   IRR_MOVE_STRETCH_BPS,
@@ -46,7 +48,8 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline } from "./stress-test-words";
+import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, untestedSentence } from "./stress-test-words";
+import { readRoster } from "./tenant-roster";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -1817,6 +1820,42 @@ describe("the headline", () => {
     expect(HEADLINE_NOI_REST_SHARE).toBe(0.01);
   });
 
+  it("names what it does not test where the price, the NOI or the debt is unchecked, or a roster rolls 25% in a year before the sale", () => {
+    // The apartment deal tests the NOI and the debt; its price stands
+    // unchecked (no comp carries a figure), so the price is named.
+    expect(rowOf(test, "basis").verdict).toBe("unchecked");
+    expect(["noi", "debt"].map((k) => rowOf(test, k as StressKey).verdict)).not.toContain("unchecked");
+    expect(h.untested).toEqual({ keys: ["basis"], roll: null });
+    expect(untestedSentence(h)).toBe("This headline does not test the price.");
+    expect(headlineSentence(test)).toContain(" This headline does not test the price.");
+    // With nothing named, nothing is said.
+    expect(untestedSentence({ ...h, untested: null })).toBe("");
+    // With no loan rate stated, the debt row stands unchecked and is named too.
+    const noRate = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => !/interest rate/i.test(m.label)) };
+    const bare = buildStressTest(apartmentArgs({ extraction: noRate }));
+    expect(rowOf(bare, "debt").verdict).toBe("unchecked");
+    expect(bare.headline!.untested).toEqual({ keys: ["basis", "debt"], roll: null });
+    expect(untestedSentence(bare.headline!)).toBe("This headline does not test the price or the loan rate.");
+    // A roster whose worst year before the sale rolls 25% or more of its
+    // listed rent is named with its share and the month that year ends.
+    const tenant = (name: string, rent: string, leaseExpiration: string) => ({ name, role: "inline", inSale: "yes", sf: "20,000 SF", rent, leaseExpiration, options: "", earlyTermination: "", rights: "", page: "p. 12" });
+    const rostered = { ...noRate, assetClass: "retail", tenants: [tenant("Grocer", "$600,000", "June 30, 2028"), tenant("Bank", "$400,000", "December 31, 2035")] } as unknown as ExtractionResult;
+    const roster = readRoster(rostered, new Date(`${READ_ON}T12:00:00Z`))!;
+    expect(roster.worst!.sharePct).toBeGreaterThanOrEqual(ROSTER_UNTESTED_PCT);
+    const rolled = buildStressTest(apartmentArgs({ extraction: rostered }));
+    const end = new Date(`${READ_ON}T12:00:00Z`);
+    end.setUTCFullYear(end.getUTCFullYear() + roster.worst!.year);
+    const through = `${end.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })} ${end.getUTCFullYear()}`;
+    expect(rolled.headline!.untested!.roll).toEqual({ sharePct: roster.worst!.sharePct, basis: "rent", through });
+    expect(untestedSentence(rolled.headline!)).toMatch(new RegExp(`^This headline does not test the price, the loan rate or the ${Math.round(roster.worst!.sharePct)}% of the listed rent rolling in the year to ${through}\\.$`));
+    // Three, joined with "or".
+    expect(untestedSentence({ ...h, untested: { keys: ["basis", "noi"], roll: { sharePct: 57.2, basis: "rent", through: "Oct 2028" } } })).toBe(
+      "This headline does not test the price, the NOI or the 57% of the listed rent rolling in the year to Oct 2028.",
+    );
+    expect(HEADLINE_UNTESTED_KEYS).toEqual(["basis", "noi", "debt"]);
+    expect(HEADLINE_METHOD.limits.join(" ")).toContain(`rolls ${ROSTER_UNTESTED_PCT}% or more of its listed rent in one year before the model's sale`);
+  });
+
   it("keeps the price at the ask in both cases, a reset tax bill struck on the ask, and names the price as left out", () => {
     const taxes = rowOf(test, "taxes");
     const reset = taxes.evidence[taxes.impact!.evidenceIndex];
@@ -1923,7 +1962,7 @@ describe("the headline", () => {
   it("says a case whose IRR does not solve in a clause of its own, never as a figure (audit M1)", () => {
     const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
     expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
-    expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\. Left out: /);
+    expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\.( This headline does not test [^.]*\.)? Left out: /);
     expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the model as it runs: ${h.modelIrrPct!.toFixed(1)}%).`);
     // The one-page memo's line leaves the model to its legend.
     expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);

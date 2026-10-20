@@ -18,6 +18,7 @@ import {
   rerunWords,
   shownHeadline,
   unsolvedSentence,
+  untestedSentence,
   type ShownPart,
 } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
@@ -708,6 +709,13 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
       <p className={`${MEASURE} text-base font-semibold leading-snug tabular-nums text-ink`} data-qa="stress-headline-line">
         {line}
       </p>
+      {/* What the headline does not test, where the deal's main risks are
+          unchecked: said under the line, in the caution tone. */}
+      {untestedSentence(h) && (
+        <p className={`mt-1 ${MEASURE} text-xs font-medium leading-relaxed text-caution`} data-qa="stress-headline-untested">
+          {untestedSentence(h)}
+        </p>
+      )}
       {kept && (
         <p className={`mt-1 ${MEASURE} text-xs leading-relaxed text-ink/85`} data-qa="stress-headline-kept">
           {kept}

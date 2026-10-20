@@ -214,6 +214,23 @@ export interface StressHeadline {
    *  Null where the NOI is not left out for them, or where it is within
    *  1% of the OM's NOI; absent on a headline struck before it was carried. */
   noiRest?: { usd: number; components: StressKey[] } | null;
+  /** what the headline does not test, where the deal's main risks are
+   *  unchecked: the price, NOI and debt rows that stand unchecked (or that
+   *  no row could be built for), and a tenant roster's worst year before the
+   *  model's sale where it rolls 25% or more (lib/tenant-roster
+   *  `readRoster`). Null where nothing is named; absent on a headline struck
+   *  before it was carried. */
+  untested?: StressUntested | null;
+}
+
+/** What a headline does not test (`StressHeadline.untested`). */
+export interface StressUntested {
+  /** of "basis", "noi" and "debt", in STRESS_KEYS' order */
+  keys: StressKey[];
+  /** the roster's worst year before the model's sale, where it rolls 25% or
+   *  more: its share, what the share is of (the listed rent, else the listed
+   *  area), and the month that year ends ("Oct 2028") */
+  roll: { sharePct: number; basis: "rent" | "area"; through: string } | null;
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -308,6 +325,7 @@ export const HEADLINE_METHOD = {
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
     "Neither case is a forecast: each is the model run once on one set of figures.",
+    "Where the price, the NOI or the debt row stands unchecked, or a tenant roster rolls 25% or more of its listed rent in one year before the model's sale, the headline names what it does not test.",
   ],
 } as const;
 
