@@ -946,7 +946,9 @@ function debtRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "published",
       label: "10-year Treasury, as the market check read it",
-      text: `${pct2(ten.value)} (${ten.asOf})`,
+      // Dated as the other published lines are (a daily series, its day in
+      // words, the index line's own `datedLong`), never a raw ISO day.
+      text: `${pct2(ten.value)} (FRED, ${datedLong(ten.asOf)})`,
       value: null,
       asOf: ten.asOf,
       publisher: "FRED",

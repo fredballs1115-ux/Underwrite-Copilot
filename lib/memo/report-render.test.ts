@@ -2940,7 +2940,7 @@ describe("the report's stress-test page", () => {
     const withStored = {
       ...test,
       rows: test.rows.map((r, i) =>
-        i === 0 ? { ...r, evidence: [...r.evidence, { kind: "published" as const, label: "10-year Treasury, as the market check read it", text: "4.94% (2026-09-17)", value: null, asOf: "2026-09-17", publisher: "FRED", scope: "nation" as const }] } : r,
+        i === 0 ? { ...r, evidence: [...r.evidence, { kind: "published" as const, label: "10-year Treasury, as the market check read it", text: "4.94% (FRED, Sep 17, 2026)", value: null, asOf: "2026-09-17", publisher: "FRED", scope: "nation" as const }] } : r,
       ),
     };
     const storedPages = pdfPageTextsOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], sensitivity, ...between, withStored))).map((p) => p.replace(/\s+/g, " "));

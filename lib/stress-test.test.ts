@@ -332,6 +332,8 @@ describe("a stabilized apartment deal with a T-12", () => {
       "Lender tests at screening defaults, the binding one named",
       "Negative leverage: the model's going-in cap against the loan's rate",
     ]);
+    // The 10-year dated as the other published lines are, never a raw ISO day.
+    expect(d.evidence[2].text).toBe("4.94% (FRED, Sep 17, 2026)");
     // The model's own arithmetic, never "the OM against itself", said as
     // what it is: a cap under the rate lowers the year-one cash yield.
     expect(d.evidence[4]).toMatchObject({ kind: "rule_of_thumb", publisher: "the model's own figures" });
