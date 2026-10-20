@@ -5,6 +5,9 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+// The one reader of the site's origin (a blank setting is unset, never a
+// localhost link sent to Stripe or a teammate).
+import { appUrl } from "@/lib/app-url";
 import { getStripe } from "@/lib/stripe/client";
 import { isStaleCustomer, stripeErrorCode } from "@/lib/stripe/diagnose";
 import { getTeam, revokeSharesOfDepartingMember } from "@/lib/teams";
@@ -14,10 +17,6 @@ import {
   proToTeamItems,
   teamToProItems,
 } from "@/lib/stripe/team-billing";
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-}
 
 /** Create a team and make the caller its owner (atomic, via the DB RPC). */
 export async function createTeam(formData: FormData) {

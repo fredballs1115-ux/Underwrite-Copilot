@@ -21,7 +21,16 @@ describe("the site's own origin for the links it sends", () => {
   });
 
   it("is the one reader the emails and the sign-in links use", () => {
-    for (const file of ["lib/email.ts", "lib/digest.ts", "app/login/actions.ts"]) {
+    // Stripe's return links and a team's invite links too: they had fallen
+    // back to http://localhost:3000 (the first-run audit of 2026-10-20).
+    for (const file of [
+      "lib/email.ts",
+      "lib/digest.ts",
+      "app/login/actions.ts",
+      "app/(app)/billing/actions.ts",
+      "app/(app)/team/actions.ts",
+      "app/(app)/team/page.tsx",
+    ]) {
       const src = readFileSync(join(process.cwd(), file), "utf8");
       expect(src, file).toMatch(/from "@\/lib\/app-url"/);
       expect(src, file).not.toMatch(/process\.env\.NEXT_PUBLIC_APP_URL/);

@@ -428,7 +428,12 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     // In-process: the action's caller rides in the run's own arguments.
     await runAnalysis("d1", { requestedBy: ASKER.toUpperCase() });
     expect(job().status).toBe("done");
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: ASKER }]);
+    // The email is handed the stress test the verdict's brief was, built
+    // once (nothing is stored on the verdict): its counts lead the email.
+    const handed = vi.mocked(notifyAnalysisReady).mock.calls[0]?.[2]?.stressTest;
+    expect(handed).toBeTruthy();
+    expect(handed).toBe(vi.mocked(synthesizeVerdict).mock.calls.at(-1)?.[0].stressTest);
 
     state = freshState();
     vi.mocked(extractTerms).mockImplementation(async () => {
@@ -444,7 +449,7 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     state.jobs[0].payload = { kind: "screen", requestedBy: ASKER, completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
     vi.mocked(notifyAnalysisReady).mockClear();
     await runAnalysis("d1", { resume: true });
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: ASKER }]);
 
     // A checkpoint written from a payload that had none keeps the run's own.
     state = freshState();
@@ -456,7 +461,7 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     state = freshState();
     vi.mocked(notifyAnalysisReady).mockClear();
     await runAnalysis("d1");
-    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: null }]);
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toMatchObject(["d1", { requestedBy: null }]);
   });
 
   it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {
@@ -2740,5 +2745,52 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     expect(input.stressTest?.impactsWithheld).toBe("No model was derived for this deal, so no return is re-run.");
     const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
     expect(buildBrief(input)).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone");
+  });
+});
+
+describe("runAnalysis — a restart mid-screen (the first-run audit of 2026-10-20)", () => {
+  afterEach(async () => {
+    const { resetInProcessRunsForTest } = await import("@/lib/in-process-runs");
+    resetInProcessRunsForTest();
+  });
+
+  it("the stop handler marks the run failed at once, and the run never writes 'running' over it", async () => {
+    const { RESTART_MESSAGES, inProcessRuns, markInterruptedRuns } = await import("@/lib/in-process-runs");
+    let heldDuring: string[] = [];
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      heldDuring = [...inProcessRuns().keys()];
+      // The signal arrives mid-step: the handler writes the row as the
+      // database write does (only a live row is touched).
+      await markInterruptedRuns(async (rows) => {
+        for (const { dealId, message } of rows) {
+          const j = state.jobs.find((r) => r.deal_id === dealId);
+          if (j && (j.status === "queued" || j.status === "running")) Object.assign(j, { status: "error", error: message });
+        }
+      });
+      return EXTRACTION;
+    });
+    await runAnalysis("d1");
+    expect(heldDuring).toEqual(["d1"]);
+    expect(job().status).toBe("error");
+    expect(job().error).toBe(RESTART_MESSAGES.screen);
+    // In-process runs keep no checkpoints, so the sentence promises no resume.
+    expect(job().error).not.toMatch(/resume|picks up/i);
+    // The run stopped at its next step boundary: no later step ran.
+    expect(challengeAssumptions).not.toHaveBeenCalled();
+    expect(synthesizeVerdict).not.toHaveBeenCalled();
+    // And the process lets go of it.
+    expect(inProcessRuns().size).toBe(0);
+  });
+
+  it("a worker attempt (resumed) is not held: the worker handles its own signals", async () => {
+    const { inProcessRuns } = await import("@/lib/in-process-runs");
+    let held = -1;
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      held = inProcessRuns().size;
+      return EXTRACTION;
+    });
+    await runAnalysis("d1", { resume: true });
+    expect(held).toBe(0);
+    expect(job().status).toBe("done");
   });
 });

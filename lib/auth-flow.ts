@@ -67,18 +67,21 @@ const GENERIC: Record<AuthIntent, string> = {
 
 /** What the page says once an account is created and waits for its
  *  confirmation link: the address it went to, so a mistyped one is seen
- *  (the form keeps it, to correct and send again), and that the link
- *  signs the person in only in this browser — the sign-up's code verifier
- *  lives in its cookies (research pass 32). */
+ *  (the form keeps it, to correct and send again), and what the link does
+ *  where: opened on any device it confirms the address (the auth service
+ *  does that before it redirects), and only in this browser does it sign
+ *  the person in too — the sign-up's code verifier lives in its cookies
+ *  (research pass 32; the first-run audit of 2026-10-20 found the old words
+ *  said the confirmation itself needed this browser). */
 export function accountCreatedNotice(email: string): string {
-  return `Account created. We sent a confirmation link to ${email} — open it in this browser to confirm your email and sign in. Not your address? Correct it and create the account again.`;
+  return `Account created. We sent a confirmation link to ${email}. Open it on any device to confirm your email; open it in this browser and you're signed in too. Not your address? Correct it and create the account again.`;
 }
 
 /** What the page says once a fresh confirmation link is asked for. The auth
  *  service answers alike for an address waiting to be confirmed, one already
  *  confirmed and one it has never seen, so the page does too. */
 export const CONFIRMATION_RESENT =
-  "If that address is waiting to be confirmed, a fresh link is on its way. Open it in this browser — it confirms your email and signs you in.";
+  "If that address is waiting to be confirmed, a fresh link is on its way. Open it on any device to confirm your email; open it in this browser and you're signed in too.";
 
 /**
  * Whether an auth failure means the address was never confirmed — the
@@ -367,7 +370,23 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
     const tail = onward ? `&next=${encodeURIComponent(onward)}` : "";
     return hadCode ? `/login?confirmed=1${tail}` : `/login?confirmed=1&link=expired${tail}`;
   }
+  // A code whose link says neither that it confirmed an address nor that it
+  // was a reset — a confirmation that fell back to the Site URL and was
+  // opened on another device, say. The address may well be confirmed, so the
+  // page says both possibilities and opens on Sign in, never on the reset
+  // form (the first-run audit of 2026-10-20).
+  if (hadCode && !isResetLanding(safe)) return `/login?link=${LINK_UNSURE}`;
   return "/login?link=expired";
+}
+
+/** The `link` marker for a code the callback could not exchange and whose
+ *  kind it cannot tell. */
+export const LINK_UNSURE = "unsure";
+
+/** The page a reset link is sent to (`resetPasswordForEmail`'s redirect,
+ *  `/account?reset=1`). */
+function isResetLanding(path: string): boolean {
+  return /^\/account(?:\?|$)/.test(path) && /[?&]reset=1(?:&|$)/.test(path);
 }
 
 /**
@@ -483,6 +502,8 @@ export const CONFIRM_LINK_FAILED =
 export const RESET_LINK_FAILED =
   "That reset link has expired, was already used, or was opened in a different browser than the one you asked from. Request a fresh one below and open it in this browser.";
 export const EMAIL_CONFIRMED = "Email confirmed — sign in below and your pipeline is ready.";
+export const LINK_UNSURE_TEXT =
+  "That link couldn't sign you in on this device. If it confirmed your email, sign in below; if it was a password reset, request a new one.";
 
 /**
  * The banner the sign-in page shows for the link that brought someone here.
@@ -502,6 +523,11 @@ export function authLinkBanner(params: {
     !!params.error_code ||
     !!params.error_description ||
     params.error === "access_denied";
+  // A code the callback could not exchange and whose kind it cannot tell
+  // (`landingAfterFailedExchange`): neither "expired" nor "confirmed".
+  if (params.link === LINK_UNSURE && !params.confirmed && !params.error_code && !params.error_description) {
+    return { tone: "warn", text: LINK_UNSURE_TEXT };
+  }
   if (refused) {
     return { tone: "warn", text: params.confirmed ? CONFIRM_LINK_FAILED : RESET_LINK_FAILED };
   }

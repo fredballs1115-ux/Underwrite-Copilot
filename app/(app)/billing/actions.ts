@@ -5,10 +5,9 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { getStripe } from "@/lib/stripe/client";
 import { isStaleCustomer, stripeErrorCode } from "@/lib/stripe/diagnose";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-}
+// The one reader of the site's origin (a blank setting is unset, never a
+// localhost link sent to Stripe or a teammate).
+import { appUrl } from "@/lib/app-url";
 
 /** Start a Stripe Checkout for the Pro subscription, then redirect to Stripe. */
 export async function startCheckout() {

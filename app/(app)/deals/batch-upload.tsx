@@ -13,12 +13,20 @@ import { DEAL_NAME_MAX, nameFromFile } from "@/lib/deal-name";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 // The run itself, pure (lib/batch-run): each answer's status, what the
 // button sends again, and the plan's limit said once with a link.
-import { BATCH_MAX_FILES, capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
+import {
+  batchMaxFiles,
+  batchOffered,
+  batchOverflowNote,
+  batchSummary,
+  capNotice,
+  runBatch,
+  runLabel,
+  type BatchStatus,
+} from "@/lib/batch-run";
 import type { BuyBoxCoverage } from "@/lib/criteria";
 import { checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 import { markFirstRead } from "@/lib/first-read";
 
-const MAX_FILES = BATCH_MAX_FILES;
 const MAX_BYTES = 32 * 1024 * 1024;
 
 interface Item {
@@ -79,9 +87,15 @@ export function triageChip(t: Triage | undefined): { label: string; cls: string;
  */
 export function BatchUpload({
   submit = createDealFromBatch,
+  left = null,
 }: {
   submit?: (formData: FormData) => Promise<CreateDealResult>;
+  /** the free deals the reader has left (lib/deal-allowance `left`), or
+   *  null where no cap applies: the batch takes no more than that, and says
+   *  no more (lib/batch-run `batchMaxFiles`) */
+  left?: number | null;
 }) {
+  const MAX_FILES = batchMaxFiles(left);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -101,7 +115,7 @@ export function BatchUpload({
     const problems: string[] = [];
     for (const file of Array.from(list)) {
       if (next.length >= MAX_FILES) {
-        problems.push(`Up to ${MAX_FILES} OMs per batch — extra files were left out.`);
+        problems.push(batchOverflowNote(MAX_FILES, left));
         break;
       }
       const looksPdf =
@@ -226,10 +240,15 @@ export function BatchUpload({
   const label = runLabel(statuses, running, finished);
   const cap = capNotice(statuses);
 
+  // Under two free deals left the single upload is the way: no batch is
+  // offered — but one already under way keeps its rows as the page
+  // refreshes the count behind it.
+  if (!batchOffered(MAX_FILES) && items.length === 0) return null;
+
   return (
     <details className="group mt-3 border-t border-line pt-3" data-qa="batch-upload">
       <summary className="cursor-pointer list-none text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden">
-        Call-for-offers day? Batch-upload up to {MAX_FILES} OMs →
+        {batchSummary(MAX_FILES)}
       </summary>
       <div className="mt-3 space-y-3">
         {/* The sort's own name (the pipeline's "Sort deals" select): there

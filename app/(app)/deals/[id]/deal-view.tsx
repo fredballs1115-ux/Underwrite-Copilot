@@ -82,6 +82,7 @@ import { interestOf } from "@/lib/interest";
 import { sampleExportsFree } from "@/lib/sample-exports";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
+import { EMAIL_WHEN_DONE } from "@/lib/screen-email-promise";
 import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
@@ -187,6 +188,9 @@ const MODEL_ERRORS: Record<string, string> = {
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: `That file is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit — save a smaller copy (a PDF compressed, a spreadsheet without its pictures) and upload that. Nothing was saved.`,
+  // A document's storage upload or its record failed (model-actions
+  // `addDealDocument`): nothing was added.
+  docupload: "That file didn’t finish uploading — nothing was added to the deal. Please try again.",
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   docformat:
@@ -294,6 +298,7 @@ export function DealView({
   job: initialJob,
   typicalScreen = null,
   typicalScreenMs = null,
+  emailWhenDone = false,
   results,
   supplements,
   model,
@@ -358,6 +363,10 @@ export function DealView({
    *  than usual (lib/screen-duration `longerThanUsual`); null with no
    *  measured median, and then it says nothing of the kind */
   typicalScreenMs?: number | null;
+  /** the screen-complete email will go to this reader (email sending, their
+   *  switch on, the run theirs — lib/screen-email-promise): the rail says
+   *  so, and never otherwise */
+  emailWhenDone?: boolean;
   results: Results;
   /** results the latest screen has not rewritten — a failed run never
    *  reached them, or a running one has not yet — so they belong to the
@@ -740,7 +749,12 @@ export function DealView({
     <div className="flex flex-col gap-5">
       {live && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} typicalScreen={typicalScreen} typicalScreenMs={typicalScreenMs} />
+          <ProgressRail
+            job={job!}
+            typicalScreen={typicalScreen}
+            typicalScreenMs={typicalScreenMs}
+            emailWhenDone={emailWhenDone}
+          />
           <NotifyOffer />
         </div>
       )}
@@ -837,12 +851,7 @@ export function DealView({
         {section === "overview" && (
           <div className="flex flex-col gap-6">
             {isSample && <SampleGuide onNavigate={navigateLegacy} />}
-            {screenDiff && <SinceLastScreen diff={screenDiff} />}
-            {discrepancies && discrepancies.discrepancies.length > 0 && (
-              <ReconciliationPanel dealId={dealId} result={discrepancies} />
-            )}
             {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
-            <PropertyActuals data={actuals} />
             <OverviewView
               results={results}
               active={live}
@@ -852,35 +861,44 @@ export function DealView({
               staleWhy={staleWhy}
               stopped={stopped != null}
               stressTest={stressTest}
-              // Feature 1: prompt for the actuals docs, directly under the
-              // stress test whose rows they turn into tests. Hidden while a
-              // screen runs, on the sample, and once both docs are folded in.
-              afterStress={(() => {
-                if (live || isSample || !hasOm) return null;
-                const slot = (
-                  kind: "rent_roll" | "t12",
-                  stored: boolean,
-                ): ActualsSlotState =>
-                  stored
-                    ? "done"
-                    : documents.some((d) => d.kind === kind)
-                      ? "uploaded"
-                      : "missing";
-                const rrState = slot("rent_roll", !!actuals.rentRoll);
-                const t12State = slot("t12", !!actuals.t12);
-                if (rrState === "done" && t12State === "done") return null;
-                return (
-                  <ActualsPrompt
-                    dealId={dealId}
-                    rentRoll={rrState}
-                    t12={t12State}
-                    // The reader's own model, offered where the Reconciler
-                    // takes one: not while a run of any kind is in flight.
-                    onReconcile={active ? null : () => navigateLegacy("reconciler")}
-                  />
-                );
-              })()}
+              // Under the call and the stress test, never above them (the
+              // first-run audit of 2026-10-20: after a re-screen with actuals
+              // the diff and the reconciliation had opened the page): first
+              // the prompt for the actuals docs, directly under the stress
+              // test whose rows they turn into tests — hidden while a screen
+              // runs, on the sample, and once both docs are folded in — then
+              // what changed since the last screen, then the documents'
+              // reconciliation.
+              afterStress={
+                <>
+                  {(() => {
+                    if (live || isSample || !hasOm) return null;
+                    const slot = (kind: "rent_roll" | "t12", stored: boolean): ActualsSlotState =>
+                      stored ? "done" : documents.some((d) => d.kind === kind) ? "uploaded" : "missing";
+                    const rrState = slot("rent_roll", !!actuals.rentRoll);
+                    const t12State = slot("t12", !!actuals.t12);
+                    if (rrState === "done" && t12State === "done") return null;
+                    return (
+                      <ActualsPrompt
+                        dealId={dealId}
+                        rentRoll={rrState}
+                        t12={t12State}
+                        // The reader's own model, offered where the Reconciler
+                        // takes one: not while a run of any kind is in flight.
+                        onReconcile={active ? null : () => navigateLegacy("reconciler")}
+                      />
+                    );
+                  })()}
+                  {screenDiff && <SinceLastScreen diff={screenDiff} />}
+                  {discrepancies && discrepancies.discrepancies.length > 0 && (
+                    <ReconciliationPanel dealId={dealId} result={discrepancies} />
+                  )}
+                </>
+              }
             />
+            {/* The property's own figures, after the call and its test, as
+                /demo and the homepage's walkthrough draw them. */}
+            <PropertyActuals data={actuals} />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
               <DealTasks
@@ -1510,7 +1528,7 @@ function DocumentsPanel({
           typedFacts: !!manualFacts,
           documents,
           sampleActuals: isSample ? actuals : null,
-          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing" },
+          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing?upsell=memo" },
         }}
         omPicture={<DealAvatar dealId={dealId} size="md" />}
         omActions={
@@ -1819,6 +1837,7 @@ function ProgressRail({
   job,
   typicalScreen = null,
   typicalScreenMs = null,
+  emailWhenDone = false,
 }: {
   job: NonNullable<Job>;
   /** the reader's own screens' measured median, said — or null, and no
@@ -1826,6 +1845,9 @@ function ProgressRail({
   typicalScreen?: string | null;
   /** the same median in ms (lib/screen-duration `longerThanUsual`) */
   typicalScreenMs?: number | null;
+  /** the screen-complete email will reach this reader
+   *  (lib/screen-email-promise) */
+  emailWhenDone?: boolean;
 }) {
   const { label: elapsed, ms: elapsedMs } = useElapsed(job.created_at);
   // Past twice the reader's own measured median — never a duration nobody
@@ -1915,6 +1937,11 @@ function ProgressRail({
           {typicalScreen
             ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
             : "Finished sections open as they land, so feel free to explore them meanwhile."}
+        </p>
+      )}
+      {emailWhenDone && (
+        <p className="mt-1 text-xs text-muted" data-qa="email-when-done">
+          {EMAIL_WHEN_DONE}
         </p>
       )}
     </div>

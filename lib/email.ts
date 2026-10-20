@@ -16,6 +16,9 @@ import { emailPictureUrl } from "@/lib/email-picture";
 import { appUrl } from "@/lib/app-url";
 import { emailEnabled, occasionKey, sendEmail } from "@/lib/email-send";
 import { requesterOf } from "@/lib/jobs";
+import { headlineShort, verdictCounts } from "@/lib/stress-test-words";
+import type { StressTest } from "@/lib/stress-test-types";
+import { stressChipLine } from "@/app/(app)/deals/[id]/stress-chip";
 
 /**
  * The screen emails — the screen-complete one and the screen-stopped one —
@@ -71,6 +74,25 @@ export async function wantsAnalysisEmail(admin: SupabaseClient, userId: string):
  *  run recorded one (lib/jobs `requesterOf`). */
 export interface ScreenEmailOptions {
   requestedBy?: string | null;
+  /** the stress test the verdict's brief was handed (lib/anthropic/pipeline
+   *  `screenStressTest`), for the screen-complete email's counts: nothing
+   *  is stored on the verdict, so the email says it only where the run
+   *  hands it over, and leaves it out otherwise, never rebuilt here */
+  stressTest?: StressTest | null;
+}
+
+/**
+ * The screen-complete email's stress-test lines: the deal header's chip
+ * words for the counts (`stressChipLine` over `verdictCounts`, so the email
+ * and the page say them alike) and the headline's one short line where the
+ * test carries one (`headlineShort`). Null with no test, or a test no row
+ * of which was struck.
+ */
+export function emailStress(test: StressTest | null | undefined): { counts: string; headline: string | null } | null {
+  if (!test || test.rows.length === 0) return null;
+  const line = stressChipLine(verdictCounts(test));
+  if (!line) return null;
+  return { counts: line.replace(/^Stress test: /, ""), headline: headlineShort(test) };
 }
 
 /**
@@ -161,10 +183,11 @@ export async function notifyAnalysisReady(
     // source — the extraction, the first signal, the address the page reads
     // — and the same fold, the mandate-fit score leading, so the email's
     // chip never disagrees with the page it links to. The page shows no chip
-    // without a box; the email says so. A box the email could not read says
-    // that, never "unverified" — the chip's word for a deal its facts could
-    // not judge, a claim about the deal — nor "no buy box set".
-    let buyBoxLabel = BUY_BOX_NOT_READ;
+    // without a box, and neither does the email. A box the email could not
+    // read says that, never "unverified" — the chip's word for a deal its
+    // facts could not judge, a claim about the deal — and is never left out
+    // as if there were none.
+    let buyBoxLabel: string | null = BUY_BOX_NOT_READ;
     try {
       const box = await getBuyBoxForDeal(
         deal.user_id as string,
@@ -184,7 +207,9 @@ export async function notifyAnalysisReady(
           box,
         ).chip.label;
       } else {
-        buyBoxLabel = "No buy box set";
+        // No box at all: the line is left out (the first-run audit of
+        // 2026-10-20 — "Buy box: No buy box set" told a new reader nothing).
+        buyBoxLabel = null;
       }
     } catch {
       // the box was not read: the label says so
@@ -226,6 +251,7 @@ export async function notifyAnalysisReady(
       verdictLabel: v.label,
       verdictColor: v.color,
       buyBoxLabel,
+      stress: emailStress(opts.stressTest),
       figures,
       reason: verdict.reason ?? "",
       dealUrl: `${appUrl()}/deals/${dealId}`,

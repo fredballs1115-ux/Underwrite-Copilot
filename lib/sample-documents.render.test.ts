@@ -9,7 +9,7 @@
 // T-12, with the demo mandate as the reader's buy box — and the two PDFs
 // are read back as text (lib/memo/pdf-text-of) and held equal.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { pdfTextOf } from "@/lib/memo/pdf-text-of";
+import { pdfPageTextsOf } from "@/lib/memo/pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 
 vi.mock("next/headers", () => ({
@@ -100,7 +100,11 @@ const req = new Request("https://example.test/api/deals/sample-1/x");
 async function textOf(res: Response): Promise<string> {
   expect(res.status).toBe(200);
   expect(res.headers.get("content-type")).toBe("application/pdf");
-  return pdfTextOf(Buffer.from(await res.arrayBuffer()));
+  // Page by page, in the page tree's order: a whole-document read follows the
+  // order the objects were written in, which can differ between two renders
+  // of the same pages (an image or a font settling first), and read two equal
+  // reports as unequal.
+  return pdfPageTextsOf(Buffer.from(await res.arrayBuffer())).join("\n\f\n");
 }
 
 describe("the sample's public documents render as the signed-in sample's", () => {

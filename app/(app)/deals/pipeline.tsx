@@ -1018,7 +1018,12 @@ export function Pipeline({
       )}
 
       {showForm && !atLimit && (
-        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} viewerId={viewerId} />
+        <NewDealForm
+          errorMessage={errorMessage}
+          prefill={prefillAddress ?? null}
+          viewerId={viewerId}
+          dealsLeft={allowance?.left ?? null}
+        />
       )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
@@ -2560,11 +2565,15 @@ function NewDealForm({
   errorMessage,
   prefill,
   viewerId,
+  dealsLeft = null,
 }: {
   errorMessage: string | null;
   prefill?: StructuredAddress | null;
   /** the signed-in reader, whose own the unsent draft is */
   viewerId?: string | null;
+  /** the free deals left before a plan is needed (lib/deal-allowance), or
+   *  null where nothing caps them: the batch upload takes no more */
+  dealsLeft?: number | null;
 }) {
   const draftKey = draftKeyFor(viewerId);
   const router = useRouter();
@@ -2872,7 +2881,7 @@ function NewDealForm({
           Create &amp; screen
         </PendingButton>
       </form>
-      <BatchUpload />
+      <BatchUpload left={dealsLeft} />
         </>
       )}
       <form action={createSampleDeal} className="mt-3 border-t border-line pt-3">

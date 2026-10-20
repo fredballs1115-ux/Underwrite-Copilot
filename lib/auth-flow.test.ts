@@ -9,6 +9,7 @@ import {
   CONFIRMATION_RESENT,
   CONFIRM_LINK_FAILED,
   EMAIL_CONFIRMED,
+  LINK_UNSURE_TEXT,
   RESET_LINK_FAILED,
   SIGNED_OUT,
   authErrorCopy,
@@ -311,9 +312,28 @@ describe("landingAfterFailedExchange — where a refused link goes", () => {
       const landed = landingAfterFailedExchange(carried, true);
       // Never carried on. (A path whose own characters fail the rule — the
       // bare parentheses of "javascript:alert(1)" — is refused whole, and
-      // lands on the plain expired-link page.)
-      expect(landed, JSON.stringify(n)).toMatch(/^\/login\?(confirmed=1|link=expired)$/);
+      // lands on the neutral banner, since nothing then says what the link
+      // was.)
+      expect(landed, JSON.stringify(n)).toMatch(/^\/login\?(confirmed=1|link=unsure)$/);
     }
+  });
+
+  it("a code whose link names neither a confirmation nor a reset gets the neutral banner, never the reset form", () => {
+    // A confirmation that fell back to the Site URL and was opened on another
+    // device: the code fails, and nothing says it was a reset.
+    for (const next of [null, "/", "/deals"]) {
+      const landed = landingAfterFailedExchange(next, true);
+      expect(landed, String(next)).toBe("/login?link=unsure");
+      const q = Object.fromEntries(new URL(landed, "https://app.test").searchParams);
+      expect(authLinkBanner(q)).toEqual({ tone: "warn", text: LINK_UNSURE_TEXT });
+      expect(initialLoginMode(q)).toBe("signin");
+    }
+    expect(LINK_UNSURE_TEXT).toMatch(/If it confirmed your email, sign in below/);
+    // A known reset still reads as the reset that failed, and a link the
+    // service refused outright (no code) as a refusal.
+    expect(landingAfterFailedExchange("/account?reset=1", true)).toBe("/login?link=expired");
+    expect(landingAfterFailedExchange("/deals", false)).toBe("/login?link=expired");
+    expect(authLinkBanner({ link: "unsure", error_code: "otp_expired" })).toEqual({ tone: "warn", text: RESET_LINK_FAILED });
   });
 });
 

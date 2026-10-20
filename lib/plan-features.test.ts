@@ -61,6 +61,12 @@ describe("the Pro card names every gate in the code, and only those", () => {
     expect(UPSELLS.filter((k) => !sent.has(k)), "a key no refusal sends any more").toEqual([]);
   });
 
+  it("a gate's link to the plans names its gate, so the billing page says what it unlocks (the first-run audit of 2026-10-20)", () => {
+    // The Documents tab's memo link had gone to a bare /billing.
+    for (const f of APP) expect(read(f), f).not.toMatch(/upsell:\s*["'`]\/billing["'`]/);
+    expect(read("app/(app)/deals/[id]/deal-view.tsx")).toContain('{ upsell: "/billing?upsell=memo" }');
+  });
+
   it("every file that asks isPro is a gate on the list — a new one fails until the card names it", () => {
     const callers = APP.filter((f) => /\bisPro\(/.test(read(f))).sort();
     expect(callers).toEqual(Object.keys(IS_PRO_CALLERS).sort());

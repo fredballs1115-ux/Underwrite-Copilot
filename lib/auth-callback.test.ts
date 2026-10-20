@@ -100,7 +100,12 @@ describe("GET /auth/callback", () => {
     exchange = async () => {
       throw new Error("socket hang up");
     };
-    expect(await land("https://app.test/auth/callback?code=abc")).toBe("/login?link=expired");
+    // A link that names no destination could have been either kind, so the
+    // page says both (the neutral banner); a reset's still reads as a reset.
+    expect(await land("https://app.test/auth/callback?code=abc")).toBe("/login?link=unsure");
+    expect(await land("https://app.test/auth/callback?code=abc&next=%2Faccount%3Freset%3D1")).toBe(
+      "/login?link=expired",
+    );
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("socket hang up"));
   });
 

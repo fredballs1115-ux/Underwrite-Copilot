@@ -17,8 +17,15 @@ export interface AnalysisReadyEmailInput {
    *  set", or lib/email's line for a box it could not read. Drawn after
    *  "Buy box:", as the plain-text part has always said it: beside the
    *  call's pill, a bare "Fit 82 · Pursue" read as a second call ("No-go
-   *  Fit 82 · Pursue"). */
-  buyBoxLabel: string;
+   *  Fit 82 · Pursue"). Null where the account has no buy box: the line is
+   *  left out, since "Buy box: No buy box set" told a new reader nothing
+   *  (the first-run audit of 2026-10-20). */
+  buyBoxLabel: string | null;
+  /** the stress test the call was reached on (lib/stress-test-words): its
+   *  counts, and the headline's one short line where it has one. Drawn
+   *  right after the call, as the memo draws its block after the verdict
+   *  box; null where the screen built none, and then nothing is said. */
+  stress?: { counts: string; headline: string | null } | null;
   /** one-line verdict reason ("" to omit) */
   reason: string;
   dealUrl: string;
@@ -183,7 +190,9 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
     ``,
     figuresLine(input.figures),
     `Verdict: ${input.verdictLabel}`,
-    `Buy box: ${input.buyBoxLabel}`,
+    input.stress ? `Stress test: ${input.stress.counts}` : null,
+    input.stress?.headline ?? null,
+    input.buyBoxLabel ? `Buy box: ${input.buyBoxLabel}` : null,
     input.reason ? `Why: ${input.reason}` : null,
     ``,
     `Open the deal: ${input.dealUrl}`,
@@ -193,8 +202,24 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
     .filter((l): l is string => l !== null)
     .join("\n");
 
-  // The call first, then why, then the box — what an inbox's preview shows.
-  const preheader = `${input.verdictLabel}${input.reason ? ` — ${input.reason}` : "."} Buy box: ${input.buyBoxLabel}.`;
+  // The call first, then why, then the stress test's counts, then the box —
+  // what an inbox's preview shows.
+  const preheader = [
+    `${input.verdictLabel}${input.reason ? ` — ${input.reason}` : "."}`,
+    input.stress ? `Stress test: ${input.stress.counts}.` : null,
+    input.buyBoxLabel ? `Buy box: ${input.buyBoxLabel}.` : null,
+  ]
+    .filter((p): p is string => !!p)
+    .join(" ");
+
+  const stressBlock = input.stress
+    ? `<p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#5f6b69;" data-qa="email-stress">The stress test, struck in code: <span style="color:#18211f;font-weight:600;">${esc(input.stress.counts)}</span></p>${
+        input.stress.headline
+          ? `
+            <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#18211f;">${esc(input.stress.headline)}</p>`
+          : ""
+      }`
+    : "";
 
   const pictureRow = bannerRow(input.picture, input.dealUrl, input.dealName);
 
@@ -211,12 +236,17 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
               <tr>
                 <td style="background-color:${esc(input.verdictColor)};border-radius:999px;padding:5px 14px;">
                   <span style="color:#ffffff;font-size:13px;font-weight:600;">${esc(input.verdictLabel)}</span>
-                </td>
+                </td>${
+                  input.buyBoxLabel
+                    ? `
                 <td style="padding-left:12px;">
                   <span style="color:#5f6b69;font-size:13px;">Buy box: <span style="color:#18211f;font-weight:600;">${esc(input.buyBoxLabel)}</span></span>
-                </td>
+                </td>`
+                    : ""
+                }
               </tr>
             </table>
+            ${stressBlock}
             ${
               input.reason
                 ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.reason)}</p>`
