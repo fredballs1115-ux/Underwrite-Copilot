@@ -90,9 +90,9 @@ const LEFT_OFF: Record<string, string> = {
 
 /** The deal page's part, read as the sample's public pages draw it: the
  *  first-draft model card's body (app/sample-model-card, the deal page's
- *  ModelView's own ModelBody), the Buy box tab captioned as the sample's
- *  example box (app/sample-buy-box, the deal page's BuyBoxPanel). */
-const AS_SAMPLE: Record<string, string> = { ModelView: "SampleModelCard", BuyBoxPanel: "SampleBuyBox" };
+ *  ModelView's own ModelBody). The Buy box tab's SampleBuyBox is the deal
+ *  page's own on the sample (held below). */
+const AS_SAMPLE: Record<string, string> = { ModelView: "SampleModelCard" };
 
 const DEAL_VIEW = "app/(app)/deals/[id]/deal-view.tsx";
 const DEMO = "app/demo/sections.tsx";
@@ -146,13 +146,35 @@ describe("each walkthrough tab draws /demo's parts, in /demo's order, and /demo 
   });
 
   it("Buy box: the deal page's panel, captioned as the sample's example box", () => {
-    const deal = dealParts(slice(DEAL_VIEW, 'section === "buybox"', 'section === "analyses"'));
+    // The deal page draws the public pages' own SampleBuyBox on the sample
+    // (handed the demo box's lines), and the bare panel on a deal of the
+    // reader's own.
+    const dealCode = slice(DEAL_VIEW, 'section === "buybox"', 'section === "analyses"');
+    expect(partsIn(dealCode)).toEqual(["SampleBuyBox", "BuyBoxPanel"]);
+    expect(dealCode).toMatch(/sampleBoxLines \? <SampleBuyBox /);
+    const deal = ["SampleBuyBox"];
     const demo = partsIn(slice(DEMO, 'section === "buybox"', 'section === "analyses"'));
     const home = partsIn(drawn(HOME, "BuyBoxTab")).filter((c) => !loading(c));
-    expect(deal).toEqual(["SampleBuyBox"]);
     expect(demo).toEqual(deal);
     expect(home).toEqual(demo);
     expect(src("app/sample-buy-box.tsx")).toContain("<BuyBoxPanel");
+    // …judged against the demo box whoever reads it: the page, the memo, the
+    // report and the workbook read the deal's box through one reader, which
+    // answers SAMPLE_DEMO_BOX on a sample.
+    const page = src("app/(app)/deals/[id]/page.tsx");
+    expect(page).toContain("sampleBoxLines={isSampleDeal ? buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }) : null}");
+    expect(src("app/demo/demo-data.ts")).toContain("boxLines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false })");
+    expect(src("lib/deal-buy-box.ts")).toContain("if (row.is_sample) return SAMPLE_DEMO_BOX;");
+    for (const file of [
+      "app/(app)/deals/[id]/page.tsx",
+      "app/api/deals/[id]/memo/route.ts",
+      "app/api/deals/[id]/report/route.ts",
+      "app/api/deals/[id]/underwrite.xlsx/route.ts",
+    ]) {
+      const code = src(file);
+      expect(code, file).toContain("buyBoxForDealRow({ ...ownership, is_sample:");
+      expect(code, file).not.toContain("getBuyBoxForDeal(");
+    }
   });
 
   it("Analyses and Documents: /demo draws the walkthrough's own panel, handed only what the walkthrough is handed", () => {

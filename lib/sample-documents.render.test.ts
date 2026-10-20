@@ -6,7 +6,9 @@
 // to `buildReportData`, so it could not see the wrapper. Here both routes
 // are driven for real — the signed-in one against a fake database holding
 // the sample's row as the seed action stores it, its rent roll and its
-// T-12, with the demo mandate as the reader's buy box — and the two PDFs
+// T-12, with a buy box of the reader's own that is NOT the demo mandate, so
+// the two can agree only where the sample is judged against the demo
+// mandate whoever reads it (lib/deal-buy-box) — and the two PDFs
 // are read back as text (lib/memo/pdf-text-of) and held equal.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { pdfPageTextsOf } from "@/lib/memo/pdf-text-of";
@@ -44,13 +46,15 @@ vi.mock("@/lib/debt-index-read", async () => {
   return { liveDebtSeeds: async () => NO_DEBT_SEEDS };
 });
 
-// The signed-in reader: a Pro account whose buy box is the demo mandate, no
-// branding and no dismissed submarket checks — what a visitor's copy holds.
+// The signed-in reader: a Pro account with a buy box of its own — offices
+// only, a 7% cap floor, a 20% return — no branding and no dismissed submarket
+// checks. The sample ignores the reader's box (lib/deal-buy-box).
 vi.mock("@/lib/billing", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/billing")>()),
   isPro: async () => true,
 }));
-vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: async () => SAMPLE_DEMO_BOX }));
+const READER_BOX = vi.hoisted(() => ({ assetClasses: ["office"], minCapPct: 7, minIrrPct: 20, unitsMin: 500 }));
+vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: async () => READER_BOX }));
 vi.mock("@/lib/branding-server", () => ({
   getBrandingForDeal: async () => null,
   brandingLogoDataUri: async () => null,
@@ -108,6 +112,21 @@ async function textOf(res: Response): Promise<string> {
 }
 
 describe("the sample's public documents render as the signed-in sample's", () => {
+  it("judges the sample against the demo mandate, never the reader's own box", async () => {
+    const { buyBoxForDealRow } = await import("@/lib/deal-buy-box");
+    const { evaluateBuyBox } = await import("@/lib/criteria");
+    const { sampleDocumentChecks, sampleDocumentRow } = await import("@/lib/sample-cover");
+    const { dealCheckSource } = await import("@/lib/buy-box-chip");
+    expect(await buyBoxForDealRow({ is_sample: true, user_id: "u1", team_id: null })).toEqual(SAMPLE_DEMO_BOX);
+    // A deal of the reader's own is judged against the reader's box…
+    expect(await buyBoxForDealRow({ is_sample: false, user_id: "u1", team_id: null })).toEqual(READER_BOX);
+    // …which judges the sample otherwise, so the documents below could not
+    // agree had the signed-in route read it.
+    const row = sampleDocumentRow();
+    const readers = evaluateBuyBox(row.asset_class, dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address as never), READER_BOX);
+    expect(readers).not.toEqual(sampleDocumentChecks());
+  });
+
   it("the full report: the same pages and words, The actuals page included", async () => {
     const signedIn = await import("@/app/api/deals/[id]/report/route");
     const demo = await import("@/app/api/demo/report/route");

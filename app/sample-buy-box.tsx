@@ -14,7 +14,16 @@ export interface SampleBuyBoxData {
   lines: string[];
 }
 
-export function SampleBuyBox({ data }: { data: SampleBuyBoxData }) {
+export function SampleBuyBox({
+  data,
+  publicDemo = true,
+}: {
+  data: SampleBuyBoxData;
+  /** a visitor's page (the default): the panel's link asks them to sign up;
+   *  the signed-in sample's page passes false, and its link edits the
+   *  reader's own criteria */
+  publicDemo?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2" data-qa="sample-box-caption">
@@ -30,7 +39,7 @@ export function SampleBuyBox({ data }: { data: SampleBuyBoxData }) {
           ))}
         </ul>
       </div>
-      <BuyBoxPanel data={data.panel} publicDemo />
+      <BuyBoxPanel data={data.panel} publicDemo={publicDemo} />
     </div>
   );
 }

@@ -1236,6 +1236,32 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(buybox).toMatch(/Basis \/ unit|Going-in cap|mandate/i);
   });
 
+  it("the sample's Buy box tab is the public pages' own: the demo mandate's checks, captioned as the sample's example box", async () => {
+    const { sampleDemoData } = await import("@/app/demo/demo-data");
+    const { NO_DEBT_SEEDS } = await import("./debt-index");
+    const { SampleBuyBox } = await import("@/app/sample-buy-box");
+    const { buyBoxLines } = await import("./criteria");
+    const { data } = sampleDemoData({ today: "2026-09-08", reads: null, debt: NO_DEBT_SEEDS });
+    // The page hands the sample's tab the demo box's lines (page.tsx), and
+    // its checks are the demo box's (lib/deal-buy-box).
+    const html = render({
+      ...sampleProps("buybox"),
+      buyBox: data.buyBox,
+      sampleBoxLines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }),
+    } as Props);
+    expect(html).toContain('data-qa="sample-box-caption"');
+    // /demo's tab, word for word, but for the panel's link: a signed-in
+    // reader edits their own criteria where a visitor is asked to sign up.
+    const sample = { data: { panel: data.buyBox, lines: data.boxLines } };
+    expect(html).toContain(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false })));
+    const demo = renderToStaticMarkup(React.createElement(SampleBuyBox, sample));
+    expect(textOf(demo).replace("Sign up to set your own box →", "Edit criteria →")).toBe(
+      textOf(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false }))),
+    );
+    // A deal of the reader's own draws the panel bare.
+    expect(render(sampleProps("buybox"))).not.toContain('data-qa="sample-box-caption"');
+  });
+
   it("the financials carry the model's assumptions against the published figures when the page read them", () => {
     // Nothing read → no card, not an empty one.
     const bare = textOf(render(sampleProps("financials")));

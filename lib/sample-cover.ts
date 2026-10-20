@@ -95,8 +95,8 @@ export function sampleDocumentRow(): DealRow {
  * the signed-in memo and report and the homepage's chip all judge
  * (lib/buy-box-chip `dealCheckSource`: the extraction with the first signal
  * and the structured address folded in). The mandate is the public demo's
- * (`SAMPLE_DEMO_BOX`), where a signed-in reader's documents judge the
- * reader's own box — a deliberate difference: a visitor has none.
+ * (`SAMPLE_DEMO_BOX`), the box the signed-in sample's documents judge it
+ * against too (lib/deal-buy-box), never the reader's own.
  */
 export function sampleDocumentChecks(): BuyBoxCheck[] {
   return evaluateBuyBox(

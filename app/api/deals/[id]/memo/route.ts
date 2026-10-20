@@ -10,7 +10,7 @@ import {
   type MemoData,
   type MemoExchange,
 } from "@/lib/memo/memo-document";
-import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { buyBoxForDealRow } from "@/lib/deal-buy-box";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
@@ -150,7 +150,7 @@ export async function GET(
       user_id: string;
       team_id: string | null;
     };
-    const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
+    const box = await buyBoxForDealRow({ ...ownership, is_sample: (deal as { is_sample?: boolean }).is_sample });
     if (box?.exchange) exchange = { block: box.exchange, readerDay };
     if (box) {
       // The same source the deal page judges (lib/buy-box-chip

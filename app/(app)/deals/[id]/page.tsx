@@ -169,10 +169,11 @@ import {
   type MemoryKeyRow,
 } from "@/lib/market-memory";
 import { compRangeTracks, type RangeSubject } from "@/lib/comp-range";
-import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { buyBoxForDealRow } from "@/lib/deal-buy-box";
+import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { emailEnabled, wantsAnalysisEmail } from "@/lib/email";
 import { screenEmailPromised } from "@/lib/screen-email-promise";
-import { type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxLines, type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { readActuals, type ActualsRead } from "@/lib/actuals/actuals-read";
@@ -661,7 +662,12 @@ export default async function DealPage({
     user_id: string;
     team_id: string | null;
   };
-  const buyBox = await getBuyBoxForDeal(ownership.user_id, ownership.team_id).catch(() => null);
+  // The box the deal is judged against (lib/deal-buy-box): the sample's is
+  // the public sample's (SAMPLE_DEMO_BOX), whoever reads it, so its fit, its
+  // Buy box tab and its max bid are the homepage's and /demo's.
+  const buyBox = await buyBoxForDealRow({ ...ownership, is_sample: (deal as { is_sample?: boolean }).is_sample }).catch(
+    () => null,
+  );
   // Each file links to the route that signs it when it is clicked
   // (lib/deal-file-link), as the OM's link does, so a page left open past a
   // signed URL's hour still opens it. Nothing is signed at render.
@@ -2052,6 +2058,10 @@ export default async function DealPage({
           provisional: !extraction && !!firstSignal,
           hasBox: !!buyBox,
         }}
+        // The sample's Buy box tab is captioned as the sample's example box,
+        // the one it is judged against (lib/deal-buy-box), as the homepage
+        // and /demo caption it.
+        sampleBoxLines={isSampleDeal ? buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }) : null}
         screenDiff={screenDiff}
         stageHistory={stageHistory}
         trackRecord={trackRecord}

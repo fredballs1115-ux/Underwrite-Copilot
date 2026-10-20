@@ -20,7 +20,7 @@ import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
-import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { buyBoxForDealRow } from "@/lib/deal-buy-box";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { regulationForDeal } from "@/lib/rent-regulation";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
@@ -166,7 +166,7 @@ export async function GET(
     if (model.meta.sale) {
       try {
         const ownership = deal as unknown as { user_id: string; team_id: string | null };
-        const hurdle = (await getBuyBoxForDeal(ownership.user_id, ownership.team_id))?.minIrrPct ?? null;
+        const hurdle = (await buyBoxForDealRow({ ...ownership, is_sample: (deal as { is_sample?: boolean }).is_sample }))?.minIrrPct ?? null;
         if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle, asOf) };
       } catch (err) {
         console.warn(`workbook buy box read failed for ${id}:`, err instanceof Error ? err.message : err);
