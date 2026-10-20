@@ -82,6 +82,7 @@ import { interestOf } from "@/lib/interest";
 import { sampleExportsFree } from "@/lib/sample-exports";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
+import { EMAIL_WHEN_DONE } from "@/lib/screen-email-promise";
 import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
@@ -297,6 +298,7 @@ export function DealView({
   job: initialJob,
   typicalScreen = null,
   typicalScreenMs = null,
+  emailWhenDone = false,
   results,
   supplements,
   model,
@@ -361,6 +363,10 @@ export function DealView({
    *  than usual (lib/screen-duration `longerThanUsual`); null with no
    *  measured median, and then it says nothing of the kind */
   typicalScreenMs?: number | null;
+  /** the screen-complete email will go to this reader (email sending, their
+   *  switch on, the run theirs — lib/screen-email-promise): the rail says
+   *  so, and never otherwise */
+  emailWhenDone?: boolean;
   results: Results;
   /** results the latest screen has not rewritten — a failed run never
    *  reached them, or a running one has not yet — so they belong to the
@@ -743,7 +749,12 @@ export function DealView({
     <div className="flex flex-col gap-5">
       {live && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} typicalScreen={typicalScreen} typicalScreenMs={typicalScreenMs} />
+          <ProgressRail
+            job={job!}
+            typicalScreen={typicalScreen}
+            typicalScreenMs={typicalScreenMs}
+            emailWhenDone={emailWhenDone}
+          />
           <NotifyOffer />
         </div>
       )}
@@ -1822,6 +1833,7 @@ function ProgressRail({
   job,
   typicalScreen = null,
   typicalScreenMs = null,
+  emailWhenDone = false,
 }: {
   job: NonNullable<Job>;
   /** the reader's own screens' measured median, said — or null, and no
@@ -1829,6 +1841,9 @@ function ProgressRail({
   typicalScreen?: string | null;
   /** the same median in ms (lib/screen-duration `longerThanUsual`) */
   typicalScreenMs?: number | null;
+  /** the screen-complete email will reach this reader
+   *  (lib/screen-email-promise) */
+  emailWhenDone?: boolean;
 }) {
   const { label: elapsed, ms: elapsedMs } = useElapsed(job.created_at);
   // Past twice the reader's own measured median — never a duration nobody
@@ -1918,6 +1933,11 @@ function ProgressRail({
           {typicalScreen
             ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
             : "Finished sections open as they land, so feel free to explore them meanwhile."}
+        </p>
+      )}
+      {emailWhenDone && (
+        <p className="mt-1 text-xs text-muted" data-qa="email-when-done">
+          {EMAIL_WHEN_DONE}
         </p>
       )}
     </div>

@@ -168,6 +168,8 @@ import {
 } from "@/lib/market-memory";
 import { compRangeTracks, type RangeSubject } from "@/lib/comp-range";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { emailEnabled, wantsAnalysisEmail } from "@/lib/email";
+import { screenEmailPromised } from "@/lib/screen-email-promise";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
@@ -577,6 +579,25 @@ export default async function DealPage({
           return { phrase: typicalScreenPhrase(median), ms: median };
         })().catch(() => ({ phrase: null, ms: null }))
       : Promise.resolve({ phrase: null, ms: null });
+  // Whether the rail may say the screen-complete email will come
+  // (lib/screen-email-promise): only while email is sending, and only to
+  // the reader it goes to, under their own switch — read only while a
+  // screen runs, overlapped with the rest of the page.
+  const emailWhenDoneRead: Promise<boolean> =
+    jobActive && user && isScreenJob(job?.step) && emailEnabled()
+      ? wantsAnalysisEmail(supabase, user.id)
+          .then((switchOn) =>
+            screenEmailPromised({
+              emailOn: true,
+              isSample: !!deal.is_sample,
+              switchOn,
+              viewerId: user.id,
+              creatorId: (deal.user_id as string | null) ?? null,
+              teamId: (deal.team_id as string | null) ?? null,
+            }),
+          )
+          .catch(() => false)
+      : Promise.resolve(false);
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
   const screenDiff =
     !jobActive && job?.status !== "error" && priorScreen && extraction
@@ -1398,6 +1419,7 @@ export default async function DealPage({
     compBasisOf ? { unit: compBasisOf.unit, noun: compBasisOf.noun } : null,
   );
   const typicalScreen = await typicalScreenRead;
+  const emailWhenDone = await emailWhenDoneRead;
   const sameFile = await twinRead;
 
   // The OM's assumptions, tested (lib/stress-test): each set against what
@@ -1999,6 +2021,7 @@ export default async function DealPage({
         job={job}
         typicalScreen={typicalScreen.phrase}
         typicalScreenMs={typicalScreen.ms}
+        emailWhenDone={emailWhenDone}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
         staleResults={staleResults}
         firstSignal={firstSignal}

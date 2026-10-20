@@ -700,6 +700,15 @@ describe("DealView — the sample deal renders every section without a runtime e
     } as unknown as Props);
     expect(running).not.toContain("longer-than-usual");
     expect(textOf(running)).toContain("Your screens usually take about 3 minutes");
+    // The email line is a promise: never said unless the page knows the
+    // email will come (lib/screen-email-promise), and said when it does.
+    expect(textOf(running)).not.toContain("We'll email you");
+    const emailed = render({
+      ...sampleProps("overview"),
+      job: { status: "running", step: "challenge", progress: 30, error: null, updated_at: now, created_at: now },
+      emailWhenDone: true,
+    } as unknown as Props);
+    expect(textOf(emailed)).toContain("We'll email you when it's done — you can close this page.");
   });
 
   it("a run waiting its turn says so, naming no analyst; a failure's toast on the deal points at the page's own banner (research pass 30)", () => {
