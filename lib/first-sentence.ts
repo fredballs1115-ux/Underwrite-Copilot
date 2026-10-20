@@ -153,6 +153,14 @@ export function firstSentence(text: string): { first: string; rest: string } {
   return { first: text.slice(0, at).trim(), rest: text.slice(at).trim() };
 }
 
+/**
+ * A caution as a page prints it: the file's "CAUTION:" marker (which
+ * `isCaution` reads) said in sentence case, "Caution: …", never shouted.
+ */
+export function cautionText(sentence: string): string {
+  return sentence.replace(/\bCAUTION:\s*/, "Caution: ");
+}
+
 /** Whether a sentence is a caution the text means a reader to see. */
 export function isCaution(sentence: string): boolean {
   return /\bCAUTION:/.test(sentence);

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ABBREVIATIONS, firstSentence, foldParts, isCaution, sentencesOf } from "./first-sentence";
+import { ABBREVIATIONS, cautionText, firstSentence, foldParts, isCaution, sentencesOf } from "./first-sentence";
 import rulesSeed from "@/data/research/regulatory_rules.json";
 
 const RULES = (rulesSeed as { rules: { id: string; effect: string }[] }).rules;
@@ -12,11 +12,11 @@ describe("firstSentence — a period ends a sentence only where it is not an abb
     // Each printed, in full, as the fragment in the comment.
     expect(firstSentence(effectOf("dc-topa-2-4-unit-exemption")).first).toBe(
       // "Under D.C."
-      "Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA unless the accommodation is majority-owned by a business CORPORATION ('majority ownership interests' = majority of the value of capital, profits, and losses).",
+      "Under D.C. Law 26-80 (eff. Dec 31, 2025), 2-4 unit accommodations are exempt from TOPA unless the accommodation is majority-owned by a business corporation ('majority ownership interests' meaning a majority of the value of capital, profits, and losses).",
     );
     expect(firstSentence(effectOf("dc-rental-act-law-26-80")).first).toBe(
-      // "ENACTED: RENTAL Amendment Act of 2025 = D.C."
-      "ENACTED: RENTAL Amendment Act of 2025 = D.C. Law 26-80 (Bill B26-0164 -> Act 26-199 signed Nov 13, 2025 -> effective Dec 31, 2025 after congressional review).",
+      // "ENACTED: RENTAL Amendment Act of 2025 = D.C." (the file's words then)
+      "Enacted: the RENTAL Amendment Act of 2025 is D.C. Law 26-80 (Bill B26-0164, signed as Act 26-199 on Nov 13, 2025, effective Dec 31, 2025 after congressional review).",
     );
     expect(firstSentence(effectOf("il-rent-control-preemption")).first).toBe(
       // "Illinois' Rent Control Preemption Act (50 ILCS 825, eff."
@@ -37,7 +37,7 @@ describe("firstSentence — a period ends a sentence only where it is not an abb
       /\(Muni\. Code 5-12-020\), except the non-renewal notice rule \(5-12-130\) and the lockout ban \(5-12-160\) which apply regardless\.$/,
     );
     expect(firstSentence(effectOf("dc-rent-stab-coverage")).first).toBe(
-      "Rental units in buildings whose building permit issued after Dec 31, 1975 are EXEMPT from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies.",
+      "Rental units in buildings whose building permit issued after Dec 31, 1975 are exempt from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies.",
     );
     expect(firstSentence(effectOf("ny-good-cause-eviction")).first).toMatch(
       /^NY Good Cause Eviction \(eff\. Apr 20, 2024; .*presumptively unreasonable\.$/,
@@ -67,8 +67,9 @@ describe("firstSentence — a period ends a sentence only where it is not an abb
     const parts = foldParts(effectOf("dc-topa-2-4-unit-exemption"));
     expect(parts.first).toMatch(/^Under D\.C\. Law 26-80/);
     expect(parts.cautions).toEqual([
-      "CAUTION: statutory text not directly fetched; practitioner reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
+      "CAUTION: the statutory text was not fetched directly; a practitioner's reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
     ]);
+    expect(cautionText(parts.cautions[0])).toMatch(/^Caution: the statutory text/);
     expect(parts.rest).toMatch(/^Per practitioner analysis/);
     expect(parts.rest).not.toContain("CAUTION");
     expect(isCaution("WATCH: a revival initiative")).toBe(false);

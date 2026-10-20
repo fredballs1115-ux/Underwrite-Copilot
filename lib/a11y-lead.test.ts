@@ -95,9 +95,11 @@ describe("the ⌘K palette (research pass 33, item 11)", () => {
 });
 
 describe("the sample deal's guide at 320px (research pass 33, item 12)", () => {
-  it("lets each card shrink, so the hint truncates rather than spill past the column", () => {
+  it("lets each card shrink, so the hint wraps rather than spill past the column", () => {
     const guide = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/sample-guide.tsx"), "utf8");
     expect(guide).toMatch(/<li key=\{s\.title\} className="min-w-0">/);
+    // Wrapped, never cut to an ellipsis: the whole hint is the card's point.
+    expect(guide).not.toMatch(/\btruncate\b/);
   });
 });
 

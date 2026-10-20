@@ -50,9 +50,9 @@ describe("the research rule — one limit, the deal page's own", () => {
       "181 days old, past the 180 days the site holds research current",
     );
     // The shared "as of" writer says it the same way once handed the day.
-    expect(asOfLabel("2026-08-20", "2027-02-16")).toBe("as of 2026-08-20");
-    expect(asOfLabel("2026-08-20", "2027-02-17")).toBe("as of 2026-08-20 (181 days old, stale)");
-    expect(asOfLabel("2026-08-20")).toBe("as of 2026-08-20");
+    expect(asOfLabel("2026-08-20", "2027-02-16")).toBe("as of Aug 20, 2026");
+    expect(asOfLabel("2026-08-20", "2027-02-17")).toBe("as of Aug 20, 2026 (181 days old, stale)");
+    expect(asOfLabel("2026-08-20")).toBe("as of Aug 20, 2026");
     expect(asOfLabel("", "2027-02-17")).toBe("undated");
   });
 

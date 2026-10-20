@@ -19,6 +19,7 @@ import type { PlaygroundData } from "./(app)/deals/[id]/sensitivity-playground";
 import { OverviewView } from "./(app)/deals/[id]/deal-sections-base";
 import { SampleGuide } from "./(app)/deals/[id]/sample-guide";
 import { AnalysisTabs, DealSectionTabs } from "./(app)/deals/[id]/section-tabs";
+import { ScrollX } from "./edge-fade";
 import {
   ANALYSES,
   LEGACY_TABS,
@@ -622,17 +623,16 @@ export function DemoTabs({
       <div className="flex items-center gap-2 border-b border-line bg-faint p-2">
         {/* The deal page's own section bar (section-tabs). It scrolls
             sideways where the column is narrower than the five tabs, under
-            the same fade at its edge. */}
-        <div className="min-w-0 flex-1 overflow-x-auto [mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
+            a drawn edge with a chevron where there is more (app/edge-fade). */}
+        <ScrollX className="flex-1" tone="var(--color-faint)">
           <DealSectionTabs
             active={section}
             stateOf={stateOf}
             counts={counts}
             onSelect={setSection}
             label="Sample deal sections"
-            fadeAlways
           />
-        </div>
+        </ScrollX>
         <span className="hidden shrink-0 pr-1 text-[10px] font-medium uppercase tracking-wide text-muted sm:block">
           Sample data
         </span>

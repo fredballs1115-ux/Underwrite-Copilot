@@ -771,7 +771,7 @@ export default async function Home() {
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
                       href="/login?mode=signup"
-                      className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+                      className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors [text-shadow:none] hover:bg-accent"
                     >
                       Get started free
                     </Link>
@@ -805,9 +805,11 @@ export default async function Home() {
                 {/* Each stat read once: the label is the term, the figure
                     its value, and the column reversed so the figure still
                     sits on top. (A hidden term above a second copy of the
-                    label as a value had a screen reader say it twice.) */}
+                    label as a value had a screen reader say it twice.)
+                    `justify-end` packs a reversed column at its TOP, so
+                    the figures share one line whichever label wraps. */}
                 {STATS.map((st) => (
-                  <div key={st.label} className="flex flex-col-reverse">
+                  <div key={st.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
                     <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
                       <CountUp value={st.value} suffix={st.suffix} />

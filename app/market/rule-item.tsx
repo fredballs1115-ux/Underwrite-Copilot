@@ -1,5 +1,5 @@
 import type { RegulatoryRule } from "@/lib/research";
-import { foldParts } from "@/lib/first-sentence";
+import { cautionText, foldParts } from "@/lib/first-sentence";
 import { datedNotes } from "@/lib/dated-window";
 import { DatedNotes } from "@/app/dated-notes";
 
@@ -56,7 +56,7 @@ export function RuleItem({ rule, today }: { rule: Pick<RegulatoryRule, "id" | "s
       )}
       {cautions.length > 0 && (
         <p className="mt-1 text-xs font-medium leading-snug text-amber-700" data-qa="rule-caution">
-          {cautions.join(" ")}
+          {cautions.map(cautionText).join(" ")}
         </p>
       )}
       <DatedNotes notes={dated} className="mt-1" />

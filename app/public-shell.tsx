@@ -75,8 +75,11 @@ export async function PublicShell({ children }: { children: ReactNode }) {
       </main>
       <footer className="border-t border-line print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
+          {/* Page-neutral: the shell closes /market, /tools and /how-we-test
+              alike, and "screen deals against this data" read wrong under a
+              page of method. */}
           <span>
-            Underwrite Copilot — screen deals against this data.{" "}
+            Underwrite Copilot — a stress test for offering memoranda.{" "}
             <Link
               href="/login?mode=signup"
               className="font-medium text-brand underline-offset-2 hover:underline"
@@ -84,7 +87,7 @@ export async function PublicShell({ children }: { children: ReactNode }) {
               Start free
             </Link>
           </span>
-          <span className="flex gap-4">
+          <span className="flex flex-wrap gap-x-4 gap-y-2 whitespace-nowrap">
             <Link href="/tools" className="transition-colors hover:text-ink">
               Deal math
             </Link>
@@ -101,6 +104,19 @@ export async function PublicShell({ children }: { children: ReactNode }) {
               Home
             </Link>
           </span>
+          {/* The terms, the privacy policy and the security page, as the
+              signed-in shell's footer carries them (app/(app)/app-shell). */}
+          <nav aria-label="Terms and policies" className="flex basis-full flex-wrap gap-x-4 gap-y-2">
+            <Link href="/terms" className="transition-colors hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/privacy" className="transition-colors hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/security" className="transition-colors hover:text-ink">
+              Security
+            </Link>
+          </nav>
           {/* The data providers' notices, a row of their own in the
               footer's type: FRED's terms ask for theirs prominently on
               the application, and /tools and /market draw FRED's figures

@@ -79,21 +79,22 @@ export function SampleGuide({ onNavigate }: { onNavigate?: (key: string) => void
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{s.title}</span>
-                <span className="block truncate text-xs text-muted">{s.hint}</span>
+                <span className="block text-pretty text-xs text-muted">{s.hint}</span>
               </span>
             </>
           );
           return (
-            // min-w-0: a grid item holds its widest line, and the hint's
-            // truncate needs room to give, so at 320px the cards spilled
-            // past the column (research pass 33).
+            // min-w-0: a grid item holds its widest line, so at 320px the
+            // cards spilled past the column (research pass 33). The hint
+            // wraps rather than truncates: at 1280 a third of the column
+            // had cut it to an ellipsis.
             <li key={s.title} className="min-w-0">
               {onNavigate ? (
                 <button
                   type="button"
                   data-guide-step={s.to}
                   onClick={() => onNavigate(s.to)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-brand/40 hover:bg-brand/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                  className="flex h-full w-full items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-brand/40 hover:bg-brand/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
                 >
                   {body}
                 </button>

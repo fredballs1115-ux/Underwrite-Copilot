@@ -46,7 +46,8 @@ import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
 import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
-import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { CoverageBoardCell, FigureCredits, HeatKey, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { ScrollX } from "../edge-fade";
 import { listSubmarkets } from "@/lib/market/store";
 import { readMarketMemory } from "@/lib/market-memory-read";
 import type { Submarket } from "@/lib/market/types";
@@ -497,7 +498,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
           )}
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      <ScrollX className="mt-3" tall>
         <table className="w-full min-w-[520px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -522,7 +523,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       {dcFmr.length > 0 && (
         <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
           {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcWhen?.text ? `, ${dcWhen.text}` : ""}: `}
@@ -894,8 +895,18 @@ function SectorHeatGrid() {
           {` · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
+      <HeatKey />
+      <ScrollX className="mt-3" tall>
+        {/* Fixed layout and equal sector columns: under auto layout a
+            column's width followed its longest period note, so the four
+            columns of one board ran 90px to 300px wide. */}
+        <table className="w-full min-w-[560px] table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[22%]" />
+            {HEAT_SECTORS.map((s) => (
+              <col key={s} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
               <th className="py-1.5 pr-3 font-medium">Market</th>
@@ -947,7 +958,7 @@ function SectorHeatGrid() {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
         Sourced figures, each with its own period; a band is shown as a band;
         a dashed cell is a figure the column does not rank (undated, over a
@@ -1075,7 +1086,7 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
 // ── Sector explorer (every asset type) ──────────────────────────────────────
 // The full research file for EVERY asset class, rendered: cycle position,
 // cap-rate ranges (ranges, never single numbers), supply/demand, debt terms,
-// the small-investor verdict, and the named gaps — provenance throughout.
+// what $1–2M buys, and the named gaps — provenance throughout.
 // SFR appears as an asset-class OVERVIEW here while staying excluded from
 // multifamily sales aggregates (an overview is not a row in 2-4 unit math).
 function SectorExplorer({ selected }: { selected?: string }) {
@@ -1157,7 +1168,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
         )}
 
         {ranges.length > 0 && (
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full min-w-[480px] text-left text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -1188,7 +1199,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
         {unpriced.length > 0 && (
           <p className="text-[11px] text-muted">
@@ -1221,6 +1232,9 @@ function SectorExplorer({ selected }: { selected?: string }) {
           </div>
         )}
 
+        {/* What a $1–2M position buys in the class, as the research reads
+            it: a description of the market, never advice to a reader (the
+            QA of 2026-10-20 — it had read "hold title personally"). */}
         {verdict && (
           <div className="rounded-xl border border-brand/25 bg-brand/[0.04] p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -1229,10 +1243,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
                   verdict.accessible ? "bg-pass/10 text-pass" : "bg-kill/10 text-kill"
                 }`}
               >
-                {verdict.accessible ? "Accessible at $1–2M" : "Not accessible direct"}
+                {verdict.accessible ? "Within reach at $1–2M" : "Mostly out of reach at $1–2M"}
               </span>
               <span className="text-[11px] uppercase tracking-wide text-muted">
-                small-investor verdict
+                What $1–2M buys, per the research
               </span>
             </div>
             {verdict.entry_vehicle && (

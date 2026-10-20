@@ -422,6 +422,10 @@ describe("the research panel's per-unit read is the card's basis, in the deal's 
     expect(page).toMatch(/basis=\{extraction \? basisTag\(extraction, strategy\.kind, deal\.asset_class as string \| null\) : null\}/);
     const panel = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/research-panel.tsx"), "utf8");
     expect(panel).toContain("{vsMarketHeading(basis)}");
+    // A whole 2–4 unit property's median sale price sits under a heading of
+    // its own, never under the deal's price a unit.
+    expect(panel).toContain('data-qa="bench-whole-property"');
+    expect(panel).toMatch(/const WHOLE_PROPERTY_ROW = \/_2_4_unit\$\//);
     expect(panel).not.toMatch(/pricePerUnit|\/unit` : ""/);
   });
 });

@@ -25,6 +25,7 @@ import {
   type SectionKey,
 } from "@/lib/deal-tabs";
 import { revealScrollLeft } from "@/lib/tab-strip";
+import { ScrollX } from "../edge-fade";
 import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
@@ -120,9 +121,9 @@ export function DemoSections({
     if (!strip || !tab) return;
     const s = strip.getBoundingClientRect();
     const t = tab.getBoundingClientRect();
-    const css = getComputedStyle(strip);
-    const mask = css.getPropertyValue("mask-image") || css.getPropertyValue("-webkit-mask-image");
-    const fade = /gradient/.test(mask) ? 1.75 * parseFloat(getComputedStyle(document.documentElement).fontSize) : 0;
+    // The drawn edge (app/edge-fade, 2rem) is over the strip only while it
+    // has more to show.
+    const fade = strip.scrollWidth > strip.clientWidth ? 2 * parseFloat(getComputedStyle(document.documentElement).fontSize) : 0;
     const left = revealScrollLeft(
       { left: s.left, clientWidth: strip.clientWidth, scrollWidth: strip.scrollWidth, scrollLeft: strip.scrollLeft },
       { left: t.left, right: t.right },
@@ -159,12 +160,12 @@ export function DemoSections({
     <div className="flex flex-col gap-5">
       {/* The deal page's own section bar (section-tabs), in the deal page's
           strip. */}
-      <div
-        ref={tabStrip}
-        className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
-      >
+      {/* Its edges drawn where there is more to scroll (app/edge-fade),
+          a chevron in the fade: a mask had faded Analyses and Documents to
+          nothing on a phone, which read as the end of the row. */}
+      <ScrollX scrollRef={tabStrip} tone="var(--color-canvas)">
         <DealSectionTabs active={section} stateOf={stateOf} counts={counts} onSelect={setSection} />
-      </div>
+      </ScrollX>
 
       <div key={section} id="deal-tabpanel" role="tabpanel" aria-labelledby={`tab-${section}`} className="animate-rise">
         {section === "overview" && (

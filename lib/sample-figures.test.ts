@@ -59,7 +59,11 @@ describe("the sample's stress test", () => {
     expect(irr("insurance")).toEqual([9.3, 8.2]);
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
-    expect(row("renovation_premium").gap?.text).toBe("The projected $200 is $60 a month (42.9%) over the achieved $140.");
+    expect(row("renovation_premium").gap?.text).toBe(
+      "The projected $200 is $60 a month (42.9%) over the achieved $140. An $18,000 door needs $82 a month to pay for itself at the model's 5.45% exit cap: the break-even, what the program needs, not evidence of what a door earns.",
+    );
+    // The break-even is said beside the row, never filed as its evidence.
+    expect(row("renovation_premium").evidence.map((e) => e.kind)).not.toContain("rule_of_thumb");
   });
 
   it("strikes the taxes on the price at the rate the memorandum's own two figures imply, never a rate of its own", () => {

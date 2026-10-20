@@ -88,6 +88,22 @@ html:has([data-home-bar]) {
   ::placeholder {
     color: var(--color-muted);
   }
+
+  /* No lone last word: a heading balances its lines, prose keeps two
+     words on its last ("…worked end to / end" on /demo's h1, "…against
+     the / evidence." on the homepage). In the base layer, so a
+     `text-wrap` utility at an element still wins. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li,
+  dd,
+  figcaption {
+    text-wrap: pretty;
+  }
 }
 
 body {
@@ -606,19 +622,25 @@ body {
 }
 
 /* "The screen, running" — a looping trace of the six stages on the sample
-   deal. Each line fades in at its own offset (staggered cascade, --i per
-   line), holds, then yields; the caret blinks on the closing line. Pure CSS,
-   server-rendered. Reduced-motion shows all lines statically. */
+   deal. Each line lights up at its own offset (staggered cascade, --i per
+   line), holds, then dims; the caret blinks on the closing line. Pure CSS,
+   server-rendered. Reduced-motion shows all lines statically.
+
+   A line not yet reached is drawn as a ghost (20%), never as nothing: the
+   box is sized by its seven lines, and while they were transparent it stood
+   100–200px of empty black on a phone for the first ten seconds (the QA of
+   2026-10-20). The cascade is quicker (1s a line, the last lit at 6s) for
+   the same reason. */
 @keyframes screenrun-in {
-  0% { opacity: 0; transform: translateY(4px); }
+  0% { opacity: 0.2; transform: translateY(2px); }
   3.5% { opacity: 1; transform: none; }
   86% { opacity: 1; }
-  93%, 100% { opacity: 0; }
+  93%, 100% { opacity: 0.2; }
 }
 .screenrun-line {
-  opacity: 0;
+  opacity: 0.2;
   animation: screenrun-in 15s linear infinite;
-  animation-delay: calc(var(--i) * 1.6s);
+  animation-delay: calc(var(--i) * 1s);
 }
 @keyframes screenrun-caret {
   0%, 49% { opacity: 1; }

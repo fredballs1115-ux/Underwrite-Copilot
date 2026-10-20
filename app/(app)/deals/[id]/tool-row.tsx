@@ -1,6 +1,7 @@
 "use client";
 
-import type { FocusEvent, ReactNode } from "react";
+import { useRef, type FocusEvent, type ReactNode } from "react";
+import { EdgeFade, useScrollEdges } from "@/app/edge-fade";
 
 /**
  * One of the deal header's two toolbar groups — the deal's tools, then its
@@ -25,8 +26,17 @@ import type { FocusEvent, ReactNode } from "react";
  * reason). On a phone each opens across its row instead — the row, outside
  * the scroller, is their containing block (ShareControl, DealActions) — so
  * the scroll does not cut them off either.
+ *
+ * The fade is the public pages' `EdgeFade` (app/edge-fade): a chevron in it
+ * says there is more, and it goes once the row is scrolled to its end. The
+ * right one shows until the browser has measured the row, as it always did.
  */
+/** The header's toolbar background (`bg-faint/50` on a surface card). */
+const ROW_TONE = "color-mix(in oklab, var(--color-faint) 50%, var(--color-surface))";
+
 export function ToolRow({ row, children }: { row: "tools" | "controls"; children: ReactNode }) {
+  const strip = useRef<HTMLDivElement>(null);
+  const edges = useScrollEdges(strip);
   const reveal = (e: FocusEvent<HTMLDivElement>) => {
     const strip = e.currentTarget;
     const target = e.target as HTMLElement;
@@ -35,7 +45,7 @@ export function ToolRow({ row, children }: { row: "tools" | "controls"; children
   };
   return (
     <div data-hero-row={row} className={`relative min-w-0 max-sm:-m-1 ${row === "tools" ? "sm:contents" : "sm:ml-auto"}`}>
-      <div onFocus={reveal} className="max-sm:overflow-x-auto max-sm:p-1 max-sm:scroll-pr-8 sm:contents">
+      <div ref={strip} onFocus={reveal} className="max-sm:overflow-x-auto max-sm:p-1 max-sm:scroll-pr-8 max-sm:scroll-pl-8 sm:contents">
         <div
           className={`flex items-center gap-2 max-sm:w-max max-sm:pr-8 ${
             row === "tools" ? "sm:contents" : "sm:flex-wrap sm:justify-end"
@@ -44,10 +54,8 @@ export function ToolRow({ row, children }: { row: "tools" | "controls"; children
           {children}
         </div>
       </div>
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-7 bg-gradient-to-r from-transparent to-[color-mix(in_oklab,var(--color-faint)_50%,var(--color-surface))] sm:hidden"
-      />
+      <EdgeFade side="start" on={!!edges?.before} tone={ROW_TONE} className="sm:hidden" />
+      <EdgeFade side="end" on={edges ? edges.after : true} tone={ROW_TONE} className="sm:hidden" />
     </div>
   );
 }

@@ -6780,7 +6780,7 @@ describe("/demo's research panel — the deal page's ResearchPanel on the sample
     expect(text).toMatch(/Covered market:\s+Philadelphia PA/);
     expect(html).toContain('data-picture="covered-market"');
     expect(text).toContain("Negative leverage: going-in cap sits 150 bps below the 30-yr fixed");
-    expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
+    expect(text).toContain("going-in cap 5.45% vs 6.95% (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of Sep 17, 2026)");
     expect(text).toContain("Against the latest curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
     expect(text).not.toContain("today's curve");
     // The sample's one rule keys off an eviction filing, never the purchase:
@@ -6812,9 +6812,9 @@ describe("/demo's research panel — the deal page's ResearchPanel on the sample
     const none = { ...NO_DEBT_SEEDS };
     const fallback = visibleText(at("2026-09-21", none));
     expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
-    expect(fallback).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(fallback).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of Aug 20, 2026)");
     expect(fallback).not.toContain("10-year");
-    expect(visibleText(at("2027-02-17", none))).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
+    expect(visibleText(at("2027-02-17", none))).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of Aug 20, 2026 (181 days old, stale))");
   });
 });
 
@@ -10970,7 +10970,7 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
 
   it("prints no rule cut at an abbreviation", () => {
     // Each of these was the whole of its rule's line on the page.
-    expect(text).toContain("Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA");
+    expect(text).toContain("Under D.C. Law 26-80 (eff. Dec 31, 2025), 2-4 unit accommodations are exempt from TOPA");
     expect(text).toContain("Illinois' Rent Control Preemption Act (50 ILCS 825, eff. Aug 1, 1997) bars every unit of local government");
     expect(text).toContain("Florida preempts local rent control (Fla. Stat. 166.043) - no Florida municipality");
     expect(text).toContain("O.C.G.A. 44-7-19 bars any county or municipality");
@@ -10987,7 +10987,9 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
 
   it("keeps the TOPA rule's caution on the page, never folded", () => {
     const caution = html.match(/<p class="[^"]*" data-qa="rule-caution">([^<]*)<\/p>/)?.[1] ?? "";
-    expect(caution).toContain("CAUTION: statutory text not directly fetched");
+    // In sentence case on the page; the file's marker is "CAUTION:".
+    expect(caution).toContain("Caution: the statutory text was not fetched directly");
+    expect(caution).not.toContain("CAUTION");
     // In view, not inside the fold that holds the rest of the rule.
     const topa = html.match(/<li class="text-sm leading-snug" data-rule="dc-topa-2-4-unit-exemption">[\s\S]*?<\/li>/)?.[0] ?? "";
     expect(topa).toContain('data-qa="rule-caution"');
@@ -11008,7 +11010,7 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
     const out = render(React.createElement(Fold, { text: note, className: "text-xs text-muted" }));
     expect(out).toContain("<summary");
     expect(out.match(/<summary[^>]*>([^<]*)/)?.[1]?.trim()).toBe("Under D.C. Law 26-80 the rule is new.");
-    expect(out).toMatch(/data-qa="caution">CAUTION: not fetched\.<\/p>/);
+    expect(out).toMatch(/data-qa="caution">Caution: not fetched\.<\/p>/);
     expect(out.match(/<details[\s\S]*<\/details>/)?.[0]).not.toContain("CAUTION");
     // One sentence is itself, unfolded.
     const one = render(React.createElement(Fold, { text: "Just one (Fla. Stat. 166.043) sentence." }));
@@ -11052,8 +11054,11 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     expect(text).toContain("Not ranked — the reason under each market");
     expect(html.indexOf("Not ranked — the reason")).toBeGreaterThan(html.lastIndexOf('data-row-rank="4"'));
     expect(text).toContain("undated; a spread of two reads");
-    // A figure with no house says so, plainly, and never "on file".
-    expect(text).toContain("vacancy: publisher not recorded");
+    // A figure with no house says so, plainly, and never "on file" — once a
+    // row: where the reason already says it, the source column names the
+    // figures with no source rather than saying it again.
+    expect((strip(dmv).match(/publisher not recorded/g) ?? []).length).toBe(1);
+    expect(strip(dmv)).toContain("vacancy and cap: no source");
     expect(text).not.toMatch(/\bon file\b/);
     // The caption says the rule the table keeps.
     expect(text).toContain("ranked only where its source names its publisher and dates it within the last year");

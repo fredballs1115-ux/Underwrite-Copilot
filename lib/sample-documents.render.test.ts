@@ -35,6 +35,10 @@ vi.mock("@/lib/model-vs-market-read", () => ({
     throw new Error("no database in a test");
   },
 }));
+// The public routes read today's figures for the sample through
+// lib/sample-stress-read: none here either, as the signed-in read above, so
+// the two stress tests are built on the same (absent) figures.
+vi.mock("@/lib/sample-stress-read", () => ({ sampleTodayReads: async () => null }));
 vi.mock("@/lib/debt-index-read", async () => {
   const { NO_DEBT_SEEDS } = await import("@/lib/debt-index");
   return { liveDebtSeeds: async () => NO_DEBT_SEEDS };

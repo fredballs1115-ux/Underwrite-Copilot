@@ -20,8 +20,8 @@
   "top_east_coast_metros": [],
   "small_investor_verdict": {
     "accessible": true,
-    "entry_vehicle": "A 30-80 lot value-add park in a secondary/tertiary East Coast market (PA/upstate NY/Southside VA/Carolinas), tenant-owned homes preferred, at the 7-9.5% tier.",
-    "reasoning": "The value-add math rhymes with the buyer's core skill (fix infrastructure, raise below-market lot rents toward market, convert park-owned homes to tenant-owned) at yields the 2-4 unit market can't reach. Watch-outs: East Coast park inventory is scarcer than the Midwest/Southeast, PE competition is real at the quality tiers, several states are adding MHC-specific tenant protections (rent-increase notice, opportunity-to-purchase on park sales) — screen each state's MHC statute before offering; not yet in the rules engine."
+    "entry_vehicle": "A 30-80 lot value-add park in a secondary or tertiary East Coast market (Pennsylvania, upstate New York, Southside Virginia, the Carolinas), tenant-owned homes the stronger form, at the 7-9.5% tier.",
+    "reasoning": "The value-add work (fixing infrastructure, raising below-market lot rents toward market, converting park-owned homes to tenant-owned) earns yields the 2-4 unit market does not reach. Against it: East Coast park inventory is scarcer than in the Midwest and Southeast, private-equity competition is real at the quality tiers, and several states are adding MHC-specific tenant protections (rent-increase notice, an opportunity to purchase on park sales); each state's MHC statute applies, and the rules engine does not yet carry them."
   },
   "gaps": [
     "MD/VA/PA/NC MHC-specific statutes (lot-rent notice, park-sale opportunity-to-purchase) — add to regulatory_rules",

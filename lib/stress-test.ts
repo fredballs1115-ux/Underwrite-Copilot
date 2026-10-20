@@ -648,7 +648,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       docs.push(piece({
         kind: "document",
         label: "The deal's rent roll: the occupancy it runs at",
-        text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
+        text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${proseDay(asOf)}` : ", no stated as-of"})`,
         value: v,
         asOf,
         publisher: "the deal's rent roll",
@@ -662,7 +662,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     docs.push(piece({
       kind: "document",
       label: "The deal's T-12: vacancy loss over gross potential rent",
-      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${t12.periodEnd}` : "; period not stated"})`,
+      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${proseDay(t12.periodEnd)}` : "; period not stated"})`,
       value: tv.pct,
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
@@ -1261,6 +1261,13 @@ function debtRow(ctx: Ctx): StressRow | null {
 const PRO_FORMA_RENT_ROW = /\b(?:pro ?forma|market|projected|stabili[sz]ed)\s+(?:avg\.?\s+|average\s+)?rents?\b/i;
 const RENT_NOT = /growth|psf|\/\s*sf|per\s+sf|comp/i;
 
+/** A stored day as a sentence writes it: "May 31, 2026" (lib/debt-index
+ *  `datedLong`), never the raw ISO day beside a page's worded dates; any
+ *  other form (a month, a year, a period) is left as written. */
+function proseDay(d: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? datedLong(d) : d;
+}
+
 function noiRow(ctx: Ctx): StressRow | null {
   const c = ctx.actuals?.noiComparison ?? null;
   const picked = pickOmNoi(ctx.rows, ctx.kind);
@@ -1273,7 +1280,7 @@ function noiRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 NOI",
-      text: `${money(t12.summary.noi)}${t12.summary.noiDerived ? " (derived: EGI less expenses)" : ""} (${t12.periodEnd ? `TTM to ${t12.periodEnd}` : "period not stated"})`,
+      text: `${money(t12.summary.noi)}${t12.summary.noiDerived ? " (derived: EGI less expenses)" : ""} (${t12.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated"})`,
       value: t12.summary.noi,
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
@@ -1289,7 +1296,7 @@ function noiRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The rent roll's in-place rent against the OM's pro forma rent",
-      text: `$${Math.round(rr.summary.avgRentMonthly).toLocaleString("en-US")} a unit a month in place${asOf ? ` (as of ${asOf})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
+      text: `$${Math.round(rr.summary.avgRentMonthly).toLocaleString("en-US")} a unit a month in place${asOf ? ` (as of ${proseDay(asOf)})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
       value: null,
       asOf,
       publisher: "the deal's rent roll",
@@ -1436,7 +1443,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 tax line",
-      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${t12.periodEnd}` : ""})`,
+      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
       value: Math.round(t12Tax.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -1535,7 +1542,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "document",
       label: "The deal's T-12 insurance line",
-      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${t12.periodEnd}` : ""})`,
+      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
       value: Math.round(t12Ins.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -1548,7 +1555,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const check = checkOf(ctx.mvm, "expense_growth");
   const idx = check?.published.find((f) => /insurance premiums/i.test(f.label)) ?? null;
   const stored = ctx.market?.liveBrief?.figures?.find((f) => f.key === "insurance_index_yoy") ?? null;
-  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${stored.asOf}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
+  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${proseDay(stored.asOf)}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
   if (index) {
     const moved = premium != null ? Math.round(premium * (1 + index.pct / 100)) : null;
     evidence.push({
@@ -2010,27 +2017,30 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
-  if (r.costPerDoor != null && ctx.derived) {
-    const cap = ctx.derived.inputs.exitCapPct;
-    const breakEven = (r.costPerDoor * cap) / 12;
-    evidence.push({
-      kind: "rule_of_thumb",
-      label: "Break-even premium at the model's exit cap",
-      text: `${dollars(breakEven)} a month pays for ${withArticle(`${money(r.costPerDoor)} door`)} at the model's ${pct2(cap * 100)} exit cap`,
-      value: Math.round(breakEven),
-      asOf: null,
-      publisher: "the model's own arithmetic",
-      scope: "deal",
-    });
-  }
+  // The break-even premium — a door's cost at the model's exit cap — is
+  // what the program NEEDS, never evidence of what a door EARNS: it is said
+  // beside the row (in its gap, or in why it is unchecked) and never filed
+  // as evidence, where it had read "a rule of thumb … the deal's own
+  // figure" and widened the evidence's range to a figure no door rents at
+  // (the QA of 2026-10-20).
+  const breakEven =
+    r.costPerDoor != null && ctx.derived
+      ? (() => {
+          const cap = ctx.derived!.inputs.exitCapPct;
+          const value = Math.round((r.costPerDoor! * cap) / 12);
+          return {
+            value,
+            text: `${withArticle(`${dollars(r.costPerDoor!)} door`)} needs ${dollars(value)} a month to pay for itself at the model's ${pct2(cap * 100)} exit cap: the break-even, what the program needs, not evidence of what a door earns`,
+          };
+        })()
+      : null;
   const omSays: StressRow["omSays"] =
     r.premium != null
       ? { text: `${dollars(r.premium)} a month a renovated door${r.premiumFrom === "rents" ? " (the renovated rent less the classic rent)" : ", as stated"}`, value: r.premium, page: locatedPage(r.page, ctx.ex?.totalPages) }
       : { text: NO_FIGURE("renovation premium"), value: null, page: locatedPage(r.page, ctx.ex?.totalPages) };
   const achieved = evidence.find((e) => e.label.startsWith("Achieved"));
-  const breakEven = evidence.find((e) => e.label.startsWith("Break-even"));
-  // The achieved premium decides, else the break-even; the rents are words.
-  const compared = indexesOf(evidence, (e) => e.value != null && (e === achieved || (achieved?.value == null && e === breakEven)));
+  // The achieved premium decides; the rents are words beside it.
+  const compared = indexesOf(evidence, (e) => e.value != null && e === achieved);
   if (r.premium == null) return unchecked("renovation_premium", omSays, evidence, NO_FIGURE("renovation premium"), compared);
   let gap: StressRow["gap"] = null;
   let verdict: StressVerdict = "unchecked";
@@ -2038,31 +2048,28 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
   if (achieved && achieved.value != null) {
     const share = (r.premium - achieved.value) / achieved.value;
     verdict = share <= SAME_SHARE ? "holds" : share > PREMIUM_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+    const context = breakEven ? ` ${breakEven.text[0].toUpperCase()}${breakEven.text.slice(1)}.` : "";
     gap = {
       value: Math.round(r.premium - achieved.value),
       unit: "usd",
       text:
-        Math.abs(share) <= SAME_SHARE
+        (Math.abs(share) <= SAME_SHARE
           ? `The projected ${dollars(r.premium)} is at the achieved ${dollars(achieved.value)}.`
           : share > 0
             ? `The projected ${dollars(r.premium)} is ${dollars(r.premium - achieved.value)} a month (${pct1(share * 100)}) over the achieved ${dollars(achieved.value)}.`
-            : `The projected ${dollars(r.premium)} is under the achieved ${dollars(achieved.value)} — the conservative side.`,
+            : `The projected ${dollars(r.premium)} is under the achieved ${dollars(achieved.value)} — the conservative side.`) + context,
     };
-  } else if (breakEven && breakEven.value != null) {
-    verdict = r.premium >= breakEven.value ? "holds" : "stretched";
-    gap = {
-      value: Math.round(r.premium - breakEven.value),
-      unit: "usd",
-      text:
-        r.premium >= breakEven.value
-          ? `The projected ${dollars(r.premium)} clears the ${dollars(breakEven.value)} break-even; no door has proven it.`
-          : `The projected ${dollars(r.premium)} is under the ${dollars(breakEven.value)} a door's cost needs at the exit cap.`,
-    };
+  } else if (breakEven) {
+    // No door has proven a premium, so nothing tests the OM's figure: the
+    // break-even says only whether the program pays if the premium holds.
+    why = `No achieved premium is stated, so no door has proven the projected ${dollars(r.premium)}. ${breakEven.text[0].toUpperCase()}${breakEven.text.slice(1)}; the projected premium ${
+      r.premium >= breakEven.value ? "clears it" : "falls short of it, so the program does not pay for itself even at the OM's own premium"
+    }.`;
   } else {
-    why = "No achieved premium is stated and no cost a door to strike a break-even on.";
+    why = "No achieved premium is stated, so no door has proven the projected premium.";
   }
   // The premium is no model input: the model grows today's rent at one rate.
-  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}), ...(achieved?.value == null && gap ? { ruleOfThumbOnly: true } : {}) };
+  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}) };
 }
 
 // ── The test ─────────────────────────────────────────────────────────────

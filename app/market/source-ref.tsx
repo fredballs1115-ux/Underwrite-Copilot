@@ -18,7 +18,7 @@ export function SourceRef({ source, className = "" }: { source: string | null | 
           source
         </a>
       ) : href ? (
-        "source on file — link unavailable"
+        "source link unavailable"
       ) : null}
       {words ? `${href ? " " : ""}(${words})` : null}
     </span>

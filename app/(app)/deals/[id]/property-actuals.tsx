@@ -96,14 +96,14 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             T-12 actual NOI{" "}
             <span className="font-mono font-semibold text-ink">{usd(noiComparison.t12Noi)}</span>
           </span>
-          <span className="ml-auto flex items-center gap-2">
+          <span className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-xs tabular-nums text-muted">
               Δ {noiComparison.direction === "below" ? "−" : ""}
               {pct(Math.abs(noiComparison.deltaPct))}
               {noiComparison.direction === "above" ? " (OM over actual)" : noiComparison.direction === "below" ? " (OM under actual)" : ""}
             </span>
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SEV[noiComparison.severity].cls}`}
+              className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SEV[noiComparison.severity].cls}`}
             >
               {SEV[noiComparison.severity].label}
             </span>

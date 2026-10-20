@@ -157,10 +157,12 @@ describe("the toolbar on a phone (research pass 36, F8)", () => {
       // keyboard lands on a control, and no box at all from sm.
       expect(classesOf(nthDiv(row, 1))).toEqual(expect.arrayContaining(["max-sm:overflow-x-auto", "max-sm:scroll-pr-8", "sm:contents"]));
       expect(classesOf(nthDiv(row, 2))).toEqual(expect.arrayContaining(["flex", "max-sm:w-max", "max-sm:pr-8"]));
-      // The tab strip's 1.75rem fade, drawn over the row and hidden from a
+      // The drawn edge (app/edge-fade), over the row and hidden from a
       // screen reader and from sm — never a mask, which would clip the share
-      // panel and the deal's menu that open out of these rows.
-      expect(row).toMatch(/<span aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-7 [^"]*sm:hidden"><\/span>/);
+      // panel and the deal's menu that open out of these rows. The right one
+      // shows until the browser has measured the row.
+      expect(row).toMatch(/<span aria-hidden="true" data-edge-fade="end" class="pointer-events-none absolute inset-y-0 [^"]*right-0[^"]* opacity-100 sm:hidden"/);
+      expect(row).toMatch(/<span aria-hidden="true" data-edge-fade="start" class="[^"]* opacity-0 sm:hidden"/);
       expect(row).not.toContain("mask-image");
     }
     // From sm the tools are the toolbar's own items again and the controls

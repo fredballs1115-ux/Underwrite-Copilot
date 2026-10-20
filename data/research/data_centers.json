@@ -18,8 +18,8 @@
   "top_east_coast_metros": [],
   "small_investor_verdict": {
     "accessible": false,
-    "entry_vehicle": "REIT shares (or nothing). The only physical-asset adjacency at $1-2M: land near substations/fiber in Northern Virginia's expansion corridors — a speculative land play, not a data-center play.",
-    "reasoning": "Minimum viable direct ticket is two orders of magnitude above budget. The NoVA land adjacency overlaps the buyer's home turf and is worth tracking through the intel watches (Loudoun/PW data-center-alley rezonings move dirt prices), but it belongs in the land/infill bucket."
+    "entry_vehicle": "No direct entry: the minimum direct ticket is two orders of magnitude above $1-2M, which leaves REIT shares. The one physical adjacency at that size is land near substations and fiber in Northern Virginia's expansion corridors — a speculative land position, not a data center.",
+    "reasoning": "Loudoun and Prince William data-center-alley rezonings move the price of nearby land, so the adjacency is a land/infill question rather than a data-center one."
   },
   "gaps": ["Stabilized colo cap-rate band", "PW County data-center overlay district changes (feeds the land thesis)"]
 }

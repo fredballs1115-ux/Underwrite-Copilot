@@ -107,7 +107,7 @@ export default async function DemoPage() {
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               A complete test, worked end to end
             </h1>
-            <span className="rounded-full bg-caution/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
+            <span className="rounded-full bg-caution px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white [text-shadow:none]">
               Illustrative sample
             </span>
           </div>
@@ -184,7 +184,7 @@ export default async function DemoPage() {
       <footer className="border-t border-line bg-paper">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>Underwrite Copilot · sample data is illustrative only</span>
-          <span className="flex gap-4">
+          <span className="flex flex-wrap gap-x-4 gap-y-2 whitespace-nowrap">
             <Link href="/terms" className="transition-colors hover:text-ink">
               Terms
             </Link>

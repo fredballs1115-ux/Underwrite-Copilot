@@ -1,4 +1,4 @@
-import { foldParts } from "@/lib/first-sentence";
+import { cautionText, foldParts } from "@/lib/first-sentence";
 
 /** A research note, folded: its first sentence shows, the rest opens on
  *  demand. The whole text stays in the HTML — the page lint, live-verify and
@@ -17,7 +17,7 @@ export function Fold({ text, className = "" }: { text: string; className?: strin
   const caution =
     cautions.length > 0 ? (
       <p className={`${className.replace(/\btext-muted\b/g, "").trim()} font-medium text-amber-700`} data-qa="caution">
-        {cautions.join(" ")}
+        {cautions.map(cautionText).join(" ")}
       </p>
     ) : null;
   if (!rest) {

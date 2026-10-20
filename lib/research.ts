@@ -483,16 +483,28 @@ export function hoursSince(iso: string, now = new Date()): number {
   return Number.isFinite(t) ? (now.getTime() - t) / 3_600_000 : Infinity;
 }
 
-/** A research figure's date as a page says it: "as of 2026-08-21", or
+/** A stored ISO day in words, as the pages write a date: "Aug 21, 2026";
+ *  anything that is not a real calendar day is left as written. */
+export function researchDay(d: string): string {
+  const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return d;
+  const at = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (at.getUTCMonth() !== Number(m[2]) - 1 || at.getUTCDate() !== Number(m[3])) return d;
+  return at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** A research figure's date as a page says it: "as of Aug 21, 2026", or
  *  "undated" where its file states none — never a date the file does not
  *  carry (hard-coded fallback dates once stood in for a missing one). Handed
  *  `today`, a date past the research rule's limit carries its age and the
- *  stale mark (lib/research-age): "as of 2026-08-20 (181 days old, stale)". */
+ *  stale mark (lib/research-age): "as of Aug 20, 2026 (181 days old,
+ *  stale)". The day is in words, as every other date on the page is: a raw
+ *  "2026-05-31" had sat beside "May 31, 2026" (the QA of 2026-10-20). */
 export function asOfLabel(asOf: string | null | undefined, today?: string | Date): string {
   const d = typeof asOf === "string" ? asOf.trim() : "";
   if (!d) return "undated";
   const mark = today === undefined ? null : staleMark(researchAge(d, today));
-  return `as of ${d}${mark ? ` (${mark})` : ""}`;
+  return `as of ${researchDay(d)}${mark ? ` (${mark})` : ""}`;
 }
 
 /** Compare a deal value to a benchmark range: below/within/above, null-safe. */

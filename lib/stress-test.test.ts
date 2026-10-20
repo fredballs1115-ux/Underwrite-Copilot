@@ -180,7 +180,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     // since the statement's stated EGI nets the vacancy from it — and the
     // sentence says what the loss was divided by.
     expect(v.evidence[0].label).toBe("The deal's T-12: vacancy loss over gross potential rent");
-    expect(v.evidence[0].text).toBe("9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to 2026-06-30)");
+    expect(v.evidence[0].text).toBe("9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026)");
     expect(v.evidence.map((e) => e.kind)).toEqual(["document", "published", "published", "rule_of_thumb"]);
     expect(v.evidence[1]).toMatchObject({ label: "Rental vacancy, metro area", publisher: "Census Bureau", scope: "metro", asOf: "2026-04-01" });
     // The region's figure is the region's, never passed off as the metro's.
@@ -536,7 +536,7 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
       ["rule_of_thumb", "Multifamily vacancy, a rule of thumb"],
     ]);
     expect(v.evidence[2].text).toBe(
-      "9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to 2026-06-30); today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close",
+      "9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close",
     );
     // 6.0% against 6.2% ±2.2: inside the margin, so it holds.
     expect(v.gap).toEqual({
@@ -781,19 +781,25 @@ describe("a value-add plan deal", () => {
     expect(n.unchecked).toBe("No T-12 is on file. On a value-add, lease-up, conversion or development deal the OM's pro forma NOI is the business plan, not today's income, so the in-place figure is not held to it.");
   });
 
-  it("reads the renovation premium against the achieved one, the rents and the break-even", () => {
+  it("reads the renovation premium against the achieved one and the rents, the break-even said beside it", () => {
     const p = rowOf(test, "renovation_premium");
     expect(p.omSays).toEqual({ text: "$250 a month a renovated door, as stated", value: 250, page: 22 });
+    // The break-even is what the program needs, not evidence of what a door
+    // earns: never filed as evidence (it had read "a rule of thumb … the
+    // deal's own figure" and widened the range to $71), said in the gap.
     expect(p.evidence.map((e) => e.label)).toEqual([
       "Achieved premium on the doors already renovated",
       "The OM's classic and renovated rents, against its lease comps' rents",
-      "Break-even premium at the model's exit cap",
     ]);
     expect(p.evidence[0]).toMatchObject({ kind: "om_internal", value: 190 });
-    expect(p.evidence[2]).toMatchObject({ kind: "rule_of_thumb", publisher: "the model's own arithmetic" });
+    expect(p.evidence.some((e) => e.kind === "rule_of_thumb")).toBe(false);
     // $15,000 × 5.71% / 12 = $71 a month.
-    expect(p.evidence[2].value).toBe(71);
-    expect(p.gap).toEqual({ value: 60, unit: "usd", text: "The projected $250 is $60 a month (31.6%) over the achieved $190." });
+    expect(p.gap).toEqual({
+      value: 60,
+      unit: "usd",
+      text: "The projected $250 is $60 a month (31.6%) over the achieved $190. A $15,000 door needs $71 a month to pay for itself at the model's 5.71% exit cap: the break-even, what the program needs, not evidence of what a door earns.",
+    });
+    expect(p.ruleOfThumbOnly).toBeUndefined();
     expect(p.verdict).toBe("unsupported");
     expect(p.impact).toBeNull();
   });
@@ -908,11 +914,11 @@ describe("the rent roll's vacancy is read by count on a class priced by the unit
     ).evidence[0];
 
   it("an apartment building by its doors", () => {
-    expect(withRoll("multifamily")).toMatchObject({ value: 9.2, text: "9.2% vacant (by count, 218 of 240 units occupied, as of 2026-05-31)" });
+    expect(withRoll("multifamily")).toMatchObject({ value: 9.2, text: "9.2% vacant (by count, 218 of 240 units occupied, as of May 31, 2026)" });
   });
 
   it("an office by its area", () => {
-    expect(withRoll("office")).toMatchObject({ value: 9.4, text: "9.4% vacant (by area, SF-weighted, as of 2026-05-31)" });
+    expect(withRoll("office")).toMatchObject({ value: 9.4, text: "9.4% vacant (by area, SF-weighted, as of May 31, 2026)" });
   });
 });
 
@@ -1043,7 +1049,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   expense_growth: ["Consumer prices", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
   insurance: ["Commercial property insurance premiums", "The deal's T-12 insurance line"],
-  renovation_premium: ["Achieved premium", "classic and renovated rents", "Break-even premium"],
+  renovation_premium: ["Achieved premium", "classic and renovated rents"],
   other: ["The challenger's own critique"],
 };
 

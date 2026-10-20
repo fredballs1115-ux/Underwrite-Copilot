@@ -11,6 +11,7 @@ import {
   type SectorJobsMetric,
 } from "@/lib/live-rates";
 import { monthOf } from "@/lib/zori";
+import { ScrollX } from "../edge-fade";
 import { heatShade } from "./heat-shade";
 
 /**
@@ -120,7 +121,7 @@ export function SectorJobsBoard({
           {`${rank.size} of ${total} cells carry a fresh figure · shaded within each column, fastest first, so office-using jobs compare to office-using jobs`}
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      <ScrollX className="mt-3" tall>
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -235,7 +236,7 @@ export function SectorJobsBoard({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
         {`BLS payrolls for each metro area by supersector, each against the same month a year earlier${newest ? `, newest ${monthOf(newest)}` : ""}, via FRED, pulled every weekday; each row is named for its metro area, and a suburb reads its metro area's row. A column ranks its newest month alone: a dashed figure with a date is an older month's, or a series that stopped updating (amber), shown rather than ranked; a dash is a series FRED does not carry. Each column is the sector that fills a kind of building — offices, warehouses, stores, hotels, clinics — and all payrolls is what rental housing runs on.`}
         {rows.some((m) => m.briefed === false)
