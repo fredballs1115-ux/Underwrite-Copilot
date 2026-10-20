@@ -5,6 +5,7 @@
 // figures it has read (lib/model-vs-market-read, lib/debt-index-read), so a
 // render test builds exactly what the page draws.
 
+import { cache } from "react";
 import type { DebtSeeds } from "@/lib/debt-index";
 import type { TodayReads } from "@/lib/model-vs-market-read";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
@@ -19,6 +20,8 @@ import { isTenancyInCommon } from "@/lib/interest";
 import { capSlotWithheld, modelReturnsRead } from "@/lib/compare-interest";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { rulesSizeText } from "@/lib/rent-regulation";
+import { readValueAdd } from "@/lib/value-add";
+import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { metroDemand } from "@/lib/metro-demand";
 import { marketPictureFor, pictureIsCheckedMarket, type MarketPicture } from "@/lib/market-picture";
 import { sampleModelReads, samplePlacement, sampleStressTest } from "@/lib/sample-stress";
@@ -133,6 +136,18 @@ export function sampleDemoData({
     // the same read of today's figures, the sample's stored results — the
     // one build the homepage's walkthrough draws too.
     stressTest: sampleStressTest({ today, reads }),
+    // The renovation program under the header, as the deal page draws it
+    // on the sample (page.tsx `ValueAddPanel`): the memorandum's program,
+    // and the derived model's exit cap and read wherever the model's reads
+    // stand (`shown`, lib/underwrite/report-grid `modelReadsWithheld`).
+    valueAdd: (() => {
+      const shown = modelReadsWithheld(derived.inputs, derived.sources, isPlanDeal(strategy.kind)) ? null : derived;
+      return {
+        program: readValueAdd(ex),
+        exitCapPct: shown ? shown.inputs.exitCapPct : null,
+        modelLine: shown?.meta.valueAdd?.read ?? "",
+      };
+    })(),
   };
 
   // The research panel's props, read as the deal page reads them for its
@@ -163,6 +178,16 @@ export function sampleDemoData({
 
   return { data, research };
 }
+
+/**
+ * `sampleDemoData`, built once a render for one day, one read of today's
+ * figures and one set of debt indices (React's `cache`, keyed on the three
+ * arguments as they are: the cached read hands every caller the same
+ * object): the homepage's header chip and its walkthrough draw one build.
+ */
+export const sampleDemoDataOnce = cache((today: string, reads: TodayReads | null, debt: DebtSeeds) =>
+  sampleDemoData({ today, reads, debt }),
+);
 
 /**
  * The homepage walkthrough's props, picked from /demo's own build: the two

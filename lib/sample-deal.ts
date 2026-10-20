@@ -35,8 +35,9 @@ import { SAMPLE_AUTHOR } from "@/lib/note-remove";
  *  the kill tone, with the count of criteria checked beside the score —
  *  the target return and the cash-on-cash cannot be checked from the
  *  documents, and lib/buy-box-chip's `buyBoxRead` says so in the chip's
- *  note. A signed-in reader's sample is judged against the reader's OWN
- *  box instead. */
+ *  note. The signed-in sample is judged against this box too, whoever
+ *  reads it (lib/deal-buy-box), never the reader's own: the three surfaces
+ *  say one thing. */
 export const SAMPLE_DEMO_BOX: BuyBox = {
   assetClasses: ["multifamily"],
   unitsMin: 100,

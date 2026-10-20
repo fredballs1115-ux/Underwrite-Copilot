@@ -35,6 +35,8 @@ import {
   type Stage,
 } from "@/lib/stages";
 import { SAMPLE_DEAL, sampleWork } from "@/lib/sample-deal";
+import { sampleFixtureColumns } from "@/lib/sample-refresh";
+import { refreshSampleDeal, syncSampleActuals } from "@/lib/sample-refresh-run";
 import { OM_REPLACED, parseDealNotes, parseDealQa } from "@/lib/deals";
 import { omFingerprint } from "@/lib/om-fingerprint";
 import {
@@ -606,30 +608,11 @@ export async function createSampleDeal() {
     .limit(1)
     .maybeSingle();
   if (existing) {
-    // Self-healing sample: backfill the neighborhood placement on samples
-    // created before the relocation, so their panels light up too.
-    try {
-      await supabase
-        .from("deals")
-        .update({ address: SAMPLE_DEAL.address })
-        .eq("id", existing.id)
-        .is("address", null);
-    } catch {
-      // pre-0011 schema — carry on
-    }
-    // A sample seeded before 2026-10-20 carries the challenger paragraph
-    // that quoted the first-draft model's IRRs beside the stress test's own;
-    // the sample's paragraph is words alone now (lib/sample-deal).
-    try {
-      await supabase
-        .from("deals")
-        .update({ challenges: SAMPLE_DEAL.challenges })
-        .eq("id", existing.id)
-        .like("challenges->>stressTest", "%levered IRR falls to%");
-    } catch {
-      // best-effort, like the address backfill above
-    }
-    await seedSampleActuals(existing.id as string);
+    // Self-healing sample: a row seeded from an older fixture is written
+    // again whole — every column the seed writes, its rent roll and T-12 —
+    // so it shows what the homepage and /demo show (lib/sample-refresh).
+    await refreshSampleDeal(existing.id as string);
+    await syncSampleActuals(existing.id as string);
     await seedSampleWork(existing.id as string);
     redirect(`/deals/${existing.id}`);
   }
@@ -639,15 +622,9 @@ export async function createSampleDeal() {
     .insert({
       user_id: user.id,
       is_sample: true,
-      name: SAMPLE_DEAL.name,
-      asset_class: SAMPLE_DEAL.asset_class,
-      extraction: SAMPLE_DEAL.extraction,
-      challenges: SAMPLE_DEAL.challenges,
-      comps: SAMPLE_DEAL.comps,
-      reconciliation: SAMPLE_DEAL.reconciliation,
-      market: SAMPLE_DEAL.market,
-      verdict: SAMPLE_DEAL.verdict,
-      model: SAMPLE_DEAL.model,
+      // The fixture's columns, its extraction stamped with the fixture's
+      // edition (lib/sample-refresh); the address is written below.
+      ...sampleFixtureColumnsWithoutAddress(),
     })
     .select("id")
     .single();
@@ -669,55 +646,19 @@ export async function createSampleDeal() {
     // pre-0011 schema — the sample still works address-less
   }
 
-  await seedSampleActuals(deal.id as string);
+  await syncSampleActuals(deal.id as string);
   await seedSampleWork(deal.id as string);
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
 }
 
-/**
- * Property actuals (Feature 1) on the sample, so the PROPERTY ACTUALS card,
- * the OM-vs-T-12 note, and the actuals-anchored playground all demo without
- * an upload. Idempotent (skips rows that already exist) so it can run on
- * every open of an existing sample. Service-role writes (0020's tables are
- * user-read-only); best-effort — a pre-0020 schema just leaves the sample
- * OM-only.
- */
-async function seedSampleActuals(dealId: string): Promise<void> {
-  try {
-    const admin = createSupabaseAdminClient();
-    const [rr, t12] = await Promise.all([
-      admin
-        .from("deal_rent_rolls")
-        .select("id", { count: "exact", head: true })
-        .eq("deal_id", dealId),
-      admin
-        .from("deal_t12_statements")
-        .select("id", { count: "exact", head: true })
-        .eq("deal_id", dealId),
-    ]);
-    // A count query against a missing table returns an error — treat any
-    // uncertainty as "don't touch".
-    if (!rr.error && (rr.count ?? 0) === 0) {
-      await admin.from("deal_rent_rolls").insert({
-        deal_id: dealId,
-        as_of_date: SAMPLE_DEAL.rentRoll.as_of_date,
-        extraction: SAMPLE_DEAL.rentRoll.extraction,
-        summary: SAMPLE_DEAL.rentRoll.summary,
-      });
-    }
-    if (!t12.error && (t12.count ?? 0) === 0) {
-      await admin.from("deal_t12_statements").insert({
-        deal_id: dealId,
-        period_end_date: SAMPLE_DEAL.t12.period_end_date,
-        extraction: SAMPLE_DEAL.t12.extraction,
-        summary: SAMPLE_DEAL.t12.summary,
-      });
-    }
-  } catch {
-    // sample still works OM-only
-  }
+/** The fixture's deal columns but its address, which the insert leaves to
+ *  its own best-effort write. */
+function sampleFixtureColumnsWithoutAddress() {
+  const { address, ...rest } = sampleFixtureColumns();
+  void address;
+  return rest;
 }
 
 /**

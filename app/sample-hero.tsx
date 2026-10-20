@@ -25,6 +25,7 @@ export function SampleDealHero({
   titleAs = "h1",
   stamp = false,
   stress = null,
+  children,
 }: {
   header: HeaderFacts;
   /** the tool row under the facts; the sample's public downloads by default */
@@ -37,6 +38,9 @@ export function SampleDealHero({
   /** the stress test's counts beside the call, as the deal page draws them
    *  (lib/stress-test-words `verdictCounts` on the page's own test) */
   stress?: Record<StressVerdict, number> | null;
+  /** the panels under the header, as the deal page draws them on the
+   *  sample (DealHero's own slot) */
+  children?: ReactNode;
 }) {
   const { pill, fit, market } = header;
   // The deal page's chips, class for class (page.tsx, `DealHero`'s chips).
@@ -82,7 +86,9 @@ export function SampleDealHero({
         ) : null
       }
       actions={tools}
-    />
+    >
+      {children}
+    </DealHero>
   );
 }
 

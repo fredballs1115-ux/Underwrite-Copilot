@@ -104,6 +104,7 @@ import type { DealDocument } from "@/lib/documents";
 // The buy box tab lives in buy-box-panel.tsx, which /demo draws on the
 // sample without this module.
 import { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
+import { SampleBuyBox } from "@/app/sample-buy-box";
 import { StatGridSkeleton, CardListSkeleton, TableSkeleton, VerdictSkeleton } from "./skeletons";
 export { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
 import { MAX_OM_PAGES } from "@/lib/pdf";
@@ -306,6 +307,7 @@ export function DealView({
   compSearch,
   isPro,
   buyBox,
+  sampleBoxLines = null,
   screenDiff,
   stageHistory,
   dealStage = null,
@@ -426,6 +428,10 @@ export function DealView({
   compSearch: CompSearchResult | null;
   isPro: boolean;
   buyBox: BuyBoxPanelData;
+  /** the sample's example box, one line a criterion (lib/criteria
+   *  `buyBoxLines` on SAMPLE_DEMO_BOX): on the sample the Buy box tab is
+   *  captioned as that box, as the homepage's walkthrough and /demo draw it */
+  sampleBoxLines?: string[] | null;
   screenDiff: ScreenDiff | null;
   stageHistory: StageChange[];
   /** the deal's stage, for what became of it once Dead or Closed (lib/
@@ -963,7 +969,8 @@ export function DealView({
           />
         )}
 
-        {section === "buybox" && <BuyBoxPanel data={buyBox} />}
+        {section === "buybox" &&
+          (sampleBoxLines ? <SampleBuyBox data={{ panel: buyBox, lines: sampleBoxLines }} publicDemo={false} /> : <BuyBoxPanel data={buyBox} />)}
 
         {section === "analyses" && (
           <AnalysesPanel

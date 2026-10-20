@@ -90,9 +90,9 @@ const LEFT_OFF: Record<string, string> = {
 
 /** The deal page's part, read as the sample's public pages draw it: the
  *  first-draft model card's body (app/sample-model-card, the deal page's
- *  ModelView's own ModelBody), the Buy box tab captioned as the sample's
- *  example box (app/sample-buy-box, the deal page's BuyBoxPanel). */
-const AS_SAMPLE: Record<string, string> = { ModelView: "SampleModelCard", BuyBoxPanel: "SampleBuyBox" };
+ *  ModelView's own ModelBody). The Buy box tab's SampleBuyBox is the deal
+ *  page's own on the sample (held below). */
+const AS_SAMPLE: Record<string, string> = { ModelView: "SampleModelCard" };
 
 const DEAL_VIEW = "app/(app)/deals/[id]/deal-view.tsx";
 const DEMO = "app/demo/sections.tsx";
@@ -146,13 +146,35 @@ describe("each walkthrough tab draws /demo's parts, in /demo's order, and /demo 
   });
 
   it("Buy box: the deal page's panel, captioned as the sample's example box", () => {
-    const deal = dealParts(slice(DEAL_VIEW, 'section === "buybox"', 'section === "analyses"'));
+    // The deal page draws the public pages' own SampleBuyBox on the sample
+    // (handed the demo box's lines), and the bare panel on a deal of the
+    // reader's own.
+    const dealCode = slice(DEAL_VIEW, 'section === "buybox"', 'section === "analyses"');
+    expect(partsIn(dealCode)).toEqual(["SampleBuyBox", "BuyBoxPanel"]);
+    expect(dealCode).toMatch(/sampleBoxLines \? <SampleBuyBox /);
+    const deal = ["SampleBuyBox"];
     const demo = partsIn(slice(DEMO, 'section === "buybox"', 'section === "analyses"'));
     const home = partsIn(drawn(HOME, "BuyBoxTab")).filter((c) => !loading(c));
-    expect(deal).toEqual(["SampleBuyBox"]);
     expect(demo).toEqual(deal);
     expect(home).toEqual(demo);
     expect(src("app/sample-buy-box.tsx")).toContain("<BuyBoxPanel");
+    // …judged against the demo box whoever reads it: the page, the memo, the
+    // report and the workbook read the deal's box through one reader, which
+    // answers SAMPLE_DEMO_BOX on a sample.
+    const page = src("app/(app)/deals/[id]/page.tsx");
+    expect(page).toContain("sampleBoxLines={isSampleDeal ? buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false }) : null}");
+    expect(src("app/demo/demo-data.ts")).toContain("boxLines: buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false })");
+    expect(src("lib/deal-buy-box.ts")).toContain("if (row.is_sample) return SAMPLE_DEMO_BOX;");
+    for (const file of [
+      "app/(app)/deals/[id]/page.tsx",
+      "app/api/deals/[id]/memo/route.ts",
+      "app/api/deals/[id]/report/route.ts",
+      "app/api/deals/[id]/underwrite.xlsx/route.ts",
+    ]) {
+      const code = src(file);
+      expect(code, file).toContain("buyBoxForDealRow({ ...ownership, is_sample:");
+      expect(code, file).not.toContain("getBuyBoxForDeal(");
+    }
   });
 
   it("Analyses and Documents: /demo draws the walkthrough's own panel, handed only what the walkthrough is handed", () => {
@@ -246,7 +268,7 @@ describe("the walkthrough draws /demo's build, part for part", () => {
     expect(data.demand).not.toBeNull();
     // The homepage builds it so, and hands it whole to its tabs.
     const page = src("app/page.tsx");
-    expect(page).toMatch(/const \{ data \} = sampleDemoData\(\{ today: fmrToday\(\), reads, debt: NO_DEBT_SEEDS \}\);/);
+    expect(page).toMatch(/const \{ data \} = sampleDemoDataOnce\(readerToday\(null\), reads, NO_DEBT_SEEDS\);/);
     expect(page).toContain("<DemoTabs {...walkthroughData(data)} />");
     // …and every prop the tabs take reaches their panel.
     const call = slice(HOME, "<DemoPanel", "/>");
@@ -324,5 +346,141 @@ describe("the walkthrough draws /demo's build, part for part", () => {
     const html = home("Analyses", "market");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+});
+
+// Past the sections: what the deal page draws under its header and under its
+// sections, held to /demo's and the homepage's. Each part the public pages
+// leave off is named with its reason, and a part named as drawing nothing on
+// the sample is read on the sample here, so the list cannot hide one.
+const PAGE = "app/(app)/deals/[id]/page.tsx";
+const DEMO_PAGE = "app/demo/page.tsx";
+const HOME_PAGE = "app/page.tsx";
+
+/** Header panels that read nothing on the sample: a fee-simple, stabilized,
+ *  single-property apartment building sold by negotiation, with no listing
+ *  team, reports, abatement or rent regime stated. */
+const HEADER_NOTHING: Record<string, string> = {
+  PlanStrip: "a stabilized building has no plan",
+  InterestPanel: "a plain fee simple says nothing",
+  PlausibilityPanel: "the sample's figures tie",
+  SandwichPanel: "no master lease",
+  SalePanel: "a negotiated sale",
+  ForwardPanel: "no forward purchase",
+  GoingConcernPanel: "no operating business",
+  AffordablePanel: "no recorded restriction",
+  RegulationPanel: "no rent regime reaches it",
+  SingleTenantPanel: "an apartment building of many tenants",
+  RosterPanel: "no business tenants",
+  TaxAbatementPanel: "no abatement",
+  HotelPanel: "not a hotel",
+  StudentHousingPanel: "not student housing",
+  ManufacturedHousingPanel: "not a park",
+  SelfStoragePanel: "not storage",
+  MixedUsePanel: "one income",
+  CondoPanel: "no condominium units",
+  SiteReportsPanel: "no third-party reports cited",
+  ListingTeam: "the memorandum names no brokers and no call for offers",
+  PlanSensitivity: "no plan, so no yield-on-cost grid",
+};
+/** Header parts that are the reader's, never the sample's. */
+const HEADER_LEFT_OFF: Record<string, string> = {
+  OlderScreenNote: "a screen stored before a read, never on the sample (lib/older-screen `isSample`)",
+  RetryForm: "the re-screen control inside that note",
+  BrokerEmailActions: "writing to the memorandum's brokers, never on the sample",
+};
+/** Under the sections: the reader's, each with its reason. */
+const PAGE_LEFT_OFF: Record<string, string> = {
+  DealStickyBar: "the page's kept-in-view bar, its chrome",
+  DealStepKeys: "the [ and ] keys through the reader's own pipeline",
+  PortfolioCard: "one property: the sample states no portfolio",
+  SubmarketCard: "the reader's own submarkets",
+  PublicCompsPanel:
+    "recorded sales pulled around a reader's row behind the page; on the sample they are shown and never set against its invented price",
+  SiteFlagsCard: "the flood zone, Opportunity Zone and tract looked up at a reader's row's point; the public pages make no lookup",
+  SectorFieldsForm: "the reader's own answers to the class's facts",
+};
+/** The deal page's part, as the public pages draw it on the sample. */
+const PAGE_AS_SAMPLE: Record<string, string> = {
+  DealView: "DemoSections",
+  PublicRecordCard: "SamplePublicRecord",
+  ResearchPanel: "ResearchPanelView",
+};
+
+describe("the deal page's panels past its sections, as the public pages draw them on the sample", () => {
+  it("under the header: the renovation program, and every other panel named with why it is left off", () => {
+    const deal = partsIn(slice(PAGE, "{older ? (", "</DealHero>"));
+    for (const name of [...Object.keys(HEADER_NOTHING), ...Object.keys(HEADER_LEFT_OFF)]) expect(deal, name).toContain(name);
+    const drawnOnSample = deal.filter((c) => !(c in HEADER_NOTHING) && !(c in HEADER_LEFT_OFF));
+    expect(drawnOnSample).toEqual(["ValueAddPanel"]);
+    const demo = partsIn(slice(DEMO_PAGE, "<SampleDealHero", "</SampleDealHero>")).filter((c) => c !== "SampleDealHero");
+    expect(demo).toEqual(drawnOnSample);
+    const home = partsIn(drawn(HOME_PAGE, "SampleWalkthrough")).filter((c) => c !== "DemoTabs");
+    expect(home).toEqual(drawnOnSample);
+  });
+
+  it("each panel named as reading nothing reads nothing on the sample", async () => {
+    const ex = SAMPLE_DEAL.extraction;
+    const noon = new Date(`${TODAY}T12:00:00Z`);
+    const ds = await import("./deal-strategy");
+    const strategy = ds.inferStrategy(ex, null);
+    const plan = ds.planWithBasisChecked(ex, strategy, ds.planSummary(ex, strategy));
+    expect(plan).toBeNull();
+    const { PlanStrip, PlausibilityPanel } = await import("@/app/(app)/deals/[id]/plausibility-panel");
+    const { InterestPanel } = await import("@/app/interest-panel");
+    const { RegulationPanel } = await import("@/app/regulation-panel");
+    const { ListingTeam } = await import("@/app/(app)/deals/[id]/listing-team");
+    const { readInterest } = await import("./interest");
+    const { regulationForDeal } = await import("./rent-regulation");
+    const { listingTeamOf, offersDueOf } = await import("./offering");
+    const html = (el: React.ReactElement) => renderToStaticMarkup(el);
+    const regulation = regulationForDeal(
+      { extraction: ex, address: SAMPLE_DEAL.address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class },
+      TODAY,
+    );
+    const rendered: Record<string, string> = {
+      PlanStrip: html(React.createElement(PlanStrip, { strategy, plan })),
+      InterestPanel: html(React.createElement(InterestPanel, { interest: readInterest(ex, ds.askingPriceOf(ex), noon) })),
+      PlausibilityPanel: html(React.createElement(PlausibilityPanel, { findings: ds.assessPlausibility(ex, strategy), strategy })),
+      RegulationPanel: html(React.createElement(RegulationPanel, { regulation, today: TODAY, modelGrowthPct: 3, modelLine: "" })),
+      ListingTeam: html(React.createElement(ListingTeam, { team: listingTeamOf(ex), offersDue: offersDueOf(ex) })),
+    };
+    for (const [name, out] of Object.entries(rendered)) expect(out, name).toBe("");
+    // The rest draw nothing on a null read; each reader reads none.
+    const readers: Record<string, () => Promise<unknown>> = {
+      SandwichPanel: async () => (await import("./sandwich-lease")).readSandwichLease(ex, noon),
+      SalePanel: async () => (await import("./sale-terms")).readSale(ex, noon),
+      ForwardPanel: async () => (await import("./forward-purchase")).readForwardPurchase(ex, noon, strategy),
+      GoingConcernPanel: async () => (await import("./going-concern")).readGoingConcern(ex, noon),
+      AffordablePanel: async () => (await import("./affordable")).readAffordable(ex, noon),
+      SingleTenantPanel: async () => (await import("./single-tenant")).readSingleTenant(ex, noon),
+      RosterPanel: async () => (await import("./tenant-roster")).readRoster(ex, noon),
+      TaxAbatementPanel: async () => (await import("./tax-abatement")).readTaxAbatement(ex, noon),
+      HotelPanel: async () => (await import("./hotel-deal")).readHotelDeal(ex, noon),
+      StudentHousingPanel: async () => (await import("./student-housing")).readStudentHousing(ex),
+      ManufacturedHousingPanel: async () => (await import("./manufactured-housing")).readManufacturedHousing(ex),
+      SelfStoragePanel: async () => (await import("./self-storage")).readSelfStorage(ex),
+      MixedUsePanel: async () => (await import("./mixed-use")).readMixedUse(ex, noon),
+      CondoPanel: async () => (await import("./condo")).readCondo(ex, noon),
+      SiteReportsPanel: async () => (await import("./site-reports")).readSiteReports(ex, noon),
+    };
+    for (const [name, read] of Object.entries(readers)) expect(await read(), name).toBeNull();
+    // PlanSensitivity draws only with a plan, held null above.
+    expect(new Set([...Object.keys(rendered), ...Object.keys(readers), "PlanSensitivity"])).toEqual(new Set(Object.keys(HEADER_NOTHING)));
+  });
+
+  it("under the sections: /demo's, the deal page's less the reader's own, each named with its reason", async () => {
+    const deal = partsIn(slice(PAGE, "</DealHero>", "Room at the foot"));
+    for (const name of Object.keys(PAGE_LEFT_OFF)) expect(deal, name).toContain(name);
+    const expected = deal.filter((c) => !(c in PAGE_LEFT_OFF)).map((c) => PAGE_AS_SAMPLE[c] ?? c);
+    expect(expected).toEqual(["DemoSections", "SamplePublicRecord", "ResearchPanelView"]);
+    const demo = partsIn(slice(DEMO_PAGE, "<DemoSections", "What comes after the screen"));
+    expect(demo).toEqual(expected);
+    // The sample states one property.
+    const { readPortfolio } = await import("./portfolio");
+    expect(readPortfolio(SAMPLE_DEAL.extraction)).toBeNull();
+    // On the sample, its neighbourhood's recorded sales are never set against
+    // its invented price.
+    expect(slice(PAGE, "<PublicCompsPanel", "/>")).toContain("subject={isSampleDeal ? null : compsCallSubject}");
   });
 });

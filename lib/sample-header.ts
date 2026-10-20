@@ -182,11 +182,14 @@ export function headerFacts(input: HeaderInput): HeaderFacts {
 }
 
 /**
- * The sample deal's header, as the signed-in sample deal's page draws it —
- * judged against the public sample's buy box (lib/sample-deal
- * `SAMPLE_DEMO_BOX`), the box the memo, the report and the walkthrough
- * judge it against. The sample has no first signal and its address is
- * never sharpened past the neighbourhood, so its market is its address's.
+ * The sample deal's header for the public pages (the homepage and /demo),
+ * through the deal page's own readers, judged against the public sample's
+ * buy box (lib/sample-deal `SAMPLE_DEMO_BOX`). The signed-in sample's page
+ * builds its header from its stored row and judges it against the same box
+ * (lib/deal-buy-box `buyBoxForDealRow` answers SAMPLE_DEMO_BOX on a sample,
+ * whoever reads it), as its memo, report and workbook do. The sample has no
+ * first signal and its address is never sharpened past the neighbourhood,
+ * so its market is its address's.
  */
 export function sampleHeader(asOf: Date = new Date()): HeaderFacts {
   return headerFacts({

@@ -27,8 +27,10 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { verdictCounts } from "@/lib/stress-test-words";
-import { sampleDemoData, walkthroughData } from "./demo/demo-data";
-import { fmrToday } from "@/lib/fmr";
+import { sampleDemoDataOnce, walkthroughData } from "./demo/demo-data";
+// The sample's stress test is read on the reader's day the memo tile and the
+// downloads date it by (lib/reader-day, New York with no reader's zone).
+import { readerToday } from "@/lib/reader-day";
 import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { BUY_BOX_CHIP_CLS, boxCriteria, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { ruleCounts } from "@/lib/research-data";
@@ -47,6 +49,7 @@ import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos
 import { photosOnDisk } from "@/lib/photos-fs";
 import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
 import { SampleDealHero } from "./sample-hero";
+import { ValueAddPanel } from "./value-add-panel";
 import { MemoPreview } from "./memo-preview";
 import { SamplePipelineCard } from "./sample-pipeline-card";
 import { sampleMemoData } from "@/lib/sample-memo";
@@ -1485,7 +1488,7 @@ async function DealPreview({ header }: { header: HeaderFacts }) {
   // build of the sample (the same day and the same figures), so the chip and
   // the panel below can never disagree.
   const reads = await sampleTodayReads();
-  const { data } = sampleDemoData({ today: fmrToday(), reads, debt: NO_DEBT_SEEDS });
+  const { data } = sampleDemoDataOnce(readerToday(null), reads, NO_DEBT_SEEDS);
   const stress = data.stressTest && data.stressTest.rows.length > 0 ? verdictCounts(data.stressTest) : null;
   return (
     <div className="relative text-ink">
@@ -1514,8 +1517,16 @@ async function DealPreview({ header }: { header: HeaderFacts }) {
 // research panel.
 async function SampleWalkthrough() {
   const reads = await sampleTodayReads();
-  const { data } = sampleDemoData({ today: fmrToday(), reads, debt: NO_DEBT_SEEDS });
-  return <DemoTabs {...walkthroughData(data)} />;
+  const { data } = sampleDemoDataOnce(readerToday(null), reads, NO_DEBT_SEEDS);
+  // The renovation program the deal page and /demo draw under the sample's
+  // header, from the same build, at the walkthrough's head: the homepage's
+  // header is the hero's compact preview.
+  return (
+    <div className="flex flex-col gap-4">
+      <ValueAddPanel {...data.valueAdd} />
+      <DemoTabs {...walkthroughData(data)} />
+    </div>
+  );
 }
 
 // ── Footer trust line ────────────────────────────────────────────────────────

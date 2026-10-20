@@ -571,7 +571,7 @@ export interface MemoStressBlock {
   /** "1 unsupported · 2 stretched" — the count beside the title */
   count: string;
   /** the headline (lib/stress-test-words `memoHeadline`): "Levered IRR on
-   *  the OM's figures 16.7% to 12.3% with the evidence: …", or "" where the
+   *  the OM's figures 16.7% to 11.5% with the evidence: …", or "" where the
    *  test carries none (the read line already says why no return is re-run) */
   headline?: string;
   rows: StressRowWords[];

@@ -334,7 +334,7 @@ export function shownHeadline(h: StressHeadline): { om: number | null; evidence:
 }
 
 /**
- * The headline's one line: "Levered IRR on the OM's figures 16.7% to 12.3%
+ * The headline's one line: "Levered IRR on the OM's figures 16.7% to 11.5%
  * with the evidence". `arrow` is "to" on paper (WinAnsi has no arrow) and
  * "→" on the page. Where nothing is past its evidence, the OM's case alone
  * and why the evidence's is the same run — said as nothing the headline
@@ -386,7 +386,7 @@ function joinAnd(parts: string[]): string {
  * The headline in one short clause, for the one-page memo, which has no
  * line to spare (measured on the sample: the line alone fits beside the
  * read line, the split does not): "Levered IRR on the OM's figures 16.7%
- * to 12.3% with the evidence; the report splits the gap by assumption."
+ * to 11.5% with the evidence; the report splits the gap by assumption."
  * The report prints `headlineSentence`, the split and what is left out
  * with why. Null with no headline.
  */

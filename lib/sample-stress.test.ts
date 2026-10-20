@@ -19,6 +19,8 @@ import { modelVsMarketFor } from "./model-vs-market";
 import { buildStressTest } from "./stress-test";
 import type { StressTest } from "./stress-test-types";
 import type { TodayReads } from "./model-vs-market-read";
+import { readValueAdd } from "./value-add";
+import { modelReadsWithheld } from "./underwrite/report-grid";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
 // deal's page (app/(app)/deals/[id]/page.tsx), /demo's Overview
@@ -67,7 +69,7 @@ const TODAY = "2026-09-21";
  * seeded), the model's read against today's figures, and `buildStressTest`
  * with no recorded sales or past screens on the sample.
  */
-function signedInSample(reads: TodayReads | null): StressTest {
+function signedInParts(reads: TodayReads | null): { stress: StressTest; derived: ReturnType<typeof deriveUnderwriteInputs> } {
   const extraction = SAMPLE_DEAL.extraction;
   const strategy = inferStrategy(extraction, null);
   const readClass = shownAssetClass(SAMPLE_DEAL.asset_class, extraction) || null;
@@ -103,7 +105,7 @@ function signedInSample(reads: TodayReads | null): StressTest {
         regulation,
       })
     : null;
-  return buildStressTest({
+  const stress = buildStressTest({
     extraction,
     firstSignal: null,
     challenger: SAMPLE_DEAL.challenges,
@@ -117,7 +119,9 @@ function signedInSample(reads: TodayReads | null): StressTest {
     pastScreens: null,
     readOn: TODAY,
   });
+  return { stress, derived };
 }
+const signedInSample = (reads: TodayReads | null): StressTest => signedInParts(reads).stress;
 
 /** The homepage's walkthrough, as app/page.tsx builds it: /demo's build,
  *  picked for the walkthrough. */
@@ -201,6 +205,30 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
   });
 
+  it("draws one renovation program under the header on all three: the deal page's props, /demo's and the homepage's", () => {
+    // The deal page (page.tsx `ValueAddPanel`): the stored memorandum's
+    // program, the derived model's exit cap and read where its reads stand.
+    const { derived } = signedInParts(READS);
+    const shown = modelReadsWithheld(derived.inputs, derived.sources, false) ? null : derived;
+    const page = {
+      program: readValueAdd(SAMPLE_DEAL.extraction),
+      exitCapPct: shown ? shown.inputs.exitCapPct : null,
+      modelLine: shown?.meta.valueAdd?.read ?? "",
+    };
+    expect(page.program).not.toBeNull();
+    expect(page.modelLine).toMatch(/exit cap a door's premium is worth/);
+    const { data } = sampleDemoData({ today: TODAY, reads: READS, debt: NO_DEBT_SEEDS });
+    expect(data.valueAdd).toEqual(page);
+    // The deal page hands the panel those three, /demo draws it under the
+    // sample's header and the homepage at its walkthrough's head, each from
+    // /demo's one build.
+    expect(src("app/(app)/deals/[id]/page.tsx")).toMatch(
+      /<ValueAddPanel\s+program=\{readValueAdd\(extraction\)\}\s+exitCapPct=\{shown \? shown\.inputs\.exitCapPct : null\}\s+modelLine=\{shown\?\.meta\.valueAdd\?\.read \?\? ""\}/,
+    );
+    expect(src("app/demo/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
+    expect(src("app/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
+  });
+
   it("places the sample where the deal page places it", () => {
     expect(samplePlacement()).toEqual(placeDeal(SAMPLE_DEAL.address, countyOf(SAMPLE_DEAL.address, null)));
     expect(samplePlacement().live).toMatchObject({ id: "philadelphia" });
@@ -216,7 +244,18 @@ describe("the sample's stress test, one build on every surface", () => {
     // the walkthrough (`walkthroughData`), on the reads it makes itself.
     const home = src("app/page.tsx");
     expect(home).toContain("const reads = await sampleTodayReads();");
-    expect(home).toMatch(/sampleDemoData\(\{ today: fmrToday\(\), reads, debt: NO_DEBT_SEEDS \}\)/);
+    // On the reader's day, the one the memo tile and the downloads date the
+    // sample by (lib/reader-day, New York with no reader's zone), never the
+    // UTC day: from 8 pm Eastern the two are a day apart.
+    expect(home).toMatch(/sampleDemoDataOnce\(readerToday\(null\), reads, NO_DEBT_SEEDS\)/);
+    expect(home).not.toContain("fmrToday");
+    expect(src("lib/sample-memo.ts")).toContain("const readerDay = readerToday(null, now);");
+    expect(src("app/demo/page.tsx")).toContain("const today = readerToday(null);");
+    expect(src("app/demo/page.tsx")).not.toContain("fmrToday");
+    // One read and one build a render (React's cache), so the homepage's
+    // chip, memo tile and walkthrough draw one set of figures.
+    expect(src("lib/sample-stress-read.ts")).toContain("export const sampleTodayReads = cache(async ()");
+    expect(src("app/demo/demo-data.ts")).toContain("export const sampleDemoDataOnce = cache(");
     expect(home).toContain("<DemoTabs {...walkthroughData(data)} />");
     expect(home).not.toMatch(/buildStressTest|sampleStressTest\(/);
     expect(src("app/demo/page.tsx")).toContain("await sampleTodayReads()");

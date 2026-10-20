@@ -125,6 +125,9 @@ const SERVER_KEY_READERS: Record<string, string> = {
   "app/(app)/deals/[id]/page.tsx": "the analyses beside them",
   // The sample deal's actuals, seeded when it is created.
   "app/(app)/deals/actions.ts": "the analyses beside them",
+  // The sample deal's fixture, its rent roll and T-12, written again over a
+  // sample seeded from an older fixture (lib/sample-refresh).
+  "lib/sample-refresh-run.ts": "the analyses beside them",
   "lib/anthropic/ask.ts": "the questions you ask about a deal",
   "lib/storage.ts": "every stored file",
   "lib/criteria-server.ts": "the buy box and branding a memo, report or export reads",
