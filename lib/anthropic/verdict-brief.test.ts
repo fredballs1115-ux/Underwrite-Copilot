@@ -577,6 +577,15 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(buildBrief({ extraction: null, ...none })).not.toContain("STRESS TEST");
   });
 
+  it("says a Census region's figure as the region's, never the metro's", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const region = { kind: "published" as const, label: "Rental vacancy, South Census region", text: "9.5% (Q2 2026)", value: 9.5, asOf: "2026-04-01", publisher: "FRED", scope: "region" as const };
+    const brief = buildBrief({ extraction: null, ...none, stressTest: { ...test, rows: test.rows.map((r) => (r.key === "vacancy" ? { ...r, evidence: [...r.evidence, region] } : r)) } });
+    expect(brief).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the Census region's figure)");
+    expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the metro's figure)");
+  });
+
   it("says the impacts are withheld, and why, where no model could be built", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");

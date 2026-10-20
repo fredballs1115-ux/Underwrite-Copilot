@@ -149,7 +149,7 @@ export function stressSection(test: StressTest): string[] {
             // where the publisher already says it ("a rule of thumb").
             const kind =
               e.kind === "published"
-                ? `the ${e.scope === "nation" ? "nation's" : e.scope === "state" ? "state's" : "metro's"} figure`
+                ? `the ${e.scope === "nation" ? "nation's" : e.scope === "state" ? "state's" : e.scope === "region" ? "Census region's" : "metro's"} figure`
                 : e.kind === "document"
                   ? "the deal's own document"
                   : e.kind === "rule_of_thumb"
