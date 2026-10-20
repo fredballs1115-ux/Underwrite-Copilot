@@ -67,7 +67,7 @@ import type {
   MarketResult,
 } from "@/lib/anthropic/types";
 import type { ActualsRead } from "@/lib/actuals/actuals-read";
-import { NOI_IN_LINE_BAND, pickOmNoi } from "@/lib/actuals/analyze";
+import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
@@ -533,10 +533,10 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     }
   };
   // The deal's own documents first: the rent roll's occupancy, the T-12's
-  // vacancy loss over its rent line — the `collectedRent` figure
-  // lib/actuals/analyze nets the vacancy and adds the other income to for
-  // the EGI, so it is the rent before the vacancy, whatever the statement
-  // called it; never "scheduled rent", which the T-12 reader does not read.
+  // vacancy loss over gross potential rent — whether its rent line already
+  // nets the vacancy is the statement's own EGI to say (lib/actuals/analyze
+  // `t12Vacancy`, the track record's one reading), and the sentence says
+  // what the loss was divided by.
   const rr = ctx.actuals?.rentRoll;
   if (rr) {
     const occ = rr.summary.sfWeightedOccupancy ?? (rr.summary.unitCount > 0 ? rr.summary.occupiedUnits / rr.summary.unitCount : null);
@@ -555,19 +555,17 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     }
   }
   const t12 = ctx.actuals?.t12;
-  if (t12 && t12.summary.vacancyLoss != null && t12.summary.collectedRent != null && t12.summary.collectedRent > 0 && t12.summary.vacancyLoss >= 0) {
-    const v = Math.round((t12.summary.vacancyLoss / t12.summary.collectedRent) * 1000) / 10;
-    if (v <= 100) {
-      push({
-        kind: "document",
-        label: "The deal's T-12: vacancy loss over its rent line",
-        text: `${pct1(v)} (${money(t12.summary.vacancyLoss)} of the ${money(t12.summary.collectedRent)} rent line its EGI nets the vacancy from${t12.periodEnd ? `, TTM to ${t12.periodEnd}` : ", period not stated"})`,
-        value: v,
-        asOf: t12.periodEnd,
-        publisher: "the deal's T-12",
-        scope: "deal",
-      });
-    }
+  const tv = t12 ? t12Vacancy(t12.summary) : null;
+  if (t12 && tv) {
+    push({
+      kind: "document",
+      label: "The deal's T-12: vacancy loss over gross potential rent",
+      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${t12.periodEnd}` : "; period not stated"})`,
+      value: tv.pct,
+      asOf: t12.periodEnd,
+      publisher: "the deal's T-12",
+      scope: "deal",
+    });
   }
   // The published figures the model-vs-market read already carries: the
   // survey (with its margin as the tolerance), the region's, the state's,

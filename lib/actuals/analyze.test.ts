@@ -6,8 +6,41 @@ import {
   compareNoi,
   severityForNoiDelta,
   pickOmNoi,
+  t12Vacancy,
+  t12VacancyOverWords,
 } from "./analyze";
 import type { RentRollRow, RentRollExtraction, T12Extraction } from "./types";
+
+describe("t12Vacancy — the loss over gross potential rent, the statement's EGI saying which the rent line is", () => {
+  // The sample's T-12: its stated EGI ($6,791,500) is the rent line plus
+  // other income, so the rent line is already net of the $650,500 loss.
+  const sample = { collectedRent: 6_499_500, vacancyLoss: 650_500, otherIncome: 292_000, egi: 6_791_500, egiStated: true };
+
+  it("a stated EGI equal to the rent line plus other income: the line is net, so the loss is over the line plus the loss", () => {
+    expect(t12Vacancy(sample)).toEqual({ pct: 9.1, loss: 650_500, over: 7_150_000, rentLine: "net" });
+    // Whatever the flag: the summarizer never derives this equation.
+    expect(t12Vacancy({ ...sample, egiStated: undefined })?.rentLine).toBe("net");
+  });
+
+  it("a stated EGI equal to the rent line less the loss plus other income: the line is gross", () => {
+    const r = t12Vacancy({ collectedRent: 4_400_000, vacancyLoss: 400_400, otherIncome: 100_000, egi: 4_099_600, egiStated: true });
+    expect(r).toEqual({ pct: 9.1, loss: 400_400, over: 4_400_000, rentLine: "gross" });
+    expect(t12VacancyOverWords(r!)).toBe("the rent line, which the stated EGI nets the vacancy from");
+  });
+
+  it("no stated EGI to tell: read as net, and said assumed", () => {
+    // The summarizer's own derived EGI tells nothing.
+    const r = t12Vacancy({ collectedRent: 4_400_000, vacancyLoss: 400_400, otherIncome: 100_000, egi: 4_099_600, egiStated: false });
+    expect(r).toMatchObject({ rentLine: "assumed_net", over: 4_800_400, pct: 8.3 });
+    expect(t12VacancyOverWords(r!)).toBe("the rent line plus the loss, assuming the rent line is net of vacancy (no stated EGI says which)");
+    expect(t12Vacancy({ ...sample, egi: null, egiStated: false })?.rentLine).toBe("assumed_net");
+  });
+
+  it("null with no rent line or no loss", () => {
+    expect(t12Vacancy({ ...sample, collectedRent: null })).toBeNull();
+    expect(t12Vacancy({ ...sample, vacancyLoss: null })).toBeNull();
+  });
+});
 
 function row(o: Partial<RentRollRow>): RentRollRow {
   return {

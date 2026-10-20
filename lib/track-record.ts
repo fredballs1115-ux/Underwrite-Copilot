@@ -38,6 +38,7 @@
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { statedDay } from "@/lib/actuals/actuals-read";
+import { t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { compactUsd } from "@/lib/money";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
@@ -74,6 +75,11 @@ export interface ScoredRow {
    *  only on a row scored on figures, so the card takes plain data */
   figures: { om: string; alt: string; later: string } | null;
   landing: Landing;
+  /** the later thing is the reader's decision (Dead, and why), a direction
+   *  with no figure: the row says which side it agrees with, and the
+   *  account's record counts it apart from the scored rows, never in the
+   *  shares */
+  decision?: boolean;
   /** why the row is unscored, where it is */
   why: string | null;
   /** one sentence: what was set against what, and where it landed */
@@ -207,16 +213,6 @@ function rollVacancyPct(s: RentRollSummary): number | null {
   if (s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy)) return round1((1 - s.sfWeightedOccupancy) * 100);
   if (s.unitCount > 0) return round1((1 - s.occupiedUnits / s.unitCount) * 100);
   return null;
-}
-
-/** The T-12's economic vacancy: its vacancy loss over gross potential
- *  rent (the rent collected plus the loss), as a percent. */
-function t12VacancyPct(s: T12Summary): number | null {
-  const loss = s.vacancyLoss;
-  const rent = s.collectedRent;
-  if (loss == null || rent == null || !Number.isFinite(loss) || !Number.isFinite(rent)) return null;
-  const gross = rent + Math.abs(loss);
-  return gross > 0 ? round1((Math.abs(loss) / gross) * 100) : null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -409,6 +405,7 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
         later: { source: later.source, value: null, text: later.text },
         figures: null,
         landing: "screen_side",
+        decision: true,
         why: null,
         text: `${title}: the screen challenged it ("${c.assumption}"), and you ${later.text} — a decision on the screen's side, not a figure.`,
       };
@@ -424,7 +421,12 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
       };
     }
     if (omFigure === altFigure) return unscored("the screen's figure is the OM's own, so there is no side to land on.");
-    const v = later.value!;
+    // A trade with no asking price to put it on the OM figure's basis
+    // carries no figure: named, never scored as one.
+    if (later.value == null) {
+      return { ...base, later: { source: later.source, value: null, text: later.text }, figures: null, landing: "unscored", why: "what came after carries no figure on the OM figure's basis.", text: `${title}: ${later.text}, but it carries no figure on the OM figure's basis, so it is not scored.` };
+    }
+    const v = later.value;
     const lo = Math.min(omFigure, altFigure);
     const hi = Math.max(omFigure, altFigure);
     const landing: Landing = v > lo && v < hi ? "between" : Math.abs(v - omFigure) <= Math.abs(v - altFigure) ? "om_side" : "screen_side";
@@ -463,8 +465,11 @@ function laterFor(
         const by = ev.roll!.summary.sfWeightedOccupancy != null ? "by area" : "by units";
         return { source: "rent_roll", value: rv, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.toFixed(1)}% vacant ${by}` };
       }
-      const tv = ev.t12 ? t12VacancyPct(ev.t12.summary) : null;
-      if (tv != null) return { source: "t12", value: tv, text: `${t12When} ran ${tv.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent)` };
+      // Over gross potential rent, the statement's own EGI saying whether
+      // its rent line is gross or net (lib/actuals/analyze, the stress
+      // test's one reading).
+      const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
+      if (tv != null) return { source: "t12", value: tv.pct, text: `${t12When} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})` };
       return null;
     }
     case "noi": {
@@ -527,7 +532,12 @@ export interface AccountRecord {
   dealsTested: number;
   /** deals with something that arrived after the screen */
   dealsWithLater: number;
+  /** rows scored on figures: the later figure set against the OM's and the
+   *  screen's; never a decision */
   scored: number;
+  /** rows a decision answered (Dead, and why): counted apart, in no share
+   *  and no key's bar, since a direction is not a figure */
+  decisions: number;
   screenSide: number;
   omSide: number;
   between: number;
@@ -542,6 +552,7 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
   let dealsTested = 0;
   let dealsWithLater = 0;
   let scored = 0;
+  let decisions = 0;
   let screenSide = 0;
   let omSide = 0;
   let between = 0;
@@ -550,6 +561,10 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
     if (d.evidence.length > 0) dealsWithLater++;
     for (const r of d.rows) {
       if (r.landing === "unscored") continue;
+      if (r.decision) {
+        decisions++;
+        continue;
+      }
       scored++;
       const k = byKey.get(r.key) ?? { key: r.key, title: TITLES[r.key], screenSide: 0, omSide: 0, between: 0 };
       if (r.landing === "screen_side") {
@@ -573,6 +588,7 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
     dealsTested,
     dealsWithLater,
     scored,
+    decisions,
     screenSide,
     omSide,
     between,
@@ -595,20 +611,30 @@ export const RECORD_NONE_LINE =
   "No track record yet, and none is claimed. Every test is scored later against three things you supply: the T-12 or rent roll you add after the screen, what you decided (dead, and why), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
+  // A decision is a direction, not a figure: said apart, never in a share.
+  const d = r.decisions;
+  const apart = d > 0 ? ` ${d} more ${d === 1 ? "row was a decision" : "rows were decisions"} (Dead, and why), counted apart and in no share.` : "";
   switch (recordState(r)) {
     case "none":
-      return RECORD_NONE_LINE;
+      return `${RECORD_NONE_LINE}${apart}`;
     case "start":
-      return `${r.scored} scored row${r.scored === 1 ? " is" : "s are"} a start, not a record.`;
+      return `${r.scored} scored row${r.scored === 1 ? " is" : "s are"} a start, not a record.${apart}`;
     default: {
       const s = r.shares!;
-      return `Of ${r.scored} scored rows, ${r.screenSide} landed on the screen's side (${s.screenSidePct}%), ${r.omSide} on the OM's (${s.omSidePct}%) and ${r.between} between (${s.betweenPct}%).`;
+      return `Of ${r.scored} scored rows, ${r.screenSide} landed on the screen's side (${s.screenSidePct}%), ${r.omSide} on the OM's (${s.omSidePct}%) and ${r.between} between (${s.betweenPct}%).${apart}`;
     }
   }
 }
 
-/** "4 deals tested · 2 with later evidence · 3 rows scored" */
+/** "4 deals tested · 2 with later evidence · 3 rows scored"; with a
+ *  decision among the rows answered, "4 rows answered, 1 of them a
+ *  decision · 3 scored", the decision never in the scored count. */
 export function recordCountsLine(r: AccountRecord): string {
   const n = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
-  return [n(r.dealsTested, "deal tested", "deals tested"), `${r.dealsWithLater} with later evidence`, n(r.scored, "row scored", "rows scored")].join(" · ");
+  const d = r.decisions;
+  const rows =
+    d > 0
+      ? [`${n(r.scored + d, "row answered", "rows answered")}, ${d} of them ${d === 1 ? "a decision" : "decisions"}`, `${r.scored} scored`]
+      : [n(r.scored, "row scored", "rows scored")];
+  return [n(r.dealsTested, "deal tested", "deals tested"), `${r.dealsWithLater} with later evidence`, ...rows].join(" · ");
 }

@@ -62,7 +62,9 @@ const T12 = summarizeT12({
   collectedRent: 4_400_000,
   vacancyLoss: -400_400, // 9.1% of the scheduled rent, filed as a negative
   otherIncome: 100_000,
-  egi: null,
+  // The statement's own EGI is the rent line less the loss plus other
+  // income, so its rent line is gross potential rent.
+  egi: 4_099_600,
   opex: [
     { key: "taxes", label: "Real estate taxes", amount: 380_000, page: "p. 2" },
     { key: "insurance", label: "Insurance", amount: 150_000, page: "p. 2" },
@@ -155,10 +157,11 @@ describe("a stabilized apartment deal with a T-12", () => {
     const v = rowOf(test, "vacancy");
     expect(v.omSays).toEqual({ text: "Occupancy: 94% as stated, which leaves 6.0% vacancy", value: 6, page: 8 });
     expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", scope: "deal", value: 9.1, asOf: "2026-06-30" });
-    // The share is over the T-12's own rent line (the figure its EGI nets
-    // the vacancy from), never a "scheduled rent" the reader does not read.
-    expect(v.evidence[0].label).toBe("The deal's T-12: vacancy loss over its rent line");
-    expect(v.evidence[0].text).toBe("9.1% ($400k of the $4.4M rent line its EGI nets the vacancy from, TTM to 2026-06-30)");
+    // The share is over gross potential rent: here the rent line itself,
+    // since the statement's stated EGI nets the vacancy from it — and the
+    // sentence says what the loss was divided by.
+    expect(v.evidence[0].label).toBe("The deal's T-12: vacancy loss over gross potential rent");
+    expect(v.evidence[0].text).toBe("9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to 2026-06-30)");
     expect(v.evidence.map((e) => e.kind)).toEqual(["document", "published", "published", "rule_of_thumb"]);
     expect(v.evidence[1]).toMatchObject({ label: "Rental vacancy, metro area", publisher: "Census Bureau", scope: "metro", asOf: "2026-04-01" });
     // The region's figure is the region's, never passed off as the metro's.
@@ -176,7 +179,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
     // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over its rent line, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
+      "The OM's stabilized vacancy against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (FRED) and multifamily vacancy, a rule of thumb.",
     );
   });
 

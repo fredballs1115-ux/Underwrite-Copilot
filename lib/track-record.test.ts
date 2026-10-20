@@ -93,7 +93,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     // 650,500 over 7,150,000 is 9.1%: past the screen's 9.0%.
     expect(row.later?.value).toBe(9.1);
     expect(row.text).toBe(
-      "Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Sep 30, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent) — on the screen's side.",
+      "Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Sep 30, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
     );
     expect(r.notScored).toEqual([]);
   });
@@ -283,7 +283,7 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
     ]);
     expect(r.rows[0].figures).toEqual({ om: "5.0%", alt: "8.0%", later: "9.1%" });
     expect(r.rows[0].text).toBe(
-      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Aug 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent) — on the screen's side.",
+      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Aug 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
     );
     // The current screen's refusal says where the T-12 is scored instead.
     expect(r.notScored).toEqual([
@@ -363,16 +363,44 @@ describe("accountRecord — counts, by key, and the floor", () => {
   });
 
   it("at the floor the shares are said, and the keys ranked by rows scored", () => {
-    const r = accountRecord([scoredDeal(insurance), scoredDeal(), scoreDeal({ screenedAt: T, challenges: [basis], ...dead("price") })]);
+    const r = accountRecord([scoredDeal(insurance), scoredDeal(), scoredDeal()]);
     expect(r.scored).toBe(4);
     expect(r.byKey.map((k) => [k.key, k.screenSide, k.omSide, k.between])).toEqual([
-      ["vacancy", 2, 0, 0],
-      ["basis", 1, 0, 0],
+      ["vacancy", 3, 0, 0],
       ["insurance", 0, 0, 1],
     ]);
     expect(r.shares).toEqual({ screenSidePct: 75, omSidePct: 0, betweenPct: 25 });
     expect(recordState(r)).toBe("record");
     expect(recordLine(r)).toBe("Of 4 scored rows, 3 landed on the screen's side (75%), 0 on the OM's (0%) and 1 between (25%).");
     expect(recordCountsLine(r)).toBe("3 deals tested · 3 with later evidence · 4 rows scored");
+  });
+
+  it("a decision is counted apart: never a scored row, never in a share or a key's bar", () => {
+    const decided = scoreDeal({ screenedAt: T, challenges: [basis], ...dead("price") });
+    expect(decided.rows[0]).toMatchObject({ landing: "screen_side", decision: true });
+    const r = accountRecord([scoredDeal(insurance), scoredDeal(), decided]);
+    expect(r).toMatchObject({ scored: 3, decisions: 1, screenSide: 2, between: 1 });
+    expect(r.byKey.map((k) => k.key)).toEqual(["vacancy", "insurance"]);
+    expect(r.shares).toEqual({ screenSidePct: 67, omSidePct: 0, betweenPct: 33 });
+    expect(recordLine(r)).toBe(
+      "Of 3 scored rows, 2 landed on the screen's side (67%), 0 on the OM's (0%) and 1 between (33%). 1 more row was a decision (Dead, and why), counted apart and in no share.",
+    );
+    expect(recordCountsLine(r)).toBe("3 deals tested · 3 with later evidence · 4 rows answered, 1 of them a decision · 3 scored");
+    // A decision alone is no record: nothing is scored on a figure.
+    const alone = accountRecord([decided]);
+    expect(recordState(alone)).toBe("none");
+    expect(recordLine(alone)).toBe(`${RECORD_NONE_LINE} 1 more row was a decision (Dead, and why), counted apart and in no share.`);
+  });
+
+  it("a trade with no asking price to put it on the OM figure's basis is named, never scored", () => {
+    const r = scoreDeal({
+      screenedAt: T,
+      challenges: [basis],
+      askingPrice: null,
+      stage: "closed",
+      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+    });
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.rows[0].text).toBe("Basis: the building traded at $60.00M, but it carries no figure on the OM figure's basis, so it is not scored.");
   });
 });

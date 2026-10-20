@@ -210,6 +210,68 @@ export function summarizeT12(x: T12Extraction): T12Summary {
 /** Within a dollar: a stored figure that is the old derivation's. */
 const sameFigure = (a: number, b: number) => Math.abs(a - b) < 1;
 
+/** A T-12's economic vacancy, and what it was divided by. */
+export interface T12VacancyRead {
+  /** the vacancy loss over gross potential rent, a percent to one place */
+  pct: number;
+  /** the loss, as a size */
+  loss: number;
+  /** gross potential rent: the rent line where it is gross, the rent line
+   *  plus the loss where it is net (or assumed net) */
+  over: number;
+  /** what the statement's own EGI says the rent line is: `net` where the
+   *  stated EGI is the rent line plus other income (the vacancy already out
+   *  of it), `gross` where it is the rent line less the loss plus other
+   *  income, `assumed_net` where no stated EGI tells */
+  rentLine: "net" | "gross" | "assumed_net";
+}
+
+/**
+ * A T-12's economic vacancy: its vacancy loss over gross potential rent —
+ * the one reading the stress test and the track record share. Whether the
+ * rent line is gross potential rent or already net of the vacancy is the
+ * STATEMENT's to say, through its own EGI: a stated EGI equal to the rent
+ * line plus other income (within $2) says the line is net, so gross
+ * potential rent is the line plus the loss; one equal to the line less the
+ * loss plus other income says it is gross. A summary's own derived EGI
+ * tells nothing (`summarizeT12` derives it on the gross reading), so where
+ * no stated EGI tells, the line is read as net — gross potential rent the
+ * line plus the loss, the reading that flatters neither side — and said
+ * assumed. Null where the statement states no rent line or no loss.
+ */
+export function t12Vacancy(s: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi" | "egiStated">): T12VacancyRead | null {
+  const rent = s.collectedRent;
+  const lossRaw = s.vacancyLoss;
+  if (rent == null || lossRaw == null || !Number.isFinite(rent) || !Number.isFinite(lossRaw) || rent <= 0) return null;
+  const loss = Math.abs(lossRaw);
+  const other = s.otherIncome != null && Number.isFinite(s.otherIncome) ? s.otherIncome : 0;
+  const egi = s.egi != null && Number.isFinite(s.egi) ? s.egi : null;
+  const close = (a: number, b: number) => Math.abs(a - b) < 2;
+  // The net equation is never the summarizer's own derivation, so it tells
+  // whatever the flag; the gross one tells only on an EGI the statement stated.
+  const rentLine: T12VacancyRead["rentLine"] =
+    egi != null && loss > 0 && close(egi, rent + other)
+      ? "net"
+      : egi != null && s.egiStated === true && close(egi, rent - loss + other)
+        ? "gross"
+        : "assumed_net";
+  const over = rentLine === "gross" ? rent : rent + loss;
+  if (!(over > 0) || loss > over) return null;
+  return { pct: Math.round((loss / over) * 1000) / 10, loss, over, rentLine };
+}
+
+/** What the vacancy was divided by, in words both readers print. */
+export function t12VacancyOverWords(r: Pick<T12VacancyRead, "rentLine">): string {
+  switch (r.rentLine) {
+    case "net":
+      return "the rent line plus the loss, since the stated EGI is the rent line plus other income";
+    case "gross":
+      return "the rent line, which the stated EGI nets the vacancy from";
+    default:
+      return "the rent line plus the loss, assuming the rent line is net of vacancy (no stated EGI says which)";
+  }
+}
+
 /**
  * A STORED summary read by today's sign rule. Summaries are written at
  * ingest. One written by today's `summarizeT12` says which of its EGI,
