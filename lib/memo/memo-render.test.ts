@@ -1040,9 +1040,10 @@ describe("MemoDocument (redesigned)", () => {
     } as unknown as DealRow;
     const data = buildMemoData(deal, "September 8, 2026", []);
     expect(data.ranges.length).toBe(4);
-    // The vacancy base at 9.0% between 6.0% and 9.5% hugs the high end; the
-    // market rent base at $2,480 between $2,400 and $2,600 does not.
-    expect(basePosition(data.ranges[1])).toBeCloseTo(0.857, 2);
+    // The vacancy base at the T-12's 9.1% between the OM's 6.0% and the rent
+    // roll's 9.3% hugs the high end; the market rent base at $2,480 between
+    // $2,400 and $2,600 does not.
+    expect(basePosition(data.ranges[1])).toBeCloseTo(0.939, 2);
     expect(basePosition(data.ranges[0])).toBeCloseTo(0.4, 2);
     expect(basePosition({ low: "n/a", base: "5%", high: "6%" })).toBeNull();
     // A base below the low end sits at the start of the track; a range with

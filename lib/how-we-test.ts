@@ -93,7 +93,10 @@ const pctOf = (share: number) => `${Math.round(share * 100)}%`;
  * a key: what lib/stress-test does, each figure its constant.
  */
 export const VERDICT_RULES: Record<StressKey, string> = {
-  basis: `Held to the first median that stands, in the order above. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
+  // lib/stress-test's price row: the first piece above that carries a
+  // figure. A median needs three; under three comps graded clean none is
+  // struck, and the row names what it holds the ask to by count.
+  basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
   exit_cap: `Held to the going-in cap, else the published cap range's low end. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported; where a published cap range reaches the exit, compression is stretched at worst.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
   noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,

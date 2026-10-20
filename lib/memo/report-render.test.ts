@@ -2972,7 +2972,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
     expect(page).toMatch(/The return: the model at 9\.3%, this input alone at the OM's figure, then at the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
-    expect(page).toContain("Ask: What's the absorption schedule to get from 9% to 6%?");
+    expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The basis row's move is the engine's, spelled.
     expect(page).toContain(
       "The return: the model at 9.3%, this input alone at the OM's figure, then at the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",

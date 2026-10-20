@@ -1441,7 +1441,7 @@ describe("ModelView — the sample model renders every panel", () => {
       // The sample's finding counts, as the deal page counts them.
       const text = visibleText(html);
       expect(text).toMatch(/Buy box\s*1\s*finding\b/);
-      expect(text).toMatch(/Analyses\s*10\s*findings/);
+      expect(text).toMatch(/Analyses\s*9\s*findings/);
       // No round pill tabs of the old design.
       expect(text).not.toContain("Buy box & fit");
       expect(text).not.toContain("Financials & model");
@@ -3127,8 +3127,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toMatch(/Sponsor\s*Go/);
     for (const r of SAMPLE_DEAL.verdict.screen?.ranges ?? []) expect(text, r.label).toContain(r.label);
     // Each range carries the deal page's positional read of where the base
-    // sits, in one neutral colour: the vacancy base at 9.0% between 6.0% and
-    // 9.5% hugs the high end, which on a vacancy is the buyer's end, not the
+    // sits, in one neutral colour: the vacancy base at 9.1% between 6.0% and
+    // 9.3% hugs the high end, which on a vacancy is the buyer's end, not the
     // sponsor's — so nothing calls it optimistic or paints it in caution.
     expect(html).not.toContain("optimistic end");
     expect(html.match(/aria-label="Where the base sits inside the range"/g)?.length).toBe(SAMPLE_DEAL.verdict.screen?.ranges.length);
@@ -3143,7 +3143,9 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // but still on the page.
     expect(html).toContain("<details");
     expect(text).toContain("sell-side selections usually do.");
-    expect(text).toContain("the $274k ask is 7% rich");
+    // The ask against the one comp graded clean, the stress test's own
+    // figure: 8.8% over The Brixton, never "the two clean trades".
+    expect(text).toContain("the $274k ask is 8.8% rich");
     // Nothing editable, nothing of the buyer's.
     expect(text).not.toMatch(/Buy box|Notes|Documents/);
     expect(html).not.toMatch(/<(button|input|textarea|select)\b/);

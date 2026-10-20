@@ -40,7 +40,8 @@ function tally<K extends string>(items: K[], order: [K, string][]): string {
  *  L5), the extraction
  *  its cited figures, the challenger its challenges and their questions for
  *  the broker, the comp scrutiny its ratings, the market check its reads
- *  against rules of thumb, and the verdict its ranges and the three
+ *  beside today's published figures and the rules of thumb (the hero's
+ *  words), and the verdict its ranges and the three
  *  deal-killers (lib/anthropic/prompts `verdictInstruction` — they had been
  *  credited to the challenger). */
 export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
@@ -90,7 +91,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
       `${plural(challenges.length, "assumption")} challenged (${severities}), ${asked === challenges.length ? "each" : asked} with a question for the broker`,
     ],
     ["comps", `${plural(comps.length, "broker comp")} rated: ${ratings}${flags ? ` · ${plural(flags, "selection flag")}` : ""}`],
-    ["market", `${plural(checks.length, "assumption")} read against rules of thumb: ${reads}`],
+    ["market", `${plural(checks.length, "assumption")} read beside today's published figures and the rules of thumb: ${reads}`],
     [
       "verdict",
       `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} named first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
@@ -138,7 +139,7 @@ export function ScreenRunStrip() {
           The test runs in order: a first read of the headline figures,
           extraction with page cites, the assumptions challenged with a
           question for the broker, the broker&apos;s comps rated, the market
-          check against rules of thumb, and a verdict with sourced ranges and
+          check beside today&apos;s published figures and the rules of thumb, and a verdict with sourced ranges and
           the three deal-killers named first; when you add your own model,
           a reconciliation against it re-runs the verdict.
         </p>

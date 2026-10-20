@@ -145,7 +145,42 @@ describe("the sample's documents tie to one another", () => {
     expect(JSON.stringify(SAMPLE_DEAL.model.metrics)).not.toMatch(/term sheet/i);
   });
 
-  it("names no trade the memorandum does not state, and the basis range's low end is its lowest clean trade", () => {
+  it("says the comps, the vacancy and the exit as the stress test reads them", () => {
+    const test = sampleStressTest({ today: "2026-10-20" });
+    const row = (key: string) => test.rows.find((r) => r.key === key)!;
+    const { inputs } = sampleDerivedInputs();
+    // The price: the ask against the one comp graded `supports`, the row's
+    // own figure and gap; Parkside, graded favorable, named apart.
+    const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports");
+    expect(clean.map((c) => c.name)).toEqual(["The Brixton — 2.1 mi"]);
+    expect(row("basis").gap!.text).toContain("the one comp graded clean, The Brixton — 2.1 mi, $252k/unit");
+    expect(SAMPLE_DEAL.comps.summary).toContain(`the $274k ask is ${row("basis").gap!.value}% rich`);
+    expect(SAMPLE_DEAL.comps.summary).not.toMatch(/two clean trades/);
+    const basis = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Basis / unit")!;
+    expect([basis.low, basis.base]).toEqual(["$252k", "$252k"]);
+    expect(basis.basis).toContain(`${row("basis").gap!.value}% over the one clean comp`);
+    // The exit: the range's base is the exit the model runs, the going-in cap.
+    const exit = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Exit cap")!;
+    expect(exit.base).toBe(`${(inputs.exitCapPct * 100).toFixed(2)}%`);
+    // The vacancy: the base is the building's in place, the figure the model
+    // runs and the T-12's; the high, the rent roll's units empty.
+    const vacancy = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Vacancy")!;
+    const t12 = SAMPLE_DEAL.t12.summary;
+    expect(vacancy.base).toBe(`${(inputs.vacancyPct * 100).toFixed(1)}%`);
+    expect(vacancy.base).toBe(`${((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 100).toFixed(1)}%`);
+    const roll = row("vacancy").evidence.find((e) => e.label === "The deal's rent roll: the occupancy it runs at")!;
+    expect(roll.text.startsWith(`${vacancy.high} vacant (by count`)).toBe(true);
+    // No next step asks for a re-run the model already makes.
+    expect(SAMPLE_DEAL.verdict.nextSteps.join(" ")).not.toMatch(/re-run/i);
+    // The conservative case is the model's own: its IRR is the engine's at
+    // the going-in exit, which the model runs.
+    const conservative = SAMPLE_DEAL.verdict.screen!.sensitivity.find((x) => x.scenario === "conservative")!;
+    expect(conservative.note).toContain(`returns ${row("exit_cap").impact!.altIrrPct!.toFixed(1)}%`);
+    // The tax reset is said as a condition, as the row says it.
+    expect(SAMPLE_DEAL.verdict.topRisks.find((r) => r.includes("bill"))).toMatch(/^If the sale resets/);
+  });
+
+  it("names no trade the memorandum does not state, and the basis range's low end is the one comp graded clean", () => {
     // Every per-unit figure the comps step and the verdict's basis range
     // name is one of the memorandum's own sale comps (p. 14).
     const stated = SAMPLE_DEAL.comps.saleComps.map((c) => c.detail.match(/^\$(\d+)k\/unit/)![1]);
@@ -153,7 +188,7 @@ describe("the sample's documents tie to one another", () => {
     const comps = [...SAMPLE_DEAL.comps.redFlags, SAMPLE_DEAL.comps.summary].join(" ");
     for (const k of named(comps).filter((k) => k !== "274")) expect(stated, `$${k}k`).toContain(k);
     const basis = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Basis / unit")!;
-    const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports" || c.support === "favorable").map((c) => Number(c.detail.match(/^\$(\d+)k/)![1]));
+    const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports").map((c) => Number(c.detail.match(/^\$(\d+)k/)![1]));
     expect(basis.low).toBe(`$${Math.min(...clean)}k`);
     for (const k of named(`${basis.source}`)) expect(stated, `$${k}k`).toContain(k);
   });
