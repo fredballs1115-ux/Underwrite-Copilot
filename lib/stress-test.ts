@@ -783,8 +783,11 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
         const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
+        // A yield, not a cap: no figure on the cap's track (the panel would
+        // draw a 4.9% tick beside a 5.5% exit), the spread said in words.
         evidence.push({
           ...e,
+          value: null,
           text:
             spread == null
               ? f.text

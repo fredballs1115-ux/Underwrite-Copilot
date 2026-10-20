@@ -264,7 +264,9 @@ describe("a stabilized apartment deal with a T-12", () => {
     const x = rowOf(test, "exit_cap");
     expect(x.omSays).toEqual({ text: "Exit cap rate: 5.50%", value: 5.5, page: 21 });
     expect(x.evidence[0]).toMatchObject({ kind: "om_internal", label: "The OM's going-in cap", value: 5.71 });
-    expect(x.evidence[1]).toMatchObject({ kind: "published", label: "10-year Treasury", value: 4.94, scope: "nation" });
+    // A yield, not a cap: it carries no figure for the cap's track, and the
+    // spread is said in its words.
+    expect(x.evidence[1]).toMatchObject({ kind: "published", label: "10-year Treasury", value: null, scope: "nation" });
     expect(x.evidence[1].text).toContain("the exit's spread over it is 56 bps");
     expect(x.gap).toEqual({ value: 21, unit: "bps", text: "The OM's 5.50% exit is 21 bps tighter than its 5.71% going-in cap — cap compression." });
     expect(x.verdict).toBe("stretched");
