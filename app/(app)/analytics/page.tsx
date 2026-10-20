@@ -40,6 +40,7 @@ import type { RentRollSummary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
+import { stabilizedVacancyStated } from "@/lib/stress-test";
 import { TrackRecordSection } from "./track-record";
 
 /** A stored rent roll or T-12 row as the track record reads it. */
@@ -246,6 +247,7 @@ export default async function AnalyticsPage() {
         history: parseStageHistory(r.stage_history),
         askingPrice: askingPriceOf(extraction),
         assetClass: shownAssetClass(r.asset_class as string | null, extraction),
+        vacancyHeldToMarket: stabilizedVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
       });
     }),
   );

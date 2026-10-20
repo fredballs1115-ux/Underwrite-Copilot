@@ -96,7 +96,7 @@ import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest } from "@/lib/stress-test";
+import { buildStressTest, stabilizedVacancyStated } from "@/lib/stress-test";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
@@ -968,6 +968,9 @@ export default async function DealPage({
     // The class the page shows, so the roll's vacancy is read as the
     // stress test reads it (by count on a class priced by the unit).
     assetClass: shownAssetClass(deal.asset_class as string | null, extraction),
+    // A stabilized assumption the stress test holds to the market: a later
+    // document's vacancy is today's and scores no vacancy challenge.
+    vacancyHeldToMarket: stabilizedVacancyStated(extraction, firstSignal),
   });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
