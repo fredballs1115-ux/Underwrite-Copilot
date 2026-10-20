@@ -1,7 +1,7 @@
 // Leverage check: the deal's going-in cap against a debt-cost benchmark —
 // deterministic code, not a model call. The 1989 lesson made concrete:
-// negative leverage means the deal loses money on every borrowed dollar
-// until growth bails it out, so it gets named, not buried.
+// negative leverage means each borrowed dollar costs more than it earns in year
+// one, until NOI growth closes the gap, so it gets named, not buried.
 //
 // The benchmark we can source for any day is the 30-yr fixed (FRED PMMS) — a
 // WEEKLY survey (data/fred-series.json: MORTGAGE30US, cadence "weekly"), so
