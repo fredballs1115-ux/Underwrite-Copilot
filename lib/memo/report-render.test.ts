@@ -30,6 +30,7 @@ import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { challengerInstruction } from "@/lib/anthropic/prompts";
+import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -447,9 +448,11 @@ describe("ReportDocument (full report)", () => {
     ).replace(/\s+/g, " ");
     expect(text).toContain("The pro forma's assumptions, challenged most severe first, each with the exact question to put to the broker.");
     expect(text).not.toContain("in the order deals die");
-    // The challenger's stress test estimates what a revert does to the
-    // returns without the engine, and its box says whose estimate it is.
-    expect(text).toContain("STRESS TEST — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
+    // The challenger's downside paragraph is its scenario in words, and its
+    // box says so: never a computed result (lib/stress-test-title).
+    expect(text).toContain(CHALLENGER_SCENARIO_TITLE.toUpperCase());
+    expect(text).toContain(CHALLENGER_SCENARIO_NOTE);
+    expect(text).not.toContain("STRESS TEST — THE SCREEN'S ESTIMATE");
     expect(text).toContain(SAMPLE_DEAL.challenges.stressTest.slice(0, 40));
   }, 45000);
 

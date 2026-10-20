@@ -139,7 +139,7 @@ function sampleProps(initialTab: string | null, initialAnalysis: string | null =
     todayIso: "2026-09-08",
     // The OM's assumptions tested on the sample (lib/sample-stress), as the
     // deal page builds them on the server and hands them to the Overview.
-    stressTest: sampleStressTest({ today: "2026-09-08", derived }),
+    stressTest: sampleStressTest({ today: "2026-09-08" }),
   } as unknown as Props;
 }
 
@@ -209,8 +209,10 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(row).toContain('data-qa="stress-impact"');
     expect(html).toContain('href="/how-we-test#vacancy"');
     // Without a test, the Overview draws no panel.
+    expect(html).toContain('data-qa="how-we-test-link"');
     const bare = { ...sampleProps("overview"), stressTest: null };
     expect(render(bare)).not.toContain('data-qa="stress-test-panel"');
+    expect(render(bare)).not.toContain('data-qa="how-we-test-link"');
   });
 
   it("the sample's reading guide opens each section it names, never a card that does nothing (research pass 32)", () => {

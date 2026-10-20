@@ -347,7 +347,7 @@ Overlay the down-cycle discipline the industry keeps re-learning in every crash:
 
 ${forward ? FORWARD_CLAUSE : PLAN_CLAUSE}
 
-Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.
+Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then, in \`stressTest\`, give a one-paragraph downside scenario in words: which of the assumptions you challenged break together, and why one failing drags the others with it (a slow lease-up that delays the rent premium and lowers the NOI the exit capitalises, say). Give no return figures — no IRR, multiple, cash-on-cash or value — and no arithmetic on them: the screen re-runs the returns in its own model, one assumption at a time, and a figure here would be a second, unchecked answer to the same question.
 
 ${CHALLENGE_STRUCTURE_CLAUSE}${sectorTrapsClause(
     assetClass,
@@ -592,7 +592,7 @@ const FORWARD_KILLERS = `The brief names a forward purchase — a building bough
 /** Step 6 — Verdict (synthesizes everything above). `forward` is a forward
  *  purchase (lib/forward-purchase): its words stand where a plan's would. */
 export function verdictInstruction(forward = false): string {
-  return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges and stress test, the comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
+  return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges, the stress test struck in code, the comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
 
 The brief opens with what the screen established about the deal, checked in code: what is being sold, how it is sold, the deal's kind and the building's own basis. Read every figure after it in that light. Where it says a price is not the building's — a note's price is a loan's, a share's price buys the share and the building's is the whole it implies, a leased fee's price buys the land — or that a figure is not a price at all — an auction's starting bid is where the bidding opens — never strike a basis, a cap or a return on that figure: build the basis on the figure the brief computes, or say there is none and why.
 

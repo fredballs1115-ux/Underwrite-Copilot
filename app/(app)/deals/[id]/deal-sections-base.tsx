@@ -7,6 +7,7 @@
 // sections only when their tab is opened. deal-sections-view.tsx draws the
 // rest with these and re-exports what it re-exported before.
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
@@ -461,6 +462,16 @@ export function OverviewView({
       {/* The OM's assumptions, tested (app/stress-test-panel): the product
           leads with it, right after the call. */}
       <StressTestPanel test={stressTest} />
+      {/* The whole method, one link under the panel wherever it is drawn —
+          the deal page, /demo and the homepage's walkthrough; each row's
+          own link lands on its section. */}
+      {stressTest && stressTest.rows.length > 0 && (
+        <p className="-mt-3 px-1 text-xs" data-qa="how-we-test-link">
+          <Link href="/how-we-test" className="font-medium text-brand hover:underline">
+            How each assumption is tested
+          </Link>
+        </p>
+      )}
 
       {/* Completeness meter — a card while results are missing or a side job
           runs; a single quiet line once everything is done (it earns no card

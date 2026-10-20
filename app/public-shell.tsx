@@ -46,6 +46,13 @@ export async function PublicShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {/* The method, from sm up: a phone's row is full (above). */}
+            <Link
+              href="/how-we-test"
+              className="hidden whitespace-nowrap py-1 text-sm font-medium text-muted transition-colors hover:text-ink sm:inline"
+            >
+              How we test
+            </Link>
             <Link
               href="/login"
               className="whitespace-nowrap py-1 text-sm font-medium text-muted transition-colors hover:text-ink"

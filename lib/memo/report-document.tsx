@@ -108,7 +108,7 @@ import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
-import { stressTestTitle } from "@/lib/stress-test-title";
+import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
 import { VERDICT_WORD, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
@@ -1120,12 +1120,6 @@ function CallInFullPage({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
-  /** the sample deal, where the caller's row does not carry `is_sample`
-   *  (a hand-built test row; the public demo's row, lib/sample-cover
-   *  `sampleDocumentRow`, carries it): its stress test is the first-draft
-   *  model's run, and the challenger page's heading says so
-   *  (lib/stress-test-title). A row marked `is_sample` says it too. */
-  sample?: boolean;
   /** the sensitivity page's data (Feature 5): both grids, the buyer-hurdle
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
@@ -2989,13 +2983,15 @@ export function ReportDocument({
               ) : null}
             </View>
           ))}
-          {/* The challenger estimates what reverting an assumption does to
-              the returns without running the engine; the box says so — and
-              on the sample, whose sentence is the first-draft model's run,
-              says that (research pass 40, M8; lib/stress-test-title). */}
+          {/* The challenger's downside scenario, in its own words: never a
+              computed result, and the box says so — a screen stored before
+              2026-10-20 may carry the challenger's own return arithmetic
+              (lib/stress-test-title). The returns' moves are the stress
+              test's page, struck in code. */}
           {str(challenges?.stressTest) ? (
             <View style={s.summaryBox} wrap={false}>
-              <Text style={[s.headText, { marginBottom: 3 }]}>{stressTestTitle(input.sample === true || (deal as { is_sample?: boolean }).is_sample === true)}</Text>
+              <Text style={[s.headText, { marginBottom: 3 }]}>{CHALLENGER_SCENARIO_TITLE}</Text>
+              <Text style={[s.summaryText, { marginBottom: 3 }]}>{CHALLENGER_SCENARIO_NOTE}</Text>
               <Text style={s.summaryText}>{str(challenges?.stressTest)}</Text>
             </View>
           ) : null}

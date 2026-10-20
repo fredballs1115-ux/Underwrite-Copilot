@@ -183,7 +183,10 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named",
       "Negative leverage: a going-in cap under the all-in rate loses money on every borrowed dollar until growth bails it out",
     ],
-    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's own rate.",
+    // lib/stress-test's debtRow sizes the tests at the OM's stated rate
+    // where one is read, else the derived model's `allInRatePct` (the seed,
+    // or lib/underwrite/inputs' flat 0.06 where nothing fresh was read).
+    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where it states one, else the model's (index plus spread, or a flat 6.00% placeholder).",
     limits: [
       "A benchmark is not a quote: only a rate a loan document states is treated as one.",
       "A floating-rate or supplemental loan is read as stated and priced on nothing.",

@@ -33,6 +33,22 @@ import { rangeRead } from "@/lib/memo/report-document";
 // finished project's figure to be tested for conservatism, never a misread
 // and never a going-in cap on the price. Every prompt that reads the OM or
 // the brief must say so, for every asset class.
+// 2026-10-20: the challenger had been asked "what happens to returns" in a
+// paragraph of its own, and answered with IRR arithmetic the engine never
+// ran, beside the stress test struck in code. It is asked for the scenario
+// in words now, and for no return figure.
+describe("the challenger's downside paragraph is a scenario in words", () => {
+  it("asks which assumptions break together, and for no return figures", () => {
+    for (const cls of ["multifamily", "office", "auto"] as const) {
+      const p = challengerInstruction(cls);
+      expect(p, cls).toContain("give a one-paragraph downside scenario in words");
+      expect(p, cls).toContain("Give no return figures");
+      expect(p, cls).toContain("the screen re-runs the returns in its own model");
+      expect(p, cls).not.toContain("what happens to returns");
+    }
+  });
+});
+
 describe("plan deals are judged on their own terms", () => {
   it("the challenger grills a plan on total cost, development spread and construction debt", () => {
     for (const cls of ["multifamily", "office", "industrial", "retail", "auto"] as const) {

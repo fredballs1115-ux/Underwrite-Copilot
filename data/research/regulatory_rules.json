@@ -190,7 +190,7 @@
      "estate_or_trust_of_decedent"
     ]
    },
-   "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 'five (5) or fewer rental units within the County' AND is '(1) a natural person or a living trust of a natural person, or (2) the trust or estate of a decedent' (exact-phrase confirmed). County FAQ states plainly: 'If you own the property through an LLC or corporate entity, the PRSA applies.' DOMICILE FINDING — SETTLED: the domicile-in-county condition attaches ONLY to the separate CONDOMINIUM exemption ('owned by one or more individuals domiciled in the County', expressly tied to § 13-147) and to the owner-occupied original-2-unit exemption; the 5-or-fewer natural-person exemption carries NO domicile condition — a Virginia-resident natural person qualifies. Other § 13-147 exemptions: religious facilities, regulated-affordable units, cooperatives, dormitories, 501(c)(3) temporary-shelter facilities. No exemption application needed while conditions hold ('not considered to be regulated rental units'); exemption lapses when conditions cease.",
+   "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 'five (5) or fewer rental units within the County' and is '(1) a natural person or a living trust of a natural person, or (2) the trust or estate of a decedent'. County FAQ states plainly: 'If you own the property through an LLC or corporate entity, the PRSA applies.' This exemption carries no domicile condition, so a Virginia-resident natural person qualifies: domicile in the County is a condition only of the separate condominium exemption ('owned by one or more individuals domiciled in the County', expressly tied to § 13-147) and of the owner-occupied original-2-unit exemption. Other § 13-147 exemptions: religious facilities, regulated-affordable units, cooperatives, dormitories, 501(c)(3) temporary-shelter facilities. No exemption application needed while conditions hold ('not considered to be regulated rental units'); exemption lapses when conditions cease.",
    "source": "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law",
    "as_of": "2026-08-21",
    "status": "sourced",
@@ -221,7 +221,7 @@
     "property_type": "rental_housing"
    },
    "exempt_if": null,
-   "effect": "No Virginia locality may impose rent control — but the mechanism is Dillon Rule ABSENCE OF GRANT, not an express statutory ban: no Code section grants (or expressly prohibits) locality rent regulation, and localities hold only powers expressly granted or necessarily implied. Enabling bills keep failing (SB 366 defeated in committee; HB 721 continued; HB 278/SB 355 sent to a Virginia Housing Commission 'Local Rent Regulation Authority Bill Study', June 2026, carried toward 2027) — WATCH ITEM: passage of an enabling act would change this row. CITE CORRECTION: § 55.1-1243 (sometimes cited for 'no rent control') is REPEALED (Acts 2021 Sp. Sess. I cc. 403-404, eff. 2021-07-01) and covered tenant ouster remedies, now § 55.1-1243.1 — it was never a rent-control provision. VRLTA statewide terms: security deposit capped — 'No landlord may demand or receive a security deposit, however denominated, in an amount or value in excess of two months' periodic rent' (§ 55.1-1226, exact-phrase confirmed); deposit itemization within 45 days of termination/vacancy; § 55.1-1204 governs rental-agreement terms (an amended version takes effect 2027-07-01 — review before then).",
+   "effect": "No Virginia locality may impose rent control, though not by an express statutory ban: under the Dillon Rule localities hold only powers expressly granted or necessarily implied, and no Code section grants (or expressly prohibits) locality rent regulation. Enabling bills keep failing (SB 366 defeated in committee; HB 721 continued; HB 278/SB 355 sent to a Virginia Housing Commission 'Local Rent Regulation Authority Bill Study', June 2026, carried toward 2027); an enabling act, if passed, would change this. § 55.1-1243, sometimes cited for 'no rent control', is repealed (Acts 2021 Sp. Sess. I cc. 403-404, eff. 2021-07-01) and covered tenant ouster remedies, now § 55.1-1243.1 — it was never a rent-control provision. VRLTA statewide terms: security deposit capped — 'No landlord may demand or receive a security deposit, however denominated, in an amount or value in excess of two months' periodic rent' (§ 55.1-1226); deposit itemization within 45 days of termination/vacancy; § 55.1-1204 governs rental-agreement terms (an amended version takes effect 2027-07-01 — review before then).",
    "source": "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/",
    "as_of": "2026-08-21",
    "status": "sourced",
@@ -297,7 +297,7 @@
      }
     ]
    },
-   "effect": "NY Good Cause Eviction (eff. Apr 20, 2024; automatic in NYC, other municipalities may opt in) requires good cause to evict or non-renew and makes rent increases above the local standard presumptively unreasonable. SMALL-LANDLORD EXEMPT: owners of 10 or fewer units statewide (for entities, EACH beneficial owner must hold <=10 units in NYS), owner-occupied buildings of <=10 units, and units renting above 245% of HUD FMR (DHCR publishes the thresholds by county each Aug 1). Landlords must state coverage/exemption in lease notices since Aug 2024.",
+   "effect": "NY Good Cause Eviction (eff. Apr 20, 2024; automatic in NYC, other municipalities may opt in) requires good cause to evict or non-renew and makes rent increases above the local standard presumptively unreasonable. Exempt: owners of 10 or fewer units statewide (for entities, each beneficial owner must hold <=10 units in NYS), owner-occupied buildings of <=10 units, and units renting above 245% of HUD FMR (DHCR publishes the thresholds by county each Aug 1). Landlords must state coverage/exemption in lease notices since Aug 2024.",
    "quote": "exempts premises owned by a 'small landlord,' ... any owner of no more than 10 units in the state",
    "source": "https://hcr.ny.gov/system/files/documents/2026/07/gce-fact-sheet-05.04.26-update.pdf",
    "as_of": "2026-08-22",
@@ -549,7 +549,7 @@
   }
  ],
  "gaps": [
-  "D.C. Law 26-80 enacted SECTION TEXT (esp. the 2-4 unit TOPA exemption's 'business corporation' definition) — currently on practitioner-alert authority; also the follow-up Council item 'tightening language' on the RENTAL Act",
+  "The enacted section text of D.C. Law 26-80 (especially the 2-4 unit TOPA exemption's 'business corporation' definition), which rests on practitioners' alerts for now; also the Council's follow-up item 'tightening language' on the RENTAL Act",
   "PG County § 13-147 code text direct pull (both current confirmations are DPIE-authored documents) + resolve the conflicting PRSA enactment/effective dates via Legistar",
   "Virginia enabling-bill WATCH: HB 278/SB 355 study outcome (Housing Commission, June 2026) — rent-control authority could be granted in a future session",
   "MoCo exemption list verbatim (23-year rolling window phrasing + full exemption enumeration)",
@@ -562,6 +562,6 @@
   "HUD fair market rents are read from HUD's own yearly FMR file for every covered metro (metros.json `fmr` blocks); the HUD API pull that keeps them current without an edit (scripts/fetch-fmr.mjs) waits on a HUD API token",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
   "Rolling exemption windows (CA 15yr / WA 12yr) encoded as building ages (building_age_years_lt) read against the current year, so they advance on their own; the read is to the year built, not the certificate-of-occupancy date the statutes count from",
-  "SCOPE NOTE (2026-08-22, per direction): rules for jurisdictions outside the 15 covered markets were REMOVED from the product (recoverable in git history). The screener says 'no rules on file - unscreened, not unregulated' outside the covered set."
+  "Scope (2026-08-22): rules for jurisdictions outside the 15 covered markets were removed from the product. The screener says 'no rules on file - unscreened, not unregulated' outside the covered set."
  ]
 }

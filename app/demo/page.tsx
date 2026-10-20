@@ -6,12 +6,12 @@ import { sampleHeader } from "@/lib/sample-header";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { fmrToday } from "@/lib/fmr";
-import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";
 import { SampleDealHero } from "@/app/sample-hero";
 import { DemoSections } from "./sections";
-import { sampleDemoData, samplePlacement } from "./demo-data";
+import { sampleDemoData } from "./demo-data";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
 
@@ -59,12 +59,7 @@ export default async function DemoPage() {
   // the deal page's own read (lib/model-vs-market-read): the demand card
   // and the model's assumptions against the published figures. A failed
   // read leaves both out rather than the page down.
-  let reads: TodayReads | null = null;
-  try {
-    reads = await todayReads(samplePlacement().live);
-  } catch (err) {
-    console.warn("sample live figures unavailable:", err instanceof Error ? err.message : err);
-  }
+  const reads = await sampleTodayReads();
   // Today's debt indices (lib/debt-index-read) for the research panel's
   // leverage check: the week's survey and the 10-year beside it.
   const debt = await liveDebtSeeds(HOLD_MONTHS);

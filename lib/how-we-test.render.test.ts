@@ -29,6 +29,7 @@ import {
   evidenceKindOf,
 } from "./how-we-test";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
+import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const html = renderToStaticMarkup(React.createElement(HowWeTestView));
@@ -140,11 +141,32 @@ describe("/how-we-test draws every method from the table", () => {
       expect(text).toContain(c.heading);
       expect(text).toContain(c.line);
     }
-    expect(CANNOT.map((c) => c.heading)).toEqual(["Not a forecast", "Not investment advice", "A metro figure is the metro's", "Licensed data is not read"]);
+    expect(CANNOT.map((c) => c.heading)).toEqual([
+      "Not a forecast",
+      "Not investment advice",
+      "No return is re-run on a plan",
+      "No return is re-run on a figure nobody stated",
+      "A metro figure is the metro's",
+      "Licensed data is not read",
+    ]);
+    // The plan's limit names every kind lib/deal-strategy's isPlanDeal
+    // calls a plan, and the stress test withholds the re-run on each.
+    const plan = CANNOT.find((c) => c.heading === "No return is re-run on a plan")!.line;
+    for (const kind of ["value_add", "lease_up", "conversion", "development"] as const) {
+      expect(isPlanDeal(kind), kind).toBe(true);
+      expect(plan.toLowerCase(), kind).toContain(kind.replace("_", "-"));
+    }
+    expect(isPlanDeal("stabilized")).toBe(false);
+    // The published-figure line claims a link only where the evidence
+    // carries one: recorded sales.
+    expect(CADENCE_RULE.lines.join(" ")).not.toContain("a link to its source");
   });
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {
     expect(gluedWords(text)).toEqual([]);
+    // A coverage label carries its own brackets ("New Jersey (statewide)"):
+    // the page never wraps it in another pair.
+    expect(text).not.toContain("))");
     expect(a11yIssues(html)).toEqual([]);
     // No paragraph past a line of prose on a public page: the longest
     // sentence the page's own words carry is the table's, not a paragraph.

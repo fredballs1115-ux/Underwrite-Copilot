@@ -1449,8 +1449,11 @@ export default async function DealPage({
     derived,
     storedAssetClass: deal.asset_class as string | null,
     brokerComps: comps,
-    recordedSales,
-    pastScreens,
+    // The sample's building and price are invented: no reader's recorded
+    // sales or past screens are set against them, so its test is the one
+    // /demo and the homepage draw (lib/sample-stress, held by its test).
+    recordedSales: isSampleDeal ? null : recordedSales,
+    pastScreens: isSampleDeal ? null : pastScreens,
     readOn: todayIso,
   });
 

@@ -489,17 +489,23 @@ export function buildBrief(input: VerdictInputs): string {
       : "Not available.",
   );
 
+  // The challenger's own downside paragraph (`stressTest`) is not handed
+  // over: a screen stored before 2026-10-20 carries return figures in it
+  // that the challenger worked out without the engine, and the brief's
+  // STRESS TEST, STRUCK IN CODE section above is the one place the
+  // synthesizer reads a return's move from.
   sections.push(
     "## Assumption challenges",
-    input.challenges
-      ? [
-          ...input.challenges.challenges.map(
-            (c) =>
-              `- [${c.severity}] ${c.assumption}${cite(c.page)}: ${c.challenge}`,
-          ),
-          `Stress test: ${input.challenges.stressTest}`,
-        ].join("\n")
-      : "Not available.",
+    !input.challenges
+      ? "Not available."
+      : input.challenges.challenges.length === 0
+        ? "None raised."
+        : input.challenges.challenges
+            .map(
+              (c) =>
+                `- [${c.severity}] ${c.assumption}${cite(c.page)}: ${c.challenge}`,
+            )
+            .join("\n"),
   );
 
   sections.push(

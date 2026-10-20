@@ -431,6 +431,13 @@ export interface Challenge {
 }
 export interface ChallengerResult {
   challenges: Challenge[];
+  /** The challenger's downside scenario in words: which of the challenged
+   *  assumptions break together, and why. Asked since 2026-10-20 with no
+   *  return figure (the stress test re-runs the returns in code,
+   *  lib/stress-test); a screen stored before may carry the challenger's
+   *  own IRR arithmetic, which is shown under the challenger's name and
+   *  never handed to the verdict. The name is kept so stored screens
+   *  parse. */
   stressTest: string;
 }
 

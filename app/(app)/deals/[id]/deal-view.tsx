@@ -1254,8 +1254,7 @@ function AnalysesPanel({
   marketPicture?: MarketPicture | null;
   /** whether that photograph is the market whose figures the check read */
   marketPictureCheckReads?: boolean;
-  /** the sample deal: its stress test is the first-draft model's run, and
-   *  the challenger's heading says so (lib/stress-test-title) */
+  /** the sample deal: its fictional comps are never geocoded or pinned */
   isSample?: boolean;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
@@ -1337,7 +1336,6 @@ function AnalysesPanel({
           result={results.challenges!}
           dealName={dealName}
           totalPages={results.extraction?.totalPages ?? null}
-          sample={isSample}
         />
       ) : analysis === "comps" ? (
         <BrokerComps

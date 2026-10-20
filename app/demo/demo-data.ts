@@ -9,7 +9,6 @@ import type { DebtSeeds } from "@/lib/debt-index";
 import type { TodayReads } from "@/lib/model-vs-market-read";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
-import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buyBoxLines, findGoingInCap } from "@/lib/criteria";
 import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { constructionSeedFor } from "@/lib/model-market";
@@ -19,20 +18,12 @@ import { assessPlausibility, inferStrategy, isPlanDeal } from "@/lib/deal-strate
 import { isTenancyInCommon } from "@/lib/interest";
 import { capSlotWithheld, modelReturnsRead } from "@/lib/compare-interest";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
-import { regulationForDeal, rulesSizeText } from "@/lib/rent-regulation";
-import { placeDeal } from "@/lib/market-county";
-import { modelVsMarketFor } from "@/lib/model-vs-market";
+import { rulesSizeText } from "@/lib/rent-regulation";
 import { metroDemand } from "@/lib/metro-demand";
-import { sampleStressTest } from "@/lib/sample-stress";
+import { sampleModelReads, samplePlacement, sampleStressTest } from "@/lib/sample-stress";
 import type { ResearchPanelProps } from "@/app/(app)/deals/[id]/research-panel";
 import type { RegulatoryRule, Benchmark } from "@/lib/research";
 import type { DemoData } from "./sections";
-
-/** Where the sample is (lib/market-county), answered as the deal page
- *  answers it: the sample carries no site flags, so no county. */
-export function samplePlacement() {
-  return placeDeal(SAMPLE_DEAL.address, null);
-}
 
 export function sampleDemoData({
   today,
@@ -56,32 +47,12 @@ export function sampleDemoData({
   const shownClass = shownAssetClass(SAMPLE_DEAL.asset_class, ex);
   const placement = samplePlacement();
 
-  // The rent rules that reach the sample, read through the one call every
-  // surface makes (lib/rent-regulation), on the page's day.
-  const regulation = regulationForDeal(
-    { extraction: ex, address, siteFlags: null, assetClass: SAMPLE_DEAL.asset_class },
-    today,
-  );
-  // One derivation with the demo workbook and the demo report
-  // (lib/sample-derive): actuals included, never seeded from today's rates,
-  // and told what the deal page tells its derivation — the rent rules and
-  // the day its dated readers read on — as the demo workbook's route tells
-  // it. Neither reaches a figure the model runs on.
-  const derived = sampleDerivedInputs({ regulation, asOf: noon });
-
-  // The model's assumptions against the published figures and the market
-  // check's demand card, off the deal page's one read of today's figures.
-  const modelRead = reads
-    ? modelVsMarketFor({
-        derived,
-        extraction: ex,
-        firstSignal: null,
-        storedAssetClass: SAMPLE_DEAL.asset_class,
-        metro: placement.live,
-        reads,
-        regulation,
-      })
-    : null;
+  // The rent rules, the one derivation (lib/sample-derive: actuals
+  // included, never seeded from today's rates, told the rules and the day)
+  // and the model's assumptions against the published figures, off the deal
+  // page's one read of today's figures — the same reads the stress test is
+  // built on (lib/sample-stress).
+  const { derived, modelVsMarket: modelRead } = sampleModelReads({ today, reads });
   const demand = reads && placement.live ? metroDemand(reads.rates, shownClass || null) : null;
 
   // The sample is never seeded (lib/model-market): its rate seeds are what
@@ -145,8 +116,9 @@ export function sampleDemoData({
     modelVsMarket: modelRead,
     demand,
     // The OM's assumptions tested (lib/sample-stress): the same derivation,
-    // the same read of today's figures, the sample's stored results.
-    stressTest: sampleStressTest({ today, derived, modelVsMarket: modelRead }),
+    // the same read of today's figures, the sample's stored results — the
+    // one build the homepage's walkthrough draws too.
+    stressTest: sampleStressTest({ today, reads }),
   };
 
   // The research panel's props, read as the deal page reads them for its

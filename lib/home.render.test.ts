@@ -575,7 +575,7 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
   });
 
   it("leads the Overview with the OM's assumptions tested on the sample, after the call and before the risk digest (2026-10-19)", () => {
-    const stressTest = sampleStressTest({ today: "2026-09-21", derived: sampleDerivedInputs() });
+    const stressTest = sampleStressTest({ today: "2026-09-21" });
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Overview" as never, stressTest }));
     const t = text(html);
     expect(a11yIssues(html)).toEqual([]);
@@ -595,6 +595,11 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(visibleText(row)).toContain("the deal's T-12");
     expect(row).toContain('data-qa="stress-impact"');
     expect(t).not.toContain("Published figures read");
+    // The whole method, one link right under the panel (2026-10-20).
+    const link = html.indexOf('data-qa="how-we-test-link"');
+    expect(link).toBeGreaterThan(panel);
+    expect(link).toBeLessThan(html.indexOf("Risk digest"));
+    expect(html.slice(link, link + 300)).toMatch(/href="\/how-we-test"[^>]*>How each assumption is tested</);
     // The page hands the walkthrough the same build.
     expect(readFileSync("app/page.tsx", "utf8")).toContain("stressTest={sampleStressTest(");
   });

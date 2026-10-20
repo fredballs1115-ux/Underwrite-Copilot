@@ -26,6 +26,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { sampleStressTest } from "@/lib/sample-stress";
+import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { constructionSeedFor } from "@/lib/model-market";
 import { NO_DEBT_SEEDS } from "@/lib/debt-index";
 import { inferStrategy } from "@/lib/deal-strategy";
@@ -135,7 +136,7 @@ const RECONCILE_ICON = (
 // tasks).
 const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
-    label: "OM + rent roll + T-12: actuals beat pro forma",
+    label: "OM + rent roll + T‑12: actuals beat pro forma",
     href: "/demo",
     icon: (
       <Icon>
@@ -399,7 +400,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, the headline assumptions are sourced ranges, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, each headline assumption is set against a dated published figure, the deal's own documents or a rule of thumb named as one, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
   },
   {
     q: "Does the test make me more accurate?",
@@ -659,6 +660,7 @@ export default function Home() {
           <nav className="hidden items-center gap-1 md:flex">
             {[
               ["#screen", "How it's tested"],
+              ["/how-we-test", "The method"],
               ["/demo", "Sample test"],
               ["#pricing", "Pricing"],
               ["#faq", "FAQ"],
@@ -708,6 +710,7 @@ export default function Home() {
               <nav className="shadow-float absolute right-0 top-11 z-20 w-48 rounded-xl border border-white/10 bg-sidebar p-1.5">
                 {[
                   ["#screen", "How it's tested"],
+                  ["/how-we-test", "The method"],
                   ["/demo", "Sample test"],
                   ["#pricing", "Pricing"],
                   ["#faq", "FAQ"],
@@ -898,7 +901,7 @@ export default function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  Same deal. Same afternoon. Same data room. One method narrows it.
+                  Same deal, same data room. The method is shown, the moves are computed, and whether it was right is scored as evidence arrives.
                 </p>
               </div>
             </Reveal>
@@ -954,15 +957,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              {/* The OM's assumptions tested on the sample (lib/sample-stress),
-                  on the same derivation as the bench, with no figure read
-                  today — the homepage reads none — so its published rows
-                  stand unchecked and the document rows carry the test. */}
-              <DemoTabs
-                buyBox={SAMPLE_BUY_BOX}
-                financials={sampleFinancials()}
-                stressTest={sampleStressTest({ today: new Date().toISOString().slice(0, 10), derived: BENCH })}
-              />
+              <SampleWalkthrough />
             </Reveal>
           </div>
         </section>
@@ -1282,7 +1277,6 @@ export default function Home() {
                 >
                   Start with Pro
                 </Link>
-                <p className="mt-2.5 text-center text-xs text-muted">Cancel anytime — your deals and exports stay yours.</p>
               </div>
 
               {/* Team */}
@@ -1321,7 +1315,7 @@ export default function Home() {
             </div>
           </Reveal>
           <p className="mt-5 text-center text-xs text-muted">
-            Billed monthly through Stripe · cancel anytime · no card required for Free.
+            Billed monthly through Stripe · cancel anytime, and your deals and exports stay yours · no card required for Free.
           </p>
           {/* How the OM is handled, beside the price — each tile opens the
               security page, which states it in full. */}
@@ -1520,6 +1514,22 @@ function DealPreview({ header }: { header: HeaderFacts }) {
         <SampleDealHero header={header} titleAs="h2" stamp />
       </div>
     </div>
+  );
+}
+
+// ── The walkthrough ─────────────────────────────────────────────────────────
+// The OM's assumptions tested on the sample (lib/sample-stress): the one
+// build /demo draws and the signed-in sample's page agrees with, on today's
+// figures for the sample's market (lib/sample-stress-read). A read that fails
+// leaves the published rows unchecked, never the page down.
+async function SampleWalkthrough() {
+  const reads = await sampleTodayReads();
+  return (
+    <DemoTabs
+      buyBox={SAMPLE_BUY_BOX}
+      financials={sampleFinancials()}
+      stressTest={sampleStressTest({ today: new Date().toISOString().slice(0, 10), reads })}
+    />
   );
 }
 
