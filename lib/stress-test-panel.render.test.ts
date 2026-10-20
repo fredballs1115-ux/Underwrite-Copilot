@@ -343,6 +343,15 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
 
+  it("draws a row held to a rule of thumb alone muted, never a green Holds, its word kept", () => {
+    const thumb: StressRow = { ...TAXES, ruleOfThumbOnly: true };
+    const s = render({ rows: [thumb], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(s).toMatch(/class="rounded-full px-2 py-0\.5 text-\[10px\] font-semibold uppercase tracking-wide bg-faint text-muted">Holds</);
+    expect(s).not.toContain("bg-pass/10 text-pass\">Holds");
+    // Held to evidence, it stays green.
+    expect(render({ rows: [TAXES], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).toContain("bg-pass/10 text-pass\">Holds");
+  });
+
   it("keys the marks it draws, and dates the published figures' read", () => {
     const key = html.slice(html.indexOf('data-qa="stress-key"'));
     const t = visibleText(key).replace(/&#x27;/g, "'").replace(/\s+/g, " ");

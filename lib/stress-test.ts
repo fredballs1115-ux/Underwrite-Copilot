@@ -57,6 +57,8 @@
 //   basis            BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
 //                    the comps' median
 //   premium          PREMIUM_UNSUPPORTED_SHARE 15% over the achieved premium
+//   any row          IRR_MOVE_STRETCH_BPS      a re-run that lowers the levered
+//                    IRR 100 bps or more never holds (`finishRow`)
 
 import type {
   BrokerCompsResult,
@@ -109,6 +111,8 @@ export const INSURANCE_UNSUPPORTED_SHARE = 0.15;
 export const BASIS_STRETCH_PCT = 5;
 export const BASIS_UNSUPPORTED_PCT = 15;
 export const PREMIUM_UNSUPPORTED_SHARE = 0.15;
+/** A re-run that moves the levered IRR down this far never reads "holds". */
+export const IRR_MOVE_STRETCH_BPS = 100;
 
 /** Two percent figures within this are one figure (lib/model-vs-market's own). */
 const SAME = 0.05;
@@ -648,7 +652,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared) };
+  return { key: "vacancy", title: TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared), ...(best.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
 }
 
 // — Rent growth —
@@ -1024,7 +1028,9 @@ function debtRow(ctx: Ctx): StressRow | null {
           model: pct2(ctx.derived.inputs.allInRatePct * 100),
         })
       : null;
-  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("debt", evidence) };
+  // The rate is held to the index plus the class's screening spread: the
+  // spread is the site's own default, so the verdict is a rule of thumb's.
+  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("debt", evidence), ruleOfThumbOnly: true };
 }
 
 /** "a 6.78%" / "an 8.00%" — the figure decides (lib/article). */
@@ -1578,16 +1584,40 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     why = "No achieved premium is stated and no cost a door to strike a break-even on.";
   }
   // The premium is no model input: the model grows today's rent at one rate.
-  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}) };
+  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}), ...(achieved?.value == null && gap ? { ruleOfThumbOnly: true } : {}) };
 }
 
 // ── The test ─────────────────────────────────────────────────────────────
+
+/**
+ * The two rules every built row answers to after its own reader:
+ *   - a verdict struck against a rule of thumb alone says so in its gap
+ *     (`ruleOfThumbOnly`), whatever the verdict;
+ *   - a verdict never contradicts its own re-run: a row whose evidence moves
+ *     the levered IRR down by `IRR_MOVE_STRETCH_BPS` or more never reads
+ *     "holds" — inside the evidence's band or not, a move that size is to be
+ *     priced, so it reads "stretched" and the gap says both.
+ */
+function finishRow(row: StressRow): void {
+  if (row.ruleOfThumbOnly && row.gap) row.gap = { ...row.gap, text: `${row.gap.text} Against a rule of thumb only.` };
+  const i = row.impact;
+  if (row.verdict === "holds" && row.gap && i && i.baseIrrPct != null && i.altIrrPct != null) {
+    const moveBps = Math.round((i.baseIrrPct - i.altIrrPct) * 100);
+    if (moveBps >= IRR_MOVE_STRETCH_BPS) {
+      row.verdict = "stretched";
+      row.gap = {
+        ...row.gap,
+        text: `${row.gap.text} The gap is inside the evidence's band, but the return moves ${moveBps} bps on it (levered IRR ${pct1(i.baseIrrPct)} to ${pct1(i.altIrrPct)}).`,
+      };
+    }
+  }
+}
 
 /** The shared screen's reason (`withheldReason`): it carries no model by
  *  design, which is not a model that failed to derive. */
 export const SHARE_NO_MODEL = "The shared screen carries no model, so no return is re-run here.";
 
-const PLAN_REASON ="A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.";
+const PLAN_REASON = "A plan deal is judged on its yield on total cost: the model's levered return runs the finished project's figures over the price, so no return is re-run on it.";
 
 /**
  * The stress test for a deal, from what the deal page already holds. One
@@ -1643,6 +1673,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     insurance: insuranceRow(ctx) ?? undefined,
     renovation_premium: renovationPremiumRow(ctx) ?? undefined,
   };
+  for (const row of Object.values(built)) if (row) finishRow(row);
   // The challenger's words: the first challenge for a key rides on its row
   // (the list is most severe first); every other challenge — a second for
   // the same key, one no key matches — is a row of its own.

@@ -20,7 +20,7 @@ import { inferStrategy } from "./deal-strategy";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
-import { CHALLENGE_KEYWORDS, SHARE_NO_MODEL, buildStressTest, challengeKey, type StressTestArgs } from "./stress-test";
+import { CHALLENGE_KEYWORDS, IRR_MOVE_STRETCH_BPS, SHARE_NO_MODEL, buildStressTest, challengeKey, type StressTestArgs } from "./stress-test";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -210,6 +210,26 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(n.impact!.altIrrPct!).toBeLessThan(n.impact!.baseIrrPct!);
   });
 
+  it("never reads holds where its own re-run lowers the levered IRR 100 bps or more", async () => {
+    // The sample's NOI is 4.7% over its T-12, inside the 5% band, yet the
+    // re-run moves the levered IRR from 11.7% to 9.3%.
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const n = rowOf(sampleStressTest("2026-10-19"), "noi");
+    expect(IRR_MOVE_STRETCH_BPS).toBe(100);
+    expect(n.verdict).toBe("stretched");
+    expect(n.gap!.text).toMatch(/^The OM's \$3\.88M is 4\.7% \(\$174k\) over the deal's T-12's \$3\.71M\. The gap is inside the evidence's band, but the return moves \d+ bps on it \(levered IRR 11\.7% to 9\.3%\)\.$/);
+  });
+
+  it("says a verdict struck on a rule of thumb alone is one, and the vacancy's turns on the best kind present", () => {
+    // No document and no published figure: the class's default alone.
+    const v = rowOf(buildStressTest(apartmentArgs({ actuals: null, modelVsMarket: null })), "vacancy");
+    expect(v.evidence.map((e) => e.kind)).toEqual(["rule_of_thumb"]);
+    expect(v.ruleOfThumbOnly).toBe(true);
+    expect(v.gap!.text.endsWith(" Against a rule of thumb only.")).toBe(true);
+    // With the T-12 on file, the deal's own document decides.
+    expect(rowOf(test, "vacancy").ruleOfThumbOnly).toBeUndefined();
+  });
+
   it("prices every gap from the OM's figure, not the model's default, and names the model's own figure where it is a third value", () => {
     const args = apartmentArgs();
     const inputs = args.derived!.inputs;
@@ -312,7 +332,8 @@ describe("a stabilized apartment deal with a T-12", () => {
       "Lender tests at screening defaults, the binding one named",
       "Negative leverage: the going-in cap against the all-in rate",
     ]);
-    expect(d.gap).toEqual({ value: 153, unit: "bps", text: "The OM's 5.25% is 153 bps under the index plus the class's spread, 6.78%." });
+    expect(d.gap).toEqual({ value: 153, unit: "bps", text: "The OM's 5.25% is 153 bps under the index plus the class's spread, 6.78%. Against a rule of thumb only." });
+    expect(d.ruleOfThumbOnly).toBe(true);
     // 153 bps under the index plus a default spread, but over the bare
     // 4.78% index: stretched, never unsupported on a rule of thumb.
     expect(d.verdict).toBe("stretched");

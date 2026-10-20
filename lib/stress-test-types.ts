@@ -112,6 +112,10 @@ export interface StressRow {
   method: string;
   /** why the row is unchecked, where it is */
   unchecked?: string | null;
+  /** the verdict was struck against a rule of thumb alone (the site's own
+   *  screening default, no figure of the deal's, the market's or the OM's):
+   *  the gap says so, and no surface draws such a row as a green "holds" */
+  ruleOfThumbOnly?: boolean;
 }
 
 export interface StressTest {

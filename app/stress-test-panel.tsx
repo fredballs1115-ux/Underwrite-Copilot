@@ -351,7 +351,9 @@ function UncheckedGroup({ rows }: { rows: readonly StressRow[] }) {
 }
 
 function RowView({ row, withheld }: { row: StressRow; withheld: string | null }) {
-  const v = VERDICT[row.verdict];
+  // A row held to a rule of thumb alone keeps its word but is never drawn
+  // as a green "holds": the site's own default is no evidence of the deal's.
+  const v = row.ruleOfThumbOnly && row.verdict === "holds" ? { ...VERDICT.holds, chip: VERDICT.unchecked.chip } : VERDICT[row.verdict];
   const at = trackScale(row);
   const hasFigure = row.omSays.value != null;
   return (

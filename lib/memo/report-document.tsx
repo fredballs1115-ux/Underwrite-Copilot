@@ -394,7 +394,8 @@ const EVIDENCE_KIND_WORD: Record<StressEvidence["kind"], string> = {
  * none), the method and the challenger's words.
  */
 function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
-  const tone = STRESS_TONE[row.verdict] ?? C.muted;
+  // A row held to a rule of thumb alone is never printed in the pass tone.
+  const tone = row.ruleOfThumbOnly && row.verdict === "holds" ? C.muted : (STRESS_TONE[row.verdict] ?? C.muted);
   const ticks = tickPositions(row);
   const track = 120;
   const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";

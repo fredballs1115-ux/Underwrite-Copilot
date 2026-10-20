@@ -2952,8 +2952,8 @@ describe("the report's stress-test page", () => {
     // The verdict word is the row's tag, printed in capitals.
     expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeGreaterThan(-1);
     expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeLessThan(page.indexOf("STRETCHED Basis"));
-    expect(page.indexOf("STRETCHED Basis")).toBeLessThan(page.indexOf("HOLDS NOI"));
-    expect(page.indexOf("HOLDS NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
+    expect(page.indexOf("STRETCHED Basis")).toBeLessThan(page.indexOf("STRETCHED NOI"));
+    expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
     // The vacancy row, whole.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
     expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026)");

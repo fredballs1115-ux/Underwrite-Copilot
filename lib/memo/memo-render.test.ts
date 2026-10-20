@@ -1633,8 +1633,8 @@ describe("the memo leads with the stress test", () => {
     expect(toOne.sensitivity).toEqual(data.stressDisplaced!.sensitivity);
     expect(toOne.stressDisplaced).toBeNull();
     // The block's count, beside its title.
-    expect(data.stressTest?.count).toBe("1 unsupported · 2 stretched");
+    expect(data.stressTest?.count).toBe("1 unsupported · 3 stretched");
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text.toLowerCase()).toContain("the om's assumptions, tested 1 unsupported · 2 stretched");
+    expect(text.toLowerCase()).toContain("the om's assumptions, tested 1 unsupported · 3 stretched");
   }, 60000);
 });
