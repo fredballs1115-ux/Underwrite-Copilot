@@ -16,7 +16,7 @@
    "exempt_if": {
     "building_permit_issued_after": "1975-12-31"
    },
-   "effect": "Rental units in buildings whose building permit issued after Dec 31, 1975 are EXEMPT from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies. Newly created units in existing structures with a C of O after Jan 1, 1980 are also exempt.",
+   "effect": "Rental units in buildings whose building permit issued after Dec 31, 1975 are exempt from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies. Newly created units in existing structures with a C of O after Jan 1, 1980 are also exempt.",
    "quote": "Any rental unit in any newly constructed housing accommodation for which the building permit was issued after December 31, 1975 ... shall be exempt",
    "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
    "as_of": "2026-07-16",
@@ -38,7 +38,7 @@
     "owner_other_rental_units_in_dc": 0,
     "exemption_registered_with_rad": true
    },
-   "effect": "Pre-1976 building escapes rent stabilization ONLY via the small-landlord exemption: housing accommodation of 4 or fewer rental units (aggregated across structures), owned by not more than 4 natural persons, none holding any direct or indirect interest in any other DC rental unit. An LLC or corporate owner does NOT qualify; owning any other DC rental disqualifies. Claim of exemption must be registered (RAD registration/BBL still required).",
+   "effect": "A pre-1976 building escapes rent stabilization only through the small-landlord exemption: housing accommodation of 4 or fewer rental units (aggregated across structures), owned by not more than 4 natural persons, none holding any direct or indirect interest in any other DC rental unit. An LLC or corporate owner does not qualify; owning any other DC rental disqualifies. Claim of exemption must be registered (RAD registration/BBL still required).",
    "quote": "(3) ... any rental unit in any housing accommodation of 4 or fewer rental units, including any aggregate of 4 rental units whether within the same structure or not, provided: (A) The housing accommodation is owned by not more than 4 natural persons; (B) None of the housing providers has an interest, either directly or indirectly, in any other rental unit in the District of Columbia",
    "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
    "as_of": "2026-07-16",
@@ -55,7 +55,7 @@
     "units_gte": 5
    },
    "exempt_if": null,
-   "effect": "For COVERED accommodations (5+ units; and 2-4 unit buildings majority-owned by a business corporation — see dc-topa-2-4-unit-exemption), sale requires a tenant opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a), as reorganized by D.C. Law 26-80 eff. 2025-12-31). Entity-interest transfers count as a 'sale' (§ 42-3404.02(c)(1)(B)(i) pre-amendment text) — TOPA cannot be structured around for covered buildings. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)).",
+   "effect": "For covered accommodations (5+ units; and 2-4 unit buildings majority-owned by a business corporation — see the 2-4 unit TOPA exemption), sale requires a tenant opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a), as reorganized by D.C. Law 26-80 eff. 2025-12-31). Entity-interest transfers count as a 'sale' (§ 42-3404.02(c)(1)(B)(i) pre-amendment text) — TOPA cannot be structured around for covered buildings. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)).",
    "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02",
    "as_of": "2026-08-21",
    "status": "sourced",
@@ -70,7 +70,7 @@
     "transaction": "sale_of_rental_housing_accommodation"
    },
    "exempt_if": null,
-   "effect": "ENACTED: RENTAL Amendment Act of 2025 = D.C. Law 26-80 (Bill B26-0164 -> Act 26-199 signed Nov 13, 2025 -> effective Dec 31, 2025 after congressional review). Amends the Rental Housing Act (expedited eviction review, reduced pre-filing notice periods) and TOPA: exempts SINGLE-FAMILY accommodations (incl. house + one ADU, and a single unit in a condo/co-op/HOA) from TOPA; clarifies 2-4 unit TOPA rules do not apply to 2-unit single-family accommodations; adds a NEW-CONSTRUCTION exemption (sale within 15 years of permanent C of O, applied retroactively to the effective date); preserves the elderly/disabled single-family tenant carve-out (rental agreement signed by 2018-03-31, occupancy by 2018-04-15). A later Council item 'tightens language on prior RENTAL Act passage' — possible follow-up amendment, unreviewed.",
+   "effect": "Enacted: the RENTAL Amendment Act of 2025 is D.C. Law 26-80 (Bill B26-0164, signed as Act 26-199 on Nov 13, 2025, effective Dec 31, 2025 after congressional review). It amends the Rental Housing Act (expedited eviction review, reduced pre-filing notice periods) and TOPA: it exempts single-family accommodations (including a house with one ADU, and a single unit in a condo, co-op or HOA) from TOPA; clarifies that the 2-4 unit TOPA rules do not apply to 2-unit single-family accommodations; adds a new-construction exemption (a sale within 15 years of the permanent C of O, applied retroactively to the effective date); and preserves the elderly/disabled single-family tenant carve-out (rental agreement signed by Mar 31, 2018, occupancy by Apr 15, 2018). A later Council item 'tightens language on prior RENTAL Act passage' — a possible follow-up amendment, not yet reviewed.",
    "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
    "as_of": "2026-08-21",
    "status": "sourced",
@@ -94,7 +94,7 @@
      "trust"
     ]
    },
-   "effect": "Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA unless the accommodation is majority-owned by a business CORPORATION ('majority ownership interests' = majority of the value of capital, profits, and losses). Per practitioner analysis, LLC/partnership/trust ownership retains the exemption — only corporate majority ownership re-triggers TOPA. This materially de-risks DC 2-4 unit purchases vs the pre-2026 regime. CAUTION: statutory text not directly fetched; practitioner reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
+   "effect": "Under D.C. Law 26-80 (eff. Dec 31, 2025), 2-4 unit accommodations are exempt from TOPA unless the accommodation is majority-owned by a business corporation ('majority ownership interests' meaning a majority of the value of capital, profits, and losses). Per practitioner analysis, LLC/partnership/trust ownership retains the exemption — only corporate majority ownership re-triggers TOPA. This materially de-risks DC 2-4 unit purchases vs the pre-2026 regime. CAUTION: the statutory text was not fetched directly; a practitioner's reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
    "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
    "as_of": "2026-08-21",
    "status": "sourced",

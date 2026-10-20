@@ -10970,7 +10970,7 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
 
   it("prints no rule cut at an abbreviation", () => {
     // Each of these was the whole of its rule's line on the page.
-    expect(text).toContain("Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA");
+    expect(text).toContain("Under D.C. Law 26-80 (eff. Dec 31, 2025), 2-4 unit accommodations are exempt from TOPA");
     expect(text).toContain("Illinois' Rent Control Preemption Act (50 ILCS 825, eff. Aug 1, 1997) bars every unit of local government");
     expect(text).toContain("Florida preempts local rent control (Fla. Stat. 166.043) - no Florida municipality");
     expect(text).toContain("O.C.G.A. 44-7-19 bars any county or municipality");
@@ -10987,7 +10987,9 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
 
   it("keeps the TOPA rule's caution on the page, never folded", () => {
     const caution = html.match(/<p class="[^"]*" data-qa="rule-caution">([^<]*)<\/p>/)?.[1] ?? "";
-    expect(caution).toContain("CAUTION: statutory text not directly fetched");
+    // In sentence case on the page; the file's marker is "CAUTION:".
+    expect(caution).toContain("Caution: the statutory text was not fetched directly");
+    expect(caution).not.toContain("CAUTION");
     // In view, not inside the fold that holds the rest of the rule.
     const topa = html.match(/<li class="text-sm leading-snug" data-rule="dc-topa-2-4-unit-exemption">[\s\S]*?<\/li>/)?.[0] ?? "";
     expect(topa).toContain('data-qa="rule-caution"');
@@ -11008,7 +11010,7 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
     const out = render(React.createElement(Fold, { text: note, className: "text-xs text-muted" }));
     expect(out).toContain("<summary");
     expect(out.match(/<summary[^>]*>([^<]*)/)?.[1]?.trim()).toBe("Under D.C. Law 26-80 the rule is new.");
-    expect(out).toMatch(/data-qa="caution">CAUTION: not fetched\.<\/p>/);
+    expect(out).toMatch(/data-qa="caution">Caution: not fetched\.<\/p>/);
     expect(out.match(/<details[\s\S]*<\/details>/)?.[0]).not.toContain("CAUTION");
     // One sentence is itself, unfolded.
     const one = render(React.createElement(Fold, { text: "Just one (Fla. Stat. 166.043) sentence." }));

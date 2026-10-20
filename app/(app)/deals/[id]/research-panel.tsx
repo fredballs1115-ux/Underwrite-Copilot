@@ -234,7 +234,7 @@ export function SourceLink({
       {!stale && <span>{dated}</span>}
       {source &&
         (!href || audited === false ? (
-          <span title={source}>source on file — link unavailable</span>
+          <span title={source}>source link unavailable</span>
         ) : (
           <a
             href={href}

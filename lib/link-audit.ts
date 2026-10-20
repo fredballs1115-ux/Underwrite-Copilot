@@ -3,7 +3,7 @@
 // source URL in the research layer and writes data/research/link_audit.json.
 // Render surfaces consult it before making a provenance link clickable:
 //   ok:true  -> link renders
-//   ok:false -> plain text "source on file — link unavailable" (never a 404)
+//   ok:false -> plain text "source link unavailable" (never a 404)
 //   unknown  -> link renders (never audited ≠ dead; the audit is the gate,
 //               not an excuse to hide provenance)
 // (Universal module.)
