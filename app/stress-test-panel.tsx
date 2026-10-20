@@ -444,7 +444,9 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
             {KIND.om_internal.word}
           </KeyItem>
         )}
-        {published && <KeyItem>{`Published figures read ${dayText(test.readOn)}`}</KeyItem>}
+        {published && (
+          <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>
+        )}
       </Key>
     </section>
   );

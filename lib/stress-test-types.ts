@@ -118,6 +118,11 @@ export interface StressTest {
   rows: StressRow[];
   /** the day the published figures were read */
   readOn: string;
+  /** whether the published evidence is TODAY's read (the model-vs-market
+   *  read handed in, its figures read on `readOn`) — false where the only
+   *  published figures are the stored market check's, read on the screen's
+   *  day, so no surface dates them `readOn` */
+  publishedRead: boolean;
   /** the model's reads are withheld, so no impact is struck (the reason) */
   impactsWithheld: string | null;
 }

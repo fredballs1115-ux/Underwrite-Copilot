@@ -162,11 +162,12 @@ const OTHER: StressRow = {
 };
 
 // Out of severity order on purpose: the panel sorts.
-const TEST: StressTest = { rows: [GROWTH, TAXES, EXIT, VACANCY, OTHER], readOn: "2026-09-21", impactsWithheld: null };
+const TEST: StressTest = { rows: [GROWTH, TAXES, EXIT, VACANCY, OTHER], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null };
 
 const WITHHELD: StressTest = {
   rows: [{ ...VACANCY, impact: null }, { ...EXIT, impact: null }, GROWTH],
   readOn: "2026-09-21",
+  publishedRead: true,
   impactsWithheld: "The model runs on the $10,000,000 placeholder price, which no memorandum stated — enter the price.",
 };
 
@@ -190,7 +191,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(render(null)).toBe("");
-    expect(render({ rows: [], readOn: "2026-09-21", impactsWithheld: null })).toBe("");
+    expect(render({ rows: [], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).toBe("");
   });
 
   it("heads with the count and leads most severe first: unsupported, stretched, holds, unchecked", () => {
@@ -245,8 +246,8 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(o).toContain("Nothing numerate. Ask the broker: Which comps?");
     expect(other).toContain('href="/how-we-test#other"');
     // Nothing unchecked, no group; nothing tested, no list.
-    expect(render({ rows: [EXIT], readOn: "2026-09-21", impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
-    const only = render({ rows: [GROWTH], readOn: "2026-09-21", impactsWithheld: null });
+    expect(render({ rows: [EXIT], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
+    const only = render({ rows: [GROWTH], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(only).not.toContain('data-qa="stress-rows"');
     expect(only).toContain('data-qa="stress-row-rent_growth"');
     expect(a11yIssues(only)).toEqual([]);
@@ -278,7 +279,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
         note: "The OM's vacancy, 6.0%, is the deal's T-12's 6.0%, so the levered IRR of 9.3% stands on it.",
       },
     };
-    const s = render({ rows: [same], readOn: "2026-09-21", impactsWithheld: null });
+    const s = render({ rows: [same], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     const t = visibleText(s).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(s.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3%, run at the evidence&#x27;s figure");
     expect(t).not.toContain("→");
@@ -286,7 +287,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain(same.impact!.note);
     expect(gluedWords(visibleText(s))).toEqual([]);
     // Two figures are a move, whatever the note's words.
-    const moved = render({ rows: [{ ...VACANCY, impact: { ...VACANCY.impact!, note: same.impact!.note } }], readOn: "2026-09-21", impactsWithheld: null });
+    const moved = render({ rows: [{ ...VACANCY, impact: { ...VACANCY.impact!, note: same.impact!.note } }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(moved.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3% → 7.1%");
   });
 
@@ -352,7 +353,12 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("The OM against itself");
     expect(t).toContain("Published figures read Sep 21, 2026");
     // A test with no published figure dates nothing.
-    expect(visibleText(render({ rows: [EXIT], readOn: "2026-09-21", impactsWithheld: null }))).not.toContain("Published figures read");
+    expect(visibleText(render({ rows: [EXIT], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null }))).not.toContain("Published figures read");
+    // Published figures from the stored market check alone are the
+    // screen's, never dated as read today.
+    const stored = visibleText(render({ ...TEST, publishedRead: false })).replace(/&#x27;/g, "'");
+    expect(stored).toContain("Published figures as of the screen's market check");
+    expect(stored).not.toContain("Published figures read");
   });
 
   it("says once at the top why no return is struck where the model's reads are withheld, and each row points up", () => {

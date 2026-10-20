@@ -2930,7 +2930,23 @@ describe("the report's stress-test page", () => {
     const page = pages[stress] + (pages[stress + 1] ?? "");
     expect(page).toContain("9 assumptions · 4 unsupported · 2 stretched");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
-    expect(page).toContain("The published figures were read on Oct 19, 2026.");
+    // The sample's test reads no figure today and its rows carry no
+    // published figure at all, so the page dates no read.
+    expect(test.publishedRead).toBe(false);
+    expect(page).not.toContain("The published figures were read on");
+    expect(page).not.toContain("The published figures are as of");
+    // With a published figure from the stored market check alone, the page
+    // says whose day it is: the screen's, never the report's.
+    const withStored = {
+      ...test,
+      rows: test.rows.map((r, i) =>
+        i === 0 ? { ...r, evidence: [...r.evidence, { kind: "published" as const, label: "10-year Treasury, as the market check read it", text: "4.94% (2026-09-17)", value: null, asOf: "2026-09-17", publisher: "FRED", scope: "nation" as const }] } : r,
+      ),
+    };
+    const storedPages = pdfPageTextsOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], sensitivity, ...between, withStored))).map((p) => p.replace(/\s+/g, " "));
+    const storedPage = storedPages.find((p) => p.includes("The stress test")) ?? "";
+    expect(storedPage).toContain("The published figures are as of the screen's market check.");
+    expect(storedPage).not.toContain("were read on Oct 19, 2026");
     // Every row, unsupported first.
     for (const r of test.rows) expect(page).toContain(`OM says: ${r.omSays.text}`);
     // The verdict word is the row's tag, printed in capitals.

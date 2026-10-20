@@ -1648,5 +1648,5 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     });
   }
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
-  return { rows, readOn: args.readOn, impactsWithheld };
+  return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld };
 }

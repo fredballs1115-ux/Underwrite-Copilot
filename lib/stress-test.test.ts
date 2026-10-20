@@ -340,6 +340,10 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(test.rows.map((r) => r.key)).toEqual(["basis", "exit_cap", "debt", "noi", "vacancy", "rent_growth", "expense_growth", "taxes", "insurance"]);
     expect(test.impactsWithheld).toBeNull();
     expect(test.readOn).toBe(READ_ON);
+    // Its published evidence is today's read; with none handed in, the
+    // stored market check's figures are the screen's, never today's.
+    expect(test.publishedRead).toBe(true);
+    expect(buildStressTest(apartmentArgs({ modelVsMarket: null })).publishedRead).toBe(false);
   });
 
   it("re-runs the engine with exactly ONE input changed, the one the impact names", () => {
