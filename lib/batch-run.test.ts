@@ -6,7 +6,22 @@
  * plan (research pass 30).
  */
 import { describe, expect, it } from "vitest";
-import { capNotice, runBatch, runLabel, sendable, statusOf, type BatchResult, type BatchStatus } from "./batch-run";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  BATCH_MAX_FILES,
+  batchMaxFiles,
+  batchOffered,
+  batchOverflowNote,
+  batchSummary,
+  capNotice,
+  runBatch,
+  runLabel,
+  sendable,
+  statusOf,
+  type BatchResult,
+  type BatchStatus,
+} from "./batch-run";
 
 const ready = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `OM ${i + 1}`, status: { kind: "ready" } as BatchStatus }));
 
@@ -85,5 +100,40 @@ describe("runBatch — one file at a time, the plan's limit stopping the rest", 
     expect(runLabel(statuses, true, false)).toBe("Uploading — keep this tab open…");
     expect(capNotice(statuses)).toBeNull();
     expect(statusOf({ ok: false, error: "nonsense" })).toEqual({ kind: "error", message: "Something went wrong." });
+  });
+});
+
+describe("the batch takes no more than the free deals left (the first-run audit of 2026-10-20)", () => {
+  it("caps the count at the allowance, and at the batch's own four where no cap applies", () => {
+    expect(batchMaxFiles(null)).toBe(BATCH_MAX_FILES);
+    expect(batchMaxFiles(undefined)).toBe(BATCH_MAX_FILES);
+    expect(batchMaxFiles(9)).toBe(BATCH_MAX_FILES);
+    expect(batchMaxFiles(3)).toBe(3);
+    expect(batchMaxFiles(2)).toBe(2);
+    expect(batchMaxFiles(0)).toBe(0);
+    expect(batchMaxFiles(-1)).toBe(0);
+  });
+
+  it("says the count it takes, and is not offered under two", () => {
+    expect(batchSummary(4)).toBe("Call-for-offers day? Batch-upload up to 4 OMs →");
+    expect(batchSummary(2)).toBe("Call-for-offers day? Batch-upload up to 2 OMs →");
+    expect(batchOffered(2)).toBe(true);
+    expect(batchOffered(1)).toBe(false);
+    expect(batchOffered(0)).toBe(false);
+  });
+
+  it("says why extra files were left out: the plan's free deals where they bind", () => {
+    expect(batchOverflowNote(2, 2)).toBe("You have 2 free deals left — extra files were left out.");
+    expect(batchOverflowNote(4, null)).toBe("Up to 4 OMs per batch — extra files were left out.");
+    expect(batchOverflowNote(4, 7)).toBe("Up to 4 OMs per batch — extra files were left out.");
+  });
+
+  it("the panel reads its count from the allowance the pipeline hands it", () => {
+    const panel = readFileSync(join(process.cwd(), "app/(app)/deals/batch-upload.tsx"), "utf8");
+    expect(panel).toContain("const MAX_FILES = batchMaxFiles(left);");
+    expect(panel).not.toMatch(/up to \{MAX_FILES\} OMs/);
+    const pipeline = readFileSync(join(process.cwd(), "app/(app)/deals/pipeline.tsx"), "utf8");
+    expect(pipeline).toContain("<BatchUpload left={dealsLeft} />");
+    expect(pipeline).toContain("dealsLeft={allowance?.left ?? null}");
   });
 });

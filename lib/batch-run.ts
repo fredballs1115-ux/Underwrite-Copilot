@@ -16,6 +16,37 @@ import { MAX_OM_PAGES } from "@/lib/pdf";
  *  queue reads it as each account's fair share (lib/worker-queue). */
 export const BATCH_MAX_FILES = 4;
 
+/**
+ * The most memoranda this reader's batch takes: `BATCH_MAX_FILES`, held to
+ * the free deals they have left (lib/deal-allowance `left`; null where no
+ * cap applies). A free reader with two deals left had been offered "up to 4
+ * OMs", and the third upload was refused by the plan (the first-run audit
+ * of 2026-10-20).
+ */
+export function batchMaxFiles(left: number | null | undefined): number {
+  if (left == null || !Number.isFinite(left)) return BATCH_MAX_FILES;
+  return Math.max(0, Math.min(BATCH_MAX_FILES, Math.floor(left)));
+}
+
+/** A batch needs two memoranda at least: under that the single upload is
+ *  the way, and the batch is not offered. */
+export function batchOffered(max: number): boolean {
+  return max >= 2;
+}
+
+/** The fold's summary, in the count the batch takes. */
+export function batchSummary(max: number): string {
+  return `Call-for-offers day? Batch-upload up to ${max} OM${max === 1 ? "" : "s"} →`;
+}
+
+/** What the picker says when more files are chosen than the batch takes:
+ *  the plan's free deals where they are the limit, else the batch's own. */
+export function batchOverflowNote(max: number, left: number | null | undefined): string {
+  return left != null && max < BATCH_MAX_FILES
+    ? `You have ${max} free deal${max === 1 ? "" : "s"} left — extra files were left out.`
+    : `Up to ${max} OMs per batch — extra files were left out.`;
+}
+
 /** The create action's answer, as the batch reads it (actions.ts
  *  `CreateDealResult`). */
 export type BatchResult =
