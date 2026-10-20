@@ -1546,6 +1546,11 @@ describe("the memo leads with the stress test", () => {
     // Helvetica has no arrow.
     expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $257k/unit (the offering memorandum) · gap 6.9% · IRR 9.3% to 12.7%");
     expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
+    // The key says what each of a row's two IRRs is run at — the one-page
+    // memo has no room to say it on every row — and claims no more of the
+    // report than that it prints every row.
+    expect(text).toContain("Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row.");
+    expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
     expect(text).toContain("Value-add program: 192 doors to renovate; $18,000 a door; $200 a month premium (13% on cost); $140 achieved on renovated units");

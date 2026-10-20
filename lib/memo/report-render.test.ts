@@ -2928,7 +2928,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeGreaterThan(at("The call, in full"));
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     const page = pages[stress] + (pages[stress + 1] ?? "");
-    expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched");
+    expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched · 2 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.

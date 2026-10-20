@@ -1362,7 +1362,7 @@ export function pdfPageCount(buf: Buffer): number {
  * Room is given back in this order where the memo runs past one page, each
  * concession kept and the next added until the memo fits: the actuals line
  * (the report carries the actuals whole), then the stress block's rows past
- * the second, then past the first (the report tests every assumption) — the
+ * the second, then past the first (the report prints every row the test read) — the
  * block's read line and its lead row stay, since the test is the memo's
  * lead. The step that cuts the block under two rows gives back the
  * deal-killer cards and the flips strip the block had emptied for its rows
@@ -1650,7 +1650,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
             })}
             {data.stressTest.rows.length > 0 ? (
               <Text style={s.stressKey}>
-                {"Ticks: the OM's figure in the row's tone, the evidence's in ink. The IRR move is the model re-run with that one input swapped; the report tests every assumption."}
+                {"Ticks: the OM's figure in the row's tone, the evidence's in ink. Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row."}
               </Text>
             ) : null}
           </Section>

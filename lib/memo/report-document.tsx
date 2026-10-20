@@ -458,7 +458,16 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
   const c = verdictCounts(test);
   const rank: Record<StressRow["verdict"], number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
   const rows = test.rows.map((r, i) => ({ r, i })).sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.i - b.i).map((x) => x.r);
-  const count = [`${test.rows.length} ${test.rows.length === 1 ? "assumption" : "assumptions"}`, c.unsupported ? `${c.unsupported} unsupported` : "", c.stretched ? `${c.stretched} stretched` : ""]
+  // Every verdict counted, as the panel and the header's chip count them
+  // (`verdictCounts`): the rows that hold and the unchecked too, so the
+  // count adds up to the assumptions it heads.
+  const count = [
+    `${test.rows.length} ${test.rows.length === 1 ? "assumption" : "assumptions"}`,
+    c.unsupported ? `${c.unsupported} unsupported` : "",
+    c.stretched ? `${c.stretched} stretched` : "",
+    c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
+    c.unchecked ? `${c.unchecked} unchecked` : "",
+  ]
     .filter(Boolean)
     .join(" · ");
   const publishers = test.rows.flatMap((r) => r.evidence.filter((e) => e.kind === "published").map((e) => e.publisher));
