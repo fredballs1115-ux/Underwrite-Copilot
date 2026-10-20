@@ -557,14 +557,23 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // what the loss was divided by.
   const rr = ctx.actuals?.rentRoll;
   if (rr) {
-    const occ = rr.summary.sfWeightedOccupancy ?? (rr.summary.unitCount > 0 ? rr.summary.occupiedUnits / rr.summary.unitCount : null);
+    // A class priced by the unit (an apartment, a hotel's keys, a park's
+    // pads) runs its occupancy by the count, as its pro forma does — a
+    // studio and a three-bedroom are one door each; a class priced by the
+    // foot runs it by area. Either falls to the other where the roll lacks it.
+    const s = rr.summary;
+    const byUnits = s.unitCount > 0 ? s.occupiedUnits / s.unitCount : null;
+    const perUnit = assetWords(ctx.assetClass).basis === "unit";
+    const useUnits = byUnits != null && (perUnit || s.sfWeightedOccupancy == null);
+    const occ = useUnits ? byUnits : s.sfWeightedOccupancy;
     if (occ != null && occ > 0.05 && occ <= 1) {
       const v = Math.round((1 - occ) * 1000) / 10;
-      const asOf = rr.asOf ?? rr.summary.asOfUsed ?? null;
+      const asOf = rr.asOf ?? s.asOfUsed ?? null;
+      const noun = assetWords(ctx.assetClass).noun?.many ?? "units";
       push({
         kind: "document",
         label: "The deal's rent roll: the occupancy it runs at",
-        text: `${pct1(v)} vacant (${rr.summary.sfWeightedOccupancy != null ? "SF-weighted" : `${rr.summary.occupiedUnits} of ${rr.summary.unitCount} units`}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
+        text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
         value: v,
         asOf,
         publisher: "the deal's rent roll",

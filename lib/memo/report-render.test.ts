@@ -2956,10 +2956,10 @@ describe("the report's stress-test page", () => {
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
     // The vacancy row, whole.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
-    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026)");
+    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of 2026-05-31) (the deal's rent roll, May 31, 2026)");
     expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
-    expect(page).toContain("Gap: The OM's 6.0% is 3.1 points under the evidence's 9.1%.");
-    expect(page).toMatch(/The return: If vacancy is the deal's rent roll's 9\.1%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.3%/);
+    expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
+    expect(page).toMatch(/The return: If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9% to 6%?");
     // The basis row's move is the engine's, spelled.

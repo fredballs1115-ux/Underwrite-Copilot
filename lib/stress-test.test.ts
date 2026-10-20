@@ -699,6 +699,29 @@ describe("the premium the insurance row reads is the building's, never insurance
   });
 });
 
+describe("the rent roll's vacancy is read by count on a class priced by the unit, by area on one priced by the foot", () => {
+  // 240 units, 218 occupied (9.2% vacant by count), 90.6% of the area.
+  const summary = { unitCount: 240, occupiedUnits: 218, totalSf: 220_720, occupiedSf: 200_000, sfWeightedOccupancy: 0.906, waltYears: 0.6, weightedAvgRentPsf: 30, expiryBuckets: null, expiryCoveredSf: 0, truncated: false };
+  const withRoll = (assetClass: string) =>
+    rowOf(
+      buildStressTest(
+        apartmentArgs({
+          storedAssetClass: assetClass,
+          actuals: readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), rentRoll: { summary, asOf: "2026-05-31" }, t12: null, assetClass }),
+        }),
+      ),
+      "vacancy",
+    ).evidence[0];
+
+  it("an apartment building by its doors", () => {
+    expect(withRoll("multifamily")).toMatchObject({ value: 9.2, text: "9.2% vacant (by count, 218 of 240 units occupied, as of 2026-05-31)" });
+  });
+
+  it("an office by its area", () => {
+    expect(withRoll("office")).toMatchObject({ value: 9.4, text: "9.4% vacant (by area, SF-weighted, as of 2026-05-31)" });
+  });
+});
+
 describe("a combined 'Taxes & insurance' row is neither line alone", () => {
   const combined: ExtractionResult = {
     ...APARTMENT,
