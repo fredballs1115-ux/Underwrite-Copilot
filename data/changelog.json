@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-20",
+      "title": "One sample, one test, and the method a click away",
+      "href": "/demo",
+      "blurb": "The homepage, the sample page and a signed-in sample now show the same stress test, built one way and set against the same dated figures. A link under every stress test opens How we test, which now also says what is not re-run (a value-add, lease-up, conversion or development plan, and a placeholder price). The challenger's downside paragraph is a scenario in words; every return figure on the page is the model's."
+    },
+    {
       "date": "2026-10-19",
       "title": "The OM's assumptions, tested — and shown",
       "href": "/how-we-test",
