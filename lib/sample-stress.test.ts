@@ -4,7 +4,7 @@ import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { samplePlacement, sampleStressTest } from "./sample-stress";
-import { sampleDemoData } from "@/app/demo/demo-data";
+import { sampleDemoData, walkthroughData } from "@/app/demo/demo-data";
 import { NO_DEBT_SEEDS } from "./debt-index";
 import { readActuals } from "./actuals/actuals-read";
 import { t12SummaryOf } from "./actuals/analyze";
@@ -119,8 +119,10 @@ function signedInSample(reads: TodayReads | null): StressTest {
   });
 }
 
-/** The homepage's walkthrough, as app/page.tsx builds it. */
-const homepage = (reads: TodayReads | null) => sampleStressTest({ today: TODAY, reads });
+/** The homepage's walkthrough, as app/page.tsx builds it: /demo's build,
+ *  picked for the walkthrough. */
+const homepage = (reads: TodayReads | null) =>
+  walkthroughData(sampleDemoData({ today: TODAY, reads, debt: NO_DEBT_SEEDS }).data).stressTest;
 /** /demo's Overview, as app/demo/demo-data builds it. */
 const demo = (reads: TodayReads | null) => sampleDemoData({ today: TODAY, reads, debt: NO_DEBT_SEEDS }).data.stressTest;
 
@@ -129,6 +131,7 @@ const src = (p: string) => readFileSync(p, "utf8");
 describe("the sample's stress test, one build on every surface", () => {
   it("is the same StressTest on the homepage, /demo and the signed-in sample's page, with today's figures read", () => {
     const page = signedInSample(READS);
+    expect(sampleStressTest({ today: TODAY, reads: READS })).toEqual(page);
     expect(homepage(READS)).toEqual(page);
     expect(demo(READS)).toEqual(page);
     // The published figures are its evidence: the rent growth row is set
@@ -161,10 +164,13 @@ describe("the sample's stress test, one build on every surface", () => {
   });
 
   it("builds it through lib/sample-stress on both public pages, and the page hands the sample no reader's evidence", () => {
+    // The homepage draws /demo's own build (app/demo/demo-data), picked for
+    // the walkthrough (`walkthroughData`), on the reads it makes itself.
     const home = src("app/page.tsx");
     expect(home).toContain("const reads = await sampleTodayReads();");
-    expect(home).toMatch(/stressTest=\{sampleStressTest\(\{ today: [^}]+, reads \}\)\}/);
-    expect(home).not.toContain("buildStressTest");
+    expect(home).toMatch(/sampleDemoData\(\{ today: fmrToday\(\), reads, debt: NO_DEBT_SEEDS \}\)/);
+    expect(home).toContain("<DemoTabs {...walkthroughData(data)} />");
+    expect(home).not.toMatch(/buildStressTest|sampleStressTest\(/);
     expect(src("app/demo/page.tsx")).toContain("await sampleTodayReads()");
     const demoData = src("app/demo/demo-data.ts");
     expect(demoData).toContain("stressTest: sampleStressTest({ today, reads })");
@@ -214,11 +220,14 @@ describe("/demo's Overview, in the deal page's order", () => {
     expect(demoOrder).toEqual(deal.filter((c) => !ACCOUNT_ONLY.has(c)));
   });
 
-  it("draws the homepage walkthrough's Overview as the deal page's own OverviewView, the stress test inside it after the call", () => {
+  it("draws the homepage walkthrough's Overview with the deal page's own OverviewView, the stress test inside it after the call", () => {
+    // Its parts and their order against /demo's are lib/sample-tabs.test.ts's.
     const home = src("app/landing-interactive.tsx");
     const overview = home.slice(home.indexOf('case "Overview":'), home.indexOf('case "Financials":'));
-    expect([...overview.matchAll(/<([A-Z][A-Za-z]+)\b/g)].map((m) => m[1])).toEqual(["OverviewView"]);
+    expect([...overview.matchAll(/<([A-Z][A-Za-z]+)\b/g)].map((m) => m[1])).toEqual(["OverviewTab"]);
     expect(overview).toContain("stressTest={stressTest}");
+    const tab = home.slice(home.indexOf("function OverviewTab("), home.indexOf("/** One tab's panel"));
+    expect(tab).toMatch(/<OverviewView [^>]*stressTest=\{stressTest\}/);
     const base = src("app/(app)/deals/[id]/deal-sections-base.tsx");
     const view = base.slice(base.indexOf("export function OverviewView"));
     expect(view.indexOf("<VerdictHero")).toBeGreaterThan(0);

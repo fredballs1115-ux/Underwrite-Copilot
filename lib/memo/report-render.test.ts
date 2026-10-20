@@ -392,16 +392,20 @@ describe("ReportDocument (full report)", () => {
     const derived = sampleDerivedInputs();
     const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
     const irr = `${(sensitivity.baseCase!.leveredIrr! * 100).toFixed(1)}%`;
-    // The memo and the call take a page each: the grids land on page 3.
+    // The memo takes a page and the call, with the sample's four risks and
+    // three next steps, two: the grids land on page 4. The chip is first
+    // drawn assuming one page each and drawn again naming the page measured.
     const input = buildReportData(deal, "October 5, 2026", checks, sensitivity);
     expect(input.targetReturnPage).toBe(3);
     expect(input.memo.buyBox.find((c) => c.label === "Target return")).toEqual({ label: "Target return", status: "unknown", note: `model ${irr}, p. 3` });
     const pages = pdfPageTextsOf(await renderReportPdf(input)).map((p) => p.replace(/\s+/g, " "));
-    expect(pages[0]).toContain(`Target return · model ${irr}, p. 3`);
-    expect(pages[2]).toContain("Sensitivity analysis");
-    expect(pages[2]).toContain(`LEVERED IRR ${irr}`);
+    expect(pages[2]).toContain("Where the call flips");
+    expect(pages[0]).toContain(`Target return · model ${irr}, p. 4`);
+    expect(pages.join(" ")).not.toContain(`model ${irr}, p. 3`);
+    expect(pages[3]).toContain("Sensitivity analysis");
+    expect(pages[3]).toContain(`LEVERED IRR ${irr}`);
     // Two overrides run the memo onto a second page: the grids land on
-    // page 4, and the chip is drawn again naming it.
+    // page 5, and the chip is drawn again naming it.
     const overridden = buildReportData(deal, "October 5, 2026", checks, sensitivity, undefined, null, [
       "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)",
       "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)",
@@ -409,8 +413,8 @@ describe("ReportDocument (full report)", () => {
     expect(overridden.targetReturnPage).toBe(3);
     const moved = pdfPageTextsOf(await renderReportPdf(overridden)).map((p) => p.replace(/\s+/g, " "));
     expect(moved[1]).toContain("screening memo, continued");
-    expect(moved[3]).toContain("Sensitivity analysis");
-    expect(moved[0]).toContain(`Target return · model ${irr}, p. 4`);
+    expect(moved[4]).toContain("Sensitivity analysis");
+    expect(moved[0]).toContain(`Target return · model ${irr}, p. 5`);
     expect(moved.join(" ")).not.toContain(", p. 3");
     // On a note the grids are the collateral's: the chip names nothing.
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
@@ -1538,10 +1542,13 @@ describe("ReportDocument (full report)", () => {
   }, 60000);
 
   it("prints a value-add program over the grids, and the premium the model does not carry (#460)", async () => {
+    // A memorandum read as a value-add, whose program this is: the sample's
+    // own program rows and its stabilized read are left out.
     const extraction = {
       ...SAMPLE_DEAL.extraction,
+      strategy: undefined,
       metrics: [
-        ...SAMPLE_DEAL.extraction.metrics,
+        ...SAMPLE_DEAL.extraction.metrics.filter((m) => !/renovat|^classic rent$/i.test(m.label)),
         { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" as const },
         { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" as const },
         { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" as const },
@@ -2921,7 +2928,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeGreaterThan(at("The call, in full"));
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     const page = pages[stress] + (pages[stress + 1] ?? "");
-    expect(page).toContain("9 assumptions · 1 unsupported · 2 stretched");
+    expect(page).toContain("9 assumptions · 4 unsupported · 2 stretched");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     expect(page).toContain("The published figures were read on Oct 19, 2026.");
     // Every row, unsupported first.
@@ -2943,6 +2950,11 @@ describe("the report's stress-test page", () => {
     expect(page).toContain(
       "The return: If the price is the memorandum's sale comps' median, $64.73M ($261k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 11.8%",
     );
+    // The taxes row: the seller's bill against the bill the memorandum's own
+    // figures make on the price, and the engine's move on the gap.
+    expect(page).toContain("OM says: Real estate taxes (2026): $727,896 (p. 27)");
+    expect(page).toContain("Gap: The OM's $728k is $224k (23.5%) under the $952k its own figures imply.");
+    expect(page).toMatch(/The return: If the tax line is the \$952k its own figures imply on the price, not the OM's \$728k, the levered IRR moves from 9\.3% to 5\.9%/);
     // An unchecked row says why, and that no return was re-run.
     expect(page).toContain("Unchecked: The OM states no loan rate.");
     expect(page).toContain("The return: No return re-run: No figure to swap.");

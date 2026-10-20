@@ -555,7 +555,11 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked");
+    expect(brief).toContain("9 assumptions of the memorandum's tested in code — 4 unsupported, 2 stretched, 1 holds, 2 unchecked");
+    // The taxes row: the seller's bill against the bill the memorandum's own
+    // figures make on the price, with the engine's move on the gap.
+    expect(brief).toContain("- Real estate taxes (taxes) [UNSUPPORTED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
+    expect(brief).toContain("the levered IRR moves from 9.3% to 5.9%");
     expect(brief).toContain(
       "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document)",
     );

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-20",
+      "title": "The sample tests its taxes, insurance and renovation premium",
+      "href": "/demo",
+      "blurb": "The sample memorandum now states its tax bill and assessed value, its pro forma insurance premium and its renovation program, so the stress test sets each against evidence: the bill re-struck on the price at the rate the memorandum's own figures imply, the premium against the T-12, and the projected rent premium against the premium the renovated units achieved. The homepage's walkthrough draws every tab the sample page draws, from the same build."
+    },
+    {
+      "date": "2026-10-20",
       "title": "One sample, one test, and the method a click away",
       "href": "/demo",
       "blurb": "The homepage, the sample page and a signed-in sample now show the same stress test, built one way and set against the same dated figures. A link under every stress test opens How we test, which now also says what is not re-run (a value-add, lease-up, conversion or development plan, and a placeholder price). The challenger's downside paragraph is a scenario in words; every return figure on the page is the model's."

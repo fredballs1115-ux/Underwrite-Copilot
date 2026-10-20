@@ -41,6 +41,8 @@ import { SAMPLE_ACTUALS_WORDS, SAMPLE_OM_FILE_WORDS, SAMPLE_OM_WORDS, SourceDocu
 import { SAMPLE_OM_HREF } from "./sample-om-link";
 import { rentRollDateWords, t12DateWords } from "./actuals/actuals-read";
 import { sampleStressTest } from "./sample-stress";
+import { sampleDemoData, walkthroughData } from "@/app/demo/demo-data";
+import { NO_DEBT_SEEDS } from "./debt-index";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -437,14 +439,16 @@ describe("the homepage's sample figures are the surfaces' own", () => {
   });
 
   it("the miniature's Financials tab is the deal page's: the terms, the debt sizer and the model card's own body", () => {
-    const { inputs, meta, sources } = sampleDerivedInputs();
+    const { inputs, meta } = sampleDerivedInputs();
     const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units })));
     const tileIrr = sampleWorkbookPreview()[1][2].replace("IRR ", "");
     const r = sampleBaseReturns();
-    const modelInterest = modelReturnsRead(SAMPLE_DEAL.extraction, { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears });
-    const strategy = inferStrategy(SAMPLE_DEAL.extraction, null);
-    const rateSeeds = { permanent: meta.rateSeed ?? null, construction: null };
-    const financials = { underwrite: inputs, underwriteSources: sources, rateSeeds, strategy, modelInterest };
+    // /demo's own build, as the page hands it to the walkthrough.
+    const { financials } = walkthroughData(sampleDemoData({ today: "2026-09-21", reads: null, debt: NO_DEBT_SEEDS }).data);
+    const { modelInterest, rateSeeds, strategy } = financials;
+    expect(modelInterest).toEqual(modelReturnsRead(SAMPLE_DEAL.extraction, { ...SAMPLE_DEAL.model.returns, holdYears: SAMPLE_DEAL.model.holdYears }, new Date("2026-09-21T12:00:00Z")));
+    expect(strategy).toEqual(inferStrategy(SAMPLE_DEAL.extraction, null));
+    expect(rateSeeds).toEqual({ permanent: meta.rateSeed ?? null, construction: null });
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Financials", financials }));
     const panel = words(html);
     // The deal page's own parts, markup for markup, in its order.
@@ -452,21 +456,18 @@ describe("the homepage's sample figures are the surfaces' own", () => {
       React.createElement(DebtSizer, {
         model: SAMPLE_DEAL.model,
         extraction: SAMPLE_DEAL.extraction,
-        underwrite: inputs,
-        underwriteSources: sources,
+        underwrite: financials.underwrite,
+        underwriteSources: financials.underwriteSources,
         rateSeeds,
         strategy,
       }),
     );
-    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest, playground: false }));
-    // Audit C10, L2: the walkthrough's Overview draws no sensitivity
-    // playground, so the card's note names none; /demo's, which draws one,
-    // names it.
+    const card = renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }));
+    // The walkthrough's Overview draws the sensitivity playground, as /demo's
+    // does (audit C10, L2 had left it out, and the card's note with it), so
+    // the card's note names it.
     expect(visibleText(card)).toContain("The workbook is a separate model, built from the memorandum’s terms — its returns can differ from the ones above.");
-    expect(card).not.toContain("sensitivity playground");
-    expect(renderToStaticMarkup(React.createElement(SampleModelCard, { model: SAMPLE_DEAL.model, interest: modelInterest }))).toContain(
-      "The Overview’s sensitivity playground runs the workbook’s model, not this one.",
-    );
+    expect(card).toContain("The Overview’s sensitivity playground runs the workbook’s model, not this one.");
     expect(html).toContain(sizer);
     expect(html).toContain(card);
     expect(html.indexOf("Extracted terms")).toBeLessThan(html.indexOf(sizer));
@@ -600,8 +601,10 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(link).toBeGreaterThan(panel);
     expect(link).toBeLessThan(html.indexOf("Risk digest"));
     expect(html.slice(link, link + 300)).toMatch(/href="\/how-we-test"[^>]*>How each assumption is tested</);
-    // The page hands the walkthrough the same build.
-    expect(readFileSync("app/page.tsx", "utf8")).toContain("stressTest={sampleStressTest(");
+    // The page hands the walkthrough the same build: /demo's, which builds
+    // its stress test through lib/sample-stress.
+    expect(readFileSync("app/page.tsx", "utf8")).toContain("<DemoTabs {...walkthroughData(data)} />");
+    expect(readFileSync("app/demo/demo-data.ts", "utf8")).toContain("stressTest: sampleStressTest({ today, reads })");
   });
 
   it("draws the deal page's own section bar and Analyses pills (section-tabs), counted by its own readers", () => {
@@ -726,7 +729,11 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     for (const c of SAMPLE_DEAL.comps.saleComps) expect(comps).toContain(COMP_RATING[c.support].label);
     expect(comps).not.toContain("Genuine support");
     const challenger = text(panel("Analyses", "challenger"));
-    for (const c of SAMPLE_DEAL.challenges.challenges) expect(challenger).toContain(c.assumption);
+    // The panel's first three, most severe first; the rest one click away.
+    const all = SAMPLE_DEAL.challenges.challenges;
+    for (const c of all.slice(0, 3)) expect(challenger).toContain(c.assumption);
+    expect(all.length).toBe(5);
+    expect(challenger).toContain(`Show ${all.length - 3} more challenges`);
     expect(challenger).toContain("Ask the broker");
     for (const sub of ["verdict", "challenger", "comps", "market", "reconciler"]) {
       const html = panel("Analyses", sub);

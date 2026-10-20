@@ -89,6 +89,24 @@ const NOI_GAP = 3_880_000 - 3_706_500;
  *  a price that buys no building withholds it. */
 const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.exitCapPct - returns.goingInCapPct) * 100)} bps over the going-in cap`;
 
+/**
+ * The stress test's re-run of the exit on the sample (lib/stress-test's
+ * exit-cap row, on the sample's one derivation, lib/sample-derive): the
+ * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.45%
+ * going-in cap the derived model runs at — each levered IRR in percent.
+ * The verdict's "breaks if" quotes these. They are written here because
+ * this module cannot load the derivation (it imports this one, and the
+ * homepage's client bundle loads this module), and lib/sample-stress.test.ts
+ * holds each to the engine's own figure, so the sentence cannot drift from
+ * the row printed beside it.
+ */
+export const SAMPLE_EXIT_RERUN = {
+  omExitPct: 5.25,
+  goingInExitPct: 5.45,
+  omIrrPct: 10.77,
+  goingInIrrPct: 9.28,
+} as const;
+
 const modelMetrics: ReconciledMetric[] = [
   {
     key: "price",
@@ -145,10 +163,12 @@ const modelMetrics: ReconciledMetric[] = [
     label: "Loan-to-value",
     chosenValue: "60%",
     unit: "%",
-    sources: [{ doc: "Loan terms", value: "60%", locator: "term sheet", basis: "term sheet" }],
-    authority: "Loan terms",
-    rationale: "Per the quoted term sheet.",
-    confidence: "high",
+    // The memorandum's own financing page (the extraction's p. 44 row): a
+    // broker's pro forma assumption. No term sheet is among the documents.
+    sources: [{ doc: "OM", value: "60%", locator: "p.44", basis: "pro forma" }],
+    authority: "OM",
+    rationale: "The memorandum's own financing assumption — no lender has quoted the loan.",
+    confidence: "medium",
     isConflict: false,
   },
   {
@@ -223,7 +243,7 @@ const modelMetrics: ReconciledMetric[] = [
     chosenValue: "$300/unit/yr",
     unit: "$",
     sources: [
-      { doc: "OM", value: "$250/unit/yr", locator: "p.9", basis: "pro forma" },
+      { doc: "OM", value: "$250/unit/yr", locator: "p.43", basis: "pro forma" },
       { doc: "Market", value: "$300/unit/yr", locator: "", basis: "lender norm" },
     ],
     authority: "Market",
@@ -237,10 +257,14 @@ const modelMetrics: ReconciledMetric[] = [
     label: "Interest rate",
     chosenValue: "6.00%",
     unit: "%",
-    sources: [{ doc: "Loan terms", value: "6.00%", locator: "term sheet", basis: "term sheet" }],
-    authority: "Loan terms",
-    rationale: "Quoted fixed rate, 30-yr amortization after one IO year.",
-    confidence: "high",
+    // No document states a rate (the OM, the rent roll and the T-12 are the
+    // documents): a screening default, never seeded from today's rates on
+    // the sample (lib/model-market), so lib/model/stated-rate reads it as
+    // no quote.
+    sources: [{ doc: "Screening default", value: "6.00%", locator: "", basis: "assumption" }],
+    authority: "Screening default",
+    rationale: "No document states a rate: a flat 6.00% screening default, 30-yr amortization after one IO year — enter your quote.",
+    confidence: "low",
     isConflict: false,
   },
   {
@@ -297,14 +321,93 @@ const extraction: ExtractionResult = {
     { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12", basis: "pro_forma" },
     { label: "Rent growth", value: "4.0%/yr", flagged: true, page: "p. 40", basis: "pro_forma" },
     { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8", basis: "pro_forma" },
+    // The renovation program (p. 25), in the extraction's own row labels
+    // (lib/value-add). The 56 doors done and the 192 to go are the 248; the
+    // classic rent with the achieved premium on the doors done averages
+    // $2,407 ((192 × $2,375 + 56 × $2,515) / 248), within a dollar of the
+    // rent roll's in-place rent and the memorandum's "$2,400/mo"; the
+    // renovated units in place rent at $2,515, beside the renovated lease
+    // comp's $2,520, while the program is priced on $200.
+    { label: "Classic rent", value: "$2,375/mo", flagged: false, page: "p. 25", basis: "in_place" },
+    { label: "Renovated rent", value: "$2,575/mo", flagged: false, page: "p. 25", basis: "pro_forma" },
+    { label: "Renovation premium", value: "$200/mo", flagged: true, page: "p. 25", basis: "pro_forma" },
+    { label: "Achieved renovation premium", value: "$140/mo", flagged: false, page: "p. 25", basis: "in_place" },
+    { label: "Units renovated", value: "56", flagged: false, page: "p. 25", basis: "na" },
+    { label: "Units to renovate", value: "192", flagged: false, page: "p. 25", basis: "na" },
+    { label: "Renovation cost per unit", value: "$18,000", flagged: false, page: "p. 25", basis: "na" },
+    // The seller's tax bill and the assessment it is struck on (p. 27) —
+    // the T-12's own tax line — and the pro forma's insurance (p. 28), under
+    // the T-12's $385,000. The stress test re-strikes the bill on the price
+    // at the rate the two stated figures imply, only because the memorandum
+    // states both: nothing here asserts what the city does on a sale.
+    { label: "Real estate taxes (2026)", value: "$727,896", flagged: false, page: "p. 27", basis: "in_place" },
+    { label: "Assessed value (2026)", value: "$52,000,000", flagged: false, page: "p. 27", basis: "na" },
+    { label: "Insurance (pro forma)", value: "$310,000", flagged: true, page: "p. 28", basis: "pro_forma" },
+    // The pro forma's reserve, on the memorandum's "Reserves" page: the
+    // figure the first-draft model's capital reserve is set against.
+    { label: "Replacement reserve (pro forma)", value: "$250/unit/yr", flagged: false, page: "p. 43", basis: "pro_forma" },
     { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44", basis: "na" },
   ],
+  // The memorandum sells a stabilized building on its in-place income, with
+  // the renovation program as the upside on turnover: read as stabilized, so
+  // the screen judges the price as a building's (a value-add is a plan deal,
+  // judged on yield on total cost) and the model carries none of the program.
+  strategy: {
+    kind: "stabilized",
+    summary: "A stabilized apartment building sold on its in-place income, with an interior program renovating the classic units as they turn.",
+    capitalBudget: "",
+    timeline: "",
+  },
   // The fictional memorandum's length, at or past its last cited page
   // (p. 44): a citation prints only inside the page count (lib/facts), and
   // without one the demo report's page column was dashes on every row
   // beside the "(p. 14)" its own memo page cites (research pass 35).
   totalPages: 48,
 };
+
+/** The T-12's insurance line (the statement below carries it): the figure
+ *  the pro forma's premium is held to. */
+const T12_INSURANCE = 385_000;
+
+const dollarsOf = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/** The memorandum's tax bill re-struck on its price at the rate its own two
+ *  stated figures imply — the stress test's taxes row's arithmetic
+ *  (lib/stress-test), said here by the challenger and the verdict. It is
+ *  conditional, as the row is: the bill if the sale resets the assessment
+ *  to the price, never a claim about what the city does. */
+const TAX = (() => {
+  const billRow = memoFact("Real estate taxes (2026)");
+  const bill = numberOf(billRow.value);
+  const assessed = numberOf(memoFact("Assessed value (2026)").value);
+  const price = numberOf(memoFact("Asking price").value);
+  const reset = Math.round((bill / assessed) * price);
+  return { bill, assessed, price, ratePct: (bill / assessed) * 100, reset, more: reset - bill, page: billRow.page };
+})();
+
+/** The program's premium as priced and as achieved (p. 25). */
+const PREMIUM = (() => {
+  const row = memoFact("Renovation premium");
+  return {
+    priced: numberOf(row.value),
+    achieved: numberOf(memoFact("Achieved renovation premium").value),
+    done: numberOf(memoFact("Units renovated").value),
+    page: row.page,
+  };
+})();
+
+/** The pro forma's insurance against the T-12's. */
+const INSURANCE = (() => {
+  const row = memoFact("Insurance (pro forma)");
+  return { proForma: numberOf(row.value), page: row.page };
+})();
+
+/** The pro forma's rent over the in-place rent (p. 12). */
+const RENT_JUMP = (() => {
+  const inPlace = numberOf(memoFact("Avg in-place rent").value);
+  const proForma = numberOf(memoFact("Pro forma rent").value);
+  return { inPlace, proForma, pct: ((proForma - inPlace) / inPlace) * 100 };
+})();
 
 const challenges: ChallengerResult = {
   challenges: [
@@ -317,17 +420,40 @@ const challenges: ChallengerResult = {
         "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
     {
-      assumption: "$200/mo renovation premium",
+      assumption: `${dollarsOf(PREMIUM.priced)}/mo renovation premium`,
       severity: "high",
       challenge:
-        "Pro forma rents jump 8.3%, $2,400 to $2,600, on a renovation program the comps don't yet support at this basis.",
-      question: "Which renovated comps achieved this premium, and at what cost per unit?",
+        `Pro forma rents jump ${RENT_JUMP.pct.toFixed(1)}%, ${dollarsOf(RENT_JUMP.inPlace)} to ${dollarsOf(RENT_JUMP.proForma)}, on a program priced at ${dollarsOf(PREMIUM.priced)} a month more a door, while the ${PREMIUM.done} doors already renovated achieve ${dollarsOf(PREMIUM.achieved)} (${PREMIUM.page}).`,
+      question: `Which leases on the ${PREMIUM.done} renovated doors make the ${dollarsOf(PREMIUM.achieved)}, and which renovated comps achieved ${dollarsOf(PREMIUM.priced)} at this basis?`,
+    },
+    {
+      assumption: "Real estate taxes carried at the seller's bill",
+      severity: "high",
+      challenge:
+        `The pro forma carries the seller's 2026 bill, ${dollarsOf(TAX.bill)} on ${withArticle(`${compactUsd(TAX.assessed, { trim: true })} assessment`)} (${TAX.page}), ${TAX.ratePct.toFixed(2)}% of it. Struck at that rate on the ${compactUsd(TAX.price, { trim: true })} price, the bill is ${dollarsOf(TAX.reset)} a year if the sale resets the assessment, ${dollarsOf(TAX.more)} more.`,
+      question: `What bill does the seller expect once the ${compactUsd(TAX.price, { trim: true })} sale reaches the assessor, and is the 2026 assessment under appeal?`,
+      key: "taxes",
+      page: TAX.page,
+      omFigure: TAX.bill,
+      altFigure: TAX.reset,
+      altBasis: "the memorandum's own bill over its assessed value, struck on the price",
     },
     {
       assumption: "6% stabilized vacancy",
       severity: "medium",
       challenge: "In-place vacancy runs ~9%; the 6% stabilized figure assumes a lease-up that isn't underwritten.",
       question: "What's the absorption schedule to get from 9% to 6%?",
+    },
+    {
+      assumption: `Insurance at ${dollarsOf(INSURANCE.proForma)}`,
+      severity: "medium",
+      challenge: `The pro forma carries insurance at ${dollarsOf(INSURANCE.proForma)} (${INSURANCE.page}), ${dollarsOf(T12_INSURANCE - INSURANCE.proForma)} under the ${dollarsOf(T12_INSURANCE)} the T-12 shows; a new owner's quote, not the building's history, sets the line.`,
+      question: `Is ${dollarsOf(INSURANCE.proForma)} a quote bound for a new owner, and on what limits and deductibles?`,
+      key: "insurance",
+      page: INSURANCE.page,
+      omFigure: INSURANCE.proForma,
+      altFigure: T12_INSURANCE,
+      altBasis: "the T-12's insurance line",
     },
   ],
   // The challenger's downside scenario, in words: which of its three
@@ -442,12 +568,14 @@ const verdict: VerdictResult = {
     "The going-in basis is rich and the returns lean on an aggressive exit and rent ramp. Worth a closer look only if the seller moves on price or the ramp is de-risked.",
   topRisks: [
     "Exit cap of 5.25% sits 20 bps inside the 5.45% going-in cap, with no catalyst for the compression.",
-    "Pro forma rents assume a $200/mo premium the comps don't support.",
+    `Taxes ride on the seller's ${dollarsOf(TAX.bill)} bill; at its ${TAX.ratePct.toFixed(2)}% on the ${compactUsd(TAX.price, { trim: true })} price, ${dollarsOf(TAX.reset)} a year.`,
+    `Pro forma rents assume ${withArticle(`${dollarsOf(PREMIUM.priced)}/mo premium`)}; the ${PREMIUM.done} renovated doors achieve ${dollarsOf(PREMIUM.achieved)}.`,
     "Stabilized vacancy of 6% ignores the 9% in-place reality.",
   ],
   nextSteps: [
     "Pull three renovated-comp leases to test the rent premium.",
     "Re-run returns at a 5.50% exit, 5 bps over the 5.45% going-in, and real in-place vacancy.",
+    "Get the seller's post-sale tax estimate and an insurance quote bound for a new owner.",
   ],
   screen: {
     ranges: [
@@ -497,7 +625,12 @@ const verdict: VerdictResult = {
       {
         lever: "exit",
         read: "Underwritten at a 5.25% exit, inside going-in.",
-        risk: `A 5.50% exit, 5 bps over going-in, knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
+        // The stress test's own figures (its exit-cap row), never the
+        // first-draft model's: the first cut quoted "roughly 180 bps" off
+        // that model at a 5.50% exit, beside a stress test whose engine
+        // moves 10.8% to 9.3% at the going-in cap.
+        // Short enough for the one-page memo's card (72 characters).
+        risk: `At the ${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% going-in cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%.`,
       },
       {
         lever: "debt",
@@ -578,12 +711,18 @@ const t12Extraction: T12Extraction = {
   vacancyLoss: 650_500,
   otherIncome: 292_000,
   egi: 6_791_500,
+  // The tax line is the memorandum's 2026 bill (p. 27), $727,896 on a
+  // $52,000,000 assessment; the lines still sum to the $3,085,000 the NOI
+  // and the model's expense load are struck on.
   opex: [
-    { key: "taxes", label: "Real estate taxes", amount: 1_140_000, page: "T-12 p.1" },
-    { key: "insurance", label: "Insurance", amount: 385_000, page: "T-12 p.1" },
-    { key: "utilities", label: "Utilities", amount: 460_000, page: "T-12 p.1" },
+    { key: "taxes", label: "Real estate taxes", amount: 727_896, page: "T-12 p.1" },
+    { key: "insurance", label: "Insurance", amount: T12_INSURANCE, page: "T-12 p.1" },
+    { key: "utilities", label: "Electric & gas", amount: 285_000, page: "T-12 p.1" },
+    { key: "water", label: "Water & sewer", amount: 250_000, page: "T-12 p.1" },
     { key: "rm", label: "Repairs & maintenance", amount: 420_000, page: "T-12 p.1" },
-    { key: "payroll", label: "Payroll", amount: 415_000, page: "T-12 p.2" },
+    { key: "turnover", label: "Turnover & make-ready", amount: 160_000, page: "T-12 p.1" },
+    { key: "contract", label: "Contract services", amount: 122_104, page: "T-12 p.2" },
+    { key: "payroll", label: "Payroll", amount: 470_000, page: "T-12 p.2" },
     { key: "mgmt", label: "Management fee", amount: 205_000, page: "T-12 p.2" },
     { key: "admin", label: "Marketing & admin", amount: 60_000, page: "T-12 p.2" },
   ],

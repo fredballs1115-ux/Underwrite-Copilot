@@ -30,6 +30,7 @@ import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { DealStrategy } from "@/lib/deal-strategy";
 import type { MetroDemand } from "@/lib/metro-demand";
+import type { MarketPicture } from "@/lib/market-picture";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import type {
   ExtractionResult,
@@ -76,6 +77,11 @@ export interface DemoData {
   modelVsMarket: ModelVsMarket | null;
   /** the metro area's payrolls by sector, read today; null where nothing was */
   demand: MetroDemand | null;
+  /** the photograph the sample's market is known by (lib/market-picture),
+   *  which the deal page's market check opens on, and whether it is the
+   *  market whose figures the check read */
+  marketPicture: MarketPicture | null;
+  marketPictureCheckReads: boolean;
   /** the OM's assumptions tested on the sample (lib/sample-stress), which
    *  the Overview leads with after the call */
   stressTest: StressTest | null;
@@ -203,6 +209,8 @@ export function DemoSections({
             tab="Analyses"
             analysis={analysis}
             demand={data.demand}
+            marketPicture={data.marketPicture}
+            marketPictureCheckReads={data.marketPictureCheckReads}
             onAnalysis={setAnalysis}
             onNavigate={navigate}
           />

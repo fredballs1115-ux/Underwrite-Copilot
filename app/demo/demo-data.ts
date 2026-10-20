@@ -20,9 +20,14 @@ import { capSlotWithheld, modelReturnsRead } from "@/lib/compare-interest";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { rulesSizeText } from "@/lib/rent-regulation";
 import { metroDemand } from "@/lib/metro-demand";
+import { marketPictureFor, pictureIsCheckedMarket, type MarketPicture } from "@/lib/market-picture";
 import { sampleModelReads, samplePlacement, sampleStressTest } from "@/lib/sample-stress";
 import type { ResearchPanelProps } from "@/app/(app)/deals/[id]/research-panel";
 import type { RegulatoryRule, Benchmark } from "@/lib/research";
+import type { MetroDemand } from "@/lib/metro-demand";
+import type { StressTest } from "@/lib/stress-test-types";
+import type { SampleFinancials, SampleOverview } from "@/app/landing-interactive";
+import type { SampleBuyBoxData } from "@/app/sample-buy-box";
 import type { DemoData } from "./sections";
 
 export function sampleDemoData({
@@ -54,6 +59,13 @@ export function sampleDemoData({
   // built on (lib/sample-stress).
   const { derived, modelVsMarket: modelRead } = sampleModelReads({ today, reads });
   const demand = reads && placement.live ? metroDemand(reads.rates, shownClass || null) : null;
+  // The photograph the market check opens on, read as the deal page reads
+  // it for the sample (page.tsx `marketPicture`): its address, the market
+  // its memorandum names, the market it is placed in and its county. It is
+  // the market whose figures the check read only where the check stored
+  // them, which the sample's never did.
+  const marketPicture = marketPictureFor(address, ex.market ?? null, placement.briefed ?? placement.read, placement.county);
+  const marketPictureCheckReads = pictureIsCheckedMarket(marketPicture, SAMPLE_DEAL.market.liveBrief ?? null, placement.live);
 
   // The sample is never seeded (lib/model-market): its rate seeds are what
   // the readers answer for a sample, as the deal page asks them.
@@ -115,6 +127,8 @@ export function sampleDemoData({
     strategy,
     modelVsMarket: modelRead,
     demand,
+    marketPicture,
+    marketPictureCheckReads,
     // The OM's assumptions tested (lib/sample-stress): the same derivation,
     // the same read of today's figures, the sample's stored results — the
     // one build the homepage's walkthrough draws too.
@@ -148,4 +162,38 @@ export function sampleDemoData({
   };
 
   return { data, research };
+}
+
+/**
+ * The homepage walkthrough's props, picked from /demo's own build: the two
+ * pages draw the sample's tabs from one set of reads, never a second copy
+ * (lib/sample-tabs.test.ts holds the homepage to it). Only what the
+ * walkthrough draws past the sample's stored results, which its client module
+ * carries already, so the page's payload holds no second copy of the deal.
+ */
+export function walkthroughData(data: DemoData): {
+  buyBox: SampleBuyBoxData;
+  financials: SampleFinancials;
+  overview: SampleOverview;
+  stressTest: StressTest | null;
+  demand: MetroDemand | null;
+  marketPicture: MarketPicture | null;
+  marketPictureCheckReads: boolean;
+} {
+  return {
+    buyBox: { panel: data.buyBox, lines: data.boxLines },
+    financials: {
+      underwrite: data.underwrite,
+      underwriteSources: data.underwriteSources ?? null,
+      rateSeeds: data.rateSeeds,
+      strategy: data.strategy,
+      modelVsMarket: data.modelVsMarket,
+      modelInterest: data.modelInterest,
+    },
+    overview: { actuals: data.actuals, playground: data.playground },
+    stressTest: data.stressTest,
+    demand: data.demand,
+    marketPicture: data.marketPicture,
+    marketPictureCheckReads: data.marketPictureCheckReads,
+  };
 }

@@ -29,11 +29,12 @@ const row = (authority: string, sources: ReconciledMetric["sources"] = []): Reco
 const src = (doc: string, basis = "", value = "1") => ({ doc, value, locator: "", basis });
 
 describe("statedByDocument — a row is a document's only where a document won it", () => {
-  it("reads the sample's rows: the rent roll, the T-12, the OM and the loan's terms state theirs; the market norms are assumed", () => {
+  it("reads the sample's rows: the rent roll, the T-12 and the OM state theirs; the market norms and the rate's screening default are assumed", () => {
     const m = SAMPLE_DEAL.model.metrics;
     const assumed = m.filter((x) => !statedByDocument(x, SAMPLE_DEAL.model.generatedFrom)).map((x) => x.key);
-    expect(assumed).toEqual(["exitCap", "rentGrowth", "expenseGrowth", "capexReserve", "sellingCost"]);
-    expect(m.length - assumed.length).toBe(8);
+    // No term sheet is among the sample's documents: its 6.00% is a default.
+    expect(assumed).toEqual(["exitCap", "rentGrowth", "expenseGrowth", "capexReserve", "rate", "sellingCost"]);
+    expect(m.length - assumed.length).toBe(7);
   });
 
   it("names a document positively: a term sheet, a lender's quote, an appraisal, a budget, the model's own file", () => {
