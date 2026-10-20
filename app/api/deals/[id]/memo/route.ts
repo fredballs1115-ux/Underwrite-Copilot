@@ -15,7 +15,12 @@ import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import type { StructuredAddress } from "@/lib/address";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { countyOf, placeDeal } from "@/lib/market-county";
+import { todayReads } from "@/lib/model-vs-market-read";
+import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { regulationForDeal } from "@/lib/rent-regulation";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
@@ -247,14 +252,19 @@ export async function GET(
     // deal page builds it: the stored results, the deal's documents and the
     // model derived as the deal page and the report derive it — the same
     // rate read, the actuals folded in, never seeded on the sample
-    // (lib/model-market). The memo reads no published figure today, so its
-    // test sets none beside the stored market check's; the report, which
-    // reads them for its assumptions block, hands them to its test. A
-    // derivation that fails prints a memo without the block, never no memo.
+    // (lib/model-market) — and the published figures the report's test
+    // reads (the model's assumptions against them, lib/model-vs-market), so
+    // the memo's block and the report's page say one test. A derivation that
+    // fails prints a memo without the block, never no memo.
     let stressTest: StressTest | null = null;
     try {
       if (extraction && !rrRes.error && !t12Res.error) {
         const debt = await liveDebtSeeds(HOLD_MONTHS);
+        // The rent rules that reach the building, on the reader's day, the
+        // report's own call (lib/rent-regulation `regulationForDeal`).
+        const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+        const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+        const regulationRead = regulationForDeal({ extraction, address, siteFlags, assetClass: deal.asset_class as string | null }, readerDay);
         const t12Summary = t12SummaryOf(t12Res.data?.summary);
         const derived = deriveUnderwriteInputs(
           extraction,
@@ -267,14 +277,34 @@ export async function GET(
           },
           modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
           // Its noon, the day every dated reader of the model reads on.
-          { asOf: new Date(`${readerDay}T12:00:00Z`) },
+          { regulation: regulationRead, asOf: new Date(`${readerDay}T12:00:00Z`) },
         );
+        // The model's assumptions against the published figures, the report
+        // route's own read: the market the deal page places the deal in
+        // (#447), the same cached readers. Its own try: a failed live read
+        // leaves the test on the stored market check's figures alone.
+        let modelVsMarket: ModelVsMarket | null = null;
+        try {
+          const metro = placeDeal(address, countyOf(address, siteFlags)).live;
+          modelVsMarket = modelVsMarketFor({
+            derived,
+            extraction,
+            firstSignal,
+            storedAssetClass: deal.asset_class as string | null,
+            metro,
+            reads: await todayReads(metro),
+            regulation: regulationRead,
+          });
+        } catch (err) {
+          console.warn(`memo assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
+          modelVsMarket = null;
+        }
         stressTest = buildStressTest({
           extraction,
           firstSignal,
           challenger: (deal.challenges as ChallengerResult | null) ?? null,
           market: (deal.market as MarketResult | null) ?? null,
-          modelVsMarket: null,
+          modelVsMarket,
           actuals,
           derived,
           storedAssetClass: deal.asset_class as string | null,
