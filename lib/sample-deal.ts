@@ -244,11 +244,11 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "$",
     sources: [
       { doc: "OM", value: "$250/unit/yr", locator: "p.43", basis: "pro forma" },
-      { doc: "Market", value: "$300/unit/yr", locator: "", basis: "lender norm" },
+      { doc: "Rule of thumb", value: "$300/unit/yr", locator: "", basis: "screening default" },
     ],
-    authority: "Market",
+    authority: "Rule of thumb",
     rationale:
-      "1990s vintage with original roofs and chillers — $250 underfunds what a lender will escrow anyway.",
+      "1990s vintage with original roofs and chillers — the sample's own call that $250 underfunds them; a rule of thumb, not a lender's requirement.",
     confidence: "medium",
     isConflict: true,
   },
@@ -293,7 +293,7 @@ const model: UnderwritingModel = {
   cashFlow,
   returns,
   summary:
-    `Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit is ${EXIT_OVER_ENTRY}, with no compression assumed.`,
+    `Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at $300/unit, a rule of thumb, and the exit is ${EXIT_OVER_ENTRY}, with no compression assumed.`,
   caveats: [
     "Single-tranche debt and straight-line growth — a screening model, not a full build.",
     "Capital reserve is a flat annual figure; confirm against a real engineering budget.",
@@ -415,7 +415,7 @@ const challenges: ChallengerResult = {
       assumption: "Exit cap compression to 5.25%",
       severity: "high",
       challenge:
-        "The OM's pro forma exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
+        "The OM's pro forma exits 20 bps tighter than going-in and states no thesis for the compression.",
       question:
         "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
@@ -501,10 +501,12 @@ const comps: BrokerCompsResult = {
   ],
   redFlags: [
     "One of three sale comps, Vue at Girard, is a newer asset in a stronger submarket, inflating the implied basis.",
-    "A weaker $238k/unit trade 0.8 mi away was omitted from the set.",
+    // No trade the memorandum does not itself state is named: the set's
+    // gap is read off its own dates (Q1'25 to Q4'25, p. 14).
+    "The newest of the three trades is Q4'25: the set states no 2026 sale.",
   ],
   summary:
-    "The comp set leans on the strongest trades and omits a nearby weaker sale — sell-side selections usually do. Against the two clean trades, $252k and $261k a unit, the $274k ask is 7% rich, and richer against the omitted $238k sale.",
+    "The comp set leans on its strongest trade — sell-side selections usually do. Against the two clean trades, $252k and $261k a unit, the $274k ask is 7% rich.",
 };
 
 const reconciliation: ReconciliationResult = {
@@ -548,7 +550,7 @@ const market: MarketResult = {
       omSays: "4.0%",
       typicalRange: "2.5–3.5%",
       assessment: "aggressive",
-      note: "Above the metro's long-run trend.",
+      note: "Above the top of the rule-of-thumb range.",
     },
     {
       assumption: "Vacancy 6%",
@@ -608,10 +610,12 @@ const verdict: VerdictResult = {
       },
       {
         label: "Basis / unit",
-        low: "$238k",
+        // The low end is the lower of the memorandum's two clean trades
+        // (p. 14), never a trade it does not state.
+        low: "$252k",
         base: "$257k",
         high: "$274k",
-        source: "Trades $252k, $261k (p. 14); omitted $238k",
+        source: "Trades $252k, $261k (p. 14)",
         basis: "Ask sits above clean comps with no renovation premium yet.",
         confidence: "high",
       },

@@ -132,4 +132,23 @@ describe("the sample's documents tie to one another", () => {
     expect(ltv.sources).toEqual([{ doc: "OM", value: metric("Loan-to-value").value, locator: "p.44", basis: "pro forma" }]);
     expect(JSON.stringify(SAMPLE_DEAL.model.metrics)).not.toMatch(/term sheet/i);
   });
+
+  it("names no trade the memorandum does not state, and the basis range's low end is its lowest clean trade", () => {
+    // Every per-unit figure the comps step and the verdict's basis range
+    // name is one of the memorandum's own sale comps (p. 14).
+    const stated = SAMPLE_DEAL.comps.saleComps.map((c) => c.detail.match(/^\$(\d+)k\/unit/)![1]);
+    const named = (s: string) => [...s.matchAll(/\$(\d+)k(?:\/unit| a unit)?/g)].map((m) => m[1]);
+    const comps = [...SAMPLE_DEAL.comps.redFlags, SAMPLE_DEAL.comps.summary].join(" ");
+    for (const k of named(comps).filter((k) => k !== "274")) expect(stated, `$${k}k`).toContain(k);
+    const basis = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Basis / unit")!;
+    const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports" || c.support === "favorable").map((c) => Number(c.detail.match(/^\$(\d+)k/)![1]));
+    expect(basis.low).toBe(`$${Math.min(...clean)}k`);
+    for (const k of named(`${basis.source}`)) expect(stated, `$${k}k`).toContain(k);
+  });
+
+  it("the first-draft model's reserve is a rule of thumb, never a lender's norm", () => {
+    const reserve = SAMPLE_DEAL.model.metrics.find((m) => m.key === "capexReserve")!;
+    expect(reserve.authority).toBe("Rule of thumb");
+    expect(JSON.stringify(reserve) + SAMPLE_DEAL.model.summary).not.toMatch(/lender norm|lender's \$/i);
+  });
 });
