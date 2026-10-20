@@ -98,7 +98,8 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
   noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   vacancy: `A stabilized assumption is held to the market: the metro survey inside its margin, else the tracker's band, the region, the state. The rent roll or T-12 shows today's gap; with no fresh market figure, they decide. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
-  rent_growth: `Held to the deal's own kind of rent: Zillow's apartment asking rents, else its all-homes rents, else CPI rent; a commercial building, its lessors' national index. The others are shown beside it. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
+  // lib/rent-growth-decider's order, one line.
+  rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
   insurance: `Held to the T-12's premium, else the OM's premium moved by the index's year. Holds within ${pctOf(SAME_SHARE)} or over it; unsupported past ${pctOf(INSURANCE_UNSUPPORTED_SHARE)} under it.`,
@@ -267,6 +268,7 @@ export const TRACK_RECORD = {
   lines: [
     "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 by the day it was uploaded, a Dead decision with its reason, a reported trade.",
     "A document the screen itself read is never scored: the challenger was handed it.",
+    "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",

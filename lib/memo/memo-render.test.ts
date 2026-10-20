@@ -1550,7 +1550,7 @@ describe("the memo leads with the stress test", () => {
     // supports (Parkside leans the seller's way, and is left out), and the
     // engine's move, spelled, since standard Helvetica has no arrow.
     expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the offering memorandum) · gap 8.8% · IRR 9.3% to 13.6%");
-    expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
+    expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 10.3% to 9.3%");
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
     // report than that it prints every row.
@@ -1574,6 +1574,41 @@ describe("the memo leads with the stress test", () => {
     expect(data.sensitivity).toEqual([]);
     expect(text).not.toContain("Breaks if (screen's estimate)");
     expect(text).not.toContain("Where the call flips");
+    expect(text).toContain("T-12 NOI");
+  }, 60000);
+
+  it("stays one page on the public sample memo with today's published figures read, as /api/demo/memo builds it", async () => {
+    // Today's figures for the sample's market (Philadelphia), the shapes the
+    // deal page's read returns — lib/sample-stress.test.ts's own READS: the
+    // published rows are checked, so the vacancy holds to the metro's survey
+    // and the rent growth to CPI rent.
+    const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const { readMetroRates, readRates } = await import("@/lib/live-rates");
+    const { FIXTURE_NOW, REAL_ROWS } = await import("@/lib/live-rates.fixture");
+    const rows = [
+      { series_id: "PHIL942URN", obs_date: "2026-07-01", value: 4.1 },
+      { series_id: "RRVRNEQ156N", obs_date: "2026-04-01", value: 4.6 },
+      { series_id: "HVS_RVR_37980", obs_date: "2026-04-01", value: 5.8 },
+      { series_id: "HVS_RVR_37980_MOE", obs_date: "2026-04-01", value: 1.9 },
+      ...Array.from({ length: 14 }, (_, i) => ({ series_id: "CUURA102SEHA", obs_date: new Date(Date.UTC(2026, 7 - i, 1)).toISOString().slice(0, 10), value: i === 0 ? 420 : i === 12 ? 400 : 410 })),
+    ];
+    const reads = { rates: readMetroRates("philadelphia", rows, FIXTURE_NOW), zori: null, realtor: null, national: readRates(REAL_ROWS, FIXTURE_NOW), now: FIXTURE_NOW };
+    const test = sampleStressTest("2026-09-21", reads);
+    expect(test.publishedRead).toBe(true);
+    expect(test.rows.find((r) => r.key === "rent_growth")!.verdict).not.toBe("unchecked");
+    const data = { ...buildMemoData(dealOf(), "September 21, 2026", sampleDocumentChecks(), null, null, null, "2026-09-21", null, test), actualsLine: sampleActualsLine() };
+    const pdf = await renderMemoPdf(data);
+    expect(pdfPageCount(pdf)).toBe(1);
+    const text = pdfTextOf(pdf).replace(/\s+/g, " ");
+    expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
+    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
+    // The lead row, unsupported first, is on the page.
+    expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 10.3% to 9.3%");
+    expect(text).toContain("BUY BOX");
+    // It fits whole: the four rows the block has room for and the actuals
+    // line beside the key terms, nothing given back.
+    expect(data.stressTest!.rows).toHaveLength(4);
+    for (const r of data.stressTest!.rows) expect(text).toContain(`${r.verdict.toUpperCase()} ${r.title} OM `);
     expect(text).toContain("T-12 NOI");
   }, 60000);
 

@@ -1,5 +1,6 @@
 import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
+import { ALL_HOMES_RENT_LABEL, APARTMENT_RENT_LABEL, CPI_RENT_LABEL, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -111,6 +112,14 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   // period: shown, named, held to nothing.
   undated: "beside an undated figure",
   old: "beside a figure over a year old",
+};
+
+/** The rent-growth check's chip where ONE figure decides (lib/rent-growth-
+ *  decider): set against that figure, never a range the others make. */
+export const DECIDED_TONE_LABEL: Partial<Record<CheckTone, string>> = {
+  ahead: "ahead of the figure it is held to",
+  inside: "at the figure it is held to",
+  behind: "behind the figure it is held to",
 };
 
 export interface PublishedFigure {
@@ -603,32 +612,45 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const phrases: string[] = [];
   const z = input.zori ?? null;
   if (z && z.yoyPct !== null) {
-    published.push({ label: "Asking rent, all home types", text: `${signed(z.yoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.yoyPct, asOf: z.asOf, publisher: "Zillow Research" });
+    published.push({ label: ALL_HOMES_RENT_LABEL, text: `${signed(z.yoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.yoyPct, asOf: z.asOf, publisher: "Zillow Research" });
     phrases.push(`the metro's asking rents moved ${signed(z.yoyPct)}%${z.mfrYoyPct !== null ? ` (apartments alone ${signed(z.mfrYoyPct)}%)` : ""} over the year to ${monthOf(z.asOf)} (Zillow)`);
     if (z.mfrYoyPct !== null) {
-      published.push({ label: "Asking rent, apartments", text: `${signed(z.mfrYoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.mfrYoyPct, asOf: z.asOf, publisher: "Zillow Research" });
+      published.push({ label: APARTMENT_RENT_LABEL, text: `${signed(z.mfrYoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.mfrYoyPct, asOf: z.asOf, publisher: "Zillow Research" });
     }
   }
   const cpiRent = fresh(input.rates, (r) => metricOf(r) === "rent_cpi_yoy");
   if (cpiRent) {
     const when = periodLabel(cpiRent.obsDate, cpiRent.meta.cadence);
-    published.push({ label: "Rent paid by sitting tenants (CPI rent)", text: `${signed(cpiRent.value)}% over the year to ${when}`, value: cpiRent.value, asOf: cpiRent.obsDate, publisher: `${publisherOf(cpiRent)}` });
+    published.push({ label: CPI_RENT_LABEL, text: `${signed(cpiRent.value)}% over the year to ${when}`, value: cpiRent.value, asOf: cpiRent.obsDate, publisher: `${publisherOf(cpiRent)}` });
     phrases.push(`sitting tenants' rents ${signed(cpiRent.value)}% over the year to ${when} (CPI rent, ${publisherOf(cpiRent)})`);
   }
   if (published.length === 0) return null;
-  // The range and the tone are the market's figures' alone: an allowance is
-  // the regime's, for the units it regulates, and folding it in would let a
-  // 3% model read "inside" a 0–4% band on a building whose regulated rents
-  // may rise 0%.
-  const values = published.map((p) => p.value);
+  // The tone is the market's figures' alone: an allowance is the regime's,
+  // for the units it regulates, and folding it in would let a 3% model read
+  // "inside" a 0–4% band on a building whose regulated rents may rise 0%.
+  // And of the market's figures ONE decides, the one for the deal's own kind
+  // of rent (lib/rent-growth-decider, the stress test's rent-growth row's
+  // own order): the CPI's sitting-tenant index running ahead of Zillow's
+  // asking rents had let a 3.0% model read "inside the published range"
+  // beside a stress row that called the same 3.0% unsupported against the
+  // apartment rents' +0.8% (audit H1). The rest are shown beside it.
+  const decided = rentGrowthDecider(input.assetClass, published.map((p) => p.label));
+  const values = decided ? [published[decided.index].value] : published.map((p) => p.value);
   const tone = rangeTone(g, values);
   const regulated = allowanceRead(input, g);
-  const clause =
-    tone === "ahead"
+  const others = decided && published.length > 1 ? "; the other figures are shown beside it, never held to" : "";
+  const clause = decided
+    ? tone === "ahead"
+      ? `Held to ${decided.name}, ${decided.why.split(";")[0]}, the model runs ahead of it ${byPoints(g, values)}${others}.`
+      : tone === "behind"
+        ? `Held to ${decided.name}, ${decided.why.split(";")[0]}, the model runs behind it ${byPoints(g, values)}${others}.`
+        : `Held to ${decided.name}, ${decided.why.split(";")[0]}, the model sits at it${others}.`
+    : tone === "ahead"
       ? `The model runs ahead of every published figure, ${byPoints(g, values)}.`
       : tone === "behind"
         ? `The model runs behind every published figure, ${byPoints(g, values)}.`
         : "The model sits inside the published range.";
+  const toneLabel = decided ? DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone] : TONE_LABEL[tone];
   const trailing = "A trailing year is what the assumption is being asked to beat, not a forecast.";
   return {
     key: "rent_growth",
@@ -639,14 +661,14 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     // market's figures, which speak for the market-rate units.
     published: regulated ? [...regulated.published, ...published] : published,
     tone,
-    toneLabel: TONE_LABEL[tone],
+    toneLabel,
     scope: "metro",
     read: regulated
       ? `${regulated.lead} For the market-rate units, over the past year ${joinWords(phrases)}. ${clause} ${trailing}`
       : `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} ${trailing}`,
     // An allowance is the regime's, drawn apart from the market's range.
     modelValue: g,
-    marks: [...(regulated ? regulated.published.map(() => mark("apart")) : []), ...published.map(() => mark("range"))],
+    marks: [...(regulated ? regulated.published.map(() => mark("apart")) : []), ...published.map((_, i) => mark(!decided || i === decided.index ? "range" : "beside"))],
   };
 }
 

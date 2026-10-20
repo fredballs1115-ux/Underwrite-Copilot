@@ -18,6 +18,7 @@ import {
   STRESS_KEYS,
   type StressEvidence,
   type StressHeadline,
+  type StressHeadlinePart,
   type StressImpact,
   type StressKey,
   type StressRow,
@@ -291,26 +292,89 @@ export function ptsText(n: number): string {
   return `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(1)} pts`;
 }
 
+/** How a part struck against a rule of thumb alone is marked, on every
+ *  surface: the loan rate's against the class's screening default, any
+ *  other's against a rule of thumb. Null on a part that was not. */
+export function partAgainst(part: Pick<StressHeadlinePart, "key" | "ruleOfThumb">): string | null {
+  if (!part.ruleOfThumb) return null;
+  return part.key === "debt" ? "against a screening default" : "against a rule of thumb";
+}
+
+/** A part as the headline prints it: its Shapley share, and `shown`, the
+ *  share in tenths of a point as printed. */
+export type ShownPart = StressHeadlinePart & { shown: number };
+
+/**
+ * The headline's figures as every surface prints them, so the printed parts
+ * add up to the printed gap: each case's levered IRR at one place, the gap
+ * taken from those two rounded figures (13.1% to 3.6% is a 9.5-point gap,
+ * never the 9.6 the unrounded figures make), and each part rounded to tenths
+ * by largest remainder so the parts sum to that gap to the tenth. Null
+ * figures where a case's IRR does not solve; then no part is shown.
+ */
+export function shownHeadline(h: StressHeadline): { om: number | null; evidence: number | null; gap: number | null; parts: ShownPart[] } {
+  const one = (n: number | null) => (n == null || !Number.isFinite(n) ? null : Number(n.toFixed(1)));
+  const om = one(h.omIrrPct);
+  const evidence = one(h.evidenceIrrPct);
+  if (om == null || evidence == null) return { om, evidence, gap: null, parts: [] };
+  // In tenths: the printed gap, and each part's floor with its remainder.
+  const target = Math.round((evidence - om) * 10);
+  const raw = h.parts.map((p) => p.pts * 10);
+  const tenths = raw.map((r) => Math.floor(r));
+  let left = target - tenths.reduce((s, t) => s + t, 0);
+  if (h.parts.length > 0) {
+    // Largest remainder first where tenths are owed; smallest first where
+    // they are over (a gap that rounds down past the parts' floors).
+    const byRemainder = raw.map((r, i) => ({ i, rem: r - tenths[i] })).sort((a, b) => b.rem - a.rem || a.i - b.i);
+    for (let k = 0; left > 0; k++, left--) tenths[byRemainder[k % byRemainder.length].i] += 1;
+    for (let k = byRemainder.length - 1; left < 0; k = (k - 1 + byRemainder.length) % byRemainder.length, left++) tenths[byRemainder[k].i] -= 1;
+  }
+  const parts = h.parts.map((p, i) => ({ ...p, shown: tenths[i] / 10 }));
+  return { om, evidence, gap: Math.abs(target) / 10, parts };
+}
+
 /**
  * The headline's one line: "Levered IRR on the OM's figures 16.7% to 12.3%
  * with the evidence". `arrow` is "to" on paper (WinAnsi has no arrow) and
  * "→" on the page. Where nothing is past its evidence, the OM's case alone
- * and why the evidence's is the same run. Null where the test carries no
- * headline.
+ * and why the evidence's is the same run — said as nothing the headline
+ * swaps where a row past its evidence is left out of it (the price, a
+ * renovation premium). A case whose IRR does not solve is said in a clause
+ * of its own, never as a figure. Null where the test carries no headline.
  */
 export function headlineLine(test: StressTest, arrow = "to"): string | null {
   const h = liveHeadline(test);
   if (!h) return null;
   const om = irrText(h.omIrrPct);
-  if (h.parts.length === 0 && h.omIrrPct != null && h.evidenceIrrPct != null && Math.abs(h.evidenceIrrPct - h.omIrrPct) < 1e-9) {
-    return `Levered IRR on the OM's figures ${om}; no figure the model takes is past its evidence, so the evidence moves nothing`;
+  if (h.omIrrPct == null && h.evidenceIrrPct == null) return "The levered IRR does not solve on the OM's figures or with the evidence";
+  if (h.evidenceIrrPct == null) return `Levered IRR on the OM's figures ${om}; with the evidence it does not solve`;
+  if (h.omIrrPct == null) return `The levered IRR does not solve on the OM's figures; with the evidence it is ${irrText(h.evidenceIrrPct)}`;
+  if (h.parts.length === 0 && Math.abs(h.evidenceIrrPct - h.omIrrPct) < 1e-9) {
+    return h.omitted.length > 0
+      ? `Levered IRR on the OM's figures ${om}, with nothing past its evidence that the headline swaps, so the evidence moves nothing`
+      : `Levered IRR on the OM's figures ${om}; no figure the model takes is past its evidence, so the evidence moves nothing`;
   }
   return `Levered IRR on the OM's figures ${om} ${arrow} ${irrText(h.evidenceIrrPct)} with the evidence`;
 }
 
-/** "the price +3.7 pts, vacancy −3.2 pts and the exit cap −1.4 pts" */
+/** "the price +3.7 pts, vacancy −3.2 pts and the loan rate −1.4 pts
+ *  (against a screening default)", each part as printed (`shownHeadline`). */
 export function headlineSplit(test: StressTest): string {
-  return joinAnd((liveHeadline(test)?.parts ?? []).map((p) => `${headlineName(p.key)} ${ptsText(p.pts)}`));
+  const h = liveHeadline(test);
+  if (!h) return "";
+  return joinAnd(
+    shownHeadline(h).parts.map((p) => {
+      const against = partAgainst(p);
+      return `${headlineName(p.key)} ${ptsText(p.shown)}${against ? ` (${against})` : ""}`;
+    }),
+  );
+}
+
+/** "2 mixes of the swaps had no IRR and were counted at the engine's floor
+ *  in the split." — "" where every mix solved. */
+export function unsolvedSentence(h: StressHeadline): string {
+  if (!(h.unsolved > 0)) return "";
+  return `${h.unsolved} mix${h.unsolved === 1 ? "" : "es"} of the swaps had no IRR and ${h.unsolved === 1 ? "was" : "were"} counted at the engine's floor in the split.`;
 }
 
 function joinAnd(parts: string[]): string {
@@ -350,7 +414,8 @@ export function headlineSentence(test: StressTest): string | null {
   const line = headlineLine(test)!;
   const multiples =
     h.omMultiple != null && h.evidenceMultiple != null && h.parts.length > 0 ? ` (equity multiple ${h.omMultiple.toFixed(2)}x to ${h.evidenceMultiple.toFixed(2)}x)` : "";
-  const gap = h.omIrrPct != null && h.evidenceIrrPct != null ? Math.abs(h.evidenceIrrPct - h.omIrrPct) : null;
+  // The gap as printed: from the two rounded IRRs, which the parts add up to.
+  const gap = shownHeadline(h).gap;
   const split =
     h.parts.length > 1 && gap != null
       ? `: ${headlineSplit(test)}, each assumption's share of the ${gap.toFixed(1)}-point gap averaged over every order the swaps could be made in.`
@@ -359,7 +424,7 @@ export function headlineSentence(test: StressTest): string | null {
         : h.omIrrPct == null || h.evidenceIrrPct == null
           ? ", so the gap is not split."
           : ".";
-  const unsolved = h.unsolved > 0 ? ` ${h.unsolved} mix${h.unsolved === 1 ? "" : "es"} of the swaps had no IRR and ${h.unsolved === 1 ? "was" : "were"} counted at the engine's floor in the split.` : "";
+  const unsolved = h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
   return `${line}${multiples}${split}${unsolved}${left}`;
 }

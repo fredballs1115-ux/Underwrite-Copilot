@@ -247,6 +247,11 @@ export default async function AnalyticsPage() {
         history: parseStageHistory(r.stage_history),
         askingPrice: askingPriceOf(extraction),
         assetClass: shownAssetClass(r.asset_class as string | null, extraction),
+        // The account's record builds no stress test a deal, so it cannot
+        // tell whether the market or the documents decided a stabilized
+        // vacancy (lib/stress-test `vacancyDecidedBy`, which the deal page
+        // reads): every stated one is held back as the market's, and the
+        // section says so (lib/track-record `ACCOUNT_VACANCY_NOTE`).
         vacancyHeldToMarket: stabilizedVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
       });
     }),

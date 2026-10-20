@@ -121,9 +121,12 @@ describe("ModelVsMarketCard — the strips", () => {
   it("draws the model as a marker and the published figures as ticks, the survey's margin a whisker", () => {
     expect(count(html, "mvm-model")).toBe(3);
     const rent = rowHtml(html, "rent_growth");
-    // Zillow's two and the CPI rent: three figures, the range filled.
-    expect(count(rent, "mvm-figure")).toBe(3);
-    expect(count(rent, "mvm-range")).toBe(1);
+    // Zillow's two and the CPI rent: the apartment rents decide, drawn as
+    // the range's one figure, the other two ticks beside it (audit H1).
+    expect(count(rent, "mvm-figure")).toBe(1);
+    expect(count(rent, "mvm-beside")).toBe(2);
+    // One figure in the range: nothing between two ends to fill.
+    expect(count(rent, "mvm-range")).toBe(0);
     const vac = rowHtml(html, "vacancy");
     expect(count(vac, "mvm-moe")).toBe(1);
     expect(count(vac, "mvm-figure")).toBe(1);

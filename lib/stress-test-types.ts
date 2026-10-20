@@ -156,6 +156,10 @@ export interface StressHeadlinePart {
   pts: number;
   /** the equity multiple's share, signed; null where a case's multiple is none */
   multiple: number | null;
+  /** the row's verdict was struck against a rule of thumb alone
+   *  (`StressRow.ruleOfThumbOnly`, the loan rate against a screening
+   *  default): every surface marks the part so; absent where it was not */
+  ruleOfThumb?: boolean;
 }
 
 /**
@@ -190,9 +194,19 @@ export const HEADLINE_NOI_LEFT_OUT =
   "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
 
 /** Why the price is in neither side of the headline's split: both cases pay
- *  the ask, so the headline is what the ask earns on each set of figures. */
-export const HEADLINE_BASIS_LEFT_OUT =
-  "both cases pay the asking price, so the headline says what the ask earns on each set of figures; the price row says how far the ask sits from the comps and what the return is at their figure";
+ *  the price the model runs on, so the headline is what that price earns on
+ *  each set of figures. `price` names it: "the asking price", or what the
+ *  model runs in the ask's place (a share's price grossed up to the whole,
+ *  an auction's floor). */
+export function headlineBasisLeftOut(price: string): string {
+  return `both cases pay ${price}, so the headline says what that price earns on each set of figures; the price row says how far the ask sits from the comps and what the return is at their figure`;
+}
+
+/** The headline's price where the model runs the asking price as stated. */
+export const HEADLINE_ASK = "the asking price";
+
+/** `headlineBasisLeftOut` on a deal whose model runs the ask as stated. */
+export const HEADLINE_BASIS_LEFT_OUT = headlineBasisLeftOut(HEADLINE_ASK);
 
 /** The headline's method, as /how-we-test prints it and
  *  lib/stress-test.test.ts holds it to `stressHeadline`. */
@@ -202,27 +216,34 @@ export const HEADLINE_METHOD = {
   omCase: [
     "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
     "That is the price, the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, insurance and the NOI.",
-    "The NOI is struck as the rent line that makes the OM's year-one NOI at the OM's own vacancy and expenses.",
+    "The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.",
+    "It is struck as the rent line that makes that NOI at the OM's own vacancy and expenses.",
     "An assumption with no re-run keeps the model's own figure.",
   ],
   evidenceCase: [
     "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
     "One that holds or is unchecked stays at the OM's figure.",
-    "The price stays at the ask in both cases: the headline asks what the ask earns, and the price row says how far the ask sits from the comps.",
+    "The price stays at the model's in both cases: the ask, a share's price grossed up to the whole, or an auction's floor.",
+    "The headline asks what that price earns, and the price row says how far the ask sits from the comps.",
   ],
   split: [
     "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic.",
-    "Each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap.",
-    "With one assumption past its evidence, the headline is that row's own re-run.",
+    "Each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap, each rounded so the printed parts add up to the printed gap.",
+    "With one assumption past its evidence, the whole gap is that assumption's, struck on the OM's case.",
+    "That can differ from the row's own re-run, which starts from the model's own figures rather than the OM's.",
+    "A part struck against a rule of thumb alone, such as the loan rate against a screening default, is marked so.",
   ],
   overlap: [
     `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
     "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
-    "A reset tax bill is struck on the asking price, which both cases pay.",
+    "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
+    "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
   limits: [
     "An assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
-    "No headline on a plan deal, a placeholder price, an assumed NOI or a price that buys no building: no return is re-run there, and the headline is withheld with the reason.",
+    "No headline on a plan deal, a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
+    "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
+    "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
     "Neither case is a forecast: each is the model run once on one set of figures.",
   ],
 } as const;
@@ -335,6 +356,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "Rents grow at the pro forma's rate every year.",
     against: [
       "One figure decides, the one for the deal's own kind of rent; every other is shown beside it. For an apartment building, Zillow's asking rents for the metro against a year ago: apartments alone, else all home types",
+      "For a rented house, Zillow's asking rents across all home types first, houses among them; for a park, a student building or a mixed-use building's apartments, the closest of these decides, named as the closest published figure, not that kind of rent",
       "Where no Zillow asking rent was read, the rent sitting tenants pay (the CPI's rent of primary residence), where the BLS publishes it for the metro: it averages every lease in place, so it lags the rents new leases sign at",
       "For a commercial class, the national index of rents its kind of lessor charges (the BLS producer price indexes), said as the nation's",
       "A rent regulation's published allowance for the units it reaches, shown first and never the figure that decides",

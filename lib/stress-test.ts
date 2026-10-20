@@ -47,7 +47,7 @@
 //                    deal's documents)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
 //                    trailing year's figure for the deal's own kind of rent
-//                    (`RENT_GROWTH_DECIDERS`)
+//                    (lib/rent-growth-decider)
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under the lowest
 //                    price index
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
@@ -109,6 +109,7 @@ import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, t
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
+import { NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
   type StressEvidence,
@@ -117,7 +118,8 @@ import {
   type StressRow,
   type StressTest,
   type StressVerdict,
-  HEADLINE_BASIS_LEFT_OUT,
+  HEADLINE_ASK,
+  headlineBasisLeftOut,
   HEADLINE_NOI_LEFT_OUT,
   type StressHeadline,
 } from "@/lib/stress-test-types";
@@ -452,11 +454,18 @@ function statedPct(rows: Row[], re: RegExp, not?: RegExp): { row: Row; pct: numb
   return row && pct != null && Number.isFinite(pct) ? { row, pct } : null;
 }
 
+/** A vacancy row that states the building's vacancy TODAY — current, in
+ *  place, actual, the T-12's, trailing — never a pro forma allowance: it is
+ *  read as today's figure, as a stated occupancy is (audit M6). */
+const VACANCY_TODAY = /\b(?:current|in[- ]place|actual|t-?12|ttm|trailing|today)\b/i;
+
 /** The OM's stabilized vacancy, as a vacancy row (a stabilized or pro forma
- *  one first) or as what its stated occupancy leaves. */
-function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" } | null {
+ *  one first) or as what its stated occupancy leaves; else a vacancy the OM
+ *  states for today, read as today's figure (`from: "today"`). */
+function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" | "today" } | null {
   const vacancyRows = rows.filter((m) => VACANCY_ROW.test(m.label) && !VACANCY_NOT.test(m.label) && !VACANCY_VALUE_NOT.test(m.value) && parsePct(m.value) != null);
-  const row = vacancyRows.find((m) => VACANCY_PLAN.test(m.label)) ?? vacancyRows[0] ?? null;
+  const assumed = vacancyRows.filter((m) => !VACANCY_TODAY.test(m.label));
+  const row = assumed.find((m) => VACANCY_PLAN.test(m.label)) ?? assumed[0] ?? null;
   if (row) {
     const pct = parsePct(row.value)!;
     if (pct >= 0 && pct <= 100) return { row, pct, from: "vacancy" };
@@ -464,6 +473,9 @@ function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occ
   const occ = occupancyRow(rows) as Row | null;
   const occPct = occ ? parsePct(occ.value) : null;
   if (occ && occPct != null && occPct >= 0 && occPct <= 100) return { row: occ, pct: Math.round((100 - occPct) * 10) / 10, from: "occupancy" };
+  const today = vacancyRows.find((m) => VACANCY_TODAY.test(m.label)) ?? null;
+  const todayPct = today ? parsePct(today.value) : null;
+  if (today && todayPct != null && todayPct >= 0 && todayPct <= 100) return { row: today, pct: todayPct, from: "today" };
   return null;
 }
 
@@ -596,6 +608,22 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
 export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
   const om = omVacancy(rowsOf(extraction));
   return om?.from === "vacancy" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
+ * The kind of evidence that decided a built test's vacancy row: the figure
+ * its re-run swapped in, else the first piece with a figure (the row prints
+ * the kind that decides first) — "published" where the market's figure held
+ * a stabilized assumption, "document" where the deal's rent roll or T-12
+ * decided it. Null with no vacancy row, or one left unchecked. The track
+ * record reads it (audit M5): a later document scores no vacancy challenge
+ * only where the market decided it, never where the documents did.
+ */
+export function vacancyDecidedBy(test: StressTest | null | undefined): StressEvidence["kind"] | null {
+  const row = test?.rows.find((r) => r.key === "vacancy");
+  if (!row || row.verdict === "unchecked") return null;
+  const e = row.impact ? row.evidence[row.impact.evidenceIndex] : row.evidence.find((x) => x.value != null);
+  return e?.kind ?? null;
 }
 
 /**
@@ -734,13 +762,15 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // Where the OM states no vacancy allowance, the figure is its occupancy
   // TODAY, not a pro forma assumption: the row is titled and worded so, and
   // the documents — today's figures too — decide it.
-  const title = om?.from === "occupancy" ? OCCUPANCY_TITLE : undefined;
+  const title = om && om.from !== "vacancy" ? OCCUPANCY_TITLE : undefined;
   const omSays: StressRow["omSays"] = om
     ? {
         text:
           om.from === "vacancy"
             ? `${om.row.label}: ${om.row.value}`
-            : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
+            : om.from === "today"
+              ? `${om.row.label}: ${om.row.value} as stated — today's vacancy, not a pro forma assumption`
+              : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
         value: om.pct,
         page: pageOf(om.row, ctx.ex),
       }
@@ -815,39 +845,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
 // — Rent growth —
 
 /**
- * The published figures a rent growth may be held to, in the order the
- * first present decides — the one that speaks to the deal's own kind of
- * rent (the read hands a residential class Zillow's and the CPI's figures,
- * a commercial class its lessors' index, never both):
- *   - an apartment building: Zillow's asking rents over multifamily
- *     listings alone, else over all home types (the nearest Zillow reads
- *     where its apartment index has no figure for the month), else the rent
- *     sitting tenants pay (the CPI's rent of primary residence), which
- *     averages every lease in place and lags the rents new leases sign at;
- *   - a commercial class: the national index of rents its kind of lessor
- *     charges (lib/live-market-brief `rentIndexFor`), the nation's.
- * Each figure is the trailing year's, and every other figure the read
- * carries stays shown beside the one that decides, never in its place.
+ * A rent growth is held to the published figure that speaks to the deal's
+ * own kind of rent, the first present in the class's order — ONE order,
+ * lib/rent-growth-decider's, which the model's rent-growth check reads too,
+ * so the deal page's card and this row are held to one figure. Each figure
+ * is the trailing year's, and every other figure the read carries stays
+ * shown beside the one that decides, never in its place.
  */
-const RENT_GROWTH_DECIDERS: readonly { re: RegExp; name: (label: string) => string; why: string }[] = [
-  { re: /^Asking rent, apartments$/, name: () => "Zillow's apartment asking rents", why: "the figure for this kind of rent" },
-  {
-    re: /^Asking rent, all home types$/,
-    name: () => "Zillow's asking rents across all home types",
-    why: "the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month",
-  },
-  {
-    re: /\(CPI rent\)$/,
-    name: () => "the rent sitting tenants pay (CPI rent)",
-    why: "the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at",
-  },
-  {
-    re: /^Rents charged by .+, national \(PPI\)$/,
-    name: (label) => `the national index of ${lowerFirst(label.replace(/, national \(PPI\)$/, ""))}`,
-    why: "the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's",
-  },
-];
-
 function rentGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
   // A regulation's allowance is the regime's, for the units it regulates —
@@ -862,23 +866,24 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
     else market.push(e);
   });
   if (!om && apart.length + market.length === 0) return null;
-  // The one figure that decides, the first of RENT_GROWTH_DECIDERS present,
-  // printed first among the market's; the rest beside it.
-  const found = RENT_GROWTH_DECIDERS.flatMap((d) => {
-    const e = market.find((m) => d.re.test(m.label));
-    return e ? [{ e, d }] : [];
-  })[0];
-  const evidence = [...apart, ...(found ? [found.e] : []), ...market.filter((m) => m !== found?.e)];
-  const pick = found ? { i: apart.length, d: found.d } : null;
+  // The one figure that decides, the first of the class's order present
+  // (lib/rent-growth-decider), printed first among the market's; the rest
+  // beside it.
+  const decided = rentGrowthDecider(ctx.assetClass, market.map((m) => m.label));
+  const found = decided ? market[decided.index] : null;
+  const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found)];
+  const pick = decided && found ? { i: apart.length, d: decided } : null;
   const compared = new Set<number>(pick ? [pick.i] : []);
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
   if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
-  if (!pick) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
+  // Lodging and licensed care read no rent index: the true reason, never
+  // that nothing could be read.
+  if (!pick) return unchecked("rent_growth", omSays, evidence, market.length === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE, compared);
   const decider = evidence[pick.i];
   const bestValue = decider.value!;
-  const name = pick.d.name(decider.label);
+  const name = pick.d.name;
   // "Held to Zillow's apartment asking rents, the figure for this kind of
   // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
   const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
@@ -1499,8 +1504,11 @@ function taxesRow(ctx: Ctx): StressRow | null {
   const impact =
     ctx.derived && ctx.impactsWithheld == null
       ? expenseImpact(
-          ctx.derived,
-          best.value! - bill,
+          ctx,
+          bill,
+          best.value!,
+          t12Tax && t12Tax.amount > 0 ? t12Tax.amount : null,
+          "tax line",
           evidenceIndex,
           abated
             ? { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: "the unabated bill", omSide: "the abated" }
@@ -1510,22 +1518,72 @@ function taxesRow(ctx: Ctx): StressRow | null {
   return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence, compared) };
 }
 
-/** The model's one expense line moved by `delta`: the one input swapped is
- *  `expenseLines`, its first line's annual figure grown by the gap. The
- *  model's lines carry the OM's bill (they are built on its figures), so
- *  the base run is the model's own. `words.evidence` is "" where `alt` is
- *  already a whole phrase. */
+/**
+ * The model's one expense line, run twice: once carrying the OM's figure for
+ * one of its lines (a tax bill, a premium) and once the evidence's, every
+ * other input as the model has it — so the two runs differ in that line
+ * alone. What the model's line already carries of it decides each side:
+ *   - where the line is the T-12's expense load (`sources.expenseLines.doc`
+ *     "T-12"), it already holds the T-12's own figure for that line
+ *     (`t12Line`, scaled to the model's load where the model's line does not
+ *     tie to the T-12's total): the OM's run is the line less the T-12's
+ *     figure plus the OM's, the evidence's the line less the T-12's figure
+ *     plus the evidence's — never the gap added on top of a line that
+ *     already holds the T-12's figure, which counted the gap twice;
+ *   - where the line is the class's ratio struck on the OM's NOI, it is read
+ *     as carrying the OM's figure: the OM's run is the model's own and the
+ *     evidence's moves it by the gap.
+ * `omValue` and `altValue` on the impact are the two runs' whole expense
+ * lines, which the headline's cases set the line to. `words.evidence` is ""
+ * where `alt` is already a whole phrase.
+ */
 function expenseImpact(
-  derived: DerivedModel,
-  delta: number,
+  ctx: Ctx,
+  omFigure: number,
+  altFigure: number,
+  t12Line: number | null,
+  lineWord: string,
   evidenceIndex: number,
   words: { what: string; om: string; alt: string; evidence: string; omSide?: string },
 ): StressImpact | null {
+  const derived = ctx.derived;
+  if (!derived) return null;
   const lines = derived.inputs.expenseLines;
   if (lines.length === 0) return null;
-  const altLines = lines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l));
-  const base = lines.reduce((s, l) => s + l.annual, 0);
-  return runImpact("expenseLines", derived.inputs, { ...derived.inputs, expenseLines: altLines }, evidenceIndex, base, base + delta, base, { ...words, model: money(base) });
+  const total = lines.reduce((s, l) => s + l.annual, 0);
+  const fromT12 = derived.sources.expenseLines?.doc === "T-12";
+  const t12Total = ctx.actuals?.t12?.summary.totalOpex ?? null;
+  // What the model's line holds of this line: the T-12's own figure where
+  // the line is the T-12's load and the T-12 breaks the line out.
+  let carried: number | null = null;
+  let carriedWords = "";
+  if (fromT12 && t12Line != null && t12Line > 0 && t12Total != null && t12Total > 0) {
+    const scale = total / t12Total;
+    const tied = Math.abs(scale - 1) <= 0.01;
+    carried = tied ? t12Line : t12Line * scale;
+    carriedWords = tied
+      ? `its one expense line at the T-12's ${money(total)} total, with the T-12's ${money(t12Line)} ${lineWord} in it`
+      : `its one expense line at the T-12's expense load, ${money(total)}, with the T-12's ${money(t12Line)} ${lineWord} in it scaled to that load, ${money(carried)}`;
+  }
+  const omTotal = carried != null ? total - carried + omFigure : total;
+  const altTotal = carried != null ? total - carried + altFigure : total + (altFigure - omFigure);
+  const at = (t: number) => lines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + (t - total) } : l));
+  const impact = runImpact(
+    "expenseLines",
+    { ...derived.inputs, expenseLines: at(omTotal) },
+    { ...derived.inputs, expenseLines: at(altTotal) },
+    evidenceIndex,
+    omTotal,
+    altTotal,
+    total,
+    { ...words, model: carriedWords || money(total) },
+  );
+  // The T-12's load with no such line broken out: the line is read as
+  // carrying the OM's figure, which the note says it may not.
+  if (fromT12 && carried == null) {
+    impact.note = `${impact.note} The model's expense line is the T-12's expense load, which breaks out no ${lineWord}, so it is read as carrying the OM's figure and the evidence's run moves it by the gap.`;
+  }
+  return impact;
 }
 
 // — Insurance —
@@ -1591,7 +1649,12 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const evidenceIndex = evidence.indexOf(best);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? expenseImpact(ctx.derived, best.value! - premium, evidenceIndex, { what: "the insurance line", om: money(premium), alt: money(best.value!), evidence: best.publisher })
+      ? expenseImpact(ctx, premium, best.value!, t12Ins && t12Ins.amount > 0 ? t12Ins.amount : null, "insurance line", evidenceIndex, {
+          what: "the insurance line",
+          om: money(premium),
+          alt: money(best.value!),
+          evidence: best.publisher,
+        })
       : null;
   return { key: "insurance", title: TITLES.insurance, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("insurance", evidence) };
 }
@@ -2111,6 +2174,23 @@ export const SHARE_NO_MODEL = "The shared screen carries no model, so no return 
 const PLAN_REASON = "On a value-add, lease-up, conversion or development deal the model runs today's income with the budget in year one, not the business plan, so a re-run would measure the wrong deal; no return is re-run.";
 
 /**
+ * The price both of the headline's cases pay, in words: the model's own
+ * price, which is the ask as stated except where the model runs another
+ * figure in its place — a share's price grossed up to the whole
+ * (`meta.grossedUpSharePct`), or an auction's floor, the starting bid plus
+ * the buyer's premium (lib/underwrite/inputs' price note).
+ */
+export function headlinePrice(derived: DerivedModel): string {
+  const share = derived.meta.grossedUpSharePct;
+  if (share != null) return `the ${Math.round(share * 10) / 10}% share's price grossed up to the whole the model runs`;
+  const note = derived.sources.purchasePrice?.note ?? "";
+  if (derived.sources.purchasePrice?.provenance === "derived" && / starting bid\b/.test(note)) {
+    return "the auction's floor, the starting bid plus the buyer's premium, which the model runs in place of an asking price";
+  }
+  return HEADLINE_ASK;
+}
+
+/**
  * The stress test for a deal, from what the deal page already holds. One
  * row an assumption, in STRESS_KEYS' order; a row with nothing stated and
  * nothing found is left out, and the challenger's unmatched challenges
@@ -2208,7 +2288,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
   // The headline is struck on the rows as finished: a row `finishRow` reads
   // stretched is swapped in the evidence's case.
-  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs) : null;
+  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs, headlinePrice(derived)) : null;
   return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
 }
 
@@ -2225,33 +2305,27 @@ const HEADLINE_SCALARS = ["purchasePrice", "exitCapPct", "allInRatePct", "vacanc
 type HeadlineScalar = (typeof HEADLINE_SCALARS)[number];
 const isHeadlineScalar = (k: string): k is HeadlineScalar => (HEADLINE_SCALARS as readonly string[]).includes(k);
 
-/** The evidence a tax row's re-run swapped in is the reset bill its own
- *  figures imply on the price (`taxesRow`), not an abatement's stated bill. */
-const isResetBill = (row: StressRow): boolean =>
-  row.key === "taxes" && !!row.impact && (row.evidence[row.impact.evidenceIndex]?.label ?? "").startsWith("The bill the OM's own figures imply");
-
 /** How each row in the OM's case sets the model's inputs, the OM's side or
  *  the evidence's — the same swap its own re-run makes:
  *   - a percent or the price: the input itself (`pctImpact`, the basis row);
- *   - the tax or insurance line: the model's first expense line moved by the
- *     gap (`expenseImpact`), the gaps of both lines added — a reset tax bill
- *     struck on the price the case pays;
+ *   - the tax or insurance line: the model's one expense line as that row's
+ *     own two runs set it (`expenseImpact`: the impact's `omValue` and
+ *     `altValue` are the whole line in each run, so a line the T-12 already
+ *     carries is swapped, never added to), each row's move from the model's
+ *     line added — a reset tax bill struck on the asking price, which both
+ *     cases pay;
  *   - the NOI: the rent line that makes the OM's NOI, or the evidence's, at
  *     the case's own vacancy and expenses (`rentForNoi`). */
 type HeadlineSwap =
   | { kind: "scalar"; row: StressRow; input: HeadlineScalar; om: number; alt: number }
-  | { kind: "expense"; row: StressRow; delta: number; reset: { bill: number; reset: number } | null }
+  | { kind: "expense"; row: StressRow; om: number; alt: number }
   | { kind: "noi"; row: StressRow; omNoi: number; altNoi: number };
 
 function headlineSwap(row: StressRow): HeadlineSwap | null {
   const i = row.impact;
   if (!i) return null;
   if (isHeadlineScalar(i.input)) return { kind: "scalar", row, input: i.input, om: i.omValue, alt: i.altValue };
-  if (i.input === "expenseLines") {
-    const e = row.evidence[i.evidenceIndex];
-    const reset = isResetBill(row) && row.omSays.value != null && e?.value != null ? { bill: row.omSays.value, reset: e.value } : null;
-    return { kind: "expense", row, delta: i.altValue - i.omValue, reset };
-  }
+  if (i.input === "expenseLines") return { kind: "expense", row, om: i.omValue, alt: i.altValue };
   if (row.key === "noi" && i.input === "inPlaceRentAnnual") {
     const altNoi = row.evidence[i.evidenceIndex]?.value ?? null;
     if (row.omSays.value == null || altNoi == null) return null;
@@ -2268,7 +2342,7 @@ function noSwapWhy(row: StressRow): string {
   return "its re-run moves an input the two cases cannot combine";
 }
 
-const swaps = (s: HeadlineSwap) => s.kind !== "scalar" || Math.abs(s.alt - s.om) > 1e-12;
+const swaps = (s: HeadlineSwap) => s.kind === "noi" || Math.abs(s.alt - s.om) > (s.kind === "expense" ? 1e-6 : 1e-12);
 const passed = (r: StressRow) => r.verdict === "stretched" || r.verdict === "unsupported";
 
 /**
@@ -2291,17 +2365,20 @@ const passed = (r: StressRow) => r.verdict === "stretched" || r.verdict === "uns
  * (`HEADLINE_NOI_LEFT_OUT`). Where none of the three is, the NOI's own swap
  * stands. Every other row swaps an input no other row touches: the exit
  * cap, the loan rate, the growth rates and the price are one input each,
- * and the tax and insurance lines add their gaps to the one expense line.
- * The one figure that rides on another row's is a reset tax bill, struck on
- * the price: where the price is swapped too, it is struck on the case's
- * price (the reset scaled by the price's own ratio), never on the ask.
+ * and the tax and insurance lines each set the one expense line as their
+ * own runs do, their moves from the model's line added. A reset tax bill is
+ * struck on the asking price, and the price is no player (both cases pay
+ * the ask), so the bill is the same in every case it is swapped into.
  *
  * With one row past its evidence and no other re-run in the OM's case, the
  * headline is that row's own re-run, to the figure: the OM's case IS its
- * base run and the evidence's case its alternative. Null where no row
+ * base run and the evidence's case its alternative. With other re-run rows
+ * in the OM's case at the OM's figures, the whole gap is still that one
+ * row's, but struck on the OM's case, so it differs from the row's own
+ * re-run, which starts from the model's own figures. Null where no row
  * carries a re-run (there is no OM's case to strike).
  */
-export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs): StressHeadline | null {
+export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs, price: string = HEADLINE_ASK): StressHeadline | null {
   // The rows in the OM's case: each re-run row whose swap the cases can make,
   // the first row to swap an input (no two rows swap one input; a second
   // would be left out, said so).
@@ -2335,19 +2412,29 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
 
   // The price is no player: both cases pay the ask, so the headline is what
   // the ask earns on each set of figures (the price row says the rest).
-  const price = players.find((s) => s.row.key === "basis");
-  if (price) {
-    players = players.filter((s) => s !== price);
-    omitted.push({ key: price.row.key, label: price.row.title, why: HEADLINE_BASIS_LEFT_OUT });
+  const basis = players.find((s) => s.row.key === "basis");
+  if (basis) {
+    players = players.filter((s) => s !== basis);
+    omitted.push({ key: basis.row.key, label: basis.row.title, why: headlineBasisLeftOut(price) });
   }
 
-  // The OM's case before its NOI: every swap at the OM's side.
-  const scalarsAt = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
+  // A case before its NOI: every scalar and expense swap at the side `alt`
+  // answers, each expense row's line as its own run sets it, the rows' moves
+  // from the model's line added.
+  const modelExpense = model.expenseLines.reduce((s, l) => s + l.annual, 0);
+  const beforeNoi = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
     const out: UnderwriteInputs = { ...model };
-    for (const s of inCase) if (s.kind === "scalar") out[s.input] = alt(s) ? s.alt : s.om;
+    let move = 0;
+    for (const s of inCase) {
+      if (s.kind === "scalar") out[s.input] = alt(s) ? s.alt : s.om;
+      else if (s.kind === "expense") move += (alt(s) ? s.alt : s.om) - modelExpense;
+    }
+    if (move !== 0 && out.expenseLines.length > 0) out.expenseLines = out.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + move } : l));
     return out;
   };
-  const omBase = scalarsAt(() => false);
+  // The OM's case before its NOI: every swap at the OM's side, the expense
+  // line carrying the OM's bill and premium.
+  const omBase = beforeNoi(() => false);
   const noiSwap = inCase.find((s): s is Extract<HeadlineSwap, { kind: "noi" }> => s.kind === "noi") ?? null;
   // The rent that makes the OM's NOI at the OM's vacancy and expenses: the
   // NOI's anchor in both cases unless the NOI is itself a player.
@@ -2365,19 +2452,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
   /** The model with the swaps `alt` answers true for at the evidence's
    *  figure and every other swap in the OM's case at the OM's. */
   const scenario = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
-    const inputs = scalarsAt(alt);
-    // The price the case pays against the OM's, for a reset tax bill.
-    const priceRatio = omBase.purchasePrice > 0 ? inputs.purchasePrice / omBase.purchasePrice : 1;
-    let delta = 0;
-    for (const s of inCase) {
-      if (s.kind !== "expense") continue;
-      // A reset bill is struck on the case's price on the evidence's side;
-      // the OM's side is the OM's bill, which the model's lines carry.
-      if (alt(s)) delta += s.reset ? s.reset.reset * priceRatio - s.reset.bill : s.delta;
-    }
-    if (delta !== 0 && inputs.expenseLines.length > 0) {
-      inputs.expenseLines = inputs.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l));
-    }
+    const inputs = beforeNoi(alt);
     if (noiIn) {
       const rent = alt(noiIn) ? rentForNoi(inputs, noiIn.altNoi) : anchorRent;
       if (rent != null) inputs.inPlaceRentAnnual = rent;
@@ -2410,6 +2485,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
         label: s.row.title,
         pts: split.shares[i].leveredIrr * 100,
         multiple: omMultiple != null && evidenceMultiple != null ? split.shares[i].leveredEquityMultiple : null,
+        ...(s.row.ruleOfThumbOnly ? { ruleOfThumb: true } : {}),
       }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }

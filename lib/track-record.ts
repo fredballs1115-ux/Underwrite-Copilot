@@ -557,6 +557,17 @@ function laterFor(
 /** Under this many scored rows the record is a start, and no share is printed. */
 export const RECORD_FLOOR = MEDIAN_FLOOR;
 
+/**
+ * What the account's record does with a stabilized vacancy, said where it is
+ * drawn (audit M5). A deal's own page scores a later rent roll or T-12
+ * against a stabilized vacancy wherever its built stress test says the
+ * documents, not the market, decided the row (lib/stress-test
+ * `vacancyDecidedBy`); the account's record builds no stress test for each
+ * deal, so it holds every stated stabilized vacancy back as the market's.
+ */
+export const ACCOUNT_VACANCY_NOTE =
+  "Here a stabilized vacancy the OM states is never scored by a later rent roll or T-12; a deal's own page scores it where the documents, not the market, decided it.";
+
 export interface KeyRecord {
   key: StressKey;
   title: string;

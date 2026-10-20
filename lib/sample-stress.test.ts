@@ -171,7 +171,15 @@ describe("the sample's stress test, one build on every surface", () => {
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
     // vacancy, its 4.0% rent growth, its tax bill and premium.
     expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
-    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.6]);
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.5]);
+    // The insurance row swaps the T-12's $385k inside the model's one expense
+    // line (the T-12's $3.09M total) for the OM's $310k, never adding the gap
+    // on top of a line that already holds the T-12's premium (audit H3): its
+    // evidence's run is the model's own.
+    const ins = page.rows.find((r) => r.key === "insurance")!.impact!;
+    expect([Math.round(ins.omValue), Math.round(ins.altValue)]).toEqual([3_010_000, 3_085_000]);
+    expect([r1(ins.baseIrrPct), r1(ins.altIrrPct)]).toEqual([10.3, 9.3]);
+    expect(ins.note).toMatch(/^If the insurance line is the deal's T-12's \$385k, not the OM's \$310k, the levered IRR moves from 10\.3% to 9\.3% /);
     expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.70"]);
     // The split, largest first: the reset tax bill, the exit at the
     // going-in cap and the T-12's premium lower it; the vacancy holds to the
