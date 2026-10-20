@@ -389,9 +389,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "An achieved premium the memorandum states, against the projected one",
       "The memorandum's own classic and renovated rents against its comps' rents",
-      "The break-even premium at the model's exit cap: the premium that pays for a door's cost",
     ],
-    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost.",
+    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost. The break-even premium (a door's cost at the model's exit cap) is said beside the row as what the program needs, never as evidence of what a door earns.",
     limits: [
       "The model grows today's rent at one rate, so the premium is in none of its returns, said so.",
       "The program's pace against the building's turnover is not tested here.",

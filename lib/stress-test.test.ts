@@ -781,19 +781,25 @@ describe("a value-add plan deal", () => {
     expect(n.unchecked).toBe("No T-12 is on file. On a value-add, lease-up, conversion or development deal the OM's pro forma NOI is the business plan, not today's income, so the in-place figure is not held to it.");
   });
 
-  it("reads the renovation premium against the achieved one, the rents and the break-even", () => {
+  it("reads the renovation premium against the achieved one and the rents, the break-even said beside it", () => {
     const p = rowOf(test, "renovation_premium");
     expect(p.omSays).toEqual({ text: "$250 a month a renovated door, as stated", value: 250, page: 22 });
+    // The break-even is what the program needs, not evidence of what a door
+    // earns: never filed as evidence (it had read "a rule of thumb … the
+    // deal's own figure" and widened the range to $71), said in the gap.
     expect(p.evidence.map((e) => e.label)).toEqual([
       "Achieved premium on the doors already renovated",
       "The OM's classic and renovated rents, against its lease comps' rents",
-      "Break-even premium at the model's exit cap",
     ]);
     expect(p.evidence[0]).toMatchObject({ kind: "om_internal", value: 190 });
-    expect(p.evidence[2]).toMatchObject({ kind: "rule_of_thumb", publisher: "the model's own arithmetic" });
+    expect(p.evidence.some((e) => e.kind === "rule_of_thumb")).toBe(false);
     // $15,000 × 5.71% / 12 = $71 a month.
-    expect(p.evidence[2].value).toBe(71);
-    expect(p.gap).toEqual({ value: 60, unit: "usd", text: "The projected $250 is $60 a month (31.6%) over the achieved $190." });
+    expect(p.gap).toEqual({
+      value: 60,
+      unit: "usd",
+      text: "The projected $250 is $60 a month (31.6%) over the achieved $190. A $15,000 door needs $71 a month to pay for itself at the model's 5.71% exit cap: the break-even, what the program needs, not evidence of what a door earns.",
+    });
+    expect(p.ruleOfThumbOnly).toBeUndefined();
     expect(p.verdict).toBe("unsupported");
     expect(p.impact).toBeNull();
   });
@@ -1043,7 +1049,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   expense_growth: ["Consumer prices", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
   insurance: ["Commercial property insurance premiums", "The deal's T-12 insurance line"],
-  renovation_premium: ["Achieved premium", "classic and renovated rents", "Break-even premium"],
+  renovation_premium: ["Achieved premium", "classic and renovated rents"],
   other: ["The challenger's own critique"],
 };
 
