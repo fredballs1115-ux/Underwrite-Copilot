@@ -585,3 +585,29 @@ describe("the verdict is handed the stress test, struck in code", () => {
   });
 });
 
+// 2026-10-20: the challenger's own downside paragraph had been handed to the
+// synthesizer as "Stress test: …" beside the stress test struck in code, and
+// a screen stored before then carries return figures the challenger worked
+// out without the engine, beside the engine's own moves. The brief hands over
+// the challenges alone.
+describe("the challenger's downside paragraph never reaches the verdict", () => {
+  const none = { extraction: null, comps: null, reconciliation: null, market: null };
+
+  it("lists the challenges and leaves the paragraph out", () => {
+    const brief = buildBrief({
+      ...none,
+      challenges: {
+        challenges: [{ assumption: "Exit cap compression", severity: "high", challenge: "Exits 20 bps tight.", question: "Why?", page: "p. 41" }],
+        stressTest: "Reverting the exit cap takes the levered IRR from about 14% to about 9%.",
+      },
+    });
+    expect(brief).toMatch(/- \[high\] Exit cap compression.*: Exits 20 bps tight\./);
+    expect(brief).not.toContain("about 14%");
+    expect(brief).not.toContain("Stress test:");
+  });
+
+  it("says none were raised where the list is empty, and not available where there is no result", () => {
+    expect(buildBrief({ ...none, challenges: { challenges: [], stressTest: "words" } })).toMatch(/## Assumption challenges\s+None raised\./);
+    expect(buildBrief({ ...none, challenges: null })).toMatch(/## Assumption challenges\s+Not available\./);
+  });
+});

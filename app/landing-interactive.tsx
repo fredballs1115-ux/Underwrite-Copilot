@@ -282,7 +282,6 @@ function AnalysesView({
             result={RESULTS.challenges}
             dealName={SAMPLE_DEAL.name}
             totalPages={RESULTS.extraction.totalPages ?? null}
-            sample
           />
         )}
         {w && analysis === "comps" && (

@@ -29,13 +29,17 @@ const ChallengerSchema = z.object({
       altBasis: z.string(),
     }),
   ),
+  // The challenger's downside scenario in words (the field keeps its old
+  // name so stored screens still parse): which assumptions break together,
+  // and no return figure — the returns are re-run in code (lib/stress-test).
   stressTest: z.string(),
 });
 
 /**
  * Red-team the OM's pro forma the way an investment committee would. Returns
  * the challenges (each with the exact question to put to the broker) plus a
- * stress test. Uses the reasoning model (Opus) since this is analytical.
+ * downside scenario in words. Uses the reasoning model (Opus) since this is
+ * analytical.
  */
 export async function challengeAssumptions(
   om: OmSource,

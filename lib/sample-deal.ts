@@ -69,20 +69,17 @@ const inputs: ModelInputs = {
 
 const { cashFlow, returns } = computeModel(inputs);
 
-// The sample's sentences quote its own model: each IRR and each move below is
-// the engine's, run on the inputs above, so a sentence can never drift from
-// the figures printed beside it (the first version said "roughly 8%" and
+// The sample's sentences quote its own model: each move below is the
+// first-draft model's, run on the inputs above, so a sentence can never drift
+// from the figures printed beside it (the first version said "roughly 8%" and
 // "roughly 200 bps" of a model that returns 8.7% and moves 185 and 237).
 const irrWith = (over: Partial<ModelInputs>): number | null =>
   computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
-const irrText = (v: number | null): string => (v == null ? "—" : `${v.toFixed(1)}%`);
 /** A move in IRR to the nearest 10 bps, from the model's own return. */
 const bpsFrom = (v: number | null): string => {
   const base = returns.leveredIrrPct;
   return v == null || base == null ? "—" : `${Math.round(Math.abs(v - base) * 10) * 10} bps`;
 };
-/** The OM's own case: its exit cap, rent growth and stabilized vacancy. */
-const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
 /** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
 const NOI_GAP = 3_880_000 - 3_706_500;
 /** The model's exit against its own going-in cap, read off the model and
@@ -333,13 +330,13 @@ const challenges: ChallengerResult = {
       question: "What's the absorption schedule to get from 9% to 6%?",
     },
   ],
-  // Both runs carry the model's own year-one expenses, so the drop is the
-  // exit, the rent growth and the vacancy — rent growth the largest of the
-  // three — and never the expense load (the audit of 2026-09-30). The model's
-  // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
-  // figure, and its exit is said as a figure, not as "flat" against the
-  // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
-  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same ${compactUsd(inputs.year1Opex)} of year-one expenses.`,
+  // The challenger's downside scenario, in words: which of its three
+  // challenges break together, and no return figure — the returns are
+  // re-run in code by the stress test (lib/sample-stress), and a figure
+  // here had been the first-draft model's, beside the engine's other
+  // figures for the same levers (2026-10-20).
+  stressTest:
+    "The three assumptions fail together. The 6% vacancy needs a lease-up from the 9% the rent roll shows that the OM never schedules, and the $200 premium arrives only as renovated units lease, so a slow lease-up delays both and leaves less income in year five. That smaller income is what the 5.25% exit capitalises, and a buyer five years out has no stated reason to pay a tighter cap than today's 5.45%.",
 };
 
 // The memorandum's three sale comps sit on its p. 14, the page the

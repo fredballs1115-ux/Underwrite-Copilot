@@ -1,19 +1,20 @@
-// Whose figures the challenger's stress test is (research pass 40, M8). On a
-// screened deal the sentence is the challenger's own: a Claude step asked
-// what reverting an assumption does to the returns answers without running
-// the engine — the screen's estimate, not the model's, as the full report has
-// always headed it. On the sample the sentence is the first-draft model's
-// (lib/model/compute, run at the reconciled case and the OM's in
-// lib/sample-deal), whose pinned figures stay; the heading says so, since the
-// screening playground beside it prints other figures at the same levers.
+// Whose words the challenger's downside paragraph is (research pass 40, M8;
+// 2026-10-20). The challenger had been asked "what happens to returns" and
+// answered with IRR arithmetic it worked out without the engine, under a
+// heading of "Stress test" beside the stress test struck in code
+// (lib/stress-test). It is asked for the scenario in words now, with no
+// return figure, and every surface heads the paragraph as the challenger's,
+// with one line saying it is not a computed result — a screen stored before
+// the change may still carry the challenger's own figures. The sample's
+// paragraph is words alone (lib/sample-deal).
 //
 // No imports: the deal page's client sections, the demo and the report read it.
 
-/** A screened deal's heading. */
-export const STRESS_TEST_ESTIMATE = "Stress test — the screen's estimate, not the model's";
+/** The paragraph's heading, on every deal and on the sample. */
+export const CHALLENGER_SCENARIO_TITLE = "The challenger's downside scenario";
 
-/** The sample's heading: its sentence is the first-draft model's run. */
-export const STRESS_TEST_FIRST_DRAFT = "Stress test — the first-draft model's figures";
-
-/** The heading for a deal, the sample's where it is the sample. */
-export const stressTestTitle = (sample: boolean): string => (sample ? STRESS_TEST_FIRST_DRAFT : STRESS_TEST_ESTIMATE);
+/** The line under the heading: whose words they are, and whose moves are
+ *  computed. True on a plan deal too, where the stress test re-runs no
+ *  return: any move it prints is the model's. */
+export const CHALLENGER_SCENARIO_NOTE =
+  "In the challenger's words, not a computed result: any return it names is the challenger's estimate, and the stress test's moves are the model's.";

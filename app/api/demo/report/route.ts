@@ -153,10 +153,7 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
     buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay, stressTest),
     actuals,
   );
-  // The sample: its stress test is the first-draft model's run, which the
-  // challenger page's heading says (lib/stress-test-title) — the row's
-  // `is_sample` says so too.
-  return renderReportPdf({ ...input, sample: true });
+  return renderReportPdf(input);
 }
 
 function getSampleReport(dateStr: string, readerDay: string): Promise<Buffer> {
