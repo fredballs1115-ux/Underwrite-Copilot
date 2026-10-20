@@ -18,13 +18,16 @@ import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
 import { sampleActuals, sampleCover, sampleDocumentChecks, sampleDocumentRow, sampleModelVsMarket, sampleStressTest } from "@/lib/sample-cover";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
+import { DEMO_DOC_CACHE_CONTROL, heldRenderFresh, type HeldRender } from "@/lib/demo-doc-cache";
 
 export const runtime = "nodejs";
 
-// Same once-per-day render cache as the sample memo route: public route,
-// pure fixture, and the full report is many pages of @react-pdf work — cache
-// the promise so concurrent first hits share one render, clear on failure.
-let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
+// The same render cache as the sample memo route, held for /demo's ISR
+// window (lib/demo-doc-cache), since the report prints today's published
+// figures too: public route, and the full report is many pages of
+// @react-pdf work — cache the promise so concurrent first hits share one
+// render, clear on failure.
+let cachedRender: (HeldRender & { pdf: Promise<Buffer> }) | null = null;
 
 /**
  * The full report the signed-in route (app/api/deals/[id]/report) builds for
@@ -158,10 +161,11 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   return renderReportPdf(input);
 }
 
-function getSampleReport(dateStr: string, readerDay: string): Promise<Buffer> {
-  if (cachedRender && cachedRender.day === readerDay) return cachedRender.pdf;
+function getSampleReport(dateStr: string, readerDay: string, now: number): Promise<Buffer> {
+  if (cachedRender && heldRenderFresh(cachedRender, readerDay, now)) return cachedRender.pdf;
   const next = {
     day: readerDay,
+    at: now,
     pdf: renderSampleReport(dateStr, readerDay).catch((err) => {
       if (cachedRender === next) cachedRender = null;
       throw err;
@@ -186,13 +190,14 @@ export async function GET() {
   const readerDay = readerToday(null, now);
 
   try {
-    const buffer = await getSampleReport(dateStr, readerDay);
+    const buffer = await getSampleReport(dateStr, readerDay, now.getTime());
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="sample-full-report.pdf"',
-        // Sample-only output — safe to cache at the edge for a day.
-        "Cache-Control": "public, max-age=86400",
+        // Held as long as /demo's own page is, never a day: it prints
+        // today's published figures.
+        "Cache-Control": DEMO_DOC_CACHE_CONTROL,
       },
     });
   } catch (err) {
