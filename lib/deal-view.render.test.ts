@@ -995,7 +995,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     // gap HIGH, because every unfavorable reconciliation row was HIGH.
     const p = sampleProps("overview");
     const html = render(p);
-    expect(textOf(html)).toMatch(/Δ 4\.7% \(OM over actual\)\s*In line/);
+    expect(textOf(html)).toMatch(/Δ 4\.7% \(OM over actual\)\s*Within 5% of the T-12/);
     const risks = deriveRisks(p.results as Parameters<typeof deriveRisks>[0]);
     expect(risks.find((r) => r.title.startsWith("Year-1 NOI"))?.severity).toBe("low");
     // The vacancy gap, 300 bps on the model's 9.0%, stays outside the band.

@@ -1794,7 +1794,7 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
   );
 }
 
-const SEVERITY_COLOR: Record<string, string> = { in_line: C.pass, material: C.caution, red_flag: C.kill };
+const SEVERITY_COLOR: Record<string, string> = { in_line: C.ink, material: C.caution, red_flag: C.kill };
 
 /**
  * The deal's actuals (research pass 24, B3): the T-12's NOI against the
