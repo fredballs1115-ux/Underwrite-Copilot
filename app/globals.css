@@ -88,6 +88,22 @@ html:has([data-home-bar]) {
   ::placeholder {
     color: var(--color-muted);
   }
+
+  /* No lone last word: a heading balances its lines, prose keeps two
+     words on its last ("…worked end to / end" on /demo's h1, "…against
+     the / evidence." on the homepage). In the base layer, so a
+     `text-wrap` utility at an element still wins. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li,
+  dd,
+  figcaption {
+    text-wrap: pretty;
+  }
 }
 
 body {
