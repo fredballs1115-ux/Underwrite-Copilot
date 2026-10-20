@@ -118,7 +118,8 @@ describe("/how-we-test draws every method from the table", () => {
       expense_growth: ["published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
       insurance: ["published", "document"],
-      renovation_premium: ["om_internal", "om_internal", null],
+      // The break-even is said beside the row, never set against it.
+      renovation_premium: ["om_internal", "om_internal"],
       other: [null],
     });
     // The page's words for a kind are the panel's own.
