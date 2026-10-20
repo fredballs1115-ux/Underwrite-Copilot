@@ -1524,7 +1524,7 @@ function DocumentsPanel({
           typedFacts: !!manualFacts,
           documents,
           sampleActuals: isSample ? actuals : null,
-          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing" },
+          memo: !hasVerdict ? null : canMemo ? { href: `/api/deals/${dealId}/memo` } : { upsell: "/billing?upsell=memo" },
         }}
         omPicture={<DealAvatar dealId={dealId} size="md" />}
         omActions={
