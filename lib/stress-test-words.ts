@@ -52,30 +52,35 @@ export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
 }
 
 /**
- * The read line over the rows: "9 assumptions tested in code — 1
- * unsupported, 2 stretched, 1 holds, 5 unchecked; the levered return
- * re-run with one input swapped for the evidence's." Where no return was
- * re-run, why.
+ * The read line over the rows: "9 of the memorandum's assumptions read in
+ * code — 4 tested (1 unsupported, 2 stretched, 1 holds), 5 unchecked; the
+ * levered return re-run with one input swapped for the evidence's." An
+ * unchecked row was read and not tested, so it is never counted among the
+ * tested. Where no return was re-run, why.
  */
 export function stressReadLine(test: StressTest): string {
   const c = verdictCounts(test);
   const n = test.rows.length;
+  const tested = n - c.unchecked;
   const parts = [
     c.unsupported ? `${c.unsupported} unsupported` : "",
     c.stretched ? `${c.stretched} stretched` : "",
     c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
-    c.unchecked ? `${c.unchecked} unchecked` : "",
   ].filter(Boolean);
-  const head = n === 0 ? "No assumption of the memorandum's could be tested in code." : `${n} ${n === 1 ? "assumption" : "assumptions"} of the memorandum's tested in code — ${parts.join(", ")}`;
+  const testedPart = tested > 0 ? `${tested} tested (${parts.join(", ")})` : "none tested";
+  const head =
+    n === 0
+      ? "No assumption of the memorandum's could be tested in code."
+      : `${n} of the memorandum's assumptions read in code — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
+  // The withheld reason is a whole sentence that already says no return is
+  // re-run (lib/stress-test), printed as it stands.
   const tail = test.impactsWithheld
-    ? `. No return is re-run: ${lowerFirst(test.impactsWithheld)}`
+    ? `${head.endsWith(".") ? "" : "."} ${test.impactsWithheld}`
     : n === 0
       ? ""
       : "; the levered return re-run with one input swapped for the evidence's, in code.";
-  return `${head}${tail}`.replace(/\.\.$/, ".");
+  return `${head}${tail}`;
 }
-
-const lowerFirst = (s: string) => (s ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 /** The evidence a row is read against: the one its impact swapped in, else
  *  the first that carries a figure, else the first; null with none. */
@@ -187,13 +192,14 @@ export function moveShort(impact: StressImpact | null): string {
   return `IRR ${irrText(impact.baseIrrPct)} to ${irrText(impact.altIrrPct)}`;
 }
 
-/** Why a row prints no move: the test's reason, else the row's own. */
+/** Why a row prints no move, as one whole sentence that says no return is
+ *  re-run: the test's reason, else the row's own. Printed as it stands. */
 export function noMoveWhy(test: StressTest, row: StressRow): string {
   if (row.impact) return "";
   if (test.impactsWithheld) return test.impactsWithheld;
-  if (row.key === "renovation_premium") return "The premium is no model input; its worth is struck at the exit cap against a door's cost.";
-  if (row.verdict === "unchecked") return "No figure to swap.";
-  return "No model input takes this figure.";
+  if (row.key === "renovation_premium") return "No return is re-run: the premium is no model input; its worth is struck at the exit cap against a door's cost.";
+  if (row.verdict === "unchecked") return "No return is re-run: no figure to swap.";
+  return "No return is re-run: the model has no input for this figure.";
 }
 
 /**

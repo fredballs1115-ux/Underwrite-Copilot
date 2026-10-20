@@ -108,11 +108,20 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(few).toContain('data-bar="record-between"');
     expect(few).not.toContain('data-bar="record-om"');
     expect(text).toContain("No share is printed under three scored rows.");
-    // Three scored rows — vacancy (screen), basis (screen), insurance
-    // (between) — is the floor, and the shares are said.
-    const atFloor = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
+    // A decision is no scored row: withLater's basis row is the Dead
+    // decision, counted apart, so its deal alone is two scored rows.
+    const decided = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
+    expect(decided).toContain('data-state="start"');
+    expect(visibleText(decided)).toContain("1 deal tested · 1 with later evidence · 3 rows answered, 1 of them a decision · 2 scored");
+    // Three scored rows — vacancy (screen) twice, insurance (between) — is
+    // the floor, and the shares are said.
+    const atFloor = html(
+      React.createElement(TrackRecordSection, {
+        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: null, summary: t12 } })]),
+      }),
+    );
     expect(atFloor).toContain('data-state="record"');
-    expect(visibleText(atFloor)).toContain("1 deal tested · 1 with later evidence · 3 rows scored");
+    expect(visibleText(atFloor)).toContain("2 deals tested · 2 with later evidence · 4 rows answered, 1 of them a decision · 3 scored");
   });
 
   it("enough: the shares, said once in the line", () => {
@@ -122,7 +131,10 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     const text = visibleText(out);
     expect(gluedWords(text)).toEqual([]);
     expect(out).toContain('data-state="record"');
-    expect(text).toContain("Of 6 scored rows, 4 landed on the screen's side (67%), 0 on the OM's (0%) and 2 between (33%).");
+    // The two Dead decisions are said apart, never in the shares.
+    expect(text).toContain(
+      "Of 4 scored rows, 2 landed on the screen's side (50%), 0 on the OM's (0%) and 2 between (50%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
+    );
     expect(text).toContain("2 screen · 0 OM");
     expect(text).toContain("0 screen · 0 OM · 2 between");
   });

@@ -29,13 +29,17 @@ describe("the call against the recorded median", () => {
   });
 
   it("is withheld where the sales are not the deal's kind", () => {
-    expect(vsMedianRead(stats, "all sales", office())).toMatchObject({ kind: "withheld" });
-    expect(vsMedianRead(stats, "multifamily", office())).toMatchObject({ kind: "withheld" });
+    expect(vsMedianRead(stats, "all sales", office())).toMatchObject({ kind: "withheld", why: "class" });
+    expect(vsMedianRead(stats, "multifamily", office())).toMatchObject({ kind: "withheld", why: "class" });
   });
 
   it("is withheld for a portfolio, a plan and land", () => {
-    expect(vsMedianRead(stats, "office", office({ portfolio: true }))).toMatchObject({ kind: "withheld" });
-    expect(vsMedianRead(stats, "office", office({ planOrLand: true }))).toMatchObject({ kind: "withheld" });
+    expect(vsMedianRead(stats, "office", office({ portfolio: true }))).toMatchObject({ kind: "withheld", why: "portfolio" });
+    expect(vsMedianRead(stats, "office", office({ planOrLand: true }))).toMatchObject({ kind: "withheld", why: "plan_or_land" });
+  });
+
+  it("says a scale off the recorded stock's apart from a class reason", () => {
+    expect(vsMedianRead({ ...stats, medianPerSqft: null, perSqftCount: 0 }, "office", office({ price: 900_000_000, perSf: null }))).toMatchObject({ kind: "withheld", why: "scale" });
   });
 
   it("compares price a square foot first, with its own count", () => {

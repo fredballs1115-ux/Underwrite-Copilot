@@ -30,10 +30,13 @@ describe("the sample's stress test", () => {
       ["basis", "stretched"],
       ["exit_cap", "stretched"],
       ["debt", "unchecked"],
-      ["noi", "holds"],
+      // 4.7% over the T-12, inside the band, but the re-run moves the
+      // levered IRR 239 bps: never a holds.
+      ["noi", "stretched"],
       ["vacancy", "unsupported"],
       ["rent_growth", "unchecked"],
-      ["taxes", "unsupported"],
+      // The reset is conditional on the jurisdiction: stretched at most.
+      ["taxes", "stretched"],
       ["insurance", "unsupported"],
       ["renovation_premium", "unsupported"],
     ]);
@@ -41,10 +44,12 @@ describe("the sample's stress test", () => {
   });
 
   it("re-runs the engine one input apart on every row whose figure is a model input", () => {
-    expect(irr("basis")).toEqual([9.3, 11.8]);
+    // At the median of the two comps the comps step graded clean, $257k.
+    expect(irr("basis")).toEqual([9.3, 12.7]);
     expect(irr("exit_cap")).toEqual([10.8, 9.3]);
     expect(irr("noi")).toEqual([11.7, 9.3]);
-    expect(irr("vacancy")).toEqual([12.4, 9.3]);
+    // At the rent roll's 9.3% by count (225 of 248 doors).
+    expect(irr("vacancy")).toEqual([12.4, 9.1]);
     expect(irr("taxes")).toEqual([9.3, 5.9]);
     expect(irr("insurance")).toEqual([9.3, 8.2]);
     // The premium is in none of the model's inputs: a gap, no re-run.
@@ -62,8 +67,11 @@ describe("the sample's stress test", () => {
     expect(taxes.omSays.page).toBe(27);
     expect(taxes.evidence[0].value).toBe(reset);
     expect(taxes.gap?.value).toBe(reset - bill);
-    // The step-up is past the threshold: the row is unsupported.
+    // The step-up is past the unsupported threshold, yet the reset is the
+    // jurisdiction's to make: the row reads stretched, and says the condition.
     expect((reset - bill) / reset).toBeGreaterThan(0.15);
+    expect(taxes.verdict).toBe("stretched");
+    expect(taxes.gap?.text).toMatch(/^If the sale resets the assessment to the price, the bill is/);
   });
 
   it("holds the pro forma's insurance to the T-12's line", () => {

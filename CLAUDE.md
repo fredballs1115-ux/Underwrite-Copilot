@@ -52,6 +52,26 @@ tested and whether that is right. So:
   `prior_screen` so the record can score them.
 - **The model is included, not the product**: every public page says so,
   and no public sentence promises a re-run the code does not make.
+- **One sample, one test** (2026-10-20): `lib/sample-stress.ts`
+  (`sampleStressTest({ today, reads })`) is the sample's one builder, and
+  `lib/sample-stress-read.ts` (`sampleTodayReads`, never throws) the one
+  read of today's figures for it. The homepage's walkthrough draws /demo's
+  own build (`sampleDemoData`, `walkthroughData`), and the signed-in sample's
+  page passes no reader-specific evidence, so the three surfaces print one
+  StressTest: `lib/sample-stress.test.ts` holds the three equal, and
+  `lib/sample-tabs.test.ts` holds each walkthrough tab's parts and order to
+  /demo's and /demo's to the deal page's (every part left off is named with
+  its reason). `lib/sample-figures.test.ts` holds the fictional OM's figures
+  to one another (its tax bill is the T-12's tax line; its renovation
+  program's rents average the rent roll's).
+- **The stress test leads the deal page**: the header carries its counts
+  beside the call (`StressChip`, `verdictCounts`, linking to
+  `#stress-test`), the sample's public headers take the same chip from the
+  same build, and the rent roll / T-12 prompt sits under the panel saying
+  which rows the documents turn into tests.
+- **The challenger's downside paragraph is a scenario in words**: its prompt
+  asks for no return figures and the verdict does not read it; every return
+  on a page is the engine's.
 
 ## Architecture
 

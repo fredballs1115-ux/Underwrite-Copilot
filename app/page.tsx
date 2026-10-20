@@ -597,13 +597,14 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
   const photos = photosOnDisk();
   // The sample's header, read on the render's day (the page is ISR).
   const header = sampleHeader();
   // The sample memo's own data, as its download draws it, on the render's
-  // day (the download names the day it is printed).
-  const memo = sampleMemoData();
+  // day (the download names the day it is printed), on the published
+  // figures the download reads.
+  const memo = sampleMemoData(new Date(), await sampleTodayReads());
   return (
     <div className="flex flex-1 flex-col">
       <script

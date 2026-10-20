@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
+import { noMoveWhy } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
@@ -35,12 +36,12 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  *   - HOW THIS WAS TESTED: the row's method sentence, linking to the
  *     methodology page's own section for the key.
  *
- * Where the model already runs at the evidence's figure (the impact's two
- * runs are one), the pair is one figure, "Levered IRR 9.3%, as the model
- * runs", never "9.3% → 9.3%".
+ * Where the OM's figure is the evidence's (the impact's two runs are one,
+ * read off its values), the pair is one figure, "Levered IRR 9.3%, run at
+ * the evidence's figure", never "9.3% → 9.3%".
  *
  * THE UNCHECKED ROWS are one folded group at the end: a summary line
- * naming them ("5 assumptions unchecked: debt, rent growth, …") and a fold
+ * naming them ("5 could not be checked: debt, rent growth, …") and a fold
  * ("Read why (5)") whose body lists each in two lines — the title with the
  * OM's figure and its page chip, then why it stands unchecked — with the
  * challenger's words folded where there are any and the method link. Drawn
@@ -110,18 +111,42 @@ export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
   return rows.map((r, i) => ({ r, i })).sort((a, b) => VERDICT[a.r.verdict].rank - VERDICT[b.r.verdict].rank || a.i - b.i).map((x) => x.r);
 }
 
-/** "9 assumptions tested: 1 unsupported, 2 stretched, 1 holds, 5 unchecked" */
+/** "9 assumptions: 1 unsupported, 2 stretched, 1 holds; 5 could not be
+ *  checked" — a row that could not be checked is never counted among the
+ *  tested, and the line says so in a reader's words. */
 export function stressReadLine(rows: readonly StressRow[]): string {
   const n = (v: StressVerdict) => rows.filter((r) => r.verdict === v).length;
   const parts: [number, string][] = [
     [n("unsupported"), "unsupported"],
     [n("stretched"), "stretched"],
     [n("holds"), n("holds") === 1 ? "holds" : "hold"],
-    [n("unchecked"), "unchecked"],
   ];
-  const said = parts.filter(([c]) => c > 0);
-  const tested = rows.length;
-  return `${tested} assumption${tested === 1 ? "" : "s"} tested: ${said.map(([c, w]) => `${c} ${w}`).join(", ")}`;
+  const said = parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`);
+  const read = rows.length;
+  const head = `${read} assumption${read === 1 ? "" : "s"}`;
+  const notChecked = n("unchecked");
+  if (said.length === 0) return `${head}: none could be checked`;
+  return `${head}: ${said.join(", ")}${notChecked > 0 ? `; ${notChecked} could not be checked` : ""}`;
+}
+
+/**
+ * What would test an unchecked row, in plain words — only where the OM
+ * states the figure and the document named is one the test reads when it
+ * is on the deal (the T-12's NOI, vacancy and insurance line, the rent
+ * roll's occupancy). Null elsewhere: a sentence never promises a test the
+ * code does not make.
+ */
+export function testedByHint(row: StressRow): string | null {
+  if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
+  switch (row.key) {
+    case "noi":
+    case "insurance":
+      return "Add the T-12 to test this.";
+    case "vacancy":
+      return "Add the rent roll or the T-12 to test this.";
+    default:
+      return null;
+  }
 }
 
 /** What each key is called in the unchecked line, mid-sentence. */
@@ -152,10 +177,9 @@ export function uncheckedName(row: StressRow): string {
   return /^(?:the|a|an)\s/i.test(t) ? t : `the ${t}`;
 }
 
-/** "5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
+/** "5 could not be checked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
 export function uncheckedLine(rows: readonly StressRow[]): string {
-  const n = rows.length;
-  return `${n} assumption${n === 1 ? "" : "s"} unchecked: ${rows.map(uncheckedName).join(", ")}`;
+  return `${rows.length} could not be checked: ${rows.map(uncheckedName).join(", ")}`;
 }
 
 /** The survey's margin, read back off the figure's own text ("6.2% ±2.2 pts"). */
@@ -228,13 +252,14 @@ function ImpactView({ impact }: { impact: StressImpact }) {
   const alt = impact.altIrrPct;
   const top = Math.max(base ?? 0, alt ?? 0, 1) * 1.15;
   const width = alt == null ? "0%" : `${Math.max(0, Math.min(100, (alt / top) * 100)).toFixed(1)}%`;
-  // The two runs are one where the model already runs at the evidence's
-  // figure (lib/stress-test's own note): one figure, not "9.3% → 9.3%".
-  const same = impact.note.startsWith("The model already runs");
+  // The two runs are one where the OM's figure IS the evidence's: one
+  // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
+  // as lib/stress-test-words does, never off the note's words.
+  const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
   return (
     <div className="mt-2" data-qa="stress-impact">
       <p className="text-xs font-medium tabular-nums text-ink" data-qa="stress-impact-pair">
-        {same ? `Levered IRR ${pctText(base)}, as the model runs` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
+        {same ? `Levered IRR ${pctText(base)}, run at the evidence's figure` : `Levered IRR ${pctText(base)} → ${pctText(alt)}`}
       </p>
       <BarRows className="mt-1 text-[11px]">
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
@@ -315,6 +340,11 @@ function UncheckedRow({ row }: { row: StressRow }) {
         {hasFigure && <PageChip page={row.omSays.page} />}
       </div>
       <p className={`mt-0.5 ${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{why}</p>
+      {testedByHint(row) && (
+        <p className={`mt-0.5 ${MEASURE} text-xs leading-relaxed text-ink`} data-qa="stress-tested-by">
+          {testedByHint(row)}
+        </p>
+      )}
       <EvidenceList evidence={row.evidence} />
       {row.challenge && <ChallengeFold challenge={row.challenge} />}
       <MethodLine row={row} />
@@ -345,8 +375,11 @@ function UncheckedGroup({ rows }: { rows: readonly StressRow[] }) {
   );
 }
 
-function RowView({ row, withheld }: { row: StressRow; withheld: string | null }) {
-  const v = VERDICT[row.verdict];
+function RowView({ row, test }: { row: StressRow; test: StressTest }) {
+  const withheld = test.impactsWithheld;
+  // A row held to a rule of thumb alone keeps its word but is never drawn
+  // as a green "holds": the site's own default is no evidence of the deal's.
+  const v = row.ruleOfThumbOnly && row.verdict === "holds" ? { ...VERDICT.holds, chip: VERDICT.unchecked.chip } : VERDICT[row.verdict];
   const at = trackScale(row);
   const hasFigure = row.omSays.value != null;
   return (
@@ -371,7 +404,9 @@ function RowView({ row, withheld }: { row: StressRow; withheld: string | null })
         <ImpactView impact={row.impact} />
       ) : (
         <p className="mt-1.5 text-[11px] text-muted" data-qa="stress-no-impact">
-          {withheld ? "No return struck: the model's reads are withheld (see above)." : "No return struck: no figure the engine can take."}
+          {/* One sentence a row: the reason once at the top where the whole
+              test re-runs nothing, else the row's own (lib/stress-test-words). */}
+          {withheld ? "No return is re-run (see the note above)." : noMoveWhy(test, row)}
         </p>
       )}
 
@@ -408,12 +443,13 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       <PanelHead title="The OM's assumptions, tested" tone={tone.head}>
         <span className="text-sm font-semibold" data-qa="stress-read">{stressReadLine(test.rows)}</span>
       </PanelHead>
-      {test.impactsWithheld && <PanelNote>{`No return struck: ${test.impactsWithheld}`}</PanelNote>}
+      {/* The reason is a whole sentence that already says no return is re-run. */}
+      {test.impactsWithheld && <PanelNote>{test.impactsWithheld}</PanelNote>}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
           {tested.map((r, i) => (
-            <RowView key={`${r.key}-${i}`} row={r} withheld={test.impactsWithheld} />
+            <RowView key={`${r.key}-${i}`} row={r} test={test} />
           ))}
         </ol>
       )}
@@ -443,7 +479,9 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
             {KIND.om_internal.word}
           </KeyItem>
         )}
-        {published && <KeyItem>{`Published figures read ${dayText(test.readOn)}`}</KeyItem>}
+        {published && (
+          <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>
+        )}
       </Key>
     </section>
   );

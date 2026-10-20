@@ -106,6 +106,7 @@ import { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
 import { StatGridSkeleton, CardListSkeleton, TableSkeleton, VerdictSkeleton } from "./skeletons";
 export { BuyBoxPanel, type BuyBoxPanelData } from "./buy-box-panel";
 import { MAX_OM_PAGES } from "@/lib/pdf";
+import { UPLOAD_MAX_BYTES } from "@/lib/upload-limit";
 import { needsOperator } from "@/lib/anthropic/operator-failures";
 import { documentFailure } from "@/lib/anthropic/document-failures";
 import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
@@ -157,14 +158,14 @@ const STEP_LABELS: Record<string, string> = {
 const MODEL_ERRORS: Record<string, string> = {
   modelfile: "Please choose your model file to upload.",
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
-  modelsize: "That file is larger than 32 MB — please try a smaller export.",
+  modelsize: `That file is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit — export the model without its pictures or extra tabs, and upload that. Nothing was changed.`,
   modelupload:
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
   omempty:
     "That PDF is empty (0 bytes) — download or export it again, and upload that. The stored OM is unchanged.",
   ompdf: "The replacement OM must be a PDF.",
-  omsize: "That PDF is larger than 32 MB — please try a smaller file.",
+  omsize: `That PDF is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit. Compress it (Acrobat’s Reduce File Size, or any PDF compressor) and upload it again. The stored OM is unchanged.`,
   omlocked:
     "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password and upload that. The stored OM is unchanged.",
   ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the sections that hold the deal's figures, and the screen will read those pages alone, not the whole memorandum. The stored OM is unchanged.`,
@@ -185,7 +186,7 @@ const MODEL_ERRORS: Record<string, string> = {
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
-  docsize: "That file is larger than 32 MB — please try a smaller one.",
+  docsize: `That file is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit — save a smaller copy (a PDF compressed, a spreadsheet without its pictures) and upload that. Nothing was saved.`,
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   docformat:

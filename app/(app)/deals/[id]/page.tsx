@@ -78,7 +78,7 @@ import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
 import { subjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
-import type { SubjectForCall } from "@/lib/public-comps/vs-median";
+import { vsMedianRead, type SubjectForCall } from "@/lib/public-comps/vs-median";
 import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
 import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -968,6 +968,9 @@ export default async function DealPage({
     stage: ((deal as { stage?: string }).stage as string) ?? null,
     history: stageHistory,
     askingPrice: askingPriceOf(extraction),
+    // The class the page shows, so the roll's vacancy is read as the
+    // stress test reads it (by count on a class priced by the unit).
+    assetClass: shownAssetClass(deal.asset_class as string | null, extraction),
   });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
@@ -1419,10 +1422,14 @@ export default async function DealPage({
   // Nothing is re-read or recomputed here: the shapes are the page's own.
   // The recorded sales' $/SF median only from three sales up, the comps
   // page's own floor (lib/public-comps `MEDIAN_FLOOR`); the past screens'
-  // median as the market memory pooled it, each at its ask.
+  // median as the market memory pooled it, each at its ask. The recorded
+  // sales stand as evidence only where the comps tab would set the deal
+  // against them (lib/public-comps/vs-median): sales of another class, or a
+  // portfolio's, a plan's or land's price, are no evidence of this basis.
   const recordedSet = lastGoodOf(publicComps);
+  const recordedRead = recordedSet?.stats ? vsMedianRead(recordedSet.stats, recordedSet.params, compsCallSubject) : null;
   const recordedSales: RecordedSalesEvidence | null =
-    recordedSet?.stats && recordedSet.stats.count > 0
+    recordedSet?.stats && recordedSet.stats.count > 0 && !(recordedRead?.kind === "withheld" && recordedRead.why !== "scale")
       ? {
           count: recordedSet.stats.count,
           medianPerSqft: (recordedSet.stats.perSqftCount ?? recordedSet.stats.count) >= MEDIAN_FLOOR ? recordedSet.stats.medianPerSqft : null,

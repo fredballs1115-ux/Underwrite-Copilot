@@ -4,6 +4,7 @@ import { StackBar } from "./stack-bar";
 import { rentQuotedMonthly } from "@/lib/asset-words";
 import {
   OM_NOI_LABEL,
+  SEVERITY_WORD,
   actualsUsd,
   actualsWalt,
   avgRentOf,
@@ -23,7 +24,10 @@ const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
   // A 5% tint, since the chip sits on the faint comparison box: at 10%
   // the 10px label read 4.37:1 (pass) and 4.39:1 (caution), at 5% 4.67:1
   // and 4.69:1. Kill reads 4.85:1 at 10% and keeps it.
-  in_line: { label: "In line", cls: "bg-pass/5 text-pass" },
+  // Inside the band is what the chip measures, said neutrally, never a
+  // green pass: the stress test beside it may read the same gap stretched
+  // where the return moves on it (lib/actuals/actuals-read `SEVERITY_WORD`).
+  in_line: { label: SEVERITY_WORD.in_line, cls: "bg-surface text-ink" },
   material: { label: "Material", cls: "bg-caution/5 text-caution" },
   red_flag: { label: "Red flag", cls: "bg-kill/10 text-kill" },
 };

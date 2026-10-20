@@ -555,20 +555,21 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("9 assumptions of the memorandum's tested in code — 4 unsupported, 2 stretched, 1 holds, 2 unchecked");
+    expect(brief).toContain("9 of the memorandum's assumptions read in code — 7 tested (3 unsupported, 4 stretched), 2 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
-    // figures make on the price, with the engine's move on the gap.
-    expect(brief).toContain("- Real estate taxes (taxes) [UNSUPPORTED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
+    // figures make on the price if the sale resets the assessment — the
+    // jurisdiction's to say, so stretched at most — with the engine's move.
+    expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
     expect(brief).toContain("the levered IRR moves from 9.3% to 5.9%");
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.1% vacant (SF-weighted, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document)",
+      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of 2026-05-31) (the deal's rent roll, May 31, 2026; the deal's own document)",
     );
-    // The engine at the OM's 6.0% against the engine at the rent roll's 9.1%.
-    expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.3%/);
+    // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
+    expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.1%/);
     expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
-    expect(brief).toContain("the levered IRR moves from 9.3% to 11.8%");
+    expect(brief).toContain("the levered IRR moves from 9.3% to 12.7%");
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
-    expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: not re-run — No figure to swap.");
+    expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");
     // The instruction: the moves are the engine's, cited by figure and date.
     expect(brief).toContain("The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself");
     expect(brief).toContain("cite it by figure and date and name its publisher");
@@ -577,14 +578,27 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(buildBrief({ extraction: null, ...none })).not.toContain("STRESS TEST");
   });
 
+  it("says a Census region's figure as the region's, never the metro's", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const region = { kind: "published" as const, label: "Rental vacancy, South Census region", text: "9.5% (Q2 2026)", value: 9.5, asOf: "2026-04-01", publisher: "FRED", scope: "region" as const };
+    const brief = buildBrief({ extraction: null, ...none, stressTest: { ...test, rows: test.rows.map((r) => (r.key === "vacancy" ? { ...r, evidence: [...r.evidence, region] } : r)) } });
+    expect(brief).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the Census region's figure)");
+    expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the metro's figure)");
+  });
+
   it("says the impacts are withheld, and why, where no model could be built", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const brief = buildBrief({ extraction: null, ...none, stressTest: withheld });
-    expect(brief).toContain("No return is re-run: no model was derived for this deal, so no return is re-run.");
-    expect(brief).toContain("The levered IRR: not re-run — No model was derived for this deal, so no return is re-run.");
-    expect(brief).toContain("No return was re-run for this deal — No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say that no impact was struck in code, and never estimate one.");
+    // One whole sentence, never behind a second "No return re-run".
+    expect(brief).toContain("2 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
+    expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");
+    // The instruction is said in a reader's words, never the phrase a verdict would echo.
+    expect(brief).not.toContain("no impact was struck in code");
     expect(brief).not.toContain("The IRR moves above are the engine's own");
   });
 });

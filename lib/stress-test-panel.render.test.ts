@@ -10,7 +10,7 @@ import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StressTestPanel, sortStressRows, stressReadLine, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
+import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { STRESS_KEYS, STRESS_METHODS, type StressRow, type StressTest } from "./stress-test-types";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -162,12 +162,13 @@ const OTHER: StressRow = {
 };
 
 // Out of severity order on purpose: the panel sorts.
-const TEST: StressTest = { rows: [GROWTH, TAXES, EXIT, VACANCY, OTHER], readOn: "2026-09-21", impactsWithheld: null };
+const TEST: StressTest = { rows: [GROWTH, TAXES, EXIT, VACANCY, OTHER], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null };
 
 const WITHHELD: StressTest = {
   rows: [{ ...VACANCY, impact: null }, { ...EXIT, impact: null }, GROWTH],
   readOn: "2026-09-21",
-  impactsWithheld: "The model runs on the $10,000,000 placeholder price, which no memorandum stated — enter the price.",
+  publishedRead: true,
+  impactsWithheld: "No return is re-run: the model runs on the $10,000,000 placeholder price, which no memorandum stated — enter the price.",
 };
 
 /** Every app/ and lib/ source, for the marker scan. */
@@ -190,14 +191,14 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(render(null)).toBe("");
-    expect(render({ rows: [], readOn: "2026-09-21", impactsWithheld: null })).toBe("");
+    expect(render({ rows: [], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).toBe("");
   });
 
   it("heads with the count and leads most severe first: unsupported, stretched, holds, unchecked", () => {
     expect(html).toContain('<h2 class="text-[11px] font-semibold uppercase tracking-wider text-kill">The OM&#x27;s assumptions, tested</h2>');
-    expect(text).toContain("5 assumptions tested: 1 unsupported, 1 stretched, 1 holds, 2 unchecked");
-    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions tested: 2 hold");
-    expect(stressReadLine([GROWTH])).toBe("1 assumption tested: 1 unchecked");
+    expect(text).toContain("5 assumptions: 1 unsupported, 1 stretched, 1 holds; 2 could not be checked");
+    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions: 2 hold");
+    expect(stressReadLine([GROWTH])).toBe("1 assumption: none could be checked");
     expect(sortStressRows(TEST.rows).map((r) => r.key)).toEqual(["vacancy", "exit_cap", "taxes", "rent_growth", "other"]);
     const verdicts = [...html.matchAll(/data-verdict="([a-z]+)"/g)].map((m) => m[1]);
     expect(verdicts).toEqual(["unsupported", "stretched", "holds", "unchecked", "unchecked"]);
@@ -212,9 +213,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const group = html.slice(html.indexOf('data-qa="stress-unchecked-group"'), html.indexOf('data-qa="stress-key"'));
     const g = visibleText(group).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // The read line at the top is unchanged: it still counts the unchecked.
-    expect(text).toContain("5 assumptions tested: 1 unsupported, 1 stretched, 1 holds, 2 unchecked");
-    expect(g).toContain("2 assumptions unchecked: rent growth, the broker's narrative on the submarket");
-    expect(uncheckedLine([GROWTH])).toBe("1 assumption unchecked: rent growth");
+    expect(text).toContain("5 assumptions: 1 unsupported, 1 stretched, 1 holds; 2 could not be checked");
+    expect(g).toContain("2 could not be checked: rent growth, the broker's narrative on the submarket");
+    expect(uncheckedLine([GROWTH])).toBe("1 could not be checked: rent growth");
     // The fold is PanelFold's own shape: the control a thumb's height on a
     // touch screen, the whole body in the HTML.
     expect(group).toMatch(/<details class="group mt-1"><summary class="[^"]*\bpointer-coarse:py-2\.5\b[^"]*">/);
@@ -245,11 +246,25 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(o).toContain("Nothing numerate. Ask the broker: Which comps?");
     expect(other).toContain('href="/how-we-test#other"');
     // Nothing unchecked, no group; nothing tested, no list.
-    expect(render({ rows: [EXIT], readOn: "2026-09-21", impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
-    const only = render({ rows: [GROWTH], readOn: "2026-09-21", impactsWithheld: null });
+    expect(render({ rows: [EXIT], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
+    const only = render({ rows: [GROWTH], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(only).not.toContain('data-qa="stress-rows"');
     expect(only).toContain('data-qa="stress-row-rent_growth"');
     expect(a11yIssues(only)).toEqual([]);
+  });
+
+  it("says what would test an unchecked row only where the document named is one the test reads", () => {
+    const noi: StressRow = { ...GROWTH, key: "noi", title: "NOI", omSays: { text: "NOI (pro forma): $3,880,000", value: 3_880_000, page: 8 }, unchecked: "No T-12 is on file, and the OM states no second NOI to hold its figure to." };
+    expect(testedByHint(noi)).toBe("Add the T-12 to test this.");
+    expect(testedByHint({ ...noi, key: "insurance" })).toBe("Add the T-12 to test this.");
+    expect(testedByHint({ ...noi, key: "vacancy" })).toBe("Add the rent roll or the T-12 to test this.");
+    // A figure the OM does not state, a market figure, a tested row: none.
+    expect(testedByHint({ ...noi, omSays: { ...noi.omSays, value: null } })).toBeNull();
+    expect(testedByHint(GROWTH)).toBeNull();
+    expect(testedByHint(VACANCY)).toBeNull();
+    const s = render({ rows: [noi], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(s)).toContain("Add the T-12 to test this.");
+    expect(s.match(/data-qa="stress-tested-by"/g)).toHaveLength(1);
   });
 
   it("names an unchecked row mid-sentence: the key's own name, or the challenger's title read as one", () => {
@@ -265,18 +280,29 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(uncheckedName({ ...OTHER, title: "RUBS income" })).toBe("the RUBS income");
   });
 
-  it("draws the pair as one figure where the model already runs at the evidence's", () => {
+  it("draws the pair as one figure where the OM's figure is the evidence's, read off the values, not the note", () => {
+    // lib/stress-test's own note for one run opens on the OM's figure, so a
+    // test of the note's words never matched it and printed "9.3% → 9.3%".
     const same: StressRow = {
       ...VACANCY,
-      impact: { ...VACANCY.impact!, altValue: 0.06, altIrrPct: 9.31, altMultiple: 1.53, note: "The model already runs vacancy at the deal's rent roll's 9.1%, so its levered IRR of 9.3% carries it." },
+      impact: {
+        ...VACANCY.impact!,
+        altValue: 0.06,
+        altIrrPct: 9.31,
+        altMultiple: 1.53,
+        note: "The OM's vacancy, 6.0%, is the deal's T-12's 6.0%, so the levered IRR of 9.3% stands on it.",
+      },
     };
-    const s = render({ rows: [same], readOn: "2026-09-21", impactsWithheld: null });
+    const s = render({ rows: [same], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     const t = visibleText(s).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(t).toContain("Levered IRR 9.3%, as the model runs");
-    expect(t).not.toContain("9.3% → 9.3%");
+    expect(s.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3%, run at the evidence&#x27;s figure");
+    expect(t).not.toContain("→");
     expect(s).toContain('data-qa="stress-impact"');
     expect(t).toContain(same.impact!.note);
     expect(gluedWords(visibleText(s))).toEqual([]);
+    // Two figures are a move, whatever the note's words.
+    const moved = render({ rows: [{ ...VACANCY, impact: { ...VACANCY.impact!, note: same.impact!.note } }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(moved.match(/data-qa="stress-impact-pair">([^<]*)</)?.[1]).toBe("Levered IRR 9.3% → 7.1%");
   });
 
   it("an unsupported row: the OM's figure with its page, the track, the gap, the impact pair and the folded challenge", () => {
@@ -327,8 +353,17 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(taxes).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(t).toContain("Holds Real estate taxes OM p. 15");
     expect(t).toContain("The OM against the evidence $532k");
-    expect(t).toContain("No return struck: no figure the engine can take.");
+    expect(t).toContain("No return is re-run: the model has no input for this figure.");
     expect(taxes).not.toContain('data-qa="stress-impact"');
+  });
+
+  it("draws a row held to a rule of thumb alone muted, never a green Holds, its word kept", () => {
+    const thumb: StressRow = { ...TAXES, ruleOfThumbOnly: true };
+    const s = render({ rows: [thumb], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(s).toMatch(/class="rounded-full px-2 py-0\.5 text-\[10px\] font-semibold uppercase tracking-wide bg-faint text-muted">Holds</);
+    expect(s).not.toContain("bg-pass/10 text-pass\">Holds");
+    // Held to evidence, it stays green.
+    expect(render({ rows: [TAXES], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).toContain("bg-pass/10 text-pass\">Holds");
   });
 
   it("keys the marks it draws, and dates the published figures' read", () => {
@@ -341,7 +376,12 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("The OM against itself");
     expect(t).toContain("Published figures read Sep 21, 2026");
     // A test with no published figure dates nothing.
-    expect(visibleText(render({ rows: [EXIT], readOn: "2026-09-21", impactsWithheld: null }))).not.toContain("Published figures read");
+    expect(visibleText(render({ rows: [EXIT], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null }))).not.toContain("Published figures read");
+    // Published figures from the stored market check alone are the
+    // screen's, never dated as read today.
+    const stored = visibleText(render({ ...TEST, publishedRead: false })).replace(/&#x27;/g, "'");
+    expect(stored).toContain("Published figures as of the screen's market check");
+    expect(stored).not.toContain("Published figures read");
   });
 
   it("says once at the top why no return is struck where the model's reads are withheld, and each row points up", () => {
@@ -349,10 +389,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(w).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(a11yIssues(w)).toEqual([]);
     expect(gluedWords(visibleText(w))).toEqual([]);
-    expect(t.match(/No return struck: The model runs on the \$10,000,000 placeholder price/g)).toHaveLength(1);
+    expect(t.match(/No return is re-run: the model runs on the \$10,000,000 placeholder price/g)).toHaveLength(1);
+    expect(t).not.toContain("No return struck: No return");
     // The two tested rows point up; the unchecked row's reason is its own.
     expect(w.match(/data-qa="stress-no-impact"/g)).toHaveLength(2);
-    expect(t).toContain("No return struck: the model's reads are withheld (see above).");
+    expect(t).toContain("No return is re-run (see the note above).");
     expect(w).not.toContain('data-bar="stress-impact"');
     // The track still draws: the evidence stands whether or not the engine runs.
     expect(w).toContain('data-bar="stress-om"');

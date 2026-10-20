@@ -21,6 +21,7 @@ import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 import { isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
 import { leasesShort } from "@/lib/rentroll/profiles";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi, t12SummaryOf } from "./analyze";
+import { NOI_IN_LINE_BAND } from "./in-line-band";
 import type { NoiComparison, RentRollSummary, T12Summary } from "./types";
 
 export interface ActualsRead {
@@ -160,8 +161,12 @@ export const OM_NOI_LABEL: Record<NonNullable<NoiComparison["omBasis"]>, string>
   stabilized: "OM pro forma NOI",
 };
 
+/** The grade in words. Inside the band is said as what it measures, never
+ *  a pass: the stress test may still read the same gap as stretched where
+ *  its re-run moves the return (lib/stress-test `IRR_MOVE_STRETCH_BPS`), and
+ *  the two sit on one screen. */
 export const SEVERITY_WORD: Record<NoiComparison["severity"], string> = {
-  in_line: "In line",
+  in_line: `Within ${Math.round(NOI_IN_LINE_BAND * 100)}% of the T-12`,
   material: "Material",
   red_flag: "Red flag",
 };

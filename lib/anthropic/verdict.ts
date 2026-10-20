@@ -149,7 +149,7 @@ export function stressSection(test: StressTest): string[] {
             // where the publisher already says it ("a rule of thumb").
             const kind =
               e.kind === "published"
-                ? `the ${e.scope === "nation" ? "nation's" : e.scope === "state" ? "state's" : "metro's"} figure`
+                ? `the ${e.scope === "nation" ? "nation's" : e.scope === "state" ? "state's" : e.scope === "region" ? "Census region's" : "metro's"} figure`
                 : e.kind === "document"
                   ? "the deal's own document"
                   : e.kind === "rule_of_thumb"
@@ -161,7 +161,7 @@ export function stressSection(test: StressTest): string[] {
           .join("; ")
       : "no evidence with a figure or words could be read";
     const gap = r.gap ? r.gap.text : `unchecked — ${r.unchecked ?? "no figure to set against the OM's"}`;
-    const move = r.impact ? r.impact.note : `not re-run — ${noMoveWhy(test, r)}`;
+    const move = r.impact ? r.impact.note : noMoveWhy(test, r);
     const ask = r.challenge?.question ? ` The challenger asks: ${r.challenge.question}` : "";
     // The OM's text may end in its own full stop ("The OM states no loan rate.").
     lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — OM says: ${r.omSays.text.replace(/\.$/, "")}${page}. Set against: ${evidence}. Gap: ${gap} The levered IRR: ${move}${ask}`);
@@ -169,7 +169,7 @@ export function stressSection(test: StressTest): string[] {
   lines.push(
     "",
     test.impactsWithheld
-      ? `No return was re-run for this deal — ${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say that no impact was struck in code, and never estimate one.`
+      ? `${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.`
       : "The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing.",
     "Lead the reason with the unsupported rows, then the stretched. Wherever a figure above decides a sentence — the reason, a screen range, a deal-killer's read, a next step — cite it by figure and date and name its publisher (\"the rent roll's 9.1% vacancy, May 31, 2026\"; \"the Census Bureau's 6.2% for the metro, Q2 2026\"): an unsupported figure is the range's conservative end, and the matching next step is what the broker must show to support the OM's figure. A row the test leaves unchecked has nothing in code to cite, and you say so if you raise it.",
   );

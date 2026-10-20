@@ -282,7 +282,10 @@ describe("text that reads at 4.5:1 where the pass measured it under (research pa
       expect(ratio(tone, `${tone}/5`, "faint/60", "surface")).toBeGreaterThanOrEqual(4.5);
     }
     const s = src("app/(app)/deals/[id]/property-actuals.tsx");
-    expect(s).toContain('in_line: { label: "In line", cls: "bg-pass/5 text-pass" }');
+    // Inside the band is said neutrally, never a green pass (the stress
+    // test beside it may read the same gap stretched).
+    expect(s).toContain('in_line: { label: SEVERITY_WORD.in_line, cls: "bg-surface text-ink" }');
+    expect(ratio("ink", "surface")).toBeGreaterThanOrEqual(4.5);
     expect(s).toContain('material: { label: "Material", cls: "bg-caution/5 text-caution" }');
   });
 

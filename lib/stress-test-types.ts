@@ -112,13 +112,24 @@ export interface StressRow {
   method: string;
   /** why the row is unchecked, where it is */
   unchecked?: string | null;
+  /** the verdict was struck against a rule of thumb alone (the site's own
+   *  screening default, no figure of the deal's, the market's or the OM's):
+   *  the gap says so, and no surface draws such a row as a green "holds" */
+  ruleOfThumbOnly?: boolean;
 }
 
 export interface StressTest {
   rows: StressRow[];
   /** the day the published figures were read */
   readOn: string;
-  /** the model's reads are withheld, so no impact is struck (the reason) */
+  /** whether the published evidence is TODAY's read (the model-vs-market
+   *  read handed in, its figures read on `readOn`) — false where the only
+   *  published figures are the stored market check's, read on the screen's
+   *  day, so no surface dates them `readOn` */
+  publishedRead: boolean;
+  /** the model's reads are withheld, so no impact is struck: one whole
+   *  sentence that says so and why ("No return is re-run: …"), printed as it
+   *  stands on every surface */
   impactsWithheld: string | null;
 }
 
@@ -147,10 +158,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, each graded for how hard it supports the ask",
+      "The memorandum's own sale comps, each graded for how hard it supports the ask, the median struck only over those graded clean",
       "Recorded sales from public property records where the site has them, a median only from three sales up",
-      "Your own past screens and pipeline in the same market and class, each at its ask",
-      "The band of prices per unit or per square foot the class trades in, a rule of thumb named as one",
+      "Other memoranda's asking prices from your own past screens in the same market and class: asks, not trades, a rule of thumb that decides only where nothing above carries a figure",
     ],
     engine: "The price is a direct input: the return is re-run at the evidence's price.",
     limits: [
@@ -181,7 +191,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named",
-      "Negative leverage: a going-in cap under the all-in rate loses money on every borrowed dollar until growth bails it out",
+      "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield",
     ],
     // lib/stress-test's debtRow sizes the tests at the OM's stated rate
     // where one is read, else the derived model's `allInRatePct` (the seed,

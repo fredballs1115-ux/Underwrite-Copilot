@@ -38,10 +38,12 @@
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { statedDay } from "@/lib/actuals/actuals-read";
+import { t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
+import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
-import { challengeKey } from "@/lib/stress-test";
+import { T12_INSURANCE_NOT, T12_TAX_NOT, challengeKey } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey } from "@/lib/stress-test-types";
 
 /** Which side of the screen's test the later figure landed on. */
@@ -74,6 +76,11 @@ export interface ScoredRow {
    *  only on a row scored on figures, so the card takes plain data */
   figures: { om: string; alt: string; later: string } | null;
   landing: Landing;
+  /** the later thing is the reader's decision (Dead, and why), a direction
+   *  with no figure: the row says which side it agrees with, and the
+   *  account's record counts it apart from the scored rows, never in the
+   *  shares */
+  decision?: boolean;
   /** why the row is unscored, where it is */
   why: string | null;
   /** one sentence: what was set against what, and where it landed */
@@ -134,6 +141,11 @@ export interface ScoreDealArgs {
   /** the memorandum's asking price (lib/deal-strategy `askingPriceOf`), so
    *  a trade can be put on the OM figure's basis; null where none is stated */
   askingPrice?: number | null;
+  /** the class the deal shows (lib/asset-class `shownAssetClass`), so a rent
+   *  roll's vacancy is read as the stress test reads it: by count on a class
+   *  priced by the unit, by area on one priced by the foot; absent, by area
+   *  where the roll carries it */
+  assetClass?: string | null;
   /** the previous screen's snapshot (the deal row's `prior_screen`), whose
    *  challenges are scored against what arrived after ITS verdict — a
    *  document that arrived between the two screens scores the challenge
@@ -195,28 +207,25 @@ interface Later {
   decision?: boolean;
 }
 
-function t12Line(summary: T12Summary, re: RegExp, key: string): number | null {
-  const line = summary.opex.find((l) => l.key === key) ?? summary.opex.find((l) => re.test(l.label));
+/** A T-12 line by its key, else its label — never one whose label `not`
+ *  refuses (lib/stress-test's own exclusions: a "Taxes & insurance" line is
+ *  neither line alone, whatever key the extraction filed it under). */
+function t12Line(summary: T12Summary, re: RegExp, key: string, not: RegExp): number | null {
+  const line = summary.opex.find((l) => l.key === key && !not.test(l.label)) ?? summary.opex.find((l) => re.test(l.label) && !not.test(l.label));
   const n = line?.amount;
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** The rent roll's vacancy as a percent: by area where the roll carries
- *  it, else by units; null where the roll counts nothing. */
-function rollVacancyPct(s: RentRollSummary): number | null {
-  if (s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy)) return round1((1 - s.sfWeightedOccupancy) * 100);
-  if (s.unitCount > 0) return round1((1 - s.occupiedUnits / s.unitCount) * 100);
+/** The rent roll's vacancy as a percent, the stress test's own reading: by
+ *  count on a class priced by the unit, by area on one priced by the foot,
+ *  each falling to the other where the roll lacks it; null where the roll
+ *  counts nothing. */
+function rollVacancy(s: RentRollSummary, perUnit: boolean): { pct: number; by: "by units" | "by area" } | null {
+  const area = s.sfWeightedOccupancy != null && Number.isFinite(s.sfWeightedOccupancy) ? s.sfWeightedOccupancy : null;
+  const units = s.unitCount > 0 ? s.occupiedUnits / s.unitCount : null;
+  if (units != null && (perUnit || area == null)) return { pct: round1((1 - units) * 100), by: "by units" };
+  if (area != null) return { pct: round1((1 - area) * 100), by: "by area" };
   return null;
-}
-
-/** The T-12's economic vacancy: its vacancy loss over gross potential
- *  rent (the rent collected plus the loss), as a percent. */
-function t12VacancyPct(s: T12Summary): number | null {
-  const loss = s.vacancyLoss;
-  const rent = s.collectedRent;
-  if (loss == null || rent == null || !Number.isFinite(loss) || !Number.isFinite(rent)) return null;
-  const gross = rent + Math.abs(loss);
-  return gross > 0 ? round1((Math.abs(loss) / gross) * 100) : null;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -400,7 +409,7 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
 
     if (T == null) return unscored("the verdict carries no screen time, so nothing can be said to have come after it.");
 
-    const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null });
+    const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null, perUnit: args.assetClass !== undefined && assetWords(args.assetClass).basis === "unit" });
     if (!later) return unscored("nothing that arrived after the screen speaks to it.");
 
     if (later.decision) {
@@ -409,6 +418,7 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
         later: { source: later.source, value: null, text: later.text },
         figures: null,
         landing: "screen_side",
+        decision: true,
         why: null,
         text: `${title}: the screen challenged it ("${c.assumption}"), and you ${later.text} — a decision on the screen's side, not a figure.`,
       };
@@ -424,7 +434,12 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
       };
     }
     if (omFigure === altFigure) return unscored("the screen's figure is the OM's own, so there is no side to land on.");
-    const v = later.value!;
+    // A trade with no asking price to put it on the OM figure's basis
+    // carries no figure: named, never scored as one.
+    if (later.value == null) {
+      return { ...base, later: { source: later.source, value: null, text: later.text }, figures: null, landing: "unscored", why: "what came after carries no figure on the OM figure's basis.", text: `${title}: ${later.text}, but it carries no figure on the OM figure's basis, so it is not scored.` };
+    }
+    const v = later.value;
     const lo = Math.min(omFigure, altFigure);
     const hi = Math.max(omFigure, altFigure);
     const landing: Landing = v > lo && v < hi ? "between" : Math.abs(v - omFigure) <= Math.abs(v - altFigure) ? "om_side" : "screen_side";
@@ -453,18 +468,21 @@ function laterFor(
     trade: { price: number; at: string; text: string } | null;
     omFigure: number | null;
     askingPrice: number | null;
+    perUnit: boolean;
   },
 ): Later | null {
   const t12When = ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12";
   switch (key) {
     case "vacancy": {
-      const rv = ev.roll ? rollVacancyPct(ev.roll.summary) : null;
+      const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
       if (rv != null) {
-        const by = ev.roll!.summary.sfWeightedOccupancy != null ? "by area" : "by units";
-        return { source: "rent_roll", value: rv, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.toFixed(1)}% vacant ${by}` };
+        return { source: "rent_roll", value: rv.pct, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}` };
       }
-      const tv = ev.t12 ? t12VacancyPct(ev.t12.summary) : null;
-      if (tv != null) return { source: "t12", value: tv, text: `${t12When} ran ${tv.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent)` };
+      // Over gross potential rent, the statement's own EGI saying whether
+      // its rent line is gross or net (lib/actuals/analyze, the stress
+      // test's one reading).
+      const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
+      if (tv != null) return { source: "t12", value: tv.pct, text: `${t12When} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})` };
       return null;
     }
     case "noi": {
@@ -473,12 +491,12 @@ function laterFor(
       return null;
     }
     case "insurance": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance") : null;
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance", T12_INSURANCE_NOT) : null;
       if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of insurance` };
       return null;
     }
     case "taxes": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes") : null;
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes", T12_TAX_NOT) : null;
       if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of real estate taxes` };
       return null;
     }
@@ -527,7 +545,12 @@ export interface AccountRecord {
   dealsTested: number;
   /** deals with something that arrived after the screen */
   dealsWithLater: number;
+  /** rows scored on figures: the later figure set against the OM's and the
+   *  screen's; never a decision */
   scored: number;
+  /** rows a decision answered (Dead, and why): counted apart, in no share
+   *  and no key's bar, since a direction is not a figure */
+  decisions: number;
   screenSide: number;
   omSide: number;
   between: number;
@@ -542,6 +565,7 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
   let dealsTested = 0;
   let dealsWithLater = 0;
   let scored = 0;
+  let decisions = 0;
   let screenSide = 0;
   let omSide = 0;
   let between = 0;
@@ -550,6 +574,10 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
     if (d.evidence.length > 0) dealsWithLater++;
     for (const r of d.rows) {
       if (r.landing === "unscored") continue;
+      if (r.decision) {
+        decisions++;
+        continue;
+      }
       scored++;
       const k = byKey.get(r.key) ?? { key: r.key, title: TITLES[r.key], screenSide: 0, omSide: 0, between: 0 };
       if (r.landing === "screen_side") {
@@ -573,6 +601,7 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
     dealsTested,
     dealsWithLater,
     scored,
+    decisions,
     screenSide,
     omSide,
     between,
@@ -595,20 +624,30 @@ export const RECORD_NONE_LINE =
   "No track record yet, and none is claimed. Every test is scored later against three things you supply: the T-12 or rent roll you add after the screen, what you decided (dead, and why), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
+  // A decision is a direction, not a figure: said apart, never in a share.
+  const d = r.decisions;
+  const apart = d > 0 ? ` ${d} more ${d === 1 ? "row was a decision" : "rows were decisions"} (Dead, and why), counted apart and in no share.` : "";
   switch (recordState(r)) {
     case "none":
-      return RECORD_NONE_LINE;
+      return `${RECORD_NONE_LINE}${apart}`;
     case "start":
-      return `${r.scored} scored row${r.scored === 1 ? " is" : "s are"} a start, not a record.`;
+      return `${r.scored} scored row${r.scored === 1 ? " is" : "s are"} a start, not a record.${apart}`;
     default: {
       const s = r.shares!;
-      return `Of ${r.scored} scored rows, ${r.screenSide} landed on the screen's side (${s.screenSidePct}%), ${r.omSide} on the OM's (${s.omSidePct}%) and ${r.between} between (${s.betweenPct}%).`;
+      return `Of ${r.scored} scored rows, ${r.screenSide} landed on the screen's side (${s.screenSidePct}%), ${r.omSide} on the OM's (${s.omSidePct}%) and ${r.between} between (${s.betweenPct}%).${apart}`;
     }
   }
 }
 
-/** "4 deals tested · 2 with later evidence · 3 rows scored" */
+/** "4 deals tested · 2 with later evidence · 3 rows scored"; with a
+ *  decision among the rows answered, "4 rows answered, 1 of them a
+ *  decision · 3 scored", the decision never in the scored count. */
 export function recordCountsLine(r: AccountRecord): string {
   const n = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
-  return [n(r.dealsTested, "deal tested", "deals tested"), `${r.dealsWithLater} with later evidence`, n(r.scored, "row scored", "rows scored")].join(" · ");
+  const d = r.decisions;
+  const rows =
+    d > 0
+      ? [`${n(r.scored + d, "row answered", "rows answered")}, ${d} of them ${d === 1 ? "a decision" : "decisions"}`, `${r.scored} scored`]
+      : [n(r.scored, "row scored", "rows scored")];
+  return [n(r.dealsTested, "deal tested", "deals tested"), `${r.dealsWithLater} with later evidence`, ...rows].join(" · ");
 }

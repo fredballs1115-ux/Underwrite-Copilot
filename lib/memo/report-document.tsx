@@ -394,11 +394,12 @@ const EVIDENCE_KIND_WORD: Record<StressEvidence["kind"], string> = {
  * none), the method and the challenger's words.
  */
 function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
-  const tone = STRESS_TONE[row.verdict] ?? C.muted;
+  // A row held to a rule of thumb alone is never printed in the pass tone.
+  const tone = row.ruleOfThumbOnly && row.verdict === "holds" ? C.muted : (STRESS_TONE[row.verdict] ?? C.muted);
   const ticks = tickPositions(row);
   const track = 120;
   const page = row.omSays.page != null ? ` (p. ${row.omSays.page})` : "";
-  const move = row.impact ? row.impact.note : `No return re-run: ${noMoveWhy(test, row)}`;
+  const move = row.impact ? row.impact.note : noMoveWhy(test, row);
   return (
     <View style={[s.block, { marginBottom: 11 }]} wrap={false}>
       <View style={s.blockTitleRow}>
@@ -461,11 +462,19 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
     .filter(Boolean)
     .join(" · ");
   const publishers = test.rows.flatMap((r) => r.evidence.filter((e) => e.kind === "published").map((e) => e.publisher));
+  // Today's read is dated by its day; the stored market check's figures are
+  // the screen's, never dated as read today (`publishedRead`).
+  const readWhen =
+    publishers.length === 0
+      ? ""
+      : test.publishedRead
+        ? ` The published figures were read on ${whenWords(test.readOn)}.`
+        : " The published figures are as of the screen's market check.";
   return (
     <PageChrome title="The stress test" count={count} dealName={dealName} branding={branding}>
       <Text style={s.sub}>
         {str(
-          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question. The published figures were read on ${whenWords(test.readOn)}.`,
+          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
       {rows.map((r, i) => (
@@ -1785,7 +1794,7 @@ function AnnualCashFlowBlock({ b, totalPages }: { b: BaseCase; totalPages: numbe
   );
 }
 
-const SEVERITY_COLOR: Record<string, string> = { in_line: C.pass, material: C.caution, red_flag: C.kill };
+const SEVERITY_COLOR: Record<string, string> = { in_line: C.ink, material: C.caution, red_flag: C.kill };
 
 /**
  * The deal's actuals (research pass 24, B3): the T-12's NOI against the

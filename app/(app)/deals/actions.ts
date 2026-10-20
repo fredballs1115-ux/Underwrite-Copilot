@@ -442,7 +442,7 @@ export async function updateManualFacts(
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path, is_sample, extraction, verdict")
+    .select("id, om_storage_path, is_sample, extraction, verdict, challenges")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) return { error: "This deal is no longer available." };
@@ -488,7 +488,10 @@ export async function updateManualFacts(
 
   // Retrade watch for typed facts: the pipeline's manual branch never
   // snapshots (the extraction it sees is already the NEW facts), so the
-  // before/after is captured here — only against a COMPLETED generation.
+  // before/after is captured here — only against a COMPLETED generation —
+  // with the challenges this re-screen replaces, as the pipeline's own
+  // snapshot keeps them, so the track record (lib/track-record) can score
+  // the earlier screen's challenges against what arrived after its verdict.
   if (deal.extraction && deal.verdict) {
     try {
       await supabase
@@ -498,6 +501,7 @@ export async function updateManualFacts(
             at: new Date().toISOString(),
             extraction: deal.extraction,
             verdict: deal.verdict,
+            challenges: deal.challenges ?? null,
           },
         })
         .eq("id", dealId);

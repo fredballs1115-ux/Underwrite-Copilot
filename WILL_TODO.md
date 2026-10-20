@@ -3019,40 +3019,14 @@ a route scoped to the share token; the memo and the report got theirs in
 
 ## Claude's moves (next session)
 
-0. **The stress test's audited follow-ups** (2026-10-19, the surfaces audit
-   of PR #470; each verified against the code, none fixed yet):
-   - the panel detects a same-figure run by its sentence
-     (`app/stress-test-panel.tsx`, `impact.note.startsWith(…)`); test the
-     values, as `lib/stress-test-words.ts` does;
-   - the recorded-sales basis evidence: the deal page hands the stats with no
-     class gate and no per-unit median, so the row reads "too few for a
-     median" on every deal — gate on `vsMedianRead`, and say "no per-unit
-     median is struck on recorded sales" where the count clears the floor;
-   - the memo route passes `modelVsMarket: null`; wire `todayReads` +
-     `modelVsMarketFor` inside its try, as the report route does;
-   - an impact should say which side the model sits on (`modelSide`,
-     `modelIrrPct` on `StressImpact`);
-   - the track record counts a Dead decision as a scored row, and
-     `t12VacancyPct` divides by rent + |loss| where the stress test divides
-     by rent (9.1% vs 10.0% on the sample);
-   - "read on {readOn}" prints where the published evidence came from the
-     stored market check, not today's read (`publishedRead` on
-     `StressTest`);
-   - the shared screen's withheld reason says "no model was derived" — it
-     carries none by design, say so (`withheldReason` on `StressTestArgs`);
-   - a Census region's scope reaches the verdict as "the metro's"
-     (`lib/anthropic/verdict.ts`; the type now has `region`);
-   - `exitCapRow` keeps the 10-year's `value`, so the panel draws a 4.9%
-     tick on the cap track — `value: null`;
-   - wording: "9 assumptions read: 4 tested, 5 unchecked"; "No return is
-     re-run: …" doubles its words; the basis possessive; the memo's fit loop
-     drops the dealKillers/sensitivity it emptied for the block;
-     `MemoStressBlock.count` never renders; "Taxes & insurance" rows need
-     mutual exclusions in the tax and insurance finders;
-     `lib/sample-cover.ts` should call `lib/sample-stress`'s builder.
-   - `app/(app)/deals/actions.ts` (the manual deal's facts edit) snapshots
-     `prior_screen` without `challenges`, so a manual deal's track record
-     loses them on a re-screen — two lines.
+0. **The stress test's next steps** (2026-10-20; the audit of PR #470 was
+   fixed in #475):
+   - store the verdict's stress test as a snapshot, so the shared screen and
+     the memo print the test the call was made on rather than rebuilding it;
+   - a value-add, lease-up, conversion or development deal withholds every
+     re-run (the owner's model-math call: which stabilized figures a plan's
+     re-run may use);
+   - an unpriced OM could take a typed price to unlock the re-runs.
 
 1. **Verify phases 1–4 end to end.** The migrations LANDED on 2026-09-16 —
    all of 0030–0035 reported ✅ — so this is no longer blocked on schema, it

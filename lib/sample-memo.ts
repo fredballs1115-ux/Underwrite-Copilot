@@ -13,10 +13,14 @@ import { buildMemoData, type MemoData, type MemoExchange } from "@/lib/memo/memo
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
 import { sampleActualsLine, sampleDocumentChecks, sampleDocumentRow, sampleStressTest } from "@/lib/sample-cover";
+import type { MarketReads } from "@/lib/model-vs-market";
 
 /** The memo the download builds at `now`, dated as it dates it (a reader of
- *  no known time zone, lib/reader-day), with no cover. */
-export function sampleMemoData(now: Date = new Date()): MemoData {
+ *  no known time zone, lib/reader-day), with no cover. `reads` are today's
+ *  published figures (lib/sample-stress-read `sampleTodayReads`), which the
+ *  download reads too; without them the stress test's published rows stay
+ *  unchecked. */
+export function sampleMemoData(now: Date = new Date(), reads: MarketReads | null = null): MemoData {
   const dateStr = readerDateLong(null, now);
   const readerDay = readerToday(null, now);
   const deal = sampleDocumentRow();
@@ -26,5 +30,5 @@ export function sampleMemoData(now: Date = new Date()): MemoData {
     : null;
   // The actuals line the download sets beside its key terms (audit C8, H1),
   // and the stress test the download leads with (lib/sample-cover).
-  return { ...buildMemoData(deal, dateStr, buyBoxChecks, null, null, null, readerDay, exchange, sampleStressTest(readerDay)), actualsLine: sampleActualsLine() };
+  return { ...buildMemoData(deal, dateStr, buyBoxChecks, null, null, null, readerDay, exchange, sampleStressTest(readerDay, reads)), actualsLine: sampleActualsLine() };
 }

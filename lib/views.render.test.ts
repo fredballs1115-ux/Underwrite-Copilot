@@ -1505,18 +1505,20 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(row).toContain('data-verdict="unsupported"');
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
-      // The engine at the OM's 6.0% against the engine at the roll's 9.1%.
-      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.3%");
+      // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
+      // by count (225 of 248 doors).
+      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.1%");
       // The sample's two unchecked rows are one folded group at the end: the
       // memorandum states no loan rate, and no figure was read today for
       // rent growth. Its taxes, insurance and premium are tested.
-      expect(visibleText(html)).toContain("2 assumptions unchecked: debt, rent growth");
+      expect(visibleText(html)).toContain("2 could not be checked: debt, rent growth");
       expect(visibleText(html)).toContain("Read why (2)");
-      for (const k of ["taxes", "insurance", "renovation_premium"]) {
+      // The taxes' reset is the jurisdiction's to make: stretched at most.
+      for (const [k, v] of [["taxes", "stretched"], ["insurance", "unsupported"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);
         expect(at, k).toBeGreaterThan(0);
         expect(at, k).toBeLessThan(html.indexOf('data-qa="stress-unchecked-group"'));
-        expect(html.slice(at, at + 400), k).toContain('data-verdict="unsupported"');
+        expect(html.slice(at, at + 400), k).toContain(`data-verdict="${v}"`);
       }
       expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-noi"'));
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
@@ -3020,9 +3022,10 @@ import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult }
 
 describe("ShareView — the read-only screen a partner or lender opens", () => {
   it("draws the OM's assumptions tested under the call, from the stored results alone, no return re-run and said so (2026-10-19)", async () => {
-    const { buildStressTest } = await import("@/lib/stress-test");
+    const { SHARE_NO_MODEL, buildStressTest } = await import("@/lib/stress-test");
     // As the loader builds it: the extraction, the challenger, the comps and
-    // the market check, no model and no figure read today.
+    // the market check, no model and no figure read today — and why there is
+    // no model: the shared screen carries none by design.
     const stressTest = buildStressTest({
       extraction: SAMPLE_DEAL.extraction,
       firstSignal: null,
@@ -3033,8 +3036,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
       derived: null,
       storedAssetClass: SAMPLE_DEAL.asset_class,
       brokerComps: SAMPLE_DEAL.comps,
+      withheldReason: SHARE_NO_MODEL,
       readOn: "2026-09-21",
     });
+    expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("withheldReason: SHARE_NO_MODEL");
     const props = {
       dealName: SAMPLE_DEAL.name,
       assetClass: SAMPLE_DEAL.asset_class,
@@ -3053,7 +3058,9 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     const panel = html.indexOf('data-qa="stress-test-panel"');
     expect(panel).toBeGreaterThan(html.indexOf("First-pass verdict"));
     expect(text).toContain("The OM's assumptions, tested");
-    expect(text).toContain("No return struck: No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("The shared screen carries no model, so no return is re-run here.");
+    expect(text).not.toContain("No return struck: The shared screen");
+    expect(text).not.toContain("No model was derived");
     expect(html).not.toContain('data-bar="stress-impact"');
     // The exit cap against the going-in cap, the OM against itself, stands
     // without a model; the loader reads the challenger's words for it.

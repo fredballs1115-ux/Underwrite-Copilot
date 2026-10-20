@@ -44,7 +44,8 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(html).not.toContain("OM assumed NOI");
     expect(html).toContain("$1.20M");
     expect(html).toContain("$1.15M");
-    expect(html).toContain("In line");
+    expect(html).toContain("Within 5% of the T-12");
+    expect(html).not.toContain("In line");
     expect(html).toContain("judged on yield on cost, never against today");
     // The deal's own documents, named by which are here — never "you
     // uploaded", untrue on the sample and on a teammate's (research pass 32).

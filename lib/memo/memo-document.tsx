@@ -527,6 +527,11 @@ export type MemoData = {
   }[];
   dealKillers: { label: string; read: string; risk: string }[];
   sensitivity: { scenario: string; call: string; note: string }[];
+  /** the deal-killer cards and the flips strip the stress block's rows took
+   *  the room of (emptied above where the block has a row): the fit loop
+   *  gives them back where it cuts the block under two rows, since a block
+   *  of one no longer holds the room it was given */
+  stressDisplaced?: { dealKillers: MemoData["dealKillers"]; sensitivity: MemoData["sensitivity"] } | null;
   nextSteps: string[];
   // The buyer's standing criteria, checked deterministically (empty = no box set).
   // `note`: what the full report adds beside a chip — the model's own IRR
@@ -905,6 +910,7 @@ export function buildMemoData(
     ranges,
     dealKillers: hasStress ? [] : dealKillers,
     sensitivity: hasStress ? [] : sensitivity,
+    stressDisplaced: hasStress ? { dealKillers, sensitivity } : null,
     nextSteps: list(verdict?.nextSteps).map(str).slice(0, hasScreen ? 2 : 4),
     buyBox: (buyBoxChecks ?? []).map((c) => ({
       label: clamp(c.label, 20),
@@ -1312,12 +1318,15 @@ const s = StyleSheet.create({
 function Section({
   title,
   keep = false,
+  count,
   children,
 }: {
   title: string;
   /** a short section moves to the next page whole rather than leave its
    *  heading at the foot of this one (a memo too long for one page) */
   keep?: boolean;
+  /** a count printed muted beside the title ("1 unsupported · 2 stretched") */
+  count?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -1325,6 +1334,7 @@ function Section({
       <View style={s.sectionTitleRow}>
         <View style={s.sectionTick} />
         <Text style={s.sectionTitle}>{title}</Text>
+        {count ? <Text style={[s.sectionTitle, { color: C.muted, marginLeft: 6 }]}>{count}</Text> : null}
       </View>
       {children}
     </View>
@@ -1349,6 +1359,41 @@ export function pdfPageCount(buf: Buffer): number {
 }
 
 /**
+ * Room is given back in this order where the memo runs past one page, each
+ * concession kept and the next added until the memo fits: the actuals line
+ * (the report carries the actuals whole), then the stress block's rows past
+ * the second, then past the first (the report tests every assumption) — the
+ * block's read line and its lead row stay, since the test is the memo's
+ * lead. The step that cuts the block under two rows gives back the
+ * deal-killer cards and the flips strip the block had emptied for its rows
+ * (`stressDisplaced`): a block of one holds none of their room, and a memo
+ * that dropped both would print the call with neither — unless they no
+ * longer fit, when the last step empties them again. A memo that still
+ * cannot fit flows to a second page with everything on it. Exported for
+ * its test.
+ */
+export const MEMO_FIT_STEPS: readonly ((d: MemoData) => MemoData | null)[] = [
+  (d) => (d.actualsLine ? { ...d, actualsLine: "" } : null),
+  (d) => (d.stressTest && d.stressTest.rows.length > 2 ? { ...d, stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 2) } } : null),
+  (d) =>
+    d.stressTest && d.stressTest.rows.length > 1
+      ? {
+          ...d,
+          stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 1) },
+          dealKillers: d.stressDisplaced?.dealKillers ?? d.dealKillers,
+          sensitivity: d.stressDisplaced?.sensitivity ?? d.sensitivity,
+        }
+      : null,
+  // Where the page still runs over with them given back, the one-row block
+  // keeps the room after all: the memo stays one page with the test's lead
+  // row rather than flowing to a second.
+  (d) =>
+    d.stressDisplaced && d.stressTest && d.stressTest.rows.length === 1 && d.dealKillers.length + d.sensitivity.length > 0
+      ? { ...d, dealKillers: [], sensitivity: [] }
+      : null,
+];
+
+/**
  * The memo as PDF bytes — what the memo route serves. The deal's actuals
  * line (research pass 24, B3) sits beside the key terms where the page has
  * room for it: a memo it would push onto a second page is drawn again
@@ -1360,19 +1405,8 @@ export async function renderMemoPdf(data: MemoData): Promise<Buffer> {
     renderToBuffer(React.createElement(MemoDocument, { data: d }) as unknown as Parameters<typeof renderToBuffer>[0]);
   const first = await draw(data);
   if (pdfPageCount(first) <= 1) return first;
-  // Room is given back in this order, each concession kept and the next
-  // added until the memo fits: the actuals line (the report carries the
-  // actuals whole), then the stress block's rows past the second, then past
-  // the first (the report tests every assumption) — the block's read line
-  // and its lead row stay, since the test is the memo's lead. A memo that
-  // still cannot fit flows to a second page with everything on it.
-  const steps: ((d: MemoData) => MemoData | null)[] = [
-    (d) => (d.actualsLine ? { ...d, actualsLine: "" } : null),
-    (d) => (d.stressTest && d.stressTest.rows.length > 2 ? { ...d, stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 2) } } : null),
-    (d) => (d.stressTest && d.stressTest.rows.length > 1 ? { ...d, stressTest: { ...d.stressTest, rows: d.stressTest.rows.slice(0, 1) } } : null),
-  ];
   let current = data;
-  for (const step of steps) {
+  for (const step of MEMO_FIT_STEPS) {
     const next = step(current);
     if (!next) continue;
     current = next;
@@ -1581,7 +1615,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
             are two ticks on one track: the OM's in the row's tone, the
             evidence's in ink. */}
         {data.stressTest && (
-          <Section title="The OM's assumptions, tested" keep>
+          <Section title="The OM's assumptions, tested" keep count={data.stressTest.count}>
             <Text style={s.stressRead}>{data.stressTest.read}</Text>
             {data.stressTest.rows.map((r, i) => {
               const tone = STRESS_TONE[r.verdict] ?? C.muted;
