@@ -50,6 +50,12 @@ export interface StressEvidence {
   scope: "deal" | "metro" | "region" | "state" | "nation" | "class";
   /** a link to the source where one exists */
   href?: string | null;
+  /** a basis row's piece judged on a yardstick other than the OM figure's
+   *  (`omSays`) — per SF where the OM's figure is per unit, say: the OM's
+   *  own figure on the piece's yardstick and that yardstick's word ("/SF").
+   *  Its value is on that yardstick, so it is drawn on no track shared with
+   *  the OM's figure. Absent on every other piece. */
+  ownYardstick?: { om: number; per: string } | null;
 }
 
 /** The return's move when the OM's figure is replaced by the evidence's,
@@ -158,15 +164,17 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, each graded for how hard it supports the ask, the median struck only over those graded clean",
-      "Recorded sales from public property records where the site has them, a median only from three sales up",
-      "Other memoranda's asking prices from your own past screens in the same market and class: asks, not trades, a rule of thumb that decides only where nothing above carries a figure",
+      "The memorandum's own sale comps, each graded by the comps step: a median only over three or more it grades as supporting the ask, one or two named and never called a median, and those it grades favorable (leaning the seller's way) or stretched named and left out",
+      "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
+      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb that decides only where nothing above carries a figure, and never on a shared screen or in the verdict's brief",
     ],
-    engine: "The price is a direct input: the return is re-run at the evidence's price.",
+    engine:
+      "The price is a direct input: the return is re-run at the evidence's price. Each piece is judged per unit where the class is, else per SF where it states only that. A value-add, lease-up, conversion or development is judged on its all-in cost (the price plus the plan's budget), a forward purchase on its price, and none of them is re-run.",
     limits: [
       "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
       "Replacement cost only where the memorandum states one.",
-      "A note's, a share's or a leased fee's price is not the building's, and no basis is struck on it.",
+      "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
+      "A basis outside the band any market trades at is the plausibility check's misread, never judged.",
     ],
   },
   {

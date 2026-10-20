@@ -17,6 +17,10 @@ import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { summarizeT12 } from "./actuals/analyze";
 import { readActuals } from "./actuals/actuals-read";
 import { inferStrategy } from "./deal-strategy";
+import { subjectBasis } from "./comp-detail";
+import { interestOf } from "./interest";
+import { screenYearOf } from "./criteria";
+import { basisTag } from "./pipeline-slots";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
@@ -1015,18 +1019,19 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "rule_of_thumb"]);
     expect(b.evidence[2]).toMatchObject({ label: "Other memoranda's asking prices in Washington DC (your past screens): asks, not trades", publisher: "your past screens", scope: "metro", value: 255_000 });
     expect(b.evidence.some((e) => /band any market delivers in|Prices the class trades in/.test(`${e.label} ${e.text}`))).toBe(false);
-    expect(b.evidence[0].value).toBe(256_500);
+    // Park Place is graded favorable — it leans the seller's way — so The
+    // Ellery is the one comp graded clean, named, never called a median.
+    expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[1]).toMatchObject({ value: 240_000, href: "https://example.test/records", asOf: "2026-10-01" });
-    expect(b.gap).toMatchObject({ unit: "pct", value: 7 });
-    // "the median of …", never a possessive bolted onto the label.
-    expect(b.gap!.text).toBe("The ask's $275k/unit is 7.0% over the median of the memorandum's sale comps, $257k/unit.");
+    expect(b.gap).toMatchObject({ unit: "pct", value: 8.9 });
+    expect(b.gap!.text).toBe("The ask's $275k/unit is 8.9% over the one comp graded clean, The Ellery, $252k/unit.");
     expect(b.verdict).toBe("stretched");
     expect(b.impact!.input).toBe("purchasePrice");
-    expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 256_500) / 274_510, 0);
-    // The note names whose median the price is re-run at, and that the loan
-    // re-sizes with the price — the median is the comps', not "the OM's".
+    expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 252_000) / 274_510, 0);
+    // The note names whose figure the price is re-run at, and that the loan
+    // re-sizes with the price — the comp's, not "the OM's".
     expect(b.impact!.note).toMatch(
-      /^If the price is the memorandum's sale comps' median, \$39\.24M \(\$257k\/unit\), at the model's loan-to-cost \(the loan re-sizes with the price\), not the OM's \$42M \(\$275k\/unit\), the levered IRR moves from/,
+      /^If the price is the one comp graded clean \(The Ellery\), \$38\.56M \(\$252k\/unit\), at the model's loan-to-cost \(the loan re-sizes with the price\), not the OM's \$42M \(\$275k\/unit\), the levered IRR moves from/,
     );
   });
 
@@ -1049,30 +1054,70 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(recorded(2)).toMatchObject({ text: "2 recorded sales, too few for a median /unit", value: null });
     expect(recorded(1).text).toBe("1 recorded sale, too few for a median /unit");
     // Six sales clear the floor; a record states no unit count, so no
-    // per-unit median is struck, whatever the count.
-    expect(recorded(6, 310)).toMatchObject({ text: "6 recorded sales; no per-unit median is struck on recorded sales", value: null });
+    // per-unit median is struck — but the deal states its area, so the
+    // $/SF median is judged per SF (lib/comp-detail `basisTracks`' rule).
+    expect(recorded(6, 310)).toMatchObject({ text: "median $310/SF over 6 recorded sales, judged per SF", value: 310 });
+    expect(recorded(6)).toMatchObject({ text: "6 recorded sales; no per-unit median is struck on recorded sales", value: null });
   });
 
-  it("strikes the comps' median only over those the comps step graded clean, naming the rest", () => {
+  it("strikes the comps' figure only over those the comps step graded supports, naming the favorable and the stretched apart", () => {
     const comps = {
       saleComps: [
         { name: "The Ellery", detail: "$252,000 per unit, 5.6% cap", support: "supports" as const, note: "" },
         { name: "Vue", detail: "$298,000 per unit", support: "stretched" as const, note: "" },
         { name: "Park Place", detail: "$261K/door, 5.4% cap", support: "favorable" as const, note: "" },
+        { name: "The Rowan", detail: "$249,000 per unit", support: "supports" as const, note: "" },
+        { name: "Hallam", detail: "$258,000 per unit", support: "supports" as const, note: "" },
       ],
       leaseComps: [],
       redFlags: [],
       summary: "",
     };
     const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps })), "basis");
-    expect(b.evidence[0].value).toBe(256_500);
+    // Three graded supports make the median; Park Place, graded favorable
+    // (it leans the seller's way, lib/anthropic/prompts), is never clean.
+    expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "3 of 3 state a figure /unit: The Ellery $252k/unit (supports); Park Place $261k/unit (favorable) — median $257k/unit over the 2 graded clean; left out, graded stretched by the comps step: Vue $298k/unit",
+      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (it leans the seller's way): Park Place $261k/unit; left out, graded stretched by the comps step (it does not support the deal): Vue $298k/unit",
     );
-    // None graded clean: no median, and the row has nothing to decide on.
+    // Favorable alone is no clean comp: nothing is set against the ask.
+    const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
+    expect(favorable.evidence[0]).toMatchObject({ value: null });
+    expect(favorable.evidence[0].text).toContain("none graded clean (supports)");
+    expect(favorable.verdict).toBe("unchecked");
+    expect(favorable.unchecked).toBe("No evidence above carries a figure the ask can be set against.");
+    // None graded clean: no figure, and the row has nothing to decide on.
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
-    expect(none.evidence[0]).toMatchObject({ value: null, text: "1 of 1 state a figure /unit, none graded clean, so no median is struck; left out, graded stretched by the comps step: Vue $298k/unit" });
+    expect(none.evidence[0]).toMatchObject({
+      value: null,
+      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (it does not support the deal): Vue $298k/unit",
+    });
     expect(none.verdict).toBe("unchecked");
+  });
+
+  it("names one or two clean comps, never a median, and calls the basis no worse than stretched on them", () => {
+    const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
+    const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" } })), "basis");
+    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (supports): The Ellery $232k/unit — the one comp graded clean, too few for a median");
+    // 18.3% over would be unsupported on a median; on one comp, stretched.
+    expect(one.verdict).toBe("stretched");
+    expect(one.gap!.text).toBe("The ask's $275k/unit is 18.3% over the one comp graded clean, The Ellery, $232k/unit. On one comp, no worse than stretched.");
+    const two = rowOf(
+      buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" } })),
+      "basis",
+    );
+    expect(two.evidence[0]).toMatchObject({ value: 234_000 });
+    expect(two.evidence[0].text).toContain("the two graded clean, midpoint $234k/unit, too few for a median");
+    expect(two.gap!.text).toMatch(/over the midpoint of the two comps graded clean \(The Ellery and Vue\), \$234k\/unit\. On two comps, no worse than stretched\.$/);
+    expect(two.verdict).toBe("stretched");
+    // Three make a median, and a median can call the basis unsupported.
+    const three = rowOf(
+      buildStressTest(
+        apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit"), comp("Hallam", "$230,000 per unit")], leaseComps: [], redFlags: [], summary: "" } }),
+      ),
+      "basis",
+    );
+    expect(three.verdict).toBe("unsupported");
   });
 
   it("judges the basis on the best kind present: the reader's own past asks never turn a stretched basis into one that holds", () => {
@@ -1095,7 +1140,12 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // The comps' median $232k: the ask 18.3% over it. Recorded sales at
     // $290k would read it under — but the sentence names the comps, so the
     // verdict does too.
-    const comps = { saleComps: [{ name: "The Ellery", detail: "$232,000 per unit", support: "supports" as const, note: "" }], leaseComps: [], redFlags: [], summary: "" };
+    const comps = {
+      saleComps: ["The Ellery", "Vue", "Hallam"].map((name) => ({ name, detail: "$232,000 per unit", support: "supports" as const, note: "" })),
+      leaseComps: [],
+      redFlags: [],
+      summary: "",
+    };
     const recordedSales = { count: 6, medianPerSqft: null, medianPerUnit: 290_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" };
     const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps, recordedSales })), "basis");
     expect(b.gap!.text).toBe("The ask's $275k/unit is 18.3% over the median of the memorandum's sale comps, $232k/unit.");
@@ -1111,5 +1161,127 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(v.evidence.some((e) => /vacancy \(research tracker\)/.test(e.label) && e.kind === "published" && e.scope === "metro")).toBe(true);
     const g = rowOf(officeTest, "rent_growth");
     expect(g.evidence[0]).toMatchObject({ scope: "nation", publisher: "BLS via FRED" });
+  });
+});
+
+// ── The basis agrees with every other surface that speaks to it ──────────
+
+describe("the basis row reads the deal as the card, the comps tick and the brief do", () => {
+  const comps = (detail: string, n = 3, support: "supports" | "favorable" | "stretched" = "supports") => ({
+    saleComps: Array.from({ length: n }, (_, i) => ({ name: `Comp ${i + 1}`, detail, support, note: "" })),
+    leaseComps: [],
+    redFlags: [],
+    summary: "",
+  });
+  const basisOf = (extraction: ExtractionResult, args: Partial<StressTestArgs> = {}) =>
+    buildStressTest({ extraction, challenger: null, market: null, modelVsMarket: null, actuals: null, derived: null, readOn: READ_ON, ...args }).rows.find((r) => r.key === "basis");
+  const deal = (metrics: ReturnType<typeof row>[], extra: Partial<ExtractionResult> = {}): ExtractionResult => ({ ...APARTMENT, metrics, ...extra });
+
+  it("divides a bulk condominium purchase's price by the units offered, as the card's basis does", () => {
+    const condo = deal([row("Asking price", "$12,600,000"), row("Units offered", "42"), row("Units in the condominium", "120"), row("Total units", "120")], { assetClass: "Condominium units" });
+    const b = basisOf(condo, { brokerComps: comps("$290,000 per unit") })!;
+    expect(basisTag(condo, "stabilized", condo.assetClass)).toBe("$300k/unit");
+    expect(b.omSays.text).toBe("$300k/unit (Asking price $12,600,000 over 42 units offered)");
+    expect(b.omSays.value).toBe(300_000);
+    expect(b.verdict).toBe("holds");
+  });
+
+  it("judges a piece per SF where it states no figure on the class's basis and the deal states its area", () => {
+    // The memorandum's comps state $/SF alone: judged per SF, never "no comp".
+    const sfComps = basisOf(APARTMENT, { brokerComps: comps("$250/SF, 5.5% cap") })!;
+    expect(sfComps.omSays.text).toBe("$300/SF (Asking price $42,000,000 over 140,000 SF)");
+    expect(sfComps.evidence[0].text).toMatch(/^3 of 3 state a figure \/SF alone, so they are judged per SF; graded clean/);
+    expect(sfComps.gap!.text).toBe("The ask's $300/SF is 20.0% over the median of the memorandum's sale comps, $250/SF.");
+    expect(sfComps.verdict).toBe("unsupported");
+    // A per-unit set first, the per-SF comps a piece of their own; the OM's
+    // figure on each yardstick, the per-SF piece marked off the shared track.
+    const mixed = {
+      ...comps("$270,000 per unit"),
+      saleComps: [...comps("$270,000 per unit").saleComps, ...comps("$250/SF").saleComps.map((c) => ({ ...c, name: `SF ${c.name}` }))],
+    };
+    const both = basisOf(APARTMENT, { brokerComps: mixed })!;
+    expect(both.evidence.map((e) => e.label)).toEqual(["The memorandum's sale comps", "The memorandum's sale comps stating a price per SF alone"]);
+    expect(both.omSays.text).toBe("$275k/unit, $300/SF (Asking price $42,000,000 over 153 units and over 140,000 SF)");
+    expect(both.gap!.text).toBe("The ask's $275k/unit is 1.7% over the median of the memorandum's sale comps, $270k/unit.");
+    expect(both.evidence[0].ownYardstick).toBeUndefined();
+    expect(both.evidence[1].ownYardstick).toEqual({ om: 300, per: "/SF" });
+    // Recorded sales' $/SF median on an apartment deal, with the count behind it.
+    const recorded = (perSqftCount: number) =>
+      basisOf(APARTMENT, { recordedSales: { count: 12, medianPerSqft: 250, perSqftCount, medianPerUnit: null, providerName: "DC OTR", retrievedAt: "2026-10-01" } })!;
+    expect(recorded(4).evidence[0].text).toBe("median $250/SF over 4 of 12 recorded sales, those that state an area, thin, judged per SF");
+    expect(recorded(4).verdict).toBe("unsupported");
+    // Under three that state an area, no median at all.
+    expect(recorded(2).evidence[0]).toMatchObject({ value: null, text: "12 recorded sales, too few of them stating an area for a median /SF" });
+  });
+
+  it("strikes no basis on a master lease of the building, and drops the comps' tick with it", () => {
+    const master = deal(APARTMENT.metrics, {
+      interest: { kind: "leasehold", summary: "The master lease of the building, sublet to its tenants", share: "", groundLease: "", loan: "", page: "" },
+    } as Partial<ExtractionResult>);
+    const b = basisOf(master, { brokerComps: comps("$300,000 per unit") })!;
+    expect(b.verdict).toBe("unchecked");
+    expect(b.omSays.text).toBe("No basis is struck: the price buys a master lease of the building, sublet to its tenants — the position between two rents, not the building.");
+    expect(subjectBasis(master.metrics, "stabilized", screenYearOf(master), interestOf(master))).toEqual({ perUnit: null, perSf: null });
+    // Its model is a leasehold's, the position's own: the other rows re-run.
+    const derived = deriveUnderwriteInputs(master, "x", undefined, { debtIndex: FIVE });
+    expect(buildStressTest({ extraction: master, challenger: null, market: null, modelVsMarket: null, actuals: null, derived, readOn: READ_ON }).impactsWithheld).toBeNull();
+  });
+
+  it("leaves a basis outside the plausibility band unchecked, with the check's own reason", () => {
+    const b = basisOf(deal([row("Asking price", "$2,000,000"), row("Units", "1,000")]), { brokerComps: comps("$250,000 per unit") })!;
+    expect(b.verdict).toBe("unchecked");
+    expect(b.gap).toBeNull();
+    expect(b.unchecked).toMatch(/^The plausibility check finds the basis outside the band any market trades at: \$2\.0M of price over 1,000 units is \$2k per unit\. No multifamily market trades there\./);
+  });
+
+  it("cites the row whose figure it divides, never a call for offers above it", () => {
+    const b = basisOf(deal([row("Asking price", "Call for offers", "p. 2"), row("Purchase price", "$42,000,000", "p. 9"), row("Units", "153")]), { brokerComps: comps("$250,000 per unit") })!;
+    expect(b.omSays.text).toBe("$275k/unit (Purchase price $42,000,000 over 153 units)");
+    expect(b.omSays.page).toBe(9);
+  });
+
+  it("says the count in the memorandum's own noun, as the card does", () => {
+    const hotel = deal([row("Asking price", "$40,000,000"), row("Rooms", "200")], { assetClass: "hotel" });
+    const b = basisOf(hotel, { storedAssetClass: "hotel", brokerComps: comps("$210,000 per key") })!;
+    expect(basisTag(hotel, "stabilized", "hotel")).toBe("$200k/room");
+    expect(b.omSays.text).toBe("$200k/room (Asking price $40,000,000 over 200 rooms)");
+  });
+
+  it("judges a value-add on its all-in cost, and leaves one with no total cost unchecked", () => {
+    const valueAdd = (metrics: ReturnType<typeof row>[]) =>
+      deal(metrics, { strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" } as ExtractionResult["strategy"] });
+    const priced = basisOf(valueAdd([row("Asking price", "$30,000,000"), row("Units", "200"), row("Renovation budget", "$8,000,000")]), { brokerComps: comps("$195,000 per unit") })!;
+    expect(priced.omSays.text).toBe("$190k/unit all-in (the $38M total cost: Asking price $30,000,000 plus the $8M budget for the plan, over 200 units)");
+    expect(priced.gap!.text).toBe("The all-in cost's $190k/unit is 2.6% under the median of the memorandum's sale comps, $195k/unit — the conservative side.");
+    expect(priced.impact).toBeNull();
+    const noBudget = basisOf(valueAdd([row("Asking price", "$30,000,000"), row("Units", "200")]), { brokerComps: comps("$195,000 per unit") })!;
+    expect(noBudget.verdict).toBe("unchecked");
+    expect(noBudget.unchecked).toBe(
+      "No all-in basis is struck: the memorandum states no budget for the plan beside the price, so no total cost is read, and the price alone, before the plan's cost, is never set against finished buildings' trades.",
+    );
+  });
+
+  it("judges a forward purchase's price as the buyer's whole cost at delivery", () => {
+    const forward = deal([row("Purchase price", "$48,000,000", "p. 2"), row("Total SF", "300,000 SF"), row("NOI (Year 1)", "$2,880,000"), row("Delivery date", "Q3 2027")], {
+      assetClass: "Industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" } as ExtractionResult["strategy"],
+    });
+    const b = basisOf(forward, { storedAssetClass: "industrial", brokerComps: comps("$175/SF") })!;
+    expect(b.omSays.text).toBe("$160/SF (the price, the buyer's whole cost at delivery: Purchase price $48,000,000 over 300,000 SF)");
+    expect(b.gap!.text).toBe("The price's $160/SF is 8.6% under the median of the memorandum's sale comps, $175/SF — the conservative side.");
+    expect(b.verdict).toBe("holds");
+    expect(b.impact).toBeNull();
+  });
+
+  it("says the past screens' median over the screens behind it, from three", () => {
+    const ps = (medianCount: number) => basisOf(APARTMENT, { pastScreens: { count: 7, medianCount, perUnitMedian: 300_000, perSfMedian: null, market: "Washington DC" } })!.evidence[0];
+    expect(ps(3)).toMatchObject({ value: 300_000, text: "median $300k/unit over 3 of 7 screens, each at its memorandum's asking price, never a price anyone paid" });
+    expect(ps(2)).toMatchObject({ value: null, text: "7 screens, 2 with a basis /unit, too few for a median" });
+  });
+
+  it("names past screens withheld by a surface whose words reach someone else", () => {
+    const b = basisOf(APARTMENT, { brokerComps: comps("$270,000 per unit"), pastScreensWithheld: "Withheld here: a reason." })!;
+    expect(b.evidence.at(-1)).toMatchObject({ label: "Other memoranda's asking prices from past screens: withheld", text: "Withheld here: a reason.", value: null });
+    expect(b.verdict).toBe("holds");
   });
 });

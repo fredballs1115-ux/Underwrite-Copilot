@@ -72,10 +72,25 @@ import type { ActualsRead } from "@/lib/actuals/actuals-read";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
-import { assetWords } from "@/lib/asset-words";
+import { assetWords, countNoun } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
-import { findGoingInCap, findMetric, findPriceRow, occupancyRow, parsePct, screenYearOf, unitCountFromMetrics, buildingSfFromMetrics } from "@/lib/criteria";
-import { askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { findGoingInCap, findMetric, occupancyRow, parsePct, planCountRow, screenYearOf, unitCountFromMetrics, unitCountRow, buildingSfFromMetrics } from "@/lib/criteria";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import {
+  askingPriceOf,
+  assessPlausibility,
+  basisOutsideBand,
+  buildingPriceOf,
+  findPricedMetric,
+  inferStrategy,
+  isOutdoorStorageYard,
+  isPlanDeal,
+  noiFigures,
+  notYetDelivered,
+  planSummary,
+  planWithBasisChecked,
+  type DealStrategy,
+} from "@/lib/deal-strategy";
 import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
@@ -86,9 +101,9 @@ import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
 import { readTaxAbatement, taxBillOf } from "@/lib/tax-abatement";
 import { sizeLoan } from "@/lib/tools/deal-math";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
-import { HOLD_MONTHS, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
-import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
+import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
 import {
   STRESS_KEYS,
@@ -129,6 +144,9 @@ export const SAME_SHARE = 0.02;
 export interface RecordedSalesEvidence {
   count: number;
   medianPerSqft: number | null;
+  /** the sales the $/SF median is taken over — those stating an area
+   *  (lib/public-comps `RecordCompsStats.perSqftCount`); absent, all of them */
+  perSqftCount?: number | null;
   medianPerUnit: number | null;
   providerName: string;
   /** the day the records were read, ISO */
@@ -141,6 +159,9 @@ export interface RecordedSalesEvidence {
  *  memorandum's asking price, never a price anyone paid. */
 export interface PastScreensEvidence {
   count: number;
+  /** the screens the median is taken over — those that state a basis
+   *  (lib/market-memory `Stat.n`); absent, all of them */
+  medianCount?: number | null;
   perUnitMedian: number | null;
   perSfMedian: number | null;
   market: string;
@@ -163,6 +184,10 @@ export interface StressTestArgs {
   brokerComps?: BrokerCompsResult | null;
   recordedSales?: RecordedSalesEvidence | null;
   pastScreens?: PastScreensEvidence | null;
+  /** why the reader's past screens are not handed in, where a surface's
+   *  words reach someone other than the reader (the shared screen, the
+   *  verdict's brief): said by name on the basis row, never as none found */
+  pastScreensWithheld?: string | null;
   /** the index the derived model's rate was seeded off (lib/debt-index
    *  `debtSeeds`' tenor, the one handed to `deriveUnderwriteInputs`), with
    *  its own date; absent, the index is read back off the seed's note */
@@ -480,6 +505,7 @@ interface Ctx {
   ex: ExtractionResult | null;
   rows: Row[];
   kind: ReturnType<typeof inferStrategy>["kind"];
+  strategy: DealStrategy;
   plan: boolean;
   assetClass: string | null;
   mvm: ModelVsMarket | null;
@@ -491,6 +517,7 @@ interface Ctx {
   brokerComps: BrokerCompsResult | null;
   recordedSales: RecordedSalesEvidence | null;
   pastScreens: PastScreensEvidence | null;
+  pastScreensWithheld: string | null;
   indexGiven: DebtIndex | null;
   readOn: string;
 }
@@ -1416,159 +1443,383 @@ function insuranceRow(ctx: Ctx): StressRow | null {
 
 // — Basis —
 
+/** A basis is struck per unit (the class's noun) or per foot. */
+type Per = "unit" | "sf";
+
+/** One piece of the basis row's evidence with a figure: its figure, the
+ *  yardstick it states it on, and — for the memorandum's comps — the names
+ *  of the comps graded clean behind it where fewer than three are (no median
+ *  is struck on them). */
+interface BasisComparable {
+  e: StressEvidence;
+  value: number;
+  on: Per;
+  few: { count: 1 | 2; names: string[] } | null;
+}
+
+/** What the comps step's grades mean, as its prompt defines them
+ *  (lib/anthropic/prompts `brokerCompsInstruction`). */
+const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
+  favorable: "favorable by the comps step (it leans the seller's way)",
+  stretched: "stretched by the comps step (it does not support the deal)",
+};
+
 function basisRow(ctx: Ctx): StressRow | null {
-  const screenYear = screenYearOf(ctx.ex);
-  const interest = interestOf(ctx.ex);
-  const basis = subjectBasis(ctx.rows, ctx.kind, screenYear, interest, ctx.ex?.assetClass ?? null);
+  const ex = ctx.ex;
+  const screenYear = screenYearOf(ex);
+  const interest = interestOf(ex);
   const words = assetWords(ctx.assetClass);
-  const per: "unit" | "sf" = words.basis === "sf" || basis.perUnit == null ? "sf" : "unit";
-  const om = per === "unit" ? basis.perUnit : basis.perSf;
-  const noun = words.noun?.one ?? "unit";
-  const perWord = per === "unit" ? `/${noun}` : "/SF";
-  const priceRow = findPriceRow(ctx.rows, ctx.kind, screenYear) as Row | null;
-  const evidence: StressEvidence[] = [];
-  const pick = (c: { perUnit: number | null; perSf: number | null }) => (per === "unit" ? c.perUnit : c.perSf);
-  // The memorandum's own sale comps, each graded by the comps step: the
-  // median is struck only over the comps it graded clean ("supports",
-  // "favorable"), and one it graded "stretched" is named and left out — the
-  // comps step's own word that it does not hold the ask up.
-  const comps = (ctx.brokerComps?.saleComps ?? []).map((c) => ({ comp: c, figure: pick(compFigures(c.detail)) })).filter((c) => c.figure != null);
-  const clean = comps.filter((c) => c.comp.support === "supports" || c.comp.support === "favorable");
-  const left = comps.filter((c) => !clean.includes(c));
-  if (comps.length > 0) {
-    const med = clean.length > 0 ? median(clean.map((c) => c.figure!)) : null;
-    const listed = clean.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord} (${c.comp.support})`).join("; ");
-    const leftOut = left.length > 0 ? `; left out, graded ${joinWords([...new Set(left.map((c) => c.comp.support))])} by the comps step: ${left.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord}`).join("; ")}` : "";
-    evidence.push({
-      kind: "om_internal",
-      label: "The memorandum's sale comps",
-      text:
-        med != null
-          ? `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}: ${listed} — median ${money(med)}${perWord} over the ${clean.length} graded clean${leftOut}`
-          : `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}, none graded clean, so no median is struck${leftOut}`,
-      value: med != null ? Math.round(med) : null,
-      asOf: null,
-      publisher: "the offering memorandum",
-      scope: "deal",
-    });
+  const withheld = basisWithheldOf(ex);
+  // The one price row: the figure divided and the page cited are read off
+  // the same row (the price reader's own, `findPricedMetric`, which
+  // lib/comp-detail's `subjectBasis` divides) — never a "Call for offers"
+  // row cited beside the figure of the row under it.
+  const priceRow = findPricedMetric(ctx.rows, ctx.kind, screenYear) as Row | null;
+  // A bulk condominium purchase's price a unit divides by the units offered
+  // (lib/condo-units), as the card's basis, the comps' tick and the brief do.
+  const unitsOffered = condoUnitsOffered(ex);
+  // A plan deal is judged on its all-in cost (lib/deal-strategy
+  // `planSummary`, held to the plausibility band by `planWithBasisChecked`),
+  // never the shell's price set against finished buildings' trades; a
+  // forward purchase's all-in cost is its price, the buyer's whole cost at
+  // delivery.
+  const plan = ctx.plan ? planWithBasisChecked(ex, ctx.strategy, planSummary(ex, ctx.strategy)) : null;
+  // What one is called: the counting row's own noun (a hotel counting
+  // "Rooms" is per room), as the pipeline card's basis says it.
+  const nounMany = countNoun((plan ? planCountRow(ctx.rows, ctx.kind) : unitCountRow(ctx.rows))?.label, ctx.assetClass);
+  const nounOne = nounMany.replace(/s$/, "");
+  const yard = isOutdoorStorageYard(ex?.assetClass ?? null);
+  const sfCount = yard ? null : buildingSfFromMetrics(ctx.rows);
+  let unitCount: number | null;
+  let omUnit: number | null;
+  let omSf: number | null;
+  if (plan) {
+    unitCount = plan.units;
+    omUnit = plan.basisWithheld ? null : plan.costPerUnit;
+    omSf = plan.basisWithheld || plan.totalCost == null || sfCount == null || !(sfCount > 0) ? null : plan.totalCost / sfCount;
+  } else {
+    const b = subjectBasis(ctx.rows, ctx.kind, screenYear, interest, ex?.assetClass ?? null, unitsOffered);
+    unitCount = unitsOffered != null && unitsOffered > 0 ? unitsOffered : unitCountFromMetrics(ctx.rows);
+    omUnit = b.perUnit;
+    omSf = b.perSf;
   }
-  // Recorded sales from public records, a median only from three sales up
-  // — the comps page's own floor, applied by the caller. Where the count
-  // clears the floor and still no median stands, the count is not why: a
-  // per-unit median is struck on no recorded sales (a record states no
-  // unit count), and a $/SF one only over the sales that state an area.
+  // A basis outside the band any market trades at is a misread, never a
+  // figure to judge (the plausibility check's rule 4, `basisOutsideBand`):
+  // the check's own finding is the row's reason; a yardstick it does not
+  // test is dropped where the band refuses it.
+  const outOfBand = !plan && (omUnit != null || omSf != null) ? (assessPlausibility(ex, ctx.strategy).find((f) => f.code === "basis_out_of_band") ?? null) : null;
+  if (omUnit != null && basisOutsideBand(omUnit, "unit", ctx.assetClass)) omUnit = null;
+  if (omSf != null && basisOutsideBand(omSf, "sf", ctx.assetClass)) omSf = null;
+  const per: Per = words.basis === "sf" || omUnit == null ? "sf" : "unit";
+  const omOn = (on: Per) => (on === "unit" ? omUnit : omSf);
+  const perWordOf = (on: Per) => (on === "unit" ? `/${nounOne}` : "/SF");
+  const perWord = perWordOf(per);
+  const pick = (c: { perUnit: number | null; perSf: number | null }, on: Per) => (on === "unit" ? c.perUnit : c.perSf);
+  // The yardstick a piece is judged on: the class's where the piece states a
+  // figure on it, else per SF where it states that and the subject has a
+  // price a foot (lib/comp-detail `basisTracks`' own rule) — so a per-SF
+  // comp or a per-SF recorded-sales median is never dropped on a deal
+  // priced by the unit.
+  const onFor = (c: { perUnit: number | null; perSf: number | null }): Per | null =>
+    pick(c, per) != null && omOn(per) != null ? per : per === "unit" && c.perSf != null && omSf != null ? "sf" : pick(c, per) != null ? per : null;
+  const evidence: StressEvidence[] = [];
+  const comparables: BasisComparable[] = [];
+  const pushComparable = (e: StressEvidence, on: Per, few: BasisComparable["few"] = null) => {
+    evidence.push(e);
+    if (e.value != null) comparables.push({ e, value: e.value, on, few });
+  };
+
+  // The memorandum's own sale comps, each graded by the comps step: a figure
+  // is struck only over the comps it graded `supports`. One it graded
+  // `favorable` leans the seller's way and one graded `stretched` does not
+  // support the deal: each is named and left out. Three or more clean comps
+  // make a median; one or two are named, never called a median (the
+  // recorded sales' own floor, lib/public-comps `MEDIAN_FLOOR`).
+  const sale = ctx.brokerComps?.saleComps ?? [];
+  type Stating = { comp: (typeof sale)[number]; on: Per; figure: number };
+  const stating: Stating[] = [];
+  for (const comp of sale) {
+    const f = compFigures(comp.detail);
+    const on = onFor(f);
+    const figure = on ? pick(f, on) : null;
+    if (on && figure != null) stating.push({ comp, on, figure });
+  }
+  const groups: Per[] = per === "unit" ? ["unit", "sf"] : ["sf"];
+  for (const on of groups) {
+    const group = stating.filter((c) => c.on === on);
+    if (group.length === 0) continue;
+    const pw = perWordOf(on);
+    const named = (cs: Stating[]) => cs.map((c) => `${c.comp.name} ${money(c.figure)}${pw}`).join("; ");
+    const clean = group.filter((c) => c.comp.support === "supports");
+    const leftOut = (["favorable", "stretched"] as const)
+      .map((grade) => {
+        const cs = group.filter((c) => c.comp.support === grade);
+        return cs.length > 0 ? `; left out, graded ${LEFT_OUT_GRADE[grade]}: ${named(cs)}` : "";
+      })
+      .join("");
+    const figure =
+      clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : clean.length === 2 ? (clean[0].figure + clean[1].figure) / 2 : clean.length === 1 ? clean[0].figure : null;
+    const head =
+      on === per ? `${group.length} of ${sale.length} state a figure ${pw}` : `${group.length} of ${sale.length} state a figure ${pw} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
+    const graded = clean.length > 0 ? `; graded clean (supports): ${named(clean)}` : "";
+    const struck =
+      clean.length >= MEDIAN_FLOOR
+        ? ` — median ${money(figure!)}${pw} over the ${clean.length}`
+        : clean.length === 2
+          ? ` — the two graded clean, midpoint ${money(figure!)}${pw}, too few for a median`
+          : clean.length === 1
+            ? " — the one comp graded clean, too few for a median"
+            : ", none graded clean (supports), so none is set against the ask";
+    pushComparable(
+      {
+        kind: "om_internal",
+        label: on === per || !stating.some((c) => c.on === per) ? "The memorandum's sale comps" : "The memorandum's sale comps stating a price per SF alone",
+        text: `${head}${graded}${struck}${leftOut}`,
+        value: figure != null ? Math.round(figure) : null,
+        asOf: null,
+        publisher: "the offering memorandum",
+        scope: "deal",
+      },
+      on,
+      clean.length === 1 || clean.length === 2 ? { count: clean.length as 1 | 2, names: clean.map((c) => c.comp.name) } : null,
+    );
+  }
+  // Recorded sales from public records, a median only from three sales up —
+  // the comps page's own floor, applied by the caller. A per-unit median is
+  // struck on no recorded sales (a record states no unit count), and a $/SF
+  // one only over the sales that state an area, said with that count
+  // ("over 5 of 12 recorded sales"), "thin" under five (lib/public-comps
+  // `compEvidence`). On a deal priced by the unit, a $/SF median is judged
+  // per SF where the subject has a price a foot.
   const rs = ctx.recordedSales;
   if (rs && rs.count > 0) {
-    const v = per === "unit" ? rs.medianPerUnit : rs.medianPerSqft;
+    const on = onFor({ perUnit: rs.medianPerUnit, perSf: rs.medianPerSqft }) ?? per;
+    const areaCount = rs.perSqftCount ?? rs.count;
+    const v = on === "unit" ? rs.medianPerUnit : areaCount >= MEDIAN_FLOOR ? rs.medianPerSqft : null;
+    const n = on === "unit" ? rs.count : areaCount;
     const sales = `${rs.count} recorded ${rs.count === 1 ? "sale" : "sales"}`;
-    evidence.push({
-      kind: "published",
-      label: `Recorded sales (${rs.providerName})`,
-      text:
-        v != null
-          ? `median ${money(v)}${perWord} over ${rs.count} recorded sales`
-          : rs.count < MEDIAN_FLOOR
-            ? `${sales}, too few for a median ${perWord}`
-            : per === "unit"
-              ? `${sales}; no per-${noun} median is struck on recorded sales`
-              : `${sales}, too few of them stating an area for a median /SF`,
-      value: v != null ? Math.round(v) : null,
-      asOf: rs.retrievedAt,
-      publisher: rs.providerName,
-      scope: "metro",
-      href: rs.href ?? null,
-    });
+    const over = n === rs.count ? `${n} recorded ${n === 1 ? "sale" : "sales"}` : `${n} of ${rs.count} recorded sales, those that state an area`;
+    pushComparable(
+      {
+        kind: "published",
+        label: `Recorded sales (${rs.providerName})`,
+        text:
+          v != null
+            ? `${medianLabel(n)} ${money(v)}${perWordOf(on)} over ${over}${compEvidence(n) === "thin" ? ", thin" : ""}${on !== per ? ", judged per SF" : ""}`
+            : rs.count < MEDIAN_FLOOR
+              ? `${sales}, too few for a median ${perWord}`
+              : on === "unit"
+                ? `${sales}; no per-${nounOne} median is struck on recorded sales`
+                : `${sales}, too few of them stating an area for a median /SF`,
+        value: v != null ? Math.round(v) : null,
+        asOf: rs.retrievedAt,
+        publisher: rs.providerName,
+        scope: "metro",
+        href: rs.href ?? null,
+      },
+      on,
+    );
   }
   // The reader's own past screens, each at its ask: other memoranda's
   // asking prices in the same market — asks, not trades, and nobody's
   // publication — so filed as a rule of thumb under the reader's own name,
-  // never a published figure. (The class's price band, which the
-  // plausibility check holds a misread to, is no pricing evidence and is
-  // not read here.)
+  // never a published figure. A median only from three screens that state a
+  // basis (`medianCount`), said with that count. (The class's price band,
+  // which the plausibility check holds a misread to, is no pricing evidence
+  // and is not read here.)
   const ps = ctx.pastScreens;
   if (ps && ps.count > 0) {
-    const v = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
+    const n = ps.medianCount ?? ps.count;
+    const raw = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
+    const v = n >= MEDIAN_FLOOR ? raw : null;
+    const of = n === ps.count ? `${n}` : `${n} of ${ps.count}`;
+    pushComparable(
+      {
+        kind: "rule_of_thumb",
+        label: `Other memoranda's asking prices in ${ps.market} (your past screens): asks, not trades`,
+        text:
+          v != null
+            ? `median ${money(v)}${perWord} over ${of} screens, each at its memorandum's asking price, never a price anyone paid`
+            : raw != null
+              ? `${ps.count} screens, ${n} with a basis ${perWord}, too few for a median`
+              : `${ps.count} screens, none with a basis ${perWord}`,
+        value: v != null ? Math.round(v) : null,
+        asOf: null,
+        publisher: "your past screens",
+        scope: "metro",
+      },
+      per,
+    );
+  }
+  // A surface whose words reach someone other than the reader (the shared
+  // screen, the verdict's brief) is handed no past screens: they are the
+  // reader's own other deals. Said by name, never as none found.
+  const psWithheld = ctx.pastScreensWithheld?.trim() || null;
+
+  // A price that buys no building keeps its row, to say why no basis is
+  // struck; so does a plan deal whose all-in cost cannot be struck, and a
+  // basis the plausibility check calls misread. Anything else with nothing
+  // stated and nothing found is left out.
+  const planWhy = plan && omUnit == null && omSf == null && !withheld ? planBasisWhy(plan, priceRow, nounOne) : null;
+  const om = omOn(per);
+  if (om == null && evidence.length === 0 && !withheld && !planWhy && !outOfBand) return null;
+  if (psWithheld) {
     evidence.push({
       kind: "rule_of_thumb",
-      label: `Other memoranda's asking prices in ${ps.market} (your past screens): asks, not trades`,
-      text: v != null ? `median ${money(v)}${perWord} over ${ps.count} screens, each at its memorandum's asking price, never a price anyone paid` : `${ps.count} screens, none with a basis ${perWord}`,
-      value: v != null ? Math.round(v) : null,
+      label: "Other memoranda's asking prices from past screens: withheld",
+      text: psWithheld,
+      value: null,
       asOf: null,
-      publisher: "your past screens",
+      publisher: "past screens",
       scope: "metro",
     });
   }
-  const withheld = basisWithheldOf(ctx.ex);
-  // A price that buys no building keeps its row, to say why no basis is
-  // struck; anything else with nothing stated and nothing found is left out.
-  if (om == null && evidence.length === 0 && !withheld) return null;
   // The basis is the whole building's: on a share, the whole its price
   // implies (lib/comp-detail's own rule), said so rather than the share's
   // price over every unit.
-  const whole = interest.sharePct != null ? buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex)) : null;
-  // The count the basis divides by, where the memorandum states one; never
-  // a "?" in its place.
-  const count = per === "unit" ? unitCountFromMetrics(ctx.rows) : buildingSfFromMetrics(ctx.rows);
-  const over = count == null ? "" : per === "unit" ? ` over ${count.toLocaleString("en-US")} ${words.noun?.many ?? "units"}` : ` over ${count.toLocaleString("en-US")} SF`;
-  const priced = priceRow
-    ? whole != null
-      ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}${over ? `,${over}` : ""})`
-      : ` (${priceRow.label} ${priceRow.value}${over})`
-    : "";
+  const whole = interest.sharePct != null ? buildingPriceOf(ex, askingPriceOf(ex)) : null;
+  const offered = unitsOffered != null && unitsOffered > 0 ? " offered" : "";
+  const plannedWord = plan && notYetDelivered(ctx.kind) ? " planned" : "";
+  const overOn = (on: Per) =>
+    on === "unit"
+      ? unitCount == null
+        ? ""
+        : `over ${unitCount.toLocaleString("en-US")}${plannedWord} ${unitCount === 1 ? nounOne : nounMany}${offered}`
+      : sfCount == null
+        ? ""
+        : `over ${sfCount.toLocaleString("en-US")} SF`;
+  // The yardstick the verdict is struck on: the first comparable's, the
+  // best kind present (below); the OM's figure on the other yardstick rides
+  // beside it where a piece is judged on that one.
+  const asks = comparables.filter((c) => c.e.publisher === "your past screens");
+  const judgedOn = comparables.length > asks.length ? comparables.filter((c) => !asks.includes(c)) : asks;
+  const lead: Per = judgedOn[0]?.on ?? per;
+  const other: Per | null = judgedOn.some((c) => c.on !== lead) ? (lead === "unit" ? "sf" : "unit") : null;
+  const omLead = omOn(lead);
+  const omText = (on: Per) => `${money(omOn(on)!)}${perWordOf(on)}`;
+  const overs = [lead, ...(other ? [other] : [])].map(overOn).filter(Boolean);
+  const over = overs.length ? ` ${overs.join(" and ")}` : "";
+  const priced = !priceRow
+    ? ""
+    : plan?.forward
+      ? ` (the price, the buyer's whole cost at delivery: ${priceRow.label} ${priceRow.value}${over})`
+      : plan && plan.totalCost != null
+        ? ` (the ${money(plan.totalCost)} total cost: ${priceRow.label} ${priceRow.value}${plan.budget && !plan.budget.isTotal ? ` plus the ${money(plan.budget.budget)} budget for the plan` : ""}${over ? `,${over}` : ""})`
+        : whole != null
+          ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}${over ? `,${over}` : ""})`
+          : ` (${priceRow.label} ${priceRow.value}${over})`;
+  const allIn = plan && !plan.forward ? " all-in" : "";
   const omSays: StressRow["omSays"] =
-    om != null
-      ? { text: `${money(om)}${perWord}${priced}`, value: om, page: pageOf(priceRow, ctx.ex) }
-      : { text: withheld ? `No basis is struck: ${withheld.why}.` : ctx.kind === "conversion" || ctx.kind === "development" ? "No price basis on a plan deal: the basis is the all-in cost." : NO_FIGURE(`price ${perWord}`), value: null, page: pageOf(priceRow, ctx.ex) };
-  if (om == null) return unchecked("basis", omSays, evidence, omSays.text);
+    omLead != null
+      ? { text: `${omText(lead)}${allIn}${other && omOn(other) != null ? `, ${omText(other)}${allIn}` : ""}${priced}`, value: omLead, page: pageOf(priceRow, ex) }
+      : {
+          text: withheld ? `No basis is struck: ${withheld.why}.` : outOfBand ? `${outOfBand.title}.` : (planWhy ?? NO_FIGURE(`price ${perWord}`)),
+          value: null,
+          page: pageOf(priceRow, ex),
+        };
+  if (withheld) return unchecked("basis", omSays, evidence, omSays.text);
+  if (outOfBand) return unchecked("basis", omSays, evidence, `The plausibility check finds the basis outside the band any market trades at: ${outOfBand.title}. ${outOfBand.detail}`);
+  if (omLead == null) return unchecked("basis", omSays, evidence, planWhy ?? omSays.text);
   // The verdict is struck on the best kind of evidence present: the
   // memorandum's graded comps and the recorded sales before the reader's
   // own past asking prices, which decide only where nothing else carries a
   // figure — another memorandum's ask never turns a stretched basis into
   // one that holds.
-  const withFigure = evidence.filter((e) => e.value != null);
-  const asks = withFigure.filter((e) => e.publisher === "your past screens");
-  const comparables = withFigure.length > asks.length ? withFigure.filter((e) => !asks.includes(e)) : asks;
-  if (comparables.length === 0) return unchecked("basis", omSays, evidence, "No comp with a figure could be read for this deal.");
-  const compared = indexesOf(evidence, (e) => comparables.includes(e));
-  const best = comparables[0];
-  // "the median of …": every basis comparable is a median, and its label is
-  // a phrase no possessive fits ("Recorded sales (Philadelphia OPA)").
-  const ofBest = `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.label)}, ${money(best.value!)}${perWord}`;
-  const judged = judge(om, comparables.map((e) => e.value!), "high", "pct", BASIS_UNSUPPORTED_PCT, 0, (gap) =>
-    Math.abs(gap) / best.value! < 0.005
-      ? `The ask's ${money(om)}${perWord} is at ${ofBest}.`
-      : gap > 0
-        ? `The ask's ${money(om)}${perWord} is ${pct1((gap / best.value!) * 100)} over ${ofBest}.`
-        : `The ask's ${money(om)}${perWord} is ${pct1((-gap / best.value!) * 100)} under ${ofBest} — the conservative side.`,
-  );
+  if (judgedOn.length === 0) {
+    return unchecked(
+      "basis",
+      omSays,
+      evidence,
+      evidence.some((e) => e.publisher !== "past screens") ? "No evidence above carries a figure the ask can be set against." : "No comp with a figure could be read for this deal.",
+    );
+  }
+  const compared = indexesOf(evidence, (e) => judgedOn.some((c) => c.e === e));
+  const best = judgedOn[0];
+  const bestOm = omOn(best.on)!;
+  const pw = perWordOf(best.on);
+  // "the median of …": every basis comparable with three figures behind it
+  // is a median, and its label is a phrase no possessive fits ("Recorded
+  // sales (Philadelphia OPA)"); one or two comps graded clean are named.
+  const ofBest = best.few
+    ? best.few.count === 1
+      ? `the one comp graded clean, ${best.few.names[0]}, ${money(best.value)}${pw}`
+      : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")}), ${money(best.value)}${pw}`
+    : `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.e.label)}, ${money(best.value)}${pw}`;
+  const subject = plan ? (plan.forward ? "The price's" : "The all-in cost's") : "The ask's";
   // The verdict is read in percent of the best figure, so the gap's unit is
-  // a share, not a dollar: struck again here on the best figure.
-  const sharePct = ((om - best.value!) / best.value!) * 100;
-  // The verdict, the sentence and the re-run are all against the one best
-  // median, so the row never prints "18% over" beside "Holds".
-  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
-  const gap = { value: Math.round(sharePct * 10) / 10, unit: "pct" as const, text: judged.gap.text };
-  const evidenceIndex = evidence.indexOf(best);
+  // a share, not a dollar. The verdict, the sentence and the re-run are all
+  // against the one best figure, so the row never prints "18% over" beside
+  // "Holds".
+  const sharePct = ((bestOm - best.value) / best.value) * 100;
+  const gapText =
+    Math.abs(sharePct) < 0.5
+      ? `${subject} ${money(bestOm)}${pw} is at ${ofBest}.`
+      : sharePct > 0
+        ? `${subject} ${money(bestOm)}${pw} is ${pct1(sharePct)} over ${ofBest}.`
+        : `${subject} ${money(bestOm)}${pw} is ${pct1(-sharePct)} under ${ofBest} — the conservative side.`;
+  let verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  // One or two comps are sightings, not a market: they can stretch a basis,
+  // never call it unsupported.
+  const capped = verdict === "unsupported" && best.few != null;
+  if (capped) verdict = "stretched";
+  const gap = {
+    value: Math.round(sharePct * 10) / 10,
+    unit: "pct" as const,
+    text: capped ? `${gapText} On ${best.few!.count === 1 ? "one comp" : "two comps"}, no worse than stretched.` : gapText,
+  };
+  const evidenceIndex = evidence.indexOf(best.e);
   // The price is a direct input: re-run at the evidence's basis — only
   // where the model's price is the building's own as stated (not a share
-  // grossed up, not a placeholder).
+  // grossed up, not a placeholder; a plan deal re-runs nothing). The ratio
+  // is the same on either yardstick.
   let impact: StressImpact | null = null;
-  if (ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
+  if (!plan && ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
     const price = ctx.derived.inputs.purchasePrice;
-    const altPrice = (price * best.value!) / om;
-    // Whose median the alternative is — the memorandum's comps', the
+    const altPrice = (price * best.value) / bestOm;
+    // Whose figure the alternative is — the memorandum's comps', the
     // recorded sales' or the reader's past screens' — and that the model's
     // loan is a share of the price, so it re-sizes with it.
-    const median = best.kind === "om_internal" ? "the memorandum's sale comps' median" : best.label.startsWith("Recorded sales") ? `the recorded sales' median (${best.publisher})` : "the median of your past screens' asking prices";
+    const whose =
+      best.e.kind === "om_internal"
+        ? best.few
+          ? best.few.count === 1
+            ? `the one comp graded clean (${best.few.names[0]})`
+            : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")})`
+          : "the memorandum's sale comps' median"
+        : best.e.label.startsWith("Recorded sales")
+          ? `the recorded sales' median (${best.e.publisher})`
+          : "the median of your past screens' asking prices";
     impact = runImpact("purchasePrice", ctx.derived.inputs, { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, price, {
       what: "the price",
-      om: `${money(price)} (${money(om)}${perWord})`,
-      alt: `${median}, ${money(altPrice)} (${money(best.value!)}${perWord}), at the model's loan-to-cost (the loan re-sizes with the price)`,
+      om: `${money(price)} (${money(bestOm)}${pw})`,
+      alt: `${whose}, ${money(altPrice)} (${money(best.value)}${pw}), at the model's loan-to-cost (the loan re-sizes with the price)`,
       evidence: "",
       model: money(price),
     });
   }
-  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(comparables === asks ? { ruleOfThumbOnly: true } : {}) };
+  // A piece on the other yardstick carries the OM's own figure on it, and is
+  // drawn on no track shared with the OM's figure.
+  for (const c of comparables) {
+    if (c.on !== best.on && omOn(c.on) != null) c.e.ownYardstick = { om: omOn(c.on)!, per: perWordOf(c.on) };
+  }
+  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(judgedOn === asks ? { ruleOfThumbOnly: true } : {}) };
+}
+
+/** Why a plan deal's all-in basis cannot be struck, in one sentence: the
+ *  plan's own words where it says why, else what the memorandum does not
+ *  state — never the price alone set against finished buildings' trades. */
+function planBasisWhy(plan: NonNullable<ReturnType<typeof planSummary>>, priceRow: Row | null, nounOne: string): string {
+  if (plan.basisWithheld) return plan.basisWithheld;
+  if (plan.costPerUnitWithheld) return plan.costPerUnitWithheld;
+  if (plan.costWithheld) return plan.costWithheld;
+  if (plan.priceWithheld) return `No all-in basis is struck: the price is ${plan.priceWithheld}.`;
+  if (plan.forward) return priceRow ? `No basis is struck: the memorandum states no count of what the price buys at delivery to set it per ${nounOne}.` : NO_FIGURE("price");
+  if (plan.totalCost == null) {
+    return priceRow
+      ? "No all-in basis is struck: the memorandum states no budget for the plan beside the price, so no total cost is read, and the price alone, before the plan's cost, is never set against finished buildings' trades."
+      : NO_FIGURE("price or total cost");
+  }
+  return `No all-in basis is struck: the memorandum states no count to set the ${money(plan.totalCost)} total cost per ${nounOne}.`;
 }
 
 function median(nums: number[]): number {
@@ -1726,13 +1977,16 @@ export function buildStressTest(args: StressTestArgs): StressTest {
         ? `No return is re-run: ${lowerFirst(readsWithheld.trim())}${/[.!?]$/.test(readsWithheld.trim()) ? "" : "."}`
         : plan
           ? PLAN_REASON
-          : withheld
+          : // A master lease's basis is withheld, but its model is the
+            // position's own, run as a leasehold's is: its other rows re-run.
+            withheld && withheld.word !== MASTER_LEASE_WORD
             ? `No return is re-run: ${withheld.why}.`
             : null;
   const ctx: Ctx = {
     ex,
     rows: rowsOf(ex),
     kind: strategy.kind,
+    strategy,
     plan,
     assetClass: shownAssetClass(args.storedAssetClass ?? null, ex) || null,
     mvm: args.modelVsMarket,
@@ -1743,6 +1997,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     brokerComps: args.brokerComps ?? null,
     recordedSales: args.recordedSales ?? null,
     pastScreens: args.pastScreens ?? null,
+    pastScreensWithheld: args.pastScreensWithheld ?? null,
     indexGiven: args.indexGiven ?? null,
     readOn: args.readOn,
   };

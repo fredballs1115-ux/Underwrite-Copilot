@@ -1541,10 +1541,10 @@ describe("the memo leads with the stress test", () => {
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.3% by count, one input apart.
     expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.3% (the deal's rent roll, May 31, 2026) · gap 3.3 pts · IRR 12.4% to 9.1%");
-    // The basis row: the ask against the median of the comps the comps step
-    // graded clean, and the engine's move, spelled, since standard
-    // Helvetica has no arrow.
-    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $257k/unit (the offering memorandum) · gap 6.9% · IRR 9.3% to 12.7%");
+    // The basis row: the ask against the one comp the comps step graded
+    // supports (Parkside leans the seller's way, and is left out), and the
+    // engine's move, spelled, since standard Helvetica has no arrow.
+    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the offering memorandum) · gap 8.8% · IRR 9.3% to 13.6%");
     expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the

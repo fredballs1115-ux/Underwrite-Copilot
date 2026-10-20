@@ -213,7 +213,9 @@ function trackScale(row: StressRow): ((v: number) => string) | null {
   if (om == null) return null;
   const points: number[] = [om];
   for (const e of row.evidence) {
-    if (e.value == null) continue;
+    // A piece on another yardstick (a basis per SF beside the OM's per
+    // unit) shares no track with the OM's figure.
+    if (e.value == null || e.ownYardstick) continue;
     const moe = marginOf(e);
     points.push(e.value);
     if (moe != null) points.push(e.value - moe, e.value + moe);
@@ -286,7 +288,7 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
       </div>
       <div className="relative mt-1 h-2 rounded-full bg-faint" aria-hidden>
         {row.evidence.map((e, i) => {
-          if (e.value == null) return null;
+          if (e.value == null || e.ownYardstick) return null;
           const moe = marginOf(e);
           if (e.kind === "rule_of_thumb") {
             return <Tick key={i} at={at(e.value)} bar="stress-evidence" tone={KIND.rule_of_thumb.mark} dashed track="secondary" />;
@@ -610,7 +612,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         : { border: "border-line border-l-brand bg-surface", head: "text-brand" };
   const published = test.rows.some((r) => r.evidence.some((e) => e.kind === "published"));
   const kindsShown = new Set<EvidenceKind>();
-  for (const r of test.rows) for (const e of r.evidence) if (e.value != null && trackScale(r)) kindsShown.add(e.kind);
+  for (const r of test.rows) for (const e of r.evidence) if (e.value != null && !e.ownYardstick && trackScale(r)) kindsShown.add(e.kind);
 
   return (
     <section

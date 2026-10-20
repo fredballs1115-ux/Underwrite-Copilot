@@ -44,8 +44,9 @@ describe("the sample's stress test", () => {
   });
 
   it("re-runs the engine one input apart on every row whose figure is a model input", () => {
-    // At the median of the two comps the comps step graded clean, $257k.
-    expect(irr("basis")).toEqual([9.3, 12.7]);
+    // At the one comp the comps step graded supports, The Brixton's $252k:
+    // Parkside, graded favorable, leans the seller's way and is left out.
+    expect(irr("basis")).toEqual([9.3, 13.6]);
     expect(irr("exit_cap")).toEqual([10.8, 9.3]);
     expect(irr("noi")).toEqual([11.7, 9.3]);
     // At the rent roll's 9.3% by count (225 of 248 doors).

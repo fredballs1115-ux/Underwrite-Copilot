@@ -567,7 +567,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
     expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.1%/);
     expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
-    expect(brief).toContain("the levered IRR moves from 9.3% to 12.7%");
+    expect(brief).toContain("the levered IRR moves from 9.3% to 13.6%");
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
     expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");
     // The instruction: the moves are the engine's, cited by figure and date.

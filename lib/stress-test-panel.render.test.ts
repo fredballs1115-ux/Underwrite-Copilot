@@ -372,6 +372,36 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(taxes).not.toContain('data-qa="stress-impact"');
   });
 
+  it("draws a basis piece judged on its own yardstick in the list, never on the track shared with the OM's per-unit figure", () => {
+    const basis: StressRow = {
+      key: "basis",
+      title: "Basis",
+      omSays: { text: "$275k/unit, $300/SF (Asking price $42,000,000 over 153 units and over 140,000 SF)", value: 274_510, page: 5 },
+      evidence: [
+        { kind: "om_internal", label: "The memorandum's sale comps", text: "3 of 6 state a figure /unit — median $270k/unit over the 3", value: 270_000, asOf: null, publisher: "the offering memorandum", scope: "deal" },
+        {
+          kind: "om_internal",
+          label: "The memorandum's sale comps stating a price per SF alone",
+          text: "3 of 6 state a figure /SF alone, so they are judged per SF — median $250/SF over the 3",
+          value: 250,
+          asOf: null,
+          publisher: "the offering memorandum",
+          scope: "deal",
+          ownYardstick: { om: 300, per: "/SF" },
+        },
+      ],
+      gap: { value: 1.7, unit: "pct", text: "The ask's $275k/unit is 1.7% over the median of the memorandum's sale comps, $270k/unit." },
+      verdict: "holds",
+      impact: null,
+      challenge: null,
+      method: "The OM's basis against the memorandum's sale comps, then the memorandum's sale comps stating a price per SF alone.",
+    };
+    const out = render({ rows: [basis], readOn: "2026-09-21", publishedRead: false, impactsWithheld: null });
+    // One evidence mark on the track — the per-unit median — and both pieces listed.
+    expect(out.match(/data-bar="stress-evidence"/g)).toHaveLength(1);
+    expect(visibleText(out)).toContain("median $250/SF over the 3");
+  });
+
   it("draws a row held to a rule of thumb alone muted, never a green Holds, its word kept", () => {
     const thumb: StressRow = { ...TAXES, ruleOfThumbOnly: true };
     const s = render({ rows: [thumb], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
