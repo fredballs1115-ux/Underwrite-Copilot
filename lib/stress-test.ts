@@ -1244,20 +1244,32 @@ function taxesRow(ctx: Ctx): StressRow | null {
   }
   const best = comparables[0];
   const share = (best.value! - bill) / Math.abs(best.value!);
-  const verdict: StressVerdict = share <= SAME_SHARE ? "holds" : share > TAX_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
   // Both figures are the OM's: the bill against the reset its own figures
   // imply, or the abated bill against the unabated one it states.
   const abated = best.label.startsWith("The stated tax abatement");
-  const itsOwn = abated ? "it states as the unabated bill" : "its own figures imply";
+  // Whether a sale resets the assessment is the jurisdiction's to say, and
+  // the code asserts none: the reset bill is a CONDITIONAL re-strike of the
+  // OM's own figures, never an observed bill, so it reads stretched at most
+  // and every sentence says the condition. A stated unabated bill the
+  // abatement ends into inside the hold is no condition, and may read
+  // unsupported.
+  const graded: StressVerdict = share <= SAME_SHARE ? "holds" : share > TAX_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  const verdict: StressVerdict = !abated && graded === "unsupported" ? "stretched" : graded;
+  const ifReset = "if the sale resets the assessment to the price";
   const gap: StressRow["gap"] = {
     value: Math.round(best.value! - bill),
     unit: "usd",
-    text:
-      Math.abs(share) <= SAME_SHARE
-        ? `The OM's ${money(bill)} is at the ${money(best.value!)} ${itsOwn}.`
+    text: abated
+      ? Math.abs(share) <= SAME_SHARE
+        ? `The OM's ${money(bill)} is at the ${money(best.value!)} it states as the unabated bill.`
         : share > 0
-          ? `The OM's ${money(bill)} is ${money(best.value! - bill)} (${pct1(share * 100)}) under the ${money(best.value!)} ${itsOwn}.`
-          : `The OM's ${money(bill)} is over the ${money(best.value!)} ${itsOwn} — the conservative side.`,
+          ? `The OM's ${money(bill)} is ${money(best.value! - bill)} (${pct1(share * 100)}) under the ${money(best.value!)} it states as the unabated bill.`
+          : `The OM's ${money(bill)} is over the ${money(best.value!)} it states as the unabated bill — the conservative side.`
+      : Math.abs(share) <= SAME_SHARE
+        ? `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, at the OM's ${money(bill)} line.`
+        : share > 0
+          ? `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, ${money(best.value! - bill)} (${pct1(share * 100)}) over the OM's ${money(bill)} line — whether it does is the jurisdiction's to say.`
+          : `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, under the OM's ${money(bill)} line — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
   const impact =
@@ -1268,7 +1280,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
           evidenceIndex,
           abated
             ? { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: "the unabated bill", omSide: "the abated" }
-            : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} its own figures imply on the price`, evidence: "" },
+            : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} bill ${ifReset}`, evidence: "" },
         )
       : null;
   return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence, compared) };

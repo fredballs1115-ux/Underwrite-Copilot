@@ -266,10 +266,14 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(t.evidence[0]).toMatchObject({ kind: "om_internal", label: "The bill the OM's own figures imply on the price", value: 532_000, scope: "deal" });
     expect(t.evidence[1]).toMatchObject({ kind: "document", label: "The deal's T-12 tax line", value: 380_000 });
     expect(t.gap).toMatchObject({ value: 152_000, unit: "usd" });
-    expect(t.verdict).toBe("unsupported");
+    // Whether the sale resets the assessment is the jurisdiction's: the
+    // reset bill is a conditional re-strike of the OM's own figures, so 28.6%
+    // under it reads stretched at most, and every sentence says the condition.
+    expect(t.verdict).toBe("stretched");
+    expect(t.gap!.text).toBe("If the sale resets the assessment to the price, the bill is $532k, $152k (28.6%) over the OM's $380k line — whether it does is the jurisdiction's to say.");
     expect(t.impact!.input).toBe("expenseLines");
     expect(t.impact!.altIrrPct!).toBeLessThan(t.impact!.baseIrrPct!);
-    expect(t.impact!.note).toMatch(/^If the tax line is the \$532k its own figures imply on the price, not the OM's \$380k, the levered IRR moves from/);
+    expect(t.impact!.note).toMatch(/^If the tax line is the \$532k bill if the sale resets the assessment to the price, not the OM's \$380k, the levered IRR moves from/);
     const i = rowOf(test, "insurance");
     expect(i.omSays.value).toBe(120_000);
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
