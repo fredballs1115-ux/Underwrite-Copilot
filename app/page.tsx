@@ -136,7 +136,7 @@ const RECONCILE_ICON = (
 // tasks).
 const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
-    label: "OM + rent roll + T-12: actuals beat pro forma",
+    label: "OM + rent roll + T‑12: actuals beat pro forma",
     href: "/demo",
     icon: (
       <Icon>
@@ -1275,7 +1275,6 @@ export default function Home() {
                 >
                   Start with Pro
                 </Link>
-                <p className="mt-2.5 text-center text-xs text-muted">Cancel anytime — your deals and exports stay yours.</p>
               </div>
 
               {/* Team */}
@@ -1314,7 +1313,7 @@ export default function Home() {
             </div>
           </Reveal>
           <p className="mt-5 text-center text-xs text-muted">
-            Billed monthly through Stripe · cancel anytime · no card required for Free.
+            Billed monthly through Stripe · cancel anytime, and your deals and exports stay yours · no card required for Free.
           </p>
           {/* How the OM is handled, beside the price — each tile opens the
               security page, which states it in full. */}
