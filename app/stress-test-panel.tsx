@@ -110,18 +110,22 @@ export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
   return rows.map((r, i) => ({ r, i })).sort((a, b) => VERDICT[a.r.verdict].rank - VERDICT[b.r.verdict].rank || a.i - b.i).map((x) => x.r);
 }
 
-/** "9 assumptions tested: 1 unsupported, 2 stretched, 1 holds, 5 unchecked" */
+/** "9 assumptions read: 4 tested (1 unsupported, 2 stretched, 1 holds), 5
+ *  unchecked" — an unchecked row was read and not tested, so it is never
+ *  counted among the tested. */
 export function stressReadLine(rows: readonly StressRow[]): string {
   const n = (v: StressVerdict) => rows.filter((r) => r.verdict === v).length;
   const parts: [number, string][] = [
     [n("unsupported"), "unsupported"],
     [n("stretched"), "stretched"],
     [n("holds"), n("holds") === 1 ? "holds" : "hold"],
-    [n("unchecked"), "unchecked"],
   ];
   const said = parts.filter(([c]) => c > 0);
-  const tested = rows.length;
-  return `${tested} assumption${tested === 1 ? "" : "s"} tested: ${said.map(([c, w]) => `${c} ${w}`).join(", ")}`;
+  const tested = rows.length - n("unchecked");
+  const read = rows.length;
+  const head = `${read} assumption${read === 1 ? "" : "s"} read`;
+  const testedPart = tested > 0 ? `${tested} tested (${said.map(([c, w]) => `${c} ${w}`).join(", ")})` : "none tested";
+  return `${head}: ${testedPart}${n("unchecked") > 0 ? `, ${n("unchecked")} unchecked` : ""}`;
 }
 
 /** What each key is called in the unchecked line, mid-sentence. */

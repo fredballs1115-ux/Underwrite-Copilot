@@ -196,9 +196,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
 
   it("heads with the count and leads most severe first: unsupported, stretched, holds, unchecked", () => {
     expect(html).toContain('<h2 class="text-[11px] font-semibold uppercase tracking-wider text-kill">The OM&#x27;s assumptions, tested</h2>');
-    expect(text).toContain("5 assumptions tested: 1 unsupported, 1 stretched, 1 holds, 2 unchecked");
-    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions tested: 2 hold");
-    expect(stressReadLine([GROWTH])).toBe("1 assumption tested: 1 unchecked");
+    expect(text).toContain("5 assumptions read: 3 tested (1 unsupported, 1 stretched, 1 holds), 2 unchecked");
+    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions read: 2 tested (2 hold)");
+    expect(stressReadLine([GROWTH])).toBe("1 assumption read: none tested, 1 unchecked");
     expect(sortStressRows(TEST.rows).map((r) => r.key)).toEqual(["vacancy", "exit_cap", "taxes", "rent_growth", "other"]);
     const verdicts = [...html.matchAll(/data-verdict="([a-z]+)"/g)].map((m) => m[1]);
     expect(verdicts).toEqual(["unsupported", "stretched", "holds", "unchecked", "unchecked"]);
@@ -213,7 +213,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const group = html.slice(html.indexOf('data-qa="stress-unchecked-group"'), html.indexOf('data-qa="stress-key"'));
     const g = visibleText(group).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // The read line at the top is unchanged: it still counts the unchecked.
-    expect(text).toContain("5 assumptions tested: 1 unsupported, 1 stretched, 1 holds, 2 unchecked");
+    expect(text).toContain("5 assumptions read: 3 tested (1 unsupported, 1 stretched, 1 holds), 2 unchecked");
     expect(g).toContain("2 assumptions unchecked: rent growth, the broker's narrative on the submarket");
     expect(uncheckedLine([GROWTH])).toBe("1 assumption unchecked: rent growth");
     // The fold is PanelFold's own shape: the control a thumb's height on a

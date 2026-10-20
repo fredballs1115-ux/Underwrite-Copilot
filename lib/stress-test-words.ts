@@ -52,21 +52,26 @@ export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
 }
 
 /**
- * The read line over the rows: "9 assumptions tested in code — 1
- * unsupported, 2 stretched, 1 holds, 5 unchecked; the levered return
- * re-run with one input swapped for the evidence's." Where no return was
- * re-run, why.
+ * The read line over the rows: "9 of the memorandum's assumptions read in
+ * code — 4 tested (1 unsupported, 2 stretched, 1 holds), 5 unchecked; the
+ * levered return re-run with one input swapped for the evidence's." An
+ * unchecked row was read and not tested, so it is never counted among the
+ * tested. Where no return was re-run, why.
  */
 export function stressReadLine(test: StressTest): string {
   const c = verdictCounts(test);
   const n = test.rows.length;
+  const tested = n - c.unchecked;
   const parts = [
     c.unsupported ? `${c.unsupported} unsupported` : "",
     c.stretched ? `${c.stretched} stretched` : "",
     c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
-    c.unchecked ? `${c.unchecked} unchecked` : "",
   ].filter(Boolean);
-  const head = n === 0 ? "No assumption of the memorandum's could be tested in code." : `${n} ${n === 1 ? "assumption" : "assumptions"} of the memorandum's tested in code — ${parts.join(", ")}`;
+  const testedPart = tested > 0 ? `${tested} tested (${parts.join(", ")})` : "none tested";
+  const head =
+    n === 0
+      ? "No assumption of the memorandum's could be tested in code."
+      : `${n} of the memorandum's assumptions read in code — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
   const tail = test.impactsWithheld
     ? `. No return is re-run: ${lowerFirst(test.impactsWithheld)}`
     : n === 0

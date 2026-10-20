@@ -1534,7 +1534,7 @@ describe("the memo leads with the stress test", () => {
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("9 assumptions of the memorandum's tested in code — 4 unsupported, 2 stretched, 1 holds, 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (4 unsupported, 2 stretched, 1 holds), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.1%, one input apart.
@@ -1592,7 +1592,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest?.count).toBe("none past the evidence");
     expect(data.dealKillers.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text).toContain("9 assumptions of the memorandum's tested in code — 9 hold;");
+    expect(text).toContain("9 of the memorandum's assumptions read in code — 9 tested (9 hold);");
     expect(text).not.toContain("Ticks:");
   }, 60000);
 
