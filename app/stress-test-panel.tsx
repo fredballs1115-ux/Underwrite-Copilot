@@ -41,7 +41,7 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  * the evidence's figure", never "9.3% → 9.3%".
  *
  * THE UNCHECKED ROWS are one folded group at the end: a summary line
- * naming them ("5 assumptions unchecked: debt, rent growth, …") and a fold
+ * naming them ("5 could not be checked: debt, rent growth, …") and a fold
  * ("Read why (5)") whose body lists each in two lines — the title with the
  * OM's figure and its page chip, then why it stands unchecked — with the
  * challenger's words folded where there are any and the method link. Drawn
@@ -111,9 +111,9 @@ export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
   return rows.map((r, i) => ({ r, i })).sort((a, b) => VERDICT[a.r.verdict].rank - VERDICT[b.r.verdict].rank || a.i - b.i).map((x) => x.r);
 }
 
-/** "9 assumptions read: 4 tested (1 unsupported, 2 stretched, 1 holds), 5
- *  unchecked" — an unchecked row was read and not tested, so it is never
- *  counted among the tested. */
+/** "9 assumptions: 1 unsupported, 2 stretched, 1 holds; 5 could not be
+ *  checked" — a row that could not be checked is never counted among the
+ *  tested, and the line says so in a reader's words. */
 export function stressReadLine(rows: readonly StressRow[]): string {
   const n = (v: StressVerdict) => rows.filter((r) => r.verdict === v).length;
   const parts: [number, string][] = [
@@ -121,12 +121,32 @@ export function stressReadLine(rows: readonly StressRow[]): string {
     [n("stretched"), "stretched"],
     [n("holds"), n("holds") === 1 ? "holds" : "hold"],
   ];
-  const said = parts.filter(([c]) => c > 0);
-  const tested = rows.length - n("unchecked");
+  const said = parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`);
   const read = rows.length;
-  const head = `${read} assumption${read === 1 ? "" : "s"} read`;
-  const testedPart = tested > 0 ? `${tested} tested (${said.map(([c, w]) => `${c} ${w}`).join(", ")})` : "none tested";
-  return `${head}: ${testedPart}${n("unchecked") > 0 ? `, ${n("unchecked")} unchecked` : ""}`;
+  const head = `${read} assumption${read === 1 ? "" : "s"}`;
+  const notChecked = n("unchecked");
+  if (said.length === 0) return `${head}: none could be checked`;
+  return `${head}: ${said.join(", ")}${notChecked > 0 ? `; ${notChecked} could not be checked` : ""}`;
+}
+
+/**
+ * What would test an unchecked row, in plain words — only where the OM
+ * states the figure and the document named is one the test reads when it
+ * is on the deal (the T-12's NOI, vacancy and insurance line, the rent
+ * roll's occupancy). Null elsewhere: a sentence never promises a test the
+ * code does not make.
+ */
+export function testedByHint(row: StressRow): string | null {
+  if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
+  switch (row.key) {
+    case "noi":
+    case "insurance":
+      return "Add the T-12 to test this.";
+    case "vacancy":
+      return "Add the rent roll or the T-12 to test this.";
+    default:
+      return null;
+  }
 }
 
 /** What each key is called in the unchecked line, mid-sentence. */
@@ -157,10 +177,9 @@ export function uncheckedName(row: StressRow): string {
   return /^(?:the|a|an)\s/i.test(t) ? t : `the ${t}`;
 }
 
-/** "5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
+/** "5 could not be checked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
 export function uncheckedLine(rows: readonly StressRow[]): string {
-  const n = rows.length;
-  return `${n} assumption${n === 1 ? "" : "s"} unchecked: ${rows.map(uncheckedName).join(", ")}`;
+  return `${rows.length} could not be checked: ${rows.map(uncheckedName).join(", ")}`;
 }
 
 /** The survey's margin, read back off the figure's own text ("6.2% ±2.2 pts"). */
@@ -321,6 +340,11 @@ function UncheckedRow({ row }: { row: StressRow }) {
         {hasFigure && <PageChip page={row.omSays.page} />}
       </div>
       <p className={`mt-0.5 ${MEASURE} text-xs leading-relaxed text-muted`} data-qa="stress-unchecked">{why}</p>
+      {testedByHint(row) && (
+        <p className={`mt-0.5 ${MEASURE} text-xs leading-relaxed text-ink`} data-qa="stress-tested-by">
+          {testedByHint(row)}
+        </p>
+      )}
       <EvidenceList evidence={row.evidence} />
       {row.challenge && <ChallengeFold challenge={row.challenge} />}
       <MethodLine row={row} />

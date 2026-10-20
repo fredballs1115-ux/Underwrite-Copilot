@@ -10,7 +10,7 @@ import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StressTestPanel, sortStressRows, stressReadLine, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
+import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { STRESS_KEYS, STRESS_METHODS, type StressRow, type StressTest } from "./stress-test-types";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -196,9 +196,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
 
   it("heads with the count and leads most severe first: unsupported, stretched, holds, unchecked", () => {
     expect(html).toContain('<h2 class="text-[11px] font-semibold uppercase tracking-wider text-kill">The OM&#x27;s assumptions, tested</h2>');
-    expect(text).toContain("5 assumptions read: 3 tested (1 unsupported, 1 stretched, 1 holds), 2 unchecked");
-    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions read: 2 tested (2 hold)");
-    expect(stressReadLine([GROWTH])).toBe("1 assumption read: none tested, 1 unchecked");
+    expect(text).toContain("5 assumptions: 1 unsupported, 1 stretched, 1 holds; 2 could not be checked");
+    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions: 2 hold");
+    expect(stressReadLine([GROWTH])).toBe("1 assumption: none could be checked");
     expect(sortStressRows(TEST.rows).map((r) => r.key)).toEqual(["vacancy", "exit_cap", "taxes", "rent_growth", "other"]);
     const verdicts = [...html.matchAll(/data-verdict="([a-z]+)"/g)].map((m) => m[1]);
     expect(verdicts).toEqual(["unsupported", "stretched", "holds", "unchecked", "unchecked"]);
@@ -213,9 +213,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const group = html.slice(html.indexOf('data-qa="stress-unchecked-group"'), html.indexOf('data-qa="stress-key"'));
     const g = visibleText(group).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // The read line at the top is unchanged: it still counts the unchecked.
-    expect(text).toContain("5 assumptions read: 3 tested (1 unsupported, 1 stretched, 1 holds), 2 unchecked");
-    expect(g).toContain("2 assumptions unchecked: rent growth, the broker's narrative on the submarket");
-    expect(uncheckedLine([GROWTH])).toBe("1 assumption unchecked: rent growth");
+    expect(text).toContain("5 assumptions: 1 unsupported, 1 stretched, 1 holds; 2 could not be checked");
+    expect(g).toContain("2 could not be checked: rent growth, the broker's narrative on the submarket");
+    expect(uncheckedLine([GROWTH])).toBe("1 could not be checked: rent growth");
     // The fold is PanelFold's own shape: the control a thumb's height on a
     // touch screen, the whole body in the HTML.
     expect(group).toMatch(/<details class="group mt-1"><summary class="[^"]*\bpointer-coarse:py-2\.5\b[^"]*">/);
@@ -251,6 +251,20 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(only).not.toContain('data-qa="stress-rows"');
     expect(only).toContain('data-qa="stress-row-rent_growth"');
     expect(a11yIssues(only)).toEqual([]);
+  });
+
+  it("says what would test an unchecked row only where the document named is one the test reads", () => {
+    const noi: StressRow = { ...GROWTH, key: "noi", title: "NOI", omSays: { text: "NOI (pro forma): $3,880,000", value: 3_880_000, page: 8 }, unchecked: "No T-12 is on file, and the OM states no second NOI to hold its figure to." };
+    expect(testedByHint(noi)).toBe("Add the T-12 to test this.");
+    expect(testedByHint({ ...noi, key: "insurance" })).toBe("Add the T-12 to test this.");
+    expect(testedByHint({ ...noi, key: "vacancy" })).toBe("Add the rent roll or the T-12 to test this.");
+    // A figure the OM does not state, a market figure, a tested row: none.
+    expect(testedByHint({ ...noi, omSays: { ...noi.omSays, value: null } })).toBeNull();
+    expect(testedByHint(GROWTH)).toBeNull();
+    expect(testedByHint(VACANCY)).toBeNull();
+    const s = render({ rows: [noi], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(s)).toContain("Add the T-12 to test this.");
+    expect(s.match(/data-qa="stress-tested-by"/g)).toHaveLength(1);
   });
 
   it("names an unchecked row mid-sentence: the key's own name, or the challenger's title read as one", () => {
