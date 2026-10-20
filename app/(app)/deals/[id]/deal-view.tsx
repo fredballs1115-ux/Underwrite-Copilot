@@ -869,7 +869,14 @@ export function DealView({
                 const t12State = slot("t12", !!actuals.t12);
                 if (rrState === "done" && t12State === "done") return null;
                 return (
-                  <ActualsPrompt dealId={dealId} rentRoll={rrState} t12={t12State} />
+                  <ActualsPrompt
+                    dealId={dealId}
+                    rentRoll={rrState}
+                    t12={t12State}
+                    // The reader's own model, offered where the Reconciler
+                    // takes one: not while a run of any kind is in flight.
+                    onReconcile={active ? null : () => navigateLegacy("reconciler")}
+                  />
                 );
               })()}
             />

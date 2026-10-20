@@ -217,7 +217,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(html).toContain('<div id="stress-test" tabindex="-1"');
   });
 
-  it("sets the rent roll and T-12 prompt directly under the stress test (2026-10-20)", () => {
+  it("sets the rent roll and T-12 prompt directly under the stress test, saying what they do to it, with the reader's own model beside it (2026-10-20)", () => {
     // A reader's deal (not the sample) with its OM and neither document on file.
     const p = {
       ...sampleProps("overview"),
@@ -230,6 +230,14 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(prompt).toBeGreaterThan(html.indexOf('data-qa="how-we-test-link"'));
     expect(prompt).toBeLessThan(html.indexOf("Risk digest"));
     expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(html.indexOf('data-qa="stress-test-panel"'));
+    const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(words).toContain("A T-12 tests the OM's NOI, vacancy and insurance against the building's own year");
+    expect(words).toContain("a rent roll tests its vacancy against the occupancy it runs at");
+    expect(words).toContain("Added after this screen, either one lets the track record score its challenges.");
+    // The T-12's tax line judges no row, so taxes are never promised.
+    expect(words).not.toMatch(/\btax/i);
+    expect(html).toContain('href="/deals/sample?tab=analyses&amp;a=reconciler"');
+    expect(words).toContain("Reconcile your own model against the OM");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(textOf(html))).toEqual([]);
     // Never on the sample.
