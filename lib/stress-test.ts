@@ -2698,15 +2698,44 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
 // ── The test ─────────────────────────────────────────────────────────────
 
 /**
+ * The band a row's "holds" was struck inside, named as its reader strikes it
+ * — "within 5% of the T-12" (`NOI_IN_LINE_BAND`), "within 5% of the comps"
+ * (`BASIS_STRETCH_PCT`), "within 2% of the evidence's figure" (`SAME_SHARE`,
+ * a tax bill or a premium), "within the figure's ±1.9-pt margin" (a survey's)
+ * — else "at the evidence's figure", the hair every other reader allows.
+ */
+function holdsBand(row: StressRow): string {
+  const at = row.decidedBy ?? row.impact?.evidenceIndex ?? null;
+  const best = at != null ? row.evidence[at] : null;
+  switch (row.key) {
+    case "noi": {
+      const p = best?.publisher ?? "";
+      const against = p.startsWith("the deal's ") ? `the ${p.slice("the deal's ".length)}` : /^the /i.test(p) ? p : "the evidence's figure";
+      return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${against}`;
+    }
+    case "basis":
+      return `within ${BASIS_STRETCH_PCT}% of the comps`;
+    case "taxes":
+    case "renovation_premium":
+      return `within ${Math.round(SAME_SHARE * 100)}% of the evidence's figure`;
+    default: {
+      const moe = best?.text.match(/±\s*(\d+(?:\.\d+)?)\s*pts?/)?.[1];
+      return moe ? `within the figure's ±${moe}-pt margin` : "at the evidence's figure";
+    }
+  }
+}
+
+/**
  * The two rules every built row answers to after its own reader:
  *   - a verdict struck against a rule of thumb alone says so in its gap
  *     (`ruleOfThumbOnly`), whatever the verdict;
  *   - a verdict never contradicts its own re-run: a row whose evidence moves
  *     the levered IRR down by `IRR_MOVE_STRETCH_BPS` or more never reads
  *     "holds" — inside the evidence's band or not, a move that size is to be
- *     priced, so it reads "stretched" and the gap says both — where the OM
- *     is the more optimistic side; on a plan deal, a re-run that moves the
- *     yield on cost down by `YOC_MOVE_STRETCH_PTS` or more, the same way.
+ *     priced, so it reads "stretched" and the gap says both (the band named,
+ *     `holdsBand`) — where the OM is the more optimistic side; on a plan
+ *     deal, a re-run that moves the yield on cost down by
+ *     `YOC_MOVE_STRETCH_PTS` or more, the same way.
  */
 function finishRow(row: StressRow): void {
   if (row.ruleOfThumbOnly && row.gap) row.gap = { ...row.gap, text: `${row.gap.text} Against a rule of thumb only.` };
@@ -2720,7 +2749,7 @@ function finishRow(row: StressRow): void {
       row.verdict = "stretched";
       row.gap = {
         ...row.gap,
-        text: `${row.gap.text} The gap is inside the evidence's band, but the return moves ${moveBps} bps on it (levered IRR ${pct1(i.baseIrrPct)} to ${pct1(i.altIrrPct)}).`,
+        text: `${row.gap.text} The gap is ${holdsBand(row)}, but the return moves ${moveBps} bps on it (levered IRR ${pct1(i.baseIrrPct)} to ${pct1(i.altIrrPct)}).`,
       };
     }
   }
@@ -2732,7 +2761,7 @@ function finishRow(row: StressRow): void {
       row.verdict = "stretched";
       row.gap = {
         ...row.gap,
-        text: `${row.gap.text} The gap is inside the evidence's band, but the yield on cost moves ${movePts.toFixed(2)} points on it (${pct2(i.baseYocPct)} to ${pct2(i.altYocPct)}).`,
+        text: `${row.gap.text} The gap is ${holdsBand(row)}, but the yield on cost moves ${movePts.toFixed(2)} points on it (${pct2(i.baseYocPct)} to ${pct2(i.altYocPct)}).`,
       };
     }
   }

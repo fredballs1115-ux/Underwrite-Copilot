@@ -490,13 +490,43 @@ const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxe
  * NOI past the NOI's own gap, "the tax swap moves the year-one NOI $54k a
  * year past the NOI's own gap". "" where the headline carries none.
  */
-export function noiRestClause(h: StressHeadline): string {
+export function noiRestClause(h: StressHeadline, test?: StressTest): string {
   const r = h.noiRest;
   if (!r) return "";
   if (r.usd > 0) return `the rest of the NOI's gap (${money(r.usd)} a year) is in neither case`;
+  // With the test in hand, both figures are said: what the swaps take off
+  // the year-one NOI (the NOI row's gap less the rest, `noiRest`'s own
+  // arithmetic) and how much more that is than the OM's NOI sits over the
+  // figure that decides its row — "the tax reset takes $224k off year-one
+  // NOI, $50k more than the OM's NOI sits over the T-12".
+  const said = test ? noiSwapClause(r, test) : "";
+  if (said) return said;
   const names = r.components.map((k) => SWAP_NAME[k] ?? headlineName(k));
   const many = names.length > 1;
   return `the ${joinAnd(names)} swap${many ? "s" : ""} move${many ? "" : "s"} the year-one NOI ${money(-r.usd)} a year past the NOI's own gap`;
+}
+
+/** The NOI's rest past its gap, in both figures, read off the test's NOI
+ *  row (the OM's NOI less the figure that decides it) and `noiRest`; "" where
+ *  the row's figures are not there to read. A tax swap struck on a reset
+ *  bill is "the tax reset". */
+function noiSwapClause(r: NonNullable<StressHeadline["noiRest"]>, test: StressTest): string {
+  const noi = test.rows.find((x) => x.key === "noi");
+  const at = noi ? (noi.decidedBy ?? noi.impact?.evidenceIndex ?? null) : null;
+  const best = noi && at != null ? noi.evidence[at] : null;
+  if (!noi || noi.omSays.value == null || !best || best.value == null) return "";
+  const gap = noi.omSays.value - best.value;
+  const moved = gap - r.usd;
+  if (!(gap > 0) || !(moved > 0)) return "";
+  const resetBill = (k: StressKey) => {
+    const row = test.rows.find((x) => x.key === k);
+    const d = row ? (row.decidedBy ?? row.impact?.evidenceIndex ?? null) : null;
+    const e = row && d != null ? row.evidence[d] : null;
+    return !!e && /\breset/i.test(`${e.label} ${e.text}`);
+  };
+  const names = r.components.map((k) => (k === "taxes" && resetBill(k) ? "the tax reset" : `the ${SWAP_NAME[k] ?? headlineName(k)} swap`));
+  const against = best.publisher.startsWith("the deal's ") ? `the ${best.publisher.slice("the deal's ".length)}` : /^the /i.test(best.publisher) ? best.publisher : "its evidence";
+  return `${joinAnd(names)} take${names.length > 1 ? "" : "s"} ${money(moved)} off year-one NOI, ${money(-r.usd)} more than the OM's NOI sits over ${against}`;
 }
 
 /**
@@ -516,8 +546,8 @@ export function untestedSentence(h: StressHeadline): string {
 }
 
 /** `noiRestClause` as a sentence; "" with none. */
-export function noiRestSentence(h: StressHeadline): string {
-  const c = noiRestClause(h);
+export function noiRestSentence(h: StressHeadline, test?: StressTest): string {
+  const c = noiRestClause(h, test);
   return c ? `${upperFirst(c)}.` : "";
 }
 
@@ -682,7 +712,7 @@ export function headlineSentence(test: StressTest): string | null {
   const untested = untestedSentence(h) ? ` ${untestedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
   // What the component swaps leave of the NOI's gap, where it is material.
-  const rest = noiRestSentence(h);
+  const rest = noiRestSentence(h, test);
   // The model as it runs, and why the evidence's case is not it.
   const kept = keptSentence(test);
   const clause = modelClause(h);

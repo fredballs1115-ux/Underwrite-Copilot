@@ -7,6 +7,7 @@ import {
   HOLDS_NO_RERUN,
   decidesTag,
   drawsRerun,
+  figureText as wordsFigure,
   headlineLine,
   headlineName,
   headlinePlaces,
@@ -26,7 +27,7 @@ import {
   untestedSentence,
   type ShownPart,
 } from "@/lib/stress-test-words";
-import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
+import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKept, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
  * The OM's assumptions, tested (2026-10-19, the refocus) — the pure panel
@@ -38,8 +39,9 @@ import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, Stress
  * THE HEADLINE leads (`HeadlineView`): the levered IRR on the OM's figures
  * against the evidence's, and the bridge between them split by assumption,
  * with the model as it runs as a third mark (an outline, never a fill) and
- * one sentence on the figures the evidence's case keeps at the OM's where
- * the model runs another (lib/stress-test-words `keptSentence`). Each row's
+ * a small table of the inputs the evidence's case runs at a figure the model
+ * does not (`keptRows`, `keptSentence`'s own lists; the sentence is the
+ * report's and the brief's). Each row's
  * re-run names its base — the model at its own IRR, one input changed
  * (`rerunWords`) — and draws that IRR as a dashed tick on its bars.
  *
@@ -68,18 +70,24 @@ import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, Stress
  *   - THE EVIDENCE, each item led by its kind's glyph (the track's own
  *     mark), with its kind, a "Decides" or "Beside it, not deciding" tag in
  *     words, its publisher, its date and whose figure it is (a metro's
- *     figure is the metro's, never the building's);
+ *     figure is the metro's — that none is the building's is said once, in
+ *     the key, `publishedScopeLine`); a range's two ends are one line
+ *     (`rangeEnds`), the memorandum's sale comps a list (`compLines`), and
+ *     the OM's own pieces carry no date and no grain, their kind saying
+ *     whose they are;
  *   - THE GAP in words, and THE IMPACT: the levered IRR with the OM's figure
  *     and with the evidence's, the engine run again with that one input
- *     swapped (`StressImpact`), as a pair and two bars on one scale — or "no
- *     return struck", the reason said once at the top where the model's
- *     reads are withheld. The gap and the impact sit in a card of their own,
+ *     swapped (`StressImpact`), as a pair and two bars on one scale (the
+ *     re-run's sentence, `StressImpact.note`, is the report's and the
+ *     brief's: the bars are it) — or "no return struck", the reason said
+ *     once at the top where the model's reads are withheld. The gap and the
+ *     impact sit in a card of their own,
  *     beside the evidence where the row is wide enough and under it on a
  *     phone;
  *   - THE CHALLENGE, the challenger's own words and its question for the
  *     broker, folded;
- *   - HOW THIS WAS TESTED: the row's method sentence, linking to the
- *     methodology page's own section for the key.
+ *   - HOW WE TEST IT: a link to the methodology page's own section for the
+ *     key (the row's method sentence its title; the report prints it).
  *
  * Where the OM's figure is the evidence's (the impact's two runs are one,
  * read off its values), the pair is one figure, "Levered IRR 9.3%, run at
@@ -126,14 +134,37 @@ const FILL: Record<StressVerdict, string> = { unsupported: "bg-kill", stretched:
  *  unchanged (the padding and the negative margin cancel). */
 const TAP = "pointer-coarse:inline-block pointer-coarse:-my-2.5 pointer-coarse:py-2.5";
 
+// Whose figure a piece is. That a published figure is never the building's
+// is said once, in the key (`publishedScopeLine`), not on every line.
 const SCOPE: Record<StressEvidence["scope"], string> = {
   deal: "the deal's own figure",
-  metro: "the metro's figure, not the building's",
-  region: "the Census region's figure, not the building's",
-  state: "the state's figure, not the building's",
-  nation: "the nation's figure, not the building's",
+  metro: "the metro's figure",
+  region: "the Census region's figure",
+  state: "the state's figure",
+  nation: "the nation's figure",
   class: "the class's, not this market's",
 };
+
+/** The published grains, as the key names them. */
+const GRAIN: Partial<Record<StressEvidence["scope"], string>> = {
+  metro: "the metro's",
+  region: "the Census region's",
+  state: "the state's",
+  nation: "the nation's",
+};
+
+/** "Published figures are the metro's, the Census region's or the nation's,
+ *  never the building's." — the grains the panel's published pieces carry,
+ *  said once in the key in place of a "not the building's" on every line;
+ *  null where no published piece carries one. */
+export function publishedScopeLine(rows: readonly StressRow[]): string | null {
+  const order: StressEvidence["scope"][] = ["metro", "region", "state", "nation"];
+  const seen = new Set(rows.flatMap((r) => r.evidence.filter((e) => e.kind === "published").map((e) => e.scope)));
+  const words = order.filter((g) => seen.has(g)).map((g) => GRAIN[g]!);
+  if (words.length === 0) return null;
+  const said = words.length === 1 ? words[0] : `${words.slice(0, -1).join(", ")} or ${words[words.length - 1]}`;
+  return `Published figures are ${said}, never the building's.`;
+}
 
 const SEVERITY: Record<NonNullable<StressRow["challenge"]>["severity"], string> = { high: "High", medium: "Medium", low: "Low" };
 
@@ -438,9 +469,9 @@ function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }
           {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
         </BarRow>
       </BarRows>
-      <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink/85`}>
-        <Dated text={impact.note} />
-      </p>
+      {/* The re-run's sentence ("If … the levered IRR moves from …") is the
+          pair and the bars above in words: the report and the verdict's
+          brief print it, the panel draws it. */}
     </div>
   );
 }
@@ -449,24 +480,135 @@ function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }
  *  track draws it), the kind, whether it decided the row or stands beside
  *  the one that did, in words, the figure in its own words, then whose it
  *  is and when, muted, and the source. */
+/**
+ * A range's two ends read as two pieces (the tracker's cap range at its low
+ * end and at its high end, each a figure on the track): the pair is one
+ * line, its shared caption said once. Read off the labels the reader writes
+ * ("…, low end" / "…, high end") and the pieces' own publisher, date, kind
+ * and grain; null where the two are not one range's ends.
+ */
+export function rangeEnds(a: StressEvidence, b: StressEvidence | undefined): { base: string; text: string } | null {
+  if (!b) return null;
+  const lo = a.label.match(/^(.*), low end$/);
+  const hi = b.label.match(/^(.*), high end$/);
+  if (!lo || !hi || lo[1] !== hi[1]) return null;
+  if (a.kind !== b.kind || a.publisher !== b.publisher || a.asOf !== b.asOf || a.scope !== b.scope) return null;
+  // A period both ends carry ("(late 2025 / early 2026)") is said once.
+  const tail = /^(.*?)( \([^()]*\))$/;
+  const ta = a.text.match(tail);
+  const tb = b.text.match(tail);
+  const text = ta && tb && ta[2] === tb[2] ? `low end ${ta[1]}, high end ${tb[1]}${ta[2]}` : `low end ${a.text}; high end ${b.text}`;
+  return { base: lo[1], text };
+}
+
+/** One of the memorandum's sale comps as the basis reader names it. */
+export type CompLine = { name: string; figure: string; grade: "clean" | "favorable" | "stretched"; why: string | null };
+
+/**
+ * The basis reader's sale-comps sentence ("3 of 3 state a figure /unit;
+ * graded clean (supports): The Brixton — 2.1 mi $252k/unit — the one comp
+ * graded clean, too few for a median; left out, graded favorable by the
+ * comps step (it leans the seller's way): Parkside — 1.4 mi $261k/unit; …")
+ * read back into its parts — the count, each comp with its figure and its
+ * grade, and what is struck over the clean ones — so the panel draws a list.
+ * Null where the text is not that sentence; the panel then prints it whole.
+ */
+export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
+  if (!/^The memorandum's sale comps/.test(e.label)) return null;
+  const m = e.text.match(
+    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — the two graded clean, midpoint .*?, too few for a median| — the one comp graded clean, too few for a median|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+  );
+  if (!m) return null;
+  const entries = (list: string): { name: string; figure: string }[] | null => {
+    const out: { name: string; figure: string }[] = [];
+    for (const part of list.split("; ")) {
+      const f = part.match(/^(.+) (\$[\d.,]+[kMB]?\/\S+)$/);
+      if (!f) return null;
+      out.push({ name: f[1], figure: f[2] });
+    }
+    return out;
+  };
+  const comps: CompLine[] = [];
+  if (m[2]) {
+    const clean = entries(m[2]);
+    if (!clean) return null;
+    comps.push(...clean.map((c) => ({ ...c, grade: "clean" as const, why: null })));
+  }
+  for (const g of (m[4] ?? "").matchAll(/; left out, graded (favorable|stretched) by the comps step \(([^()]*)\): (.*?)(?=; left out, graded |$)/g)) {
+    const list = entries(g[3]);
+    if (!list) return null;
+    comps.push(...list.map((c) => ({ ...c, grade: g[1] as "favorable" | "stretched", why: g[2] })));
+  }
+  // No comp named, nothing to list; every left-out clause read, or the
+  // sentence is printed whole.
+  if (comps.length === 0) return null;
+  if ((m[4] ?? "").split("; left out, graded ").length - 1 !== new Set(comps.filter((c) => c.grade !== "clean").map((c) => c.grade)).size) return null;
+  const struck = m[3].replace(/^(?: — |, )/, "");
+  return { head: m[1], comps, struck: upperFirst(struck) };
+}
+
+const GRADE_WORD: Record<CompLine["grade"], string> = {
+  clean: "Graded clean",
+  favorable: "Favorable, left out",
+  stretched: "Stretched, left out",
+};
+
+/** The sale comps as a list: each comp with its figure and its grade in
+ *  words, then what is struck over the clean ones. */
+function CompList({ read }: { read: NonNullable<ReturnType<typeof compLines>> }) {
+  return (
+    <>
+      <ul className="mt-0.5 space-y-0.5" data-qa="stress-comp-list">
+        {read.comps.map((c, i) => (
+          <li key={i} className="flex flex-wrap items-baseline gap-x-1.5" data-grade={c.grade}>
+            <span className="text-ink">{c.name}</span>
+            <span className="font-semibold tabular-nums text-ink">{c.figure}</span>
+            <span className={c.grade === "clean" ? "font-medium text-ink" : "text-muted"}>{`· ${GRADE_WORD[c.grade]}${c.why ? `: ${c.why.replace(/^it /, "")}` : ""}`}</span>
+          </li>
+        ))}
+      </ul>
+      <span className="mt-0.5 block text-ink">{read.struck}</span>
+    </>
+  );
+}
+
 function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean }) {
   const evidence = row.evidence;
   if (evidence.length === 0) return null;
   const d = decidingIndex(row);
+  // Each line is one piece, or a range's two ends as one (`rangeEnds`).
+  const lines: { at: number[]; range: ReturnType<typeof rangeEnds> }[] = [];
+  for (let i = 0; i < evidence.length; i++) {
+    const range = rangeEnds(evidence[i], evidence[i + 1]);
+    lines.push({ at: range ? [i, i + 1] : [i], range });
+    if (range) i++;
+  }
   return (
     <ul className="mt-1 space-y-1.5 text-[11px] leading-4" data-qa="stress-evidence-list">
-      {evidence.map((e, i) => {
+      {lines.map(({ at, range }) => {
+        const e = evidence[at[0]];
         const kind = KIND[e.kind];
-        const tag = decidesTag({ ...row, decidedBy: d }, i);
+        const tags = at.map((i) => decidesTag({ ...row, decidedBy: d }, i));
+        const deciding = d != null && at.includes(d);
+        // A range's tag: the one both ends carry, else "Decides" on the end
+        // that does, named.
+        const tag = tags[0] == null ? null : tags.every((t) => t === tags[0]) ? tags[0] : `${tags[at.indexOf(d!)]}: the ${at.indexOf(d!) === 0 ? "low" : "high"} end`;
+        const comps = range ? null : compLines(e);
+        const href = at.map((i) => evidence[i].href).find(Boolean);
+        const Body = comps ? "div" : "p";
         return (
-          <li key={i} className="flex gap-2" data-evidence={e.kind} data-decides={tag == null ? undefined : i === d ? "true" : "false"}>
-            {marks && <span className={`flex h-4 w-2.5 shrink-0 items-center justify-center${i === d ? "" : " opacity-40"}`}>{e.value != null && <EvidenceGlyph kind={e.kind} />}</span>}
-            <p className={`min-w-0 ${MEASURE}`}>
+          <li key={at[0]} className="flex gap-2" data-evidence={e.kind} data-decides={tag == null ? undefined : deciding ? "true" : "false"}>
+            {marks && (
+              <span className={`flex h-4 w-2.5 shrink-0 items-center justify-center${deciding ? "" : " opacity-40"}`}>
+                {at.some((i) => evidence[i].value != null) && <EvidenceGlyph kind={e.kind} />}
+              </span>
+            )}
+            <Body className={`min-w-0 ${MEASURE}`}>
               <span className={`mr-1 inline-block rounded px-1 align-[1px] text-[9.5px] font-semibold uppercase leading-[14px] tracking-wide ${kind.chip}`}>{kind.word}</span>{" "}
               {tag && (
                 <>
                   <span
-                    className={`mr-1 inline-block rounded border px-1 align-[1px] text-[9.5px] leading-[12px] ${i === d ? "border-ink/60 font-semibold text-ink" : "border-line text-muted"}`}
+                    className={`mr-1 inline-block rounded border px-1 align-[1px] text-[9.5px] leading-[12px] ${deciding ? "border-ink/60 font-semibold text-ink" : "border-line text-muted"}`}
                     data-qa="stress-decides-tag"
                   >
                     {tag}
@@ -474,8 +616,10 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                 </>
               )}
               <span className="text-ink">
-                <Dated text={`${e.label}: ${e.text}`} />
+                <Dated text={range ? `${range.base}: ${range.text}` : comps ? `${e.label}: ${comps.head}` : `${e.label}: ${e.text}`} />
               </span>{" "}
+              {/* The OM's own pieces are the memorandum itself: no date to
+                  print, and their kind already says whose they are. */}
               <span className="text-muted">
                 {`— ${e.publisher}`}
                 {e.asOf ? (
@@ -485,20 +629,21 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                       {dayText(e.asOf)}
                     </time>
                   </>
-                ) : e.kind === "rule_of_thumb" ? null : (
+                ) : e.kind === "rule_of_thumb" || e.kind === "om_internal" ? null : (
                   ", undated"
                 )}
-                {` · ${SCOPE[e.scope]}`}
+                {e.scope === "deal" && (e.kind === "document" || e.kind === "om_internal") ? "" : ` · ${SCOPE[e.scope]}`}
               </span>
-              {e.href && (
+              {href && (
                 <>
                   {" "}
-                  <a href={e.href} target="_blank" rel="noopener noreferrer" className={`font-medium text-brand hover:underline ${TAP}`}>
+                  <a href={href} target="_blank" rel="noopener noreferrer" className={`font-medium text-brand hover:underline ${TAP}`}>
                     Source
                   </a>
                 </>
               )}
-            </p>
+              {comps && <CompList read={comps} />}
+            </Body>
           </li>
         );
       })}
@@ -523,12 +668,14 @@ function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challe
   );
 }
 
+/** The way to how the row is tested: the methodology page's own section for
+ *  its key. The row's method sentence is the report's to print (and this
+ *  link's title); the page says each key's method in full. */
 function MethodLine({ row }: { row: StressRow }) {
   return (
-    <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-method">
-      <span>{`How this was tested: ${row.method}`}</span>{" "}
-      <Link href={`/how-we-test#${row.key}`} className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
-        The method
+    <p className={`mt-2 ${MEASURE} text-[11px] leading-4`} data-qa="stress-method">
+      <Link href={`/how-we-test#${row.key}`} title={row.method} className={`font-medium text-brand hover:underline ${TAP}`}>
+        {`How we test ${uncheckedName(row)}`}
       </Link>
     </p>
   );
@@ -735,7 +882,85 @@ function ModelBarRow({ model, style, yoc = false }: { model: number; style: { le
   );
 }
 
-function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; line: string; kept: string | null }) {
+/** One input on which the evidence's case and the screening model differ
+ *  (`keptRows`). */
+export type KeptRow = { key: StressKey; assumption: string; evidence: string; why: string; model: string };
+
+const KEPT_WHY: Record<StressKept["why"], string> = {
+  holds: "the OM's; the row holds",
+  left_out: "the OM's; left out of the headline",
+  same: "the OM's, which is the evidence's",
+  unchecked: "the OM's; the row is unchecked",
+};
+
+/**
+ * `keptSentence` as a table's rows, read off the same `keptAtOm` and
+ * `atEvidence` in the same order: each input the evidence's case runs at a
+ * figure the screening model does not — the OM's where a row holds, is left
+ * out, is the evidence's own or is unchecked, else the evidence's — with the
+ * model's figure beside it. Empty where `keptSentence` is null.
+ */
+export function keptRows(test: StressTest): KeptRow[] {
+  const h = liveHeadline(test);
+  if (!h || h.modelIrrPct === undefined || keptSentence(test) == null) return [];
+  const order: StressKept["why"][] = ["holds", "left_out", "same", "unchecked"];
+  const kept = h.keptAtOm ?? [];
+  const rows: KeptRow[] = order.flatMap((why) =>
+    kept
+      .filter((k) => k.why === why)
+      .map((k) => ({
+        key: k.key,
+        assumption: k.key === "noi" && k.noi != null ? `Rent line (makes the OM's ${compactUsd(k.noi, MONEY)} NOI)` : k.label,
+        evidence: k.key === "noi" ? compactUsd(k.om, MONEY) : wordsFigure(k.key, k.om),
+        why: KEPT_WHY[why],
+        model: k.key === "noi" ? compactUsd(k.model, MONEY) : wordsFigure(k.key, k.model),
+      })),
+  );
+  for (const a of h.atEvidence ?? []) {
+    rows.push({ key: a.key, assumption: a.label, evidence: wordsFigure(a.key, a.evidence), why: "the evidence's", model: wordsFigure(a.key, a.model) });
+  }
+  return rows;
+}
+
+/** The evidence's case against the screening model, input by input: a small
+ *  table whose column headers say what each figure is. */
+function KeptTable({ rows, model }: { rows: readonly KeptRow[]; model: number | null }) {
+  return (
+    <table className="mt-2 w-full max-w-xl table-fixed border-collapse text-left text-[11px] leading-4" data-qa="stress-headline-kept">
+      <caption className="pb-1 text-left text-xs text-ink/85">
+        {`Where the evidence's case and the screening model as it runs (${model == null ? "its levered IRR does not solve" : pctText(model)}) differ`}
+      </caption>
+      <thead>
+        <tr className="border-b border-line text-muted">
+          <th scope="col" className="w-[38%] py-0.5 pr-2 font-medium">
+            Assumption
+          </th>
+          <th scope="col" className="py-0.5 pr-2 font-medium">
+            {"Evidence's case"}
+          </th>
+          <th scope="col" className="w-[24%] py-0.5 font-medium">
+            Screening model
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.key} className="border-b border-line/60 align-baseline last:border-0">
+            <th scope="row" className="py-0.5 pr-2 font-normal text-ink">
+              {r.assumption}
+            </th>
+            <td className="py-0.5 pr-2">
+              <span className="font-semibold tabular-nums text-ink">{r.evidence}</span> <span className="text-muted">{`(${r.why})`}</span>
+            </td>
+            <td className="py-0.5 tabular-nums text-ink">{r.model}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadline; line: string; kept: readonly KeptRow[]; test: StressTest }) {
   // The figures as printed (lib/stress-test-words `shownHeadline`): each
   // case at its measure's place (a levered IRR at one, a plan's yield on
   // cost at two) and each part rounded so the segments end exactly on the
@@ -791,11 +1016,7 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
           {untestedSentence(h)}
         </p>
       )}
-      {kept && (
-        <p className={`mt-1 ${MEASURE} text-xs leading-relaxed text-ink/85`} data-qa="stress-headline-kept">
-          {kept}
-        </p>
-      )}
+      {kept.length > 0 && <KeptTable rows={kept} model={h.modelIrrPct ?? null} />}
       {!(h.parts.length > 0 && om != null && ev != null) && om != null && model != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-cases">
           <BarRow label="On the OM's figures" figure={fig(om)}>
@@ -860,7 +1081,7 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
                   : "Nothing the model takes is past its evidence, so the two runs are one."}
         {h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : ""}
         {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}
-        {noiRestSentence(h) ? ` ${noiRestSentence(h)}` : ""}{" "}
+        {noiRestSentence(h, test) ? ` ${noiRestSentence(h, test)}` : ""}{" "}
         <Link href="/how-we-test#headline" className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
           How the headline is struck
         </Link>
@@ -902,7 +1123,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       {/* The reason is a whole sentence that already says no return is
           re-run; the headline goes with the re-runs, said so. */}
       {test.impactsWithheld && <PanelNote>{`${test.impactsWithheld} ${HEADLINE_WITHHELD}`}</PanelNote>}
-      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} kept={keptSentence(test)} />}
+      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} kept={keptRows(test)} test={test} />}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">
@@ -941,6 +1162,8 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         {published && (
           <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>
         )}
+        {/* Whose a published figure is, said once for every line. */}
+        {publishedScopeLine(test.rows) && <KeyItem>{publishedScopeLine(test.rows)}</KeyItem>}
       </Key>
     </section>
   );

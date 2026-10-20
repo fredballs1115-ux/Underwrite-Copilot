@@ -232,7 +232,12 @@ describe("the sample's stress test, one build on every surface", () => {
     // and the headline says it does not test it.
     expect(h.untested).toEqual({ keys: ["debt"], roll: null });
     expect(headlineSentence(page)).toContain(" This headline does not test the loan rate. ");
-    expect(headlineSentence(page)).toContain(" The tax swap moves the year-one NOI $50k a year past the NOI's own gap. ");
+    // Both figures said, struck from the row's own: the reset's $224k off
+    // year-one NOI, $50k more than the NOI row's $174k gap over the T-12.
+    expect(headlineSentence(page)).toContain(" The tax reset takes $224k off year-one NOI, $50k more than the OM's NOI sits over the T-12. ");
+    const noi = page.rows.find((r) => r.key === "noi")!;
+    const gap = noi.omSays.value! - noi.evidence[noi.decidedBy!].value!;
+    expect(gap - h.noiRest!.usd).toBeCloseTo(224_000, -4);
     // With the read failed: the published rows unchecked, rent growth out of
     // both cases, and the vacancy held to the deal's own rent roll.
     const bare = signedInSample(null).headline!;

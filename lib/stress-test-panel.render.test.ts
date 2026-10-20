@@ -5,14 +5,18 @@
 // (one figure where the model already runs at the evidence's), the
 // challenge folded, the method linked, the unchecked rows one folded group
 // at the end — and its markers to the panel.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StressTestPanel, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
+import { StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD, HOLDS_NO_RERUN } from "./stress-test-words";
+import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence } from "./stress-test-words";
+import { readMetroRates, readRates, type RateRow } from "./live-rates";
+import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
+import { sampleStressTest } from "./sample-stress";
+import type { TodayReads } from "./model-vs-market-read";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const h = React.createElement;
@@ -235,7 +239,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(growth).not.toContain('data-qa="stress-no-impact"');
     expect(growth).not.toContain('data-qa="stress-challenge"');
     expect(growth).toContain('href="/how-we-test#rent_growth"');
-    expect(t).toContain(`How this was tested: ${GROWTH.method} The method`);
+    // The method is the methodology page's to say: the panel links to it,
+    // the row's sentence the link's title (the report prints it).
+    expect(t).toContain("How we test rent growth");
+    expect(t).not.toContain(GROWTH.method);
+    expect(growth).toContain(`title="${GROWTH.method.replace(/'/g, "&#x27;")}"`);
     // The challenger's own row: no page chip (it states no figure), its
     // title said once, its words folded under it.
     const other = group.slice(group.indexOf('data-qa="stress-row-other"'));
@@ -305,7 +313,8 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // One run, one bar: no second bar for the same figure.
     expect(s).not.toContain('data-bar="stress-impact-om"');
     expect(t).not.toContain("At the OM's figure");
-    expect(t).toContain(same.impact!.note);
+    // The re-run's sentence is the report's; the panel draws the pair.
+    expect(t).not.toContain(same.impact!.note);
     expect(gluedWords(visibleText(s))).toEqual([]);
     // Two figures are a move, whatever the note's words.
     const moved = render({ rows: [{ ...VACANCY, impact: { ...VACANCY.impact!, note: same.impact!.note } }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
@@ -349,8 +358,17 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(row.match(/<li class="flex gap-2" data-evidence="[a-z_]+" data-decides="(?:true|false)"><span class="flex h-4 w-2\.5 shrink-0 items-center justify-center(?: opacity-40)?"><span aria-hidden="true"/g)).toHaveLength(3);
     // Each piece of evidence: its kind, whether it decided, in words, its
     // publisher, its date, whose figure it is.
-    expect(t).toContain("The deal's own document Decides The deal's T-12: vacancy loss over scheduled rent: 9.1% ($400k of $4.4M, TTM to 2026-06-30) — the deal's T-12, Jun 30, 2026 · the deal's own figure");
-    expect(t).toContain("A published figure Beside it, not deciding Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) — Census Bureau, Apr 1, 2026 · the metro's figure, not the building's Source");
+    // The deal's own document says whose it is by its kind; a published
+    // figure names its grain, and that none is the building's is said once,
+    // in the key.
+    expect(t).toContain("The deal's own document Decides The deal's T-12: vacancy loss over scheduled rent: 9.1% ($400k of $4.4M, TTM to 2026-06-30) — the deal's T-12, Jun 30, 2026");
+    expect(t).not.toContain("the deal's own figure");
+    expect(t).toContain("A published figure Beside it, not deciding Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) — Census Bureau, Apr 1, 2026 · the metro's figure Source");
+    expect(t).not.toContain("not the building's Source");
+    expect(t.match(/never the building's/g)).toBeNull();
+    const all = visibleText(html).replace(/&#x27;/g, "'");
+    expect(all.match(/never the building's/g)).toHaveLength(1);
+    expect(all).not.toContain("figure, not the building's");
     expect(row).toContain('href="https://www.census.gov/housing/hvs/"');
     expect(t).toContain("A rule of thumb Beside it, not deciding Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure — a rule of thumb · the class's, not this market's");
     expect(row.match(/data-qa="stress-decides-tag"/g)).toHaveLength(3);
@@ -377,14 +395,17 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(held).not.toContain('data-bar="stress-impact"');
     expect(held).not.toContain("data-bar=\"stress-impact-model\"");
     expect(visibleText(held).replace(/&#x27;/g, "'")).not.toContain(VACANCY.impact!.note);
-    expect(t).toContain(VACANCY.impact!.note);
+    // The re-run's sentence is the pair and the bars in words: the report's
+    // and the brief's, never the panel's.
+    expect(t).not.toContain(VACANCY.impact!.note);
     // The challenger's words, folded whole under the row.
     expect(t).toContain("The challenge · High severity");
     expect(row).toContain("<details");
     expect(t).toContain(VACANCY.challenge!.challenge);
     expect(t).toContain(`Ask the broker: ${VACANCY.challenge!.question}`);
     // How it was tested, linking to the method's own section.
-    expect(t).toContain(`How this was tested: ${VACANCY.method} The method`);
+    expect(t).toContain("How we test vacancy");
+    expect(t).not.toContain("How this was tested");
     expect(row).toContain('href="/how-we-test#vacancy"');
   });
 
@@ -568,10 +589,16 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(hh.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
     expect(t).toContain("With the evidence 11.5% The screening model as it runs 9.3%");
     expect(hh).toMatch(/class="absolute inset-y-0 rounded-full border border-dashed border-ink\/60" data-bar="stress-headline-model" style="left:0\.00%;width:[\d.]+%"/);
-    // Why the evidence's case is not the model, under the line.
+    // Why the evidence's case is not the model, under the line: a table of
+    // three columns, in the sentence's own order (the sentence is the
+    // report's and the brief's: lib/stress-test-words `keptSentence`).
+    expect(t).toContain("Where the evidence's case and the screening model as it runs (9.3%) differ");
+    expect(hh).toMatch(/<th scope="col"[^>]*>Assumption<\/th><th scope="col"[^>]*>Evidence&#x27;s case<\/th><th scope="col"[^>]*>Screening model<\/th>/);
     expect(t).toContain(
-      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).",
+      "Stabilized vacancy 6.0% (the OM's; the row holds) 9.1% Rent growth 4.0%/yr (the OM's; the row holds) 3.0%/yr Rent line (makes the OM's $3.88M NOI) $7.33M (the OM's; left out of the headline) $7.47M Real estate taxes $952k (the evidence's) $728k",
     );
+    expect(hh.match(/<th scope="row"/g)).toHaveLength(4);
+    expect(t).not.toContain("Against the screening model as it runs (9.3%), the evidence's case keeps");
     expect(hh.indexOf('data-qa="stress-headline-kept"')).toBeLessThan(hh.indexOf('data-qa="stress-headline-bridge"'));
     // Each re-run names its base, and the model's dashed tick stands on its
     // bars, the key saying what it is.
@@ -642,5 +669,85 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // as its id).
     expect(STRESS_METHODS.map((m) => m.key).sort()).toEqual([...STRESS_KEYS].sort());
     expect(readFileSync(join(process.cwd(), "app/how-we-test/view.tsx"), "utf8")).toContain("<section id={method.key}");
+  });
+});
+
+// The sample's own panel (the homepage's walkthrough, /demo and the
+// signed-in sample draw this one build): the long form is the report's and
+// /how-we-test's, and the panel says each claim once.
+vi.mock("@/lib/model-vs-market-read", () => ({
+  todayReads: async () => {
+    throw new Error("no database in a test");
+  },
+}));
+
+describe("StressTestPanel on the sample — each claim once", () => {
+  const rates: RateRow[] = [
+    { series_id: "PHIL942URN", obs_date: "2026-07-01", value: 4.1 },
+    { series_id: "RRVRNEQ156N", obs_date: "2026-04-01", value: 4.6 },
+    { series_id: "HVS_RVR_37980", obs_date: "2026-04-01", value: 5.8 },
+    { series_id: "HVS_RVR_37980_MOE", obs_date: "2026-04-01", value: 1.9 },
+  ];
+  const reads: TodayReads = { rates: readMetroRates("philadelphia", rates, FIXTURE_NOW), zori: null, realtor: null, national: readRates(REAL_ROWS, FIXTURE_NOW), now: FIXTURE_NOW };
+  const test = sampleStressTest({ today: "2026-09-21", reads });
+  const out = renderToStaticMarkup(React.createElement(StressTestPanel, { test }));
+  const t = visibleText(out).replace(/\s+/g, " ");
+
+  it("lints clean and links each row's method rather than printing it", () => {
+    expect(a11yIssues(out)).toEqual([]);
+    expect(gluedWords(visibleText(out))).toEqual([]);
+    expect(t).not.toContain("How this was tested");
+    for (const r of test.rows) {
+      expect(out).toContain(`href="/how-we-test#${r.key}"`);
+      expect(t).not.toContain(r.method);
+    }
+    // No re-run's "If … the levered IRR moves from …" beside its own bars.
+    for (const r of test.rows.filter((x) => x.verdict !== "unchecked" && x.impact)) expect(t).not.toContain(r.impact!.note);
+  });
+
+  it("says once that a published figure is never the building's, and dates no piece that is the OM itself", () => {
+    // (The challenger's own "a new owner's quote, not the building's
+    // history" is its words, not a piece's grain.)
+    expect(t.match(/figure, not the building's/g) ?? []).toHaveLength(0);
+    expect(t.match(/never the building's/g)).toHaveLength(1);
+    expect(publishedScopeLine(test.rows)).toBe("Published figures are the metro's, the Census region's or the nation's, never the building's.");
+    expect(t).not.toContain("the offering memorandum, undated");
+    expect(t).not.toContain("the memorandum's own figures, undated");
+  });
+
+  it("draws the memorandum's sale comps as a list of comp, figure and grade", () => {
+    const basis = test.rows.find((r) => r.key === "basis")!;
+    const read = compLines(basis.evidence.find((e) => /^The memorandum's sale comps/.test(e.label))!)!;
+    expect(read.head).toBe("3 of 3 state a figure /unit");
+    expect(read.comps.map((c) => [c.name, c.figure, c.grade])).toEqual([
+      ["The Brixton — 2.1 mi", "$252k/unit", "clean"],
+      ["Parkside — 1.4 mi", "$261k/unit", "favorable"],
+      ["Vue at Girard — 4.0 mi", "$298k/unit", "stretched"],
+    ]);
+    expect(read.struck).toBe("The one comp graded clean, too few for a median");
+    expect(out.match(/data-grade="/g)).toHaveLength(3);
+    expect(t).toContain("Parkside — 1.4 mi $261k/unit · Favorable, left out: leans the seller's way");
+    expect(t).not.toContain("graded clean (supports): The Brixton");
+  });
+
+  it("draws a range's two ends as one line, its caption said once", () => {
+    const exit = test.rows.find((r) => r.key === "exit_cap")!;
+    const i = exit.evidence.findIndex((e) => /, low end$/.test(e.label));
+    expect(i).toBeGreaterThanOrEqual(0);
+    const range = rangeEnds(exit.evidence[i], exit.evidence[i + 1])!;
+    expect(range.text).toMatch(/^low end [\d.]+%, high end [\d.]+% \(/);
+    const caption = exit.evidence[i].label.replace(/, low end$/, "");
+    expect(t.split(caption).length - 1).toBe(1);
+    // Two pieces that are not one range's ends stay two.
+    expect(rangeEnds(exit.evidence[i], { ...exit.evidence[i + 1], publisher: "someone else" })).toBeNull();
+  });
+
+  it("sets the evidence's case against the screening model in a table, in keptSentence's order", () => {
+    const rows = keptRows(test);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(keptSentence(test)).not.toBeNull();
+    expect(out).toContain('data-qa="stress-headline-kept"');
+    expect(t).not.toContain("the evidence's case keeps the OM's figure");
+    for (const r of rows) expect(t).toContain(`${r.assumption} ${r.evidence} (${r.why}) ${r.model}`);
   });
 });

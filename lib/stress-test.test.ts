@@ -277,7 +277,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     const n = rowOf(sampleStressTest("2026-10-19"), "noi");
     expect(IRR_MOVE_STRETCH_BPS).toBe(100);
     expect(n.verdict).toBe("stretched");
-    expect(n.gap!.text).toMatch(/^The OM's \$3\.88M is 4\.7% \(\$174k\) over the deal's T-12's \$3\.71M\. The gap is inside the evidence's band, but the return moves \d+ bps on it \(levered IRR 11\.7% to 9\.3%\)\.$/);
+    expect(n.gap!.text).toMatch(/^The OM's \$3\.88M is 4\.7% \(\$174k\) over the deal's T-12's \$3\.71M\. The gap is within 5% of the T-12, but the return moves \d+ bps on it \(levered IRR 11\.7% to 9\.3%\)\.$/);
   });
 
   it("says a verdict struck on a rule of thumb alone is one, and the vacancy's turns on the best kind present", () => {
@@ -1541,7 +1541,7 @@ describe("the plan re-runs strike no yield on a figure the plan does not reach",
     const v = rowOf(build(ex, { mvm: true }), "vacancy");
     expect(v.evidence[0].kind).toBe("published");
     expect(v.verdict).toBe("stretched");
-    expect(v.gap!.text).toMatch(/The gap is inside the evidence's band, but the yield on cost moves 0\.\d\d points on it \(6\.85% to 6\.\d\d%\)\.$/);
+    expect(v.gap!.text).toMatch(/The gap is within the figure's ±[\d.]+-pt margin, but the yield on cost moves 0\.\d\d points on it \(6\.85% to 6\.\d\d%\)\.$/);
     // A small gross keeps it holding.
     const small = rowOf(build({ ...ex, metrics: ex.metrics.map((m) => (/gross potential/.test(m.label) ? { ...m, value: "$5,000,000" } : m)) }, { mvm: true }), "vacancy");
     expect(small.verdict).toBe("holds");
@@ -2408,6 +2408,15 @@ describe("the headline", () => {
     expect(noiRestClause({ ...said, noiRest: { usd: -54_000, components: ["vacancy", "taxes"] } })).toBe("the vacancy and tax swaps move the year-one NOI $54k a year past the NOI's own gap");
     expect(noiRestSentence({ ...said, noiRest: { usd: -54_000, components: ["taxes"] } })).toBe("The tax swap moves the year-one NOI $54k a year past the NOI's own gap.");
     expect(noiRestClause({ ...said, noiRest: null })).toBe("");
+    // With the test in hand, both figures are said, read off the NOI row:
+    // what the swaps take off year-one NOI and how far past its gap that is.
+    const withRows = { ...test, rows: test.rows.map((r) => (r.key === "noi" ? { ...r, decidedBy: r.impact!.evidenceIndex } : r)) };
+    const past = { ...said, noiRest: { usd: -54_000, components: ["taxes" as const] } };
+    const takes = `$${Math.round((noiGap + 54_000) / 1000)}k`;
+    expect(noiRestClause(past, withRows)).toMatch(/^the tax (?:reset|swap) takes \$\d+k off year-one NOI, \$54k more than the OM's NOI sits over the /);
+    expect(noiRestClause(past, withRows)).toContain(` takes ${takes} off `);
+    // No NOI row to read: the clause as before.
+    expect(noiRestClause(past, { ...test, rows: [] })).toBe("the tax swap moves the year-one NOI $54k a year past the NOI's own gap");
     // A tax move that carries the NOI's gap to within 1% says nothing.
     const carried = only(["noi", "taxes"]).map((r) => (r.key === "taxes" ? { ...r, impact: { ...r.impact!, altValue: r.impact!.omValue + noiGap } } : r));
     expect(stressHeadline(carried, model)!.noiRest).toBeNull();
