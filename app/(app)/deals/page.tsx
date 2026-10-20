@@ -33,6 +33,7 @@ import { pipelineCard, sampleDealCard } from "@/lib/pipeline-card";
 import { readAllResult, readByIds } from "@/lib/read-all";
 import { pipelineReadNote } from "@/lib/pipeline-read-note";
 import { inTurns } from "@/lib/in-turns";
+import { relationMissing } from "@/lib/db-error";
 import { after } from "next/server";
 
 export const metadata: Metadata = { title: "Pipeline" };
@@ -145,10 +146,11 @@ export default async function DealsPage({
     : null;
 
   if (error) {
-    // "Relation does not exist" means the migrations haven't run (a setup
-    // state); anything else is a transient outage — don't tell a user in
-    // production to go run SQL.
-    const schemaMissing = /relation|does not exist|schema/i.test(error.message ?? "");
+    // A table that is not there (Postgres's 42P01) means the migrations
+    // haven't run (a setup state); anything else — PostgREST's reloading
+    // "schema cache" among them — is a transient outage: don't tell a user
+    // in production to go run SQL (lib/db-error).
+    const schemaMissing = relationMissing(readError);
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
         {schemaMissing ? (
