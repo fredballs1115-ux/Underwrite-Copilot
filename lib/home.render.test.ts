@@ -635,7 +635,6 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
           counts: sectionCounts(counts, buyBox.panel.checks),
           onSelect: () => {},
           label: "Sample deal sections",
-          fadeAlways: true,
         }),
       ),
     );

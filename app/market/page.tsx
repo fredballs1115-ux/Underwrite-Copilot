@@ -498,7 +498,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
           )}
         </span>
       </div>
-      <ScrollX className="mt-3">
+      <ScrollX className="mt-3" tall>
         <table className="w-full min-w-[520px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -896,7 +896,7 @@ function SectorHeatGrid() {
         </span>
       </div>
       <HeatKey />
-      <ScrollX className="mt-3">
+      <ScrollX className="mt-3" tall>
         {/* Fixed layout and equal sector columns: under auto layout a
             column's width followed its longest period note, so the four
             columns of one board ran 90px to 300px wide. */}

@@ -631,7 +631,6 @@ export function DemoTabs({
             counts={counts}
             onSelect={setSection}
             label="Sample deal sections"
-            fadeAlways
           />
         </ScrollX>
         <span className="hidden shrink-0 pr-1 text-[10px] font-medium uppercase tracking-wide text-muted sm:block">

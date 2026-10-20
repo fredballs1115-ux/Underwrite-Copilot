@@ -121,7 +121,7 @@ export function SectorJobsBoard({
           {`${rank.size} of ${total} cells carry a fresh figure · shaded within each column, fastest first, so office-using jobs compare to office-using jobs`}
         </span>
       </div>
-      <ScrollX className="mt-3">
+      <ScrollX className="mt-3" tall>
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">

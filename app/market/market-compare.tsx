@@ -251,33 +251,33 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
             {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b, today)}`}
           </p>
           <ScrollX className="mt-1.5">
-          <table className="w-full min-w-[28rem] text-left text-[11px]">
-            <thead>
-              <tr className="text-muted">
-                <th className="w-24 py-1 pr-2 font-medium">Sector</th>
-                <th className="py-1 pr-2 font-medium">{a.name}</th>
-                <th className="py-1 font-medium">{b.name}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SECTOR_ROWS.map((sec) => (
-                <tr key={sec} className="border-t border-line/60">
-                  <td className="py-1.5 pr-2 font-medium capitalize text-ink">
-                    {sec}
-                  </td>
-                  {[a, b].map((m) => (
-                    <td
-                      key={m.id}
-                      className="py-1.5 pr-2 font-mono tabular-nums text-muted"
-                      title={m.sectors?.[sec]?.cite}
-                    >
-                      {sectorCell(m.sectors?.[sec])}
-                    </td>
-                  ))}
+            <table className="w-full min-w-[28rem] text-left text-[11px]">
+              <thead>
+                <tr className="text-muted">
+                  <th className="w-24 py-1 pr-2 font-medium">Sector</th>
+                  <th className="py-1 pr-2 font-medium">{a.name}</th>
+                  <th className="py-1 font-medium">{b.name}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {SECTOR_ROWS.map((sec) => (
+                  <tr key={sec} className="border-t border-line/60">
+                    <td className="py-1.5 pr-2 font-medium capitalize text-ink">
+                      {sec}
+                    </td>
+                    {[a, b].map((m) => (
+                      <td
+                        key={m.id}
+                        className="py-1.5 pr-2 font-mono tabular-nums text-muted"
+                        title={m.sectors?.[sec]?.cite}
+                      >
+                        {sectorCell(m.sectors?.[sec])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </ScrollX>
           <p className="mt-1 text-[10px] text-muted">
             Tracker spreads shown as ranges; a dash is a recorded gap.

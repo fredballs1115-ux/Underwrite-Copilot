@@ -219,7 +219,7 @@ export function LeaderboardTable({
     return (
       <>
         {" "}
-        <span className="block max-w-[16rem] font-sans text-[10px] leading-snug text-caution" data-qa="figure-slice">
+        <span className="block min-w-[11rem] max-w-[16rem] font-sans text-[10px] leading-snug text-caution" data-qa="figure-slice">
           {`${words.charAt(0).toUpperCase()}${words.slice(1)}`}
         </span>
       </>
@@ -240,7 +240,7 @@ export function LeaderboardTable({
           {stale}
         </p>
       )}
-      <ScrollX className="mt-2">
+      <ScrollX className="mt-2" tall>
         <table className="w-full min-w-[440px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -395,20 +395,23 @@ export function HeatKey() {
   const steps = [0, 0.25, 0.5, 0.75, 1];
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted" data-qa="heat-key">
-      <span className="inline-flex items-center gap-1.5">
-        <span>Tightest vacancy</span>
-        <span aria-hidden className="inline-flex overflow-hidden rounded-sm">
-          {steps.map((t) => (
-            <span key={t} className="h-3 w-4" style={{ backgroundColor: heatShade(t) }} />
-          ))}
+      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span>Tightest</span>
+          <span aria-hidden className="inline-flex overflow-hidden rounded-sm ring-1 ring-inset ring-line/60">
+            {steps.map((t) => (
+              <span key={t} className="h-3 w-4" style={{ backgroundColor: heatShade(t) }} />
+            ))}
+          </span>
+          <span>loosest</span>
         </span>
-        <span>loosest, ranked within each column</span>
+        <span>vacancy, ranked within its column</span>
       </span>
-      <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
         <span aria-hidden className="h-3 w-4 rounded-sm border border-dashed border-line" />
         <span>not ranked</span>
       </span>
-      <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
         <span aria-hidden className="font-mono">—</span>
         <span>no figure on file</span>
       </span>

@@ -44,27 +44,39 @@ export function EdgeFade({
   side,
   on,
   tone,
+  tall = false,
   className = "",
 }: {
   side: "start" | "end";
   on: boolean;
   /** the background the row sits on, as a CSS colour */
   tone: string;
+  /** a table taller than a screen: the chevron rides at the middle of the
+   *  window while the table passes, where centred in the table it sat a
+   *  screen below the rows a reader was looking at */
+  tall?: boolean;
   className?: string;
 }) {
   const end = side === "end";
+  const chevron = (
+    <svg viewBox="0 0 16 16" className={`h-3.5 w-3.5 shrink-0 text-muted ${end ? "" : "rotate-180"}`} fill="none">
+      <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
   return (
     <span
       aria-hidden
       data-edge-fade={side}
-      className={`pointer-events-none absolute inset-y-0 flex w-8 items-center transition-opacity duration-150 ${
-        end ? "right-0 justify-end" : "left-0 justify-start"
+      className={`pointer-events-none absolute inset-y-0 flex w-8 transition-opacity duration-150 ${end ? "right-0" : "left-0"} ${
+        tall ? `flex-col justify-start ${end ? "items-end" : "items-start"}` : `items-center ${end ? "justify-end" : "justify-start"}`
       } ${on ? "opacity-100" : "opacity-0"} ${className}`}
       style={{ backgroundImage: `linear-gradient(to ${end ? "right" : "left"}, transparent, ${tone} 70%)` }}
     >
-      <svg viewBox="0 0 16 16" className={`h-3.5 w-3.5 text-muted ${end ? "" : "rotate-180"}`} fill="none">
-        <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      {tall ? (
+        <span className="sticky top-[50vh] my-3 flex">{chevron}</span>
+      ) : (
+        chevron
+      )}
     </span>
   );
 }
@@ -78,12 +90,15 @@ export function ScrollX({
   children,
   className = "",
   tone = "var(--color-surface)",
+  tall = false,
   scrollRef,
 }: {
   children: ReactNode;
   className?: string;
   /** the background the scroller sits on, as a CSS colour */
   tone?: string;
+  /** a table that can run taller than a screen (`EdgeFade`'s `tall`) */
+  tall?: boolean;
   /** the scroller, for a caller that moves it itself */
   scrollRef?: RefObject<HTMLDivElement | null>;
 }) {
@@ -101,8 +116,8 @@ export function ScrollX({
       <div ref={ref} onFocus={reveal} className="overflow-x-auto scroll-px-8">
         {children}
       </div>
-      <EdgeFade side="start" on={!!edges?.before} tone={tone} />
-      <EdgeFade side="end" on={!!edges?.after} tone={tone} />
+      <EdgeFade side="start" on={!!edges?.before} tone={tone} tall={tall} />
+      <EdgeFade side="end" on={!!edges?.after} tone={tone} tall={tall} />
     </div>
   );
 }
