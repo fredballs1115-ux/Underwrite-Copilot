@@ -103,6 +103,12 @@ export interface PlaygroundData {
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
+/** Which model the playground runs, and why its returns are not the
+ *  first-draft model's (model-body's `FIRST_DRAFT_MODEL_LINE` is its
+ *  other half). */
+const PLAYGROUND_MODEL_LINE =
+  "The screening model, read off the memorandum's terms: the one the stress test re-runs and the Excel workbook and the full report carry. A first-draft model, where the Financials tab has one, sets its own assumptions, so its returns can differ.";
+
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
 
 /** The levered IRR as a tile says it: the rate, or why none solved — "no
@@ -402,9 +408,10 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       </div>
       {/* Which model this is, where a second model's returns can be seen
           beside it (the first-draft model's, on the Financials tab): the
-          one the Excel workbook and the full report carry. */}
+          one the stress test re-runs and the Excel workbook and the full
+          report carry, and why the two differ. One string, one text node. */}
       <p className="mt-1 text-xs text-muted" data-qa="playground-model">
-        The screening model — the one the Excel workbook and the full report carry.
+        {PLAYGROUND_MODEL_LINE}
       </p>
 
       <PriceCapControls

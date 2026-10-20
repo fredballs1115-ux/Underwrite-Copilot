@@ -1524,7 +1524,7 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
       expect(row).toContain('data-qa="stress-impact"');
       expect(data.stressTest!.rows.find((r) => r.key === "vacancy")!.evidence.some((e) => e.kind === "document" && e.publisher === "the deal's T-12")).toBe(true);
-      expect(text).toContain("The screening model — the one the Excel workbook and the full report carry.");
+      expect(text).toContain("The screening model, read off the memorandum's terms: the one the stress test re-runs and the Excel workbook and the full report carry.");
       expect(text).toContain("Levered IRR 9.3%, the base case");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(text)).toEqual([]);
@@ -1551,6 +1551,11 @@ describe("ModelView — the sample model renders every panel", () => {
         ),
       );
       expect(text).toContain("First-draft model — verify before relying on it");
+      // Which model the card is, beside the Overview's stress test and
+      // playground, and why the two models' returns differ.
+      expect(text).toContain(
+        "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, read off the memorandum's terms, so their returns can differ.",
+      );
       expect(text).toContain("Projected returns · first-draft model");
       expect(text).toContain("Add more to the model");
       expect(html).not.toContain('aria-label="Model views"');
