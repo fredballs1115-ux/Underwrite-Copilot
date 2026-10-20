@@ -477,6 +477,12 @@ describe("the exit cap row", () => {
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.74%", "5.50%") })), "exit_cap")).toMatchObject({ gap: { value: 24, unit: "bps" }, verdict: "stretched" });
   });
 
+  it("an exit flat to the going-in cap holds, and says most underwriting adds expansion — no expansion figure invented", () => {
+    const x = rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.50%", "5.50%") })), "exit_cap");
+    expect(x.verdict).toBe("holds");
+    expect(x.gap!.text).toBe("The OM's 5.50% exit is flat to its 5.50% going-in cap; most underwriting adds expansion over a hold.");
+  });
+
   it("says the exit's spread under the 10-year where it is under it", () => {
     const x = rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.50%") })), "exit_cap");
     expect(x.evidence[1].text).toBe("4.94% on Sep 17, 2026 — the exit's spread under it is 44 bps");

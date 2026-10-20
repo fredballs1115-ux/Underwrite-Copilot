@@ -829,8 +829,11 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     const diffBps = (g - om.pct) * 100;
     // The figures are percent points here; the threshold is in bps.
     judged = judge(om.pct, [g], "low", "bps", supported ? Infinity : EXIT_CAP_UNSUPPORTED_BPS / 100 - SAME, SAME, () =>
+      // Flat to the entry holds: the code carries no expansion default (the
+      // model itself exits at the going-in cap), so none is invented here;
+      // the sentence says what most underwriting does.
       Math.abs(diffBps) < SAME * 100
-        ? `The OM's ${pct2(om.pct)} exit holds its ${pct2(g)} going-in cap.`
+        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(g)} going-in cap; most underwriting adds expansion over a hold.`
         : diffBps > 0
           ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(g)} going-in cap — cap compression${supported ? ", inside the published cap range" : ""}.`
           : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(g)} going-in cap — the conservative side.`,
