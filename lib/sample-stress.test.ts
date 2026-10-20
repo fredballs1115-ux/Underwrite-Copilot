@@ -162,6 +162,39 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(page.rows.flatMap((r) => r.evidence).some((e) => e.kind === "published" && e.publisher === "FRED")).toBe(false);
   });
 
+  it("leads with one headline on every surface: the OM's figures against the evidence's, split by assumption", () => {
+    const page = signedInSample(READS);
+    expect(homepage(READS).headline).toEqual(page.headline);
+    expect(demo(READS).headline).toEqual(page.headline);
+    const h = page.headline!;
+    const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
+    // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
+    // vacancy, its 4.0% rent growth, its tax bill and premium.
+    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 12.3]);
+    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.76"]);
+    // The split, largest first: the comps' price raises the return (the ask
+    // is over them), the rent roll's vacancy, the reset tax bill, the exit
+    // at the going-in cap and the T-12's premium lower it; rent growth holds
+    // and carries no part.
+    expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
+      ["basis", 3.7],
+      ["vacancy", -3.2],
+      ["taxes", -2.5],
+      ["exit_cap", -1.4],
+      ["insurance", -1],
+    ]);
+    expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
+    // The NOI's T-12 figure holds the vacancy, taxes and insurance the rows
+    // move on their own; the premium is no model input.
+    expect(h.omitted.map((o) => o.key)).toEqual(["noi", "renovation_premium"]);
+    // With the read failed, the published rows unchecked and rent growth
+    // out of both cases.
+    const bare = signedInSample(null).headline!;
+    expect(bare.omKeys).not.toContain("rent_growth");
+    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 8.2]);
+  });
+
   it("places the sample where the deal page places it", () => {
     expect(samplePlacement()).toEqual(placeDeal(SAMPLE_DEAL.address, countyOf(SAMPLE_DEAL.address, null)));
     expect(samplePlacement().live).toMatchObject({ id: "philadelphia" });
