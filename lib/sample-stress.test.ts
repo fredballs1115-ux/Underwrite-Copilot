@@ -164,8 +164,8 @@ describe("the sample's stress test, one build on every surface", () => {
 
   it("leads with one headline on every surface: the OM's figures against the evidence's, split by assumption", () => {
     const page = signedInSample(READS);
-    expect(homepage(READS).headline).toEqual(page.headline);
-    expect(demo(READS).headline).toEqual(page.headline);
+    expect(homepage(READS)!.headline).toEqual(page.headline);
+    expect(demo(READS)!.headline).toEqual(page.headline);
     const h = page.headline!;
     const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
