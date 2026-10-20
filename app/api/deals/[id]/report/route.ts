@@ -18,7 +18,8 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { countyOf, placeDeal } from "@/lib/market-county";
-import { todayReads } from "@/lib/model-vs-market-read";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { modelEvidenceFor } from "@/lib/model-evidence";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
@@ -269,6 +270,32 @@ export async function GET(
       // The same rate read as the deal page and the workbook route — and,
       // as there, none for the sample (lib/model-market).
       const debt = await liveDebtSeeds(HOLD_MONTHS);
+      // Today's published figures, read ONCE before the model is derived:
+      // its growth and exit run at the stress test's deciding figures off
+      // them (lib/model-evidence), and the assumptions read below sets the
+      // model against the same reads. The covered metro, the metro area its
+      // county sits in (#447), or the state's own series — the same market
+      // the page reads, so the report cannot disagree with it. Its own try:
+      // a failed live read leaves the model on the memorandum's own figures.
+      const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+      const metro = placeDeal(
+        address,
+        countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+      ).live;
+      let reads: TodayReads | null = null;
+      try {
+        reads = await todayReads(metro);
+      } catch (err) {
+        console.warn(`report live figures read failed for ${id}:`, err instanceof Error ? err.message : err);
+      }
+      const modelEvidence = modelEvidenceFor({
+        extraction,
+        firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+        storedAssetClass: deal.asset_class as string | null,
+        metro,
+        reads,
+        regulation: regulationRead,
+      });
       const derived = deriveUnderwriteInputs(
         extraction,
         deal.name,
@@ -286,7 +313,7 @@ export async function GET(
               }
             : null,
         },
-        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence),
         { regulation: regulationRead, asOf: readerNoon },
       );
       // The sources say whether the price and the year-1 NOI are the
@@ -320,6 +347,7 @@ export async function GET(
         {
           pct: derived.inputs.exitCapPct,
           provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+          published: derived.sources.exitCapPct?.published != null,
         },
         (deal.first_signal as FirstSignal | null) ?? null,
       );
@@ -369,25 +397,19 @@ export async function GET(
       // one function, the same cached readers), so the report says what the
       // page says. Its own try: a failed live read leaves the grids in place.
       try {
-        // The covered metro, the metro area its county sits in (#447), or
-        // the state's own series — the same market the page reads, so the
-        // report cannot disagree with it.
-        const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
-        const metro = placeDeal(
-          address,
-          countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
-        ).live;
-        assumptions = modelVsMarketFor({
-          derived,
-          extraction,
-          // The kind the page reads — the extraction and the first signal —
-          // so a plan the signal names reads no going-in cap here either.
-          firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
-          storedAssetClass: deal.asset_class as string | null,
-          metro,
-          reads: await todayReads(metro),
-          regulation: regulationRead,
-        });
+        assumptions = reads
+          ? modelVsMarketFor({
+              derived,
+              extraction,
+              // The kind the page reads — the extraction and the first signal —
+              // so a plan the signal names reads no going-in cap here either.
+              firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
+              storedAssetClass: deal.asset_class as string | null,
+              metro,
+              reads,
+              regulation: regulationRead,
+            })
+          : null;
       } catch (err) {
         console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
         assumptions = null;

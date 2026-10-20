@@ -30,11 +30,12 @@ import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow 
  *  documents (lib/anthropic/model-reconcile), with its own exit, growth or
  *  vacancy where none is stated; the stress test runs the screening model
  *  (lib/underwrite/inputs): the memorandum's price and terms, with
- *  screening defaults for growth and the exit (lib/screening-model-words). */
+ *  its growth and exit at the published figures the stress test decides by,
+ *  else the memorandum's, else screening defaults (lib/screening-model-words). */
 const FIRST_DRAFT_MODEL_LINE =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so its returns can differ.";
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, the memorandum's price and terms with its growth and exit at the published figures the stress test decides by, else the memorandum's, else screening defaults, so its returns can differ.";
 const FIRST_DRAFT_MODEL_LINE_PLAYGROUND =
-  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with screening defaults for growth and the exit, so their returns can differ.";
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, the memorandum's price and terms with its growth and exit at the published figures the stress test decides by, else the memorandum's, else screening defaults, so their returns can differ.";
 
 /** The card's body with a model, as the deal page stacks it. */
 export function ModelBody({

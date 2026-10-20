@@ -1,6 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { countyOf, placeDeal } from "@/lib/market-county";
+import { modelEvidenceFor } from "@/lib/model-evidence";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type DerivedModel } from "@/lib/underwrite/inputs";
@@ -68,9 +73,39 @@ export async function currentDealModel(
       .limit(1)
       .maybeSingle(),
     liveDebtSeeds(holdMonths),
-    supabase.from("deals").select("is_sample").eq("id", dealId).maybeSingle(),
+    supabase.from("deals").select("is_sample, address, site_flags, asset_class, first_signal").eq("id", dealId).maybeSingle(),
   ]);
-  const isSample = !!(dealRes.data as { is_sample?: boolean | null } | null)?.is_sample;
+  const row = (dealRes.data as {
+    is_sample?: boolean | null;
+    address?: unknown;
+    site_flags?: SiteFlagsResult | null;
+    asset_class?: string | null;
+    first_signal?: FirstSignal | null;
+  } | null) ?? null;
+  const isSample = !!row?.is_sample;
+
+  // The figures the model's growth and exit run at (lib/model-evidence): the
+  // stress test's deciding figures off today's published figures, read
+  // through the deal page's own cached reads for the market the page places
+  // the deal in (#447), else the memorandum's own. A failed read leaves the
+  // memorandum's figures; the sample is handed none (lib/model-market).
+  const address = addressUpgrade(row?.address, extraction) ?? (row?.address as StructuredAddress | null) ?? null;
+  const metro = placeDeal(address, countyOf(address, row?.site_flags ?? null)).live;
+  let reads: TodayReads | null = null;
+  if (!isSample) {
+    try {
+      reads = await todayReads(metro);
+    } catch (err) {
+      console.warn(`bridge live figures read failed for ${dealId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  const evidence = modelEvidenceFor({
+    extraction,
+    firstSignal: row?.first_signal ?? null,
+    storedAssetClass: row?.asset_class ?? null,
+    metro,
+    reads,
+  });
 
   const rrSummary = (rrRes.data?.summary as RentRollSummary | null) ?? null;
   const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
@@ -86,7 +121,7 @@ export async function currentDealModel(
         ? { summary: t12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null }
         : null,
     },
-    modelMarketFor(isSample, debt),
+    modelMarketFor(isSample, debt, evidence),
     { asOf },
   );
 }

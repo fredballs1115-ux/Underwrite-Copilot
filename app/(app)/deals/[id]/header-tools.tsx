@@ -27,7 +27,7 @@ export const DEAL_TOOL_LABEL: Record<DealToolKind, string> = {
 export const DEAL_TOOL_TITLE: Record<Exclude<DealToolKind, "bridge">, string> = {
   memo: "IC screening memo, one page where it fits — verdict, buy-box fit, flags, next steps",
   report: "The full screening report — memo plus every term, challenge, comp, and market check",
-  model: "The screening model (Excel): the memorandum's price and terms, with screening defaults for growth and the exit — live formulas; change the exit cap and levered IRR recalculates",
+  model: "The screening model (Excel): the memorandum's price and terms, with its growth and exit at the published figures the stress test decides by, else the memorandum's, else screening defaults — live formulas; change the exit cap and levered IRR recalculates",
   rentRoll: "Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model",
   valuations: "BOV reconciler — decompose the gap between two opinions of value",
 };

@@ -18,7 +18,8 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
-import { todayReads } from "@/lib/model-vs-market-read";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { modelEvidenceFor } from "@/lib/model-evidence";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { regulationForDeal } from "@/lib/rent-regulation";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
@@ -270,6 +271,29 @@ export async function GET(
         const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
         const regulationRead = regulationForDeal({ extraction, address, siteFlags, assetClass: deal.asset_class as string | null }, readerDay);
         const t12Summary = t12SummaryOf(t12Res.data?.summary);
+        // Today's published figures, read ONCE before the model is derived,
+        // the report route's own read: the market the deal page places the
+        // deal in (#447), the same cached readers. The model's growth and
+        // exit run at the stress test's deciding figures off them
+        // (lib/model-evidence), and the assumptions read below sets the
+        // model against them. Its own try: a failed live read leaves the
+        // model on the memorandum's own figures and the test on the stored
+        // market check's figures alone.
+        const metro = placeDeal(address, countyOf(address, siteFlags)).live;
+        let reads: TodayReads | null = null;
+        try {
+          reads = await todayReads(metro);
+        } catch (err) {
+          console.warn(`memo assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
+        }
+        const modelEvidence = modelEvidenceFor({
+          extraction,
+          firstSignal,
+          storedAssetClass: deal.asset_class as string | null,
+          metro,
+          reads,
+          regulation: regulationRead,
+        });
         const derived = deriveUnderwriteInputs(
           extraction,
           deal.name,
@@ -279,30 +303,23 @@ export async function GET(
               : null,
             t12: t12Summary ? { summary: t12Summary as T12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null } : null,
           },
-          modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+          modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence),
           // Its noon, the day every dated reader of the model reads on.
           { regulation: regulationRead, asOf: new Date(`${readerDay}T12:00:00Z`) },
         );
-        // The model's assumptions against the published figures, the report
-        // route's own read: the market the deal page places the deal in
-        // (#447), the same cached readers. Its own try: a failed live read
-        // leaves the test on the stored market check's figures alone.
-        let modelVsMarket: ModelVsMarket | null = null;
-        try {
-          const metro = placeDeal(address, countyOf(address, siteFlags)).live;
-          modelVsMarket = modelVsMarketFor({
-            derived,
-            extraction,
-            firstSignal,
-            storedAssetClass: deal.asset_class as string | null,
-            metro,
-            reads: await todayReads(metro),
-            regulation: regulationRead,
-          });
-        } catch (err) {
-          console.warn(`memo assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
-          modelVsMarket = null;
-        }
+        // The model's assumptions against the published figures, on the
+        // reads above.
+        const modelVsMarket: ModelVsMarket | null = reads
+          ? modelVsMarketFor({
+              derived,
+              extraction,
+              firstSignal,
+              storedAssetClass: deal.asset_class as string | null,
+              metro,
+              reads,
+              regulation: regulationRead,
+            })
+          : null;
         // The recorded sales and the reader's own past screens, as the deal
         // page sets the basis against them (lib/stress-basis-read, the one
         // builder): the memo is the reader's own document.

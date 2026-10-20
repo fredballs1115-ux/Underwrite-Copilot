@@ -112,7 +112,9 @@ function sourceText(s: InputSource | undefined): string {
   // as that document's: the writer had put "OM" before every extracted
   // figure, so a rent roll's occupancy read "OM — Rent roll actual …".
   if (s.provenance === "extracted" && s.doc) return s.note.startsWith(s.doc) ? s.note : `${s.doc} — ${s.note}`;
-  const tag = s.provenance === "extracted" ? "OM" : s.provenance === "derived" ? "Derived" : "Assumption";
+  // A published figure the stress test decides the row by (lib/model-
+  // evidence) is the publisher's, never derived from the documents.
+  const tag = s.published ? "Published" : s.provenance === "extracted" ? "OM" : s.provenance === "derived" ? "Derived" : "Assumption";
   const page = s.provenance === "extracted" && s.page ? ` ${s.page}` : "";
   return `${tag}${page} — ${s.note}`;
 }

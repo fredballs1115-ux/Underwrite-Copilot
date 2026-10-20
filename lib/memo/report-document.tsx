@@ -1584,6 +1584,9 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
  *  only where it falls inside the memorandum), "derived", "assumption". */
 function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
+  // A published figure the stress test decides the row by (lib/model-
+  // evidence) is its publisher's, never "derived".
+  if (src.published) return src.published.publisher;
   if (src.provenance === "extracted") {
     // A figure read from another document (a rent roll, a T-12) is that
     // document's, never the OM's (research pass 40, M3).
@@ -2654,6 +2657,7 @@ export function ReportDocument({
               // view in the model").
               `Reference cap: ${fmtPct(plan.refCap.pct, 2)}, ${refCapNote(
                 plan.refCap.provenance,
+                plan.refCap.published,
               )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal, and the annual cash flow with it: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
             )}
           </Text>

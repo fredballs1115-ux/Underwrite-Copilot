@@ -208,6 +208,7 @@ import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarketFor, wordsOnly, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { modelEvidenceFor } from "@/lib/model-evidence";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
 import { readAll, readByIds } from "@/lib/read-all";
@@ -1042,6 +1043,19 @@ export default async function DealPage({
     { extraction, address: dealAddress, siteFlags, assetClass: deal.asset_class as string | null },
     todayIso,
   );
+  // The figures the model's growth and exit run at (lib/model-evidence):
+  // the stress test's deciding figures, off the very reads its row and the
+  // model's read against the market use below, else the memorandum's own.
+  const modelEvidence = extraction
+    ? modelEvidenceFor({
+        extraction,
+        firstSignal,
+        storedAssetClass: deal.asset_class as string | null,
+        metro: liveMarket,
+        reads,
+        regulation,
+      })
+    : null;
   const derived = extraction
     ? deriveUnderwriteInputs(
         extraction,
@@ -1054,7 +1068,7 @@ export default async function DealPage({
             ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
             : null,
         },
-        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence),
         // The model's lines read the reader's day, as the panels beside
         // them do (research pass 40; lib/reader-day).
         { regulation, asOf: readerNoon },
@@ -1137,6 +1151,7 @@ export default async function DealPage({
     ? {
         pct: derived.inputs.exitCapPct,
         provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const),
+        published: derived.sources.exitCapPct?.published != null,
       }
     : null;
 

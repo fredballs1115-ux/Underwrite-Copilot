@@ -202,16 +202,20 @@ export interface RefCapInput {
   pct: number;
   /** where the model's exit-cap assumption came from */
   provenance: "extracted" | "derived" | "assumption";
+  /** the exit runs at a published figure the stress test decides by — the
+   *  research tracker's cap range at its low end (lib/model-evidence) */
+  published?: boolean;
 }
 
 /** One phrase, shared by the deal page and the report, on what the reference
  *  cap is — so the spread is always measured against a number the reader can
  *  see and change. */
-export function refCapNote(provenance: RefCapInput["provenance"]): string {
+export function refCapNote(provenance: RefCapInput["provenance"], published?: boolean): string {
+  if (published) return "the research tracker's cap range at its low end, the stress test's deciding figure, which the model also exits at";
   return provenance === "derived"
     ? "the OM's going-in cap, which the model also exits at"
     : provenance === "extracted"
-      ? "the OM's stated cap"
+      ? "the OM's stated exit cap, which the model also exits at"
       : "the model's exit-cap default — set your own view in the model";
 }
 

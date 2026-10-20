@@ -61,7 +61,7 @@ export function PlanSensitivity({
   // as the report's copy of these sentences says it (audit C6, LOW-1).
   const noiText = planNoiText(plan.stabilizedNoi!, money);
   const budget = plan.budget!.budget;
-  const refNote = refCapNote(refCap.provenance);
+  const refNote = refCapNote(refCap.provenance, refCap.published);
 
   return (
     <section

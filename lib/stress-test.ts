@@ -170,6 +170,7 @@ import {
   taxesDecider,
   vacancyDecider,
   type DeciderCandidate,
+  type DecidingFigure,
 } from "@/lib/stress-deciders";
 
 export const VACANCY_UNSUPPORTED_PTS = 3;
@@ -368,8 +369,9 @@ const multOrNone = (n: number | null): string => (n == null ? "—" : `${n.toFix
  * The engine on the model's inputs with ONE input replaced, twice: the base
  * run with the OM's figure in that input, the alternative with the
  * evidence's — so the two runs differ in that one input and nothing else,
- * and the move is the gap's own. The model's default is neither (it never
- * reads the OM's growth rates, runs its exit at the going-in cap and its
+ * and the move is the gap's own. The model's own figure may be either or
+ * neither (its growth and exit run at the figure the row decides by where
+ * one is fresh, else the OM's, else a default — lib/model-evidence — and its
  * rate at the seed), so where the model's own figure is a third value the
  * note says what the model itself runs; where the OM's figure IS the
  * evidence's the two runs are one, and the note says so. `omValue`,
@@ -1091,34 +1093,67 @@ function vacancyRow(ctx: Ctx): StressRow | null {
  * is the trailing year's, and every other figure the read carries stays
  * shown beside the one that decides, never in its place.
  */
-function rentGrowthRow(ctx: Ctx): StressRow | null {
-  const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
-  // A regulation's allowance is the regime's, for the units it regulates —
-  // shown first and never in the market's range (the read's own rule), so
-  // never the figure that decides.
-  const check = checkOf(ctx.mvm, "rent_growth");
+/** A row's pieces and the one figure that decides it, as the row reads
+ *  them — exported so the screening model's seed (lib/model-evidence) runs
+ *  the very figure the row decides by, never a second reading of it. The
+ *  deciding figure's `index` is its place in `evidence`. */
+export interface RowPieces {
+  evidence: StressEvidence[];
+  decided: DecidingFigure | null;
+}
+
+/** The OM's stated rent growth, percent, as the rent-growth row reads it. */
+export function omRentGrowth(ex: ExtractionResult | null): { row: Row; pct: number } | null {
+  return statedPct(rowsOf(ex), RENT_GROWTH_ROW, RENT_GROWTH_NOT);
+}
+
+/** The OM's stated expense growth, percent, as the expense-growth row reads it. */
+export function omExpenseGrowth(ex: ExtractionResult | null): { row: Row; pct: number } | null {
+  return statedPct(rowsOf(ex), EXPENSE_GROWTH_ROW);
+}
+
+/** The OM's stated exit cap, percent (a range at its first figure), as the
+ *  exit-cap row reads it. */
+export function omExitCap(ex: ExtractionResult | null): { row: Row; pct: number } | null {
+  return statedPct(rowsOf(ex), EXIT_CAP_ROW);
+}
+
+/**
+ * The rent-growth row's pieces: a regulation's allowance set apart (the
+ * regime's, for the units it regulates — shown first and never in the
+ * market's range, so never the figure that decides), the market's figures,
+ * and the one that decides, the first of the class's order present
+ * (lib/rent-growth-decider), printed first among the market's; the rest
+ * beside it.
+ */
+export function rentGrowthPieces(mvm: ModelVsMarket | null, assetClass: string | null): RowPieces & { apart: number; market: number } {
+  const check = checkOf(mvm, "rent_growth");
   const apart: StressEvidence[] = [];
   const market: StressEvidence[] = [];
   check?.published.forEach((f, i) => {
-    const e = published(check, f, ctx.mvm?.grain ?? null);
+    const e = published(check, f, mvm?.grain ?? null);
     if (check.marks?.[i]?.role === "apart" || /allowance on the regulated units/i.test(f.label)) apart.push(e);
     else market.push(e);
   });
-  if (!om && apart.length + market.length === 0) return null;
-  // The one figure that decides, the first of the class's order present
-  // (lib/rent-growth-decider), printed first among the market's; the rest
-  // beside it.
-  const decided = rentGrowthDeciding(ctx.assetClass, candidatesOf(market));
+  const decided = rentGrowthDeciding(assetClass, candidatesOf(market));
   const found = decided ? market[decided.index] : null;
   const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found)];
-  const pick = decided && found ? { i: apart.length, d: decided } : null;
+  return { evidence, decided: decided && found ? { ...decided, index: apart.length } : null, apart: apart.length, market: market.length };
+}
+
+function rentGrowthRow(ctx: Ctx): StressRow | null {
+  const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
+  const pieces = rentGrowthPieces(ctx.mvm, ctx.assetClass);
+  const evidence = pieces.evidence;
+  if (!om && evidence.length === 0) return null;
+  const pick = pieces.decided ? { i: pieces.decided.index, d: pieces.decided } : null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
   if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"));
   // Lodging and licensed care read no rent index: the true reason, never
   // that nothing could be read.
-  if (!pick) return unchecked("rent_growth", omSays, evidence, market.length === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE);
+  if (!pick) return unchecked("rent_growth", omSays, evidence, pieces.market === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE);
   const decider = evidence[pick.i];
   const bestValue = decider.value!;
   const name = pick.d.name!;
@@ -1156,17 +1191,23 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
  * decided, so a 2.5% expense growth held against core's 2.4% while the CPI
  * read 3.4%.
  */
+/** The expense-growth row's pieces: every published figure the read
+ *  carries, and the one that decides (`expenseGrowthDecider`). */
+export function expenseGrowthPieces(mvm: ModelVsMarket | null): RowPieces {
+  const evidence: StressEvidence[] = [];
+  const check = checkOf(mvm, "expense_growth");
+  if (check) for (const f of check.published) evidence.push(published(check, f, mvm?.grain ?? null));
+  return { evidence, decided: expenseGrowthDecider(candidatesOf(evidence)) };
+}
+
 function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, EXPENSE_GROWTH_ROW);
-  const evidence: StressEvidence[] = [];
-  const check = checkOf(ctx.mvm, "expense_growth");
-  if (check) for (const f of check.published) evidence.push(published(check, f, ctx.mvm?.grain ?? null));
+  const { evidence, decided } = expenseGrowthPieces(ctx.mvm);
   if (!om && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("expense growth rate"), value: null, page: null };
   if (!om) return unchecked("expense_growth", omSays, evidence, NO_FIGURE("expense growth rate"));
-  const decided = expenseGrowthDecider(candidatesOf(evidence));
   if (!decided) return unchecked("expense_growth", omSays, evidence, NO_EVIDENCE);
   const evidenceIndex = decided.index;
   const bestValue = decided.figure;
@@ -1195,13 +1236,29 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
 
 // — Exit cap —
 
-function exitCapRow(ctx: Ctx): StressRow | null {
-  const om = statedPct(ctx.rows, EXIT_CAP_ROW);
+/**
+ * The exit-cap row's pieces: the OM's going-in cap (an exit tighter than
+ * the entry is cap compression; none on a plan deal, whose going-in cap is
+ * struck on today's income, nor on a price that buys no building), the
+ * published figures the read carries — the 10-year, dated (a yield, not a
+ * cap: the exit's spread over it is the read, never a comparable, so it
+ * carries no figure), and the tracker's cap range where one is on file,
+ * held to only where the read holds the model to it (fresh, dated, the
+ * whole stock) — and the one figure that decides (`exitCapDecider`): the
+ * going-in cap, else the tracker's range at its low end. `exitPct` is the
+ * exit the 10-year's spread is said for (none: the figure alone).
+ */
+export function exitCapPieces(
+  ex: ExtractionResult | null,
+  plan: boolean,
+  mvm: ModelVsMarket | null,
+  exitPct: number | null,
+): RowPieces & { goingIn: number | null; rangeRead: boolean } {
+  const rows = rowsOf(ex);
   const evidence: StressEvidence[] = [];
-  // The going-in cap: an exit tighter than the entry is cap compression.
-  const goingRow = findGoingInCap(ctx.rows);
+  const goingRow = findGoingInCap(rows);
   const goingIn = goingRow ? parsePct(goingRow.value) : null;
-  const goingInOk = goingIn != null && goingIn > 0 && !ctx.plan && buildingPriceOf(ctx.ex, 1) != null;
+  const goingInOk = goingIn != null && goingIn > 0 && !plan && buildingPriceOf(ex, 1) != null;
   if (goingInOk) {
     evidence.push({
       kind: "om_internal",
@@ -1213,22 +1270,17 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
-  // The published figures the read carries: the 10-year, dated (a yield,
-  // not a cap — the exit's spread over it is the read, never a comparable),
-  // and the tracker's cap range where one is on file — held to only where
-  // the read holds the model to it (fresh, dated, the whole stock).
-  const check = checkOf(ctx.mvm, "exit_cap");
+  const check = checkOf(mvm, "exit_cap");
   const trackerHeld = new Set<StressEvidence>();
   if (check) {
     const held = !/not held to it/.test(check.read);
     for (const f of check.published) {
-      const e = published(check, f, ctx.mvm?.grain ?? null);
+      const e = published(check, f, mvm?.grain ?? null);
       if (/research tracker/i.test(f.label)) {
         evidence.push(e);
         if (held) trackerHeld.add(e);
       } else {
-        const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
-        const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
+        const spread = exitPct != null ? Math.round((exitPct - f.value) * 100) : null;
         // The going-in cap's spread over the same yield, beside the exit's,
         // where the going-in cap is one the exit is held to.
         const entry = goingInOk && spread != null ? Math.round((goingIn! - f.value) * 100) : null;
@@ -1249,24 +1301,31 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       }
     }
   }
-  if (!om && evidence.length === 0) return null;
-  const omSays: StressRow["omSays"] = om
-    ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
-    : { text: NO_FIGURE("exit cap"), value: null, page: null };
-  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"));
   // ONE figure decides (lib/stress-deciders `exitCapDecider`): the OM's own
   // going-in cap — the cap the deal is bought at, and the model's own exit —
   // else the tracker's cap range at its low end. A tracker range beside a
   // going-in cap is shown and decides nothing: it had turned an unsupported
   // compression into a stretched one wherever its low end reached the exit.
   const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || trackerHeld.has(e)));
+  return { evidence, decided, goingIn, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
+}
+
+function exitCapRow(ctx: Ctx): StressRow | null {
+  const om = statedPct(ctx.rows, EXIT_CAP_ROW);
+  const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
+  const { evidence, decided, goingIn, rangeRead } = exitCapPieces(ctx.ex, ctx.plan, ctx.mvm, exit);
+  if (!om && evidence.length === 0) return null;
+  const omSays: StressRow["omSays"] = om
+    ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
+    : { text: NO_FIGURE("exit cap"), value: null, page: null };
+  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"));
   if (!decided) {
     // Said by what stopped the test, never "no going-in cap" beside one the
     // OM states: on a value-add, lease-up, conversion or development deal
     // the going-in cap is struck on today's income, not the stabilized one
     // the exit sells; on a price that buys no building it is no building's.
     const stated = goingIn != null && goingIn > 0;
-    const range = check?.published.some((f) => /research tracker/i.test(f.label)) ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
+    const range = rangeRead ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
     const why = !stated
       ? `The OM states no going-in cap, and ${range}.`
       : ctx.plan

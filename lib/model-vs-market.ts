@@ -38,8 +38,10 @@ import { allowanceSentence, dayText, pctText, type AllowanceRead, type RegimeRea
  * The model's assumptions against the published figures — pure, no model
  * call. The screening model runs on four numbers that decide its return
  * more than any others: rent growth, expense growth, stabilized vacancy
- * and the exit cap. Two of them are flat defaults on every deal (3.0%/yr,
- * "set your view"), and the market brief beside the deal shows what the
+ * and the exit cap. The growth rates and the exit run at the figure the
+ * stress test decides each by where one is fresh (lib/model-evidence), else
+ * the memorandum's, else a default (3.0%/yr, "set your view"; the sample
+ * keeps the defaults), and the market brief beside the deal shows what the
  * metro has actually done — so this sets each assumption against the
  * figure that speaks to it, dated and sourced, and says which way the
  * assumption runs. It does NOT say the assumption is wrong: a trailing
@@ -443,6 +445,9 @@ const pts = (n: number): string => `${n.toFixed(1)} point${Math.abs(n - 1) < 0.0
 const SAME = 0.05;
 
 function sourceWords(s: InputSource | undefined): string {
+  // The figure the stress test decides the row by, run as the model's own
+  // (lib/model-evidence): a published figure, never a screening default.
+  if (s?.published) return "the published figure the stress test decides by";
   switch (s?.provenance) {
     case "extracted":
       return "from the documents";
@@ -1126,6 +1131,11 @@ export function dealGoingInCap(
   return implied ? { pct: implied.pct, source: implied.whole ? "implied_whole" : "implied" } : null;
 }
 
+/** The assumptions a read of the published figures alone is struck on
+ *  (`modelVsMarketFor` with no model): any finite figures do, since only the
+ *  checks' words and tone read them, never the figures they carry. */
+const NEUTRAL_ASSUMPTIONS: Pick<UnderwriteInputs, AssumptionKey> = { rentGrowthPct: 0.03, expenseGrowthPct: 0.03, vacancyPct: 0.05, exitCapPct: 0.06 };
+
 /**
  * The read for a deal, from what every surface already holds — the derived
  * model, the extraction, the first signal, the stored class, the covered
@@ -1143,7 +1153,11 @@ export function dealGoingInCap(
  * widening on the page and 20 in the documents.
  */
 export function modelVsMarketFor(args: {
-  derived: Pick<DerivedModel, "inputs" | "sources">;
+  /** the derived model; null reads the published figures alone, before a
+   *  model is derived (lib/model-evidence, the screening model's seed): the
+   *  figures a check carries never depend on the model's own, only its
+   *  words and tone do, which that caller does not read */
+  derived: Pick<DerivedModel, "inputs" | "sources"> | null;
   extraction: ExtractionResult | null;
   firstSignal?: FirstSignal | null;
   /** the deal row's own class column — "auto" shows what the deck turned out to be */
@@ -1168,8 +1182,8 @@ export function modelVsMarketFor(args: {
   const goingIn = dealGoingInCap(extraction, args.firstSignal ?? null);
   const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
-    inputs: derived.inputs,
-    sources: derived.sources,
+    inputs: derived?.inputs ?? NEUTRAL_ASSUMPTIONS,
+    sources: derived?.sources ?? {},
     assetClass,
     deckWords: extraction?.assetClass ?? null,
     plan: planDeal,
@@ -1177,7 +1191,7 @@ export function modelVsMarketFor(args: {
     goingInCapSource: goingIn?.source,
     // The model's own year-1 NOI over its price, named beside the going-in
     // cap where the two sit apart, and the exit set against it.
-    modelEntryCapPct: modelEntryCap(derived, extraction),
+    modelEntryCapPct: derived ? modelEntryCap(derived, extraction) : null,
     metro,
     rates: reads.rates,
     zori: reads.zori,

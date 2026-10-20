@@ -75,9 +75,10 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { isStateMarket } from "@/lib/market-match";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates, type LiveRate, type RateRow } from "@/lib/live-rates";
-import { MODEL_CHECK_NATIONAL_IDS, modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { MODEL_CHECK_NATIONAL_IDS, modelVsMarketFor, type MarketReads } from "@/lib/model-vs-market";
+import { modelEvidenceFor } from "@/lib/model-evidence";
 import { NO_DEBT_SEEDS, debtSeeds, isDebtSeedSeries, ratesPromptLine, type DebtSeeds } from "@/lib/debt-index";
-import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread, type DerivedModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread } from "@/lib/underwrite/inputs";
 import { modelMarketFor } from "@/lib/model-market";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -497,26 +498,27 @@ interface VerdictReads {
 }
 
 /**
- * The model's assumptions against the published figures for the verdict's
- * stress test (lib/model-vs-market `modelVsMarketFor`, the deal page's, the
- * report's and the workbook's one function), over the same bare queries the
+ * Today's published figures for the verdict's stress test — the reads the
+ * model's growth and exit are seeded from (lib/model-evidence) and its
+ * assumptions are set against (lib/model-vs-market `modelVsMarketFor`, the
+ * deal page's, the report's and the workbook's one function) — over the same bare queries the
  * market check makes (lib/live-rates-query; the worker has no Next cache):
  * the metro's series and Zillow's rent as the market step read them where
  * it ran in this attempt — never a second read of a figure in hand — topped
  * up with the national series the checks read and the brief did not ask
  * for; or, where the step did not run in this attempt, the deal placed
- * again and every series read once. Null where there is no model to read,
- * where the market step's read failed, or where a read here fails: the
+ * again and every series read once. Null where the market step's read
+ * failed, or where a read here fails: the model then runs on the
+ * memorandum's own figures, the
  * test then carries the documents' and the rules of thumb's evidence alone,
  * as it did before, and the screen never fails for it.
  */
-async function verdictModelRead(
+async function verdictMarketReads(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   row: { extraction?: unknown; first_signal?: unknown; address?: unknown; asset_class?: unknown },
-  derived: DerivedModel | null,
   reads: VerdictReads | undefined,
-): Promise<ModelVsMarket | null> {
-  if (!derived || !reads || reads.market === null) return null;
+): Promise<{ metro: { id: string; name: string; placedBy?: unknown } | null; reads: MarketReads; regulation: RegulationRead | null } | null> {
+  if (!reads || reads.market === null) return null;
   try {
     const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
     let failed = false;
@@ -549,16 +551,12 @@ async function verdictModelRead(
     const topUp = SERIES.filter((s) => MODEL_CHECK_NATIONAL_IDS.includes(s.id) && !market.nationalAsked.includes(s.id));
     const more = topUp.length > 0 ? await fetchSeriesRows(admin, topUp, fail) : [];
     if (failed) return null;
-    return modelVsMarketFor({
-      derived,
-      extraction,
-      firstSignal: (row.first_signal as FirstSignal | null | undefined) ?? null,
-      storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
+    return {
       metro: market.metro,
       reads: { rates: market.rates, zori: market.zori, national: readRates([...market.nationalRows, ...more], market.now), now: market.now },
       // The rent rules on the UTC day the worker keeps, as every step reads them.
       regulation: screenRegulation(row, reads.flags),
-    });
+    };
   } catch (err) {
     console.warn(`[pipeline] the model's published-figure read was not made for the verdict:`, err instanceof Error ? err.message : err);
     return null;
@@ -575,7 +573,7 @@ async function verdictModelRead(
  * on the sample) — so the moves the verdict cites are the engine's own on
  * the model every other surface runs. The published figures the model's
  * read sets its assumptions against (lib/model-vs-market) are read bare
- * (`verdictModelRead`): the deal page reads them through Next's cached
+ * (`verdictMarketReads`): the deal page reads them through Next's cached
  * readers, which the worker has not, and the first cut handed the test
  * none, so no published vacancy, rent or price figure reached the verdict
  * from the worker. A model that cannot be derived (no extraction) tests the
@@ -612,6 +610,21 @@ async function screenStressTest(
     const t12Summary = t12SummaryOf(t12?.summary);
     // The UTC day the worker keeps (lib/reader-day), at its noon.
     const today = new Date().toISOString().slice(0, 10);
+    // Today's published figures, read once (bare, as the market check reads
+    // them) before the model is derived: its growth and exit run at the
+    // stress test's deciding figures off them (lib/model-evidence), and the
+    // model's read against the market below sets it against the same reads.
+    const live = extraction ? await verdictMarketReads(admin, row, reads) : null;
+    const evidence = extraction
+      ? modelEvidenceFor({
+          extraction,
+          firstSignal,
+          storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
+          metro: live?.metro ?? null,
+          reads: live?.reads ?? null,
+          regulation: live?.regulation ?? null,
+        })
+      : null;
     const derived = extraction
       ? deriveUnderwriteInputs(
           extraction,
@@ -620,7 +633,7 @@ async function screenStressTest(
             rentRoll: rr?.summary ? { summary: rr.summary as RentRollSummary, asOf: rr.as_of_date ?? null } : null,
             t12: t12Summary ? { summary: t12Summary as T12Summary, periodEnd: t12?.period_end_date ?? null } : null,
           },
-          modelMarketFor(!!row.is_sample, seeds),
+          modelMarketFor(!!row.is_sample, seeds, evidence),
           { asOf: new Date(`${today}T12:00:00Z`) },
         )
       : null;
@@ -640,7 +653,18 @@ async function screenStressTest(
       firstSignal,
       challenger: (row.challenges as ChallengerResult | null | undefined) ?? null,
       market: (row.market as MarketResult | null | undefined) ?? null,
-      modelVsMarket: await verdictModelRead(admin, row, derived, reads),
+      modelVsMarket:
+        derived && live
+          ? modelVsMarketFor({
+              derived,
+              extraction,
+              firstSignal,
+              storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
+              metro: live.metro,
+              reads: live.reads,
+              regulation: live.regulation,
+            })
+          : null,
       actuals: actualsFromRows(extraction, inferStrategy(extraction, firstSignal), assetClass, rr, t12),
       derived,
       storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
@@ -950,7 +974,7 @@ async function liveMarketFromDb(
  * price as a property's while every step before it was told otherwise.
  *
  * `reads` is what the run holds for the stress test's model read
- * (`verdictModelRead`): the site flags, and the market step's own reads
+ * (`verdictMarketReads`): the site flags, and the market step's own reads
  * where it ran in this attempt.
  */
 async function regenerateVerdict(
