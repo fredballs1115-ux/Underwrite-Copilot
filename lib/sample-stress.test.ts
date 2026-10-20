@@ -201,6 +201,11 @@ describe("the sample's stress test, one build on every surface", () => {
     // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
     // and insurance the rows move on their own; the premium is no model input.
     expect(h.omitted.map((o) => o.key)).toEqual(["basis", "noi", "renovation_premium"]);
+    // The NOI is left out for the tax swap, which moves the year-one NOI by
+    // the reset's $224k, $50k past the NOI row's own $174k gap over the
+    // T-12: said, never swapped.
+    expect(h.noiRest).toEqual({ usd: -50_468, components: ["taxes"] });
+    expect(headlineSentence(page)).toContain(" The tax swap moves the year-one NOI $50k a year past the NOI's own gap. ");
     // With the read failed: the published rows unchecked, rent growth out of
     // both cases, and the vacancy held to the deal's own rent roll.
     const bare = signedInSample(null).headline!;

@@ -382,6 +382,31 @@ export function unsolvedSentence(h: StressHeadline): string {
 
 const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
+/** A component swap named before "swap": "the tax swap". */
+const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance" };
+
+/**
+ * What the component swaps leave of the NOI's gap where the NOI is left out
+ * for them (`StressHeadline.noiRest`), one clause: "the rest of the NOI's
+ * gap ($54k a year) is in neither case"; where the swaps move the year-one
+ * NOI past the NOI's own gap, "the tax swap moves the year-one NOI $54k a
+ * year past the NOI's own gap". "" where the headline carries none.
+ */
+export function noiRestClause(h: StressHeadline): string {
+  const r = h.noiRest;
+  if (!r) return "";
+  if (r.usd > 0) return `the rest of the NOI's gap (${money(r.usd)} a year) is in neither case`;
+  const names = r.components.map((k) => SWAP_NAME[k] ?? headlineName(k));
+  const many = names.length > 1;
+  return `the ${joinAnd(names)} swap${many ? "s" : ""} move${many ? "" : "s"} the year-one NOI ${money(-r.usd)} a year past the NOI's own gap`;
+}
+
+/** `noiRestClause` as a sentence; "" with none. */
+export function noiRestSentence(h: StressHeadline): string {
+  const c = noiRestClause(h);
+  return c ? `${upperFirst(c)}.` : "";
+}
+
 function joinAnd(parts: string[]): string {
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
@@ -520,11 +545,13 @@ export function headlineSentence(test: StressTest): string | null {
           : ".";
   const unsolved = h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : "";
   const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
+  // What the component swaps leave of the NOI's gap, where it is material.
+  const rest = noiRestSentence(h);
   // The model as it runs, and why the evidence's case is not it.
   const kept = keptSentence(test);
   const clause = modelClause(h);
   const model = kept ? ` ${kept}` : clause ? ` ${upperFirst(clause)}.` : "";
-  return `${line}${multiples}${split}${unsolved}${left}${model}`;
+  return `${line}${multiples}${split}${unsolved}${left}${rest ? ` ${rest}` : ""}${model}`;
 }
 
 /** The rows in STRESS_KEYS' order, as the test holds them. */

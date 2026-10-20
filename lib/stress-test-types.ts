@@ -205,6 +205,15 @@ export interface StressHeadline {
    *  case runs that the model does not. Absent where `modelIrrPct` is, and on
    *  a headline struck before it was carried. */
   atEvidence?: StressAtEvidence[];
+  /** where the NOI is left out for its components (`HEADLINE_NOI_LEFT_OUT`),
+   *  what the component swaps leave of the NOI row's gap: that gap (the OM's
+   *  NOI less its evidence's) less the year-one NOI the component swaps move,
+   *  in the model's own year-one terms, in dollars a year — positive where
+   *  that much of the gap is in neither case, negative where the swaps move
+   *  the year-one NOI past the NOI's own gap — with the swapped components.
+   *  Null where the NOI is not left out for them, or where it is within
+   *  1% of the OM's NOI; absent on a headline struck before it was carried. */
+  noiRest?: { usd: number; components: StressKey[] } | null;
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -289,6 +298,7 @@ export const HEADLINE_METHOD = {
   overlap: [
     `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
     "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
+    "What the component swaps leave of the NOI's gap, the NOI row's gap less the year-one NOI they move, is in neither case, and the headline says how much wherever it passes 1% of the OM's NOI.",
     "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],

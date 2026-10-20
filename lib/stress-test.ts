@@ -2382,6 +2382,10 @@ export function buildStressTest(args: StressTestArgs): StressTest {
  *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
 export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
 
+/** The share of the OM's NOI past which the rest of the NOI's gap — what the
+ *  component swaps leave of it (`StressHeadline.noiRest`) — is said. */
+export const HEADLINE_NOI_REST_SHARE = 0.01;
+
 /** The percent and dollar inputs a row's re-run swaps whole, which the two
  *  cases set directly. */
 const HEADLINE_SCALARS = ["purchasePrice", "exitCapPct", "allInRatePct", "vacancyPct", "rentGrowthPct", "expenseGrowthPct"] as const;
@@ -2572,6 +2576,22 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
       }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
+  // THE NOI'S REST. Where the NOI is left out for its components, the
+  // component swaps move the evidence's case's year-one NOI, but not
+  // necessarily by the NOI row's own gap: what is left of that gap — the NOI
+  // row's gap less the year-one NOI the component swaps move, in the model's
+  // own year-one terms — is in neither case. Said where it passes
+  // `HEADLINE_NOI_REST_SHARE` of the OM's NOI.
+  let noiRest: StressHeadline["noiRest"] = null;
+  if (noi && noiIn === noi && omitted.some((o) => o.key === "noi" && o.why === HEADLINE_NOI_LEFT_OUT)) {
+    const components = players.filter((s) => HEADLINE_NOI_COMPONENTS.includes(s.row.key));
+    const componentCase = scenario((s) => components.includes(s));
+    const moved = year1Noi(omCase) - year1Noi(componentCase);
+    const rest = noi.omNoi - noi.altNoi - moved;
+    if (Number.isFinite(rest) && Math.abs(rest) > HEADLINE_NOI_REST_SHARE * Math.abs(noi.omNoi)) {
+      noiRest = { usd: Math.round(rest), components: components.map((s) => s.row.key).sort((a, b) => STRESS_KEYS.indexOf(a) - STRESS_KEYS.indexOf(b)) };
+    }
+  }
   const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
   // The model as it runs, every input its own: the run each row's re-run
   // swaps one input on (`runImpact`'s inputs are the model's with that one
@@ -2590,6 +2610,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
     modelIrrPct,
     keptAtOm: keptAtOm(inCase, players, omitted, model, modelExpense, noiIn ? anchorRent : null).sort((a, b) => order(a.key) - order(b.key)),
     atEvidence: atEvidence(players, model, modelExpense).sort((a, b) => order(a.key) - order(b.key)),
+    noiRest,
   };
 }
 

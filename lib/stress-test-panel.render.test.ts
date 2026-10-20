@@ -497,6 +497,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("Left out: the NOI.");
     expect(t).toContain(`NOI: ${HEADLINE_NOI_LEFT_OUT}.`);
     expect(hh).toContain('href="/how-we-test#headline"');
+    // What the component swaps leave of the NOI's gap is said in the note,
+    // after what is left out; a headline that carries none says nothing.
+    expect(t).not.toContain("in neither case");
+    const rest = visibleText(render({ ...TEST, headline: { ...headline, noiRest: { usd: 54_000, components: ["vacancy", "taxes"] } } })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(rest).toContain("Left out: the NOI. The rest of the NOI's gap ($54k a year) is in neither case. How the headline is struck");
     // With the re-runs withheld there is no headline, and the note says so.
     const w = visibleText(render({ ...WITHHELD, headline: null })).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(w).toContain(HEADLINE_WITHHELD.replace(/&#x27;/g, "'"));

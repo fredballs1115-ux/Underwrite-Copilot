@@ -10,6 +10,7 @@ import {
   liveHeadline,
   modelIrrOf,
   noMoveWhy,
+  noiRestSentence,
   partAgainst,
   ptsText,
   rerunWords,
@@ -762,7 +763,8 @@ function HeadlineView({ headline: h, line, kept }: { headline: StressHeadline; l
                 ? "Nothing past its evidence is a figure the headline swaps, so the two runs are one."
                 : "Nothing the model takes is past its evidence, so the two runs are one."}
         {h.unsolved > 0 ? ` ${unsolvedSentence(h)}` : ""}
-        {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}{" "}
+        {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}
+        {noiRestSentence(h) ? ` ${noiRestSentence(h)}` : ""}{" "}
         <Link href="/how-we-test#headline" className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
           How the headline is struck
         </Link>

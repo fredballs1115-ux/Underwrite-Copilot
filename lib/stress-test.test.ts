@@ -30,6 +30,7 @@ import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./s
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
+  HEADLINE_NOI_REST_SHARE,
   INSURANCE_NO_QUOTE,
   INSURANCE_RERUN_NOTE,
   IRR_MOVE_STRETCH_BPS,
@@ -43,7 +44,7 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, ptsText, rerunWords, shownHeadline } from "./stress-test-words";
+import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline } from "./stress-test-words";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -1783,6 +1784,32 @@ describe("the headline", () => {
     // The NOI anchors the OM's case at the OM's own vacancy: year one is the
     // OM's NOI whether or not the vacancy row is past its evidence.
     expect(HEADLINE_METHOD.overlap[0]).toContain(HEADLINE_NOI_LEFT_OUT);
+  });
+
+  it("says what the component swaps leave of the NOI's gap, in neither case, wherever it passes 1% of the OM's NOI", () => {
+    const n = rowOf(test, "noi");
+    const t = rowOf(test, "taxes").impact!;
+    const noiGap = n.omSays.value! - n.evidence[n.impact!.evidenceIndex].value!;
+    // The tax swap moves the year-one NOI by the bill's own move, dollar for
+    // dollar (the management fee is struck on the income, not the expenses).
+    const rest = noiGap - (t.altValue - t.omValue);
+    const pair = stressHeadline(only(["noi", "taxes"]), model)!;
+    expect(Math.abs(rest)).toBeGreaterThan(HEADLINE_NOI_REST_SHARE * n.omSays.value!);
+    expect(pair.noiRest!.components).toEqual(["taxes"]);
+    expect(pair.noiRest!.usd).toBeCloseTo(rest, -1);
+    // Said in one clause, by its sign.
+    const said = { ...pair, noiRest: { usd: 54_000, components: ["taxes" as const] } };
+    expect(noiRestClause(said)).toBe("the rest of the NOI's gap ($54k a year) is in neither case");
+    expect(noiRestClause({ ...said, noiRest: { usd: -54_000, components: ["vacancy", "taxes"] } })).toBe("the vacancy and tax swaps move the year-one NOI $54k a year past the NOI's own gap");
+    expect(noiRestSentence({ ...said, noiRest: { usd: -54_000, components: ["taxes"] } })).toBe("The tax swap moves the year-one NOI $54k a year past the NOI's own gap.");
+    expect(noiRestClause({ ...said, noiRest: null })).toBe("");
+    // A tax move that carries the NOI's gap to within 1% says nothing.
+    const carried = only(["noi", "taxes"]).map((r) => (r.key === "taxes" ? { ...r, impact: { ...r.impact!, altValue: r.impact!.omValue + noiGap } } : r));
+    expect(stressHeadline(carried, model)!.noiRest).toBeNull();
+    // Where the NOI is not left out, there is no rest to say.
+    expect(stressHeadline(only(["noi", "exit_cap"]), model)!.noiRest).toBeNull();
+    expect(HEADLINE_METHOD.overlap.join(" ")).toContain("passes 1% of the OM's NOI");
+    expect(HEADLINE_NOI_REST_SHARE).toBe(0.01);
   });
 
   it("keeps the price at the ask in both cases, a reset tax bill struck on the ask, and names the price as left out", () => {
