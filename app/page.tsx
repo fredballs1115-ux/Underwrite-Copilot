@@ -915,15 +915,20 @@ export default function Home() {
         {/* Inside the screen — the deal page's own sections, in miniature. */}
         <section className="border-b border-line">
           <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-[1fr_1.4fr]">
-            <Reveal>
-              <SectionHead eyebrow="The test, row by row" title="Click through what every call rests on." />
-              <Link
-                href="/login?mode=signup"
-                className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                Run it on a real OM
-              </Link>
-            </Reveal>
+            {/* Beside a walkthrough several screens tall, the heading and its
+                button stay in view on a laptop rather than leaving the column
+                empty below them. */}
+            <div className="lg:sticky lg:top-24">
+              <Reveal>
+                <SectionHead eyebrow="The test, row by row" title="Click through what every call rests on." />
+                <Link
+                  href="/login?mode=signup"
+                  className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                >
+                  Run it on a real OM
+                </Link>
+              </Reveal>
+            </div>
             <Reveal delay={120}>
               <SampleWalkthrough />
             </Reveal>
