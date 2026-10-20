@@ -19,6 +19,7 @@ import { countyOf, placeDeal } from "./market-county";
 import { modelVsMarketFor } from "./model-vs-market";
 import { PLAN_YIELD_LEAD, buildStressTest } from "./stress-test";
 import type { StressTest } from "./stress-test-types";
+import { stressSnapshotOf } from "./stress-snapshot";
 import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
@@ -158,6 +159,9 @@ describe("the sample's stress test, one build on every surface", () => {
     // 9.3% shown beside it as today's. With no Zillow figure in this read,
     // its 4.0% rent growth is held to the CPI rent's +5.0%.
     expect(row("vacancy")).toMatchObject({ verdict: "holds", gap: { value: -0.2, unit: "pts" } });
+    // Kept with the verdict, the row carries the tolerance it held by: the
+    // survey's 1.9-point margin of error, never a stricter 0.05 points.
+    expect(stressSnapshotOf(page)!.rows.find((r) => r.key === "vacancy")!.threshold).toEqual({ value: 1.9, unit: "pts" });
     expect(row("vacancy").evidence[0].label).toBe("Rental vacancy, metro area");
     expect(row("vacancy").gap!.text).toContain("Today the deal's rent roll runs 9.3% vacant, 3.3 points over the assumption — the gap a lease-up has to close.");
     // 3.3 points is past the row's own 3-point threshold: neither run

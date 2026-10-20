@@ -1,9 +1,10 @@
-import { ACCOUNT_VACANCY_NOTE, DOCUMENT_DATE_RULE, RECORD_FLOOR, TAX_INSURANCE_NOT_SCORED, recordCountsLine, recordLine, recordState, type AccountRecord, type KeyRecord } from "@/lib/track-record";
+import { ACCOUNT_VACANCY_NOTE, DOCUMENT_DATE_RULE, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, TAX_INSURANCE_NOT_SCORED, recordCountsLine, recordLine, recordState, type AccountRecord, type KeyRecord } from "@/lib/track-record";
 
 /**
  * The account's track record (2026-10-19; every stress-test row since
  * 2026-10-20): what the screens' stress tests came to once later evidence
- * arrived — each row right or wrong, holds included, scored in
+ * arrived — each row a later figure can speak to right or wrong, holds
+ * included (the rest named as not yet scorable), scored in
  * lib/track-record, never claimed. Three states, each in its own words:
  * nothing scored yet (and what it will be scored against), a few rows ("a
  * start, not a record", with no shares), and enough rows to say shares,
@@ -60,7 +61,10 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
           }.${state === "start" ? ` No share is printed under ${RECORD_FLOOR} scored rows.` : ""}`}
         </p>
       )}
-      <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-documents">
+      <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-scored-by">
+        {`${SCORED_BY} ${NOT_YET_SCORABLE}`}
+      </p>
+      <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-documents">
         {`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`}
       </p>
       <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-vacancy">

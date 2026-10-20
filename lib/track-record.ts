@@ -84,8 +84,10 @@ import { RECORD_FLOOR, shareWords, type RowOutcome } from "@/lib/track-record-wo
 export {
   CARD_SCOPE,
   DOCUMENT_DATE_RULE,
+  NOT_YET_SCORABLE,
   OUTCOME_WORD,
   RECORD_FLOOR,
+  SCORED_BY,
   TAX_INSURANCE_NOT_SCORED,
   dealRecordLine,
   shareWords,
@@ -972,7 +974,7 @@ export function recordState(r: Pick<AccountRecord, "scored"> & { challenges?: { 
 /** What the record is scored against — the homepage's FAQ promises exactly
  *  these three, and this sentence keeps it true. */
 export const RECORD_NONE_LINE =
-  "No track record yet, and none is claimed. Every test is scored later against three things you supply: a T-12 or rent roll dated after the screen, what you decided (dead, and why), and what the building traded for.";
+  "No track record yet, and none is claimed. A test's rows are scored later where one of three things you supply speaks to them: a T-12 or rent roll dated after the screen, what you decided (dead, and why), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
   // A decision is a direction, not a figure: said apart, never in a share.

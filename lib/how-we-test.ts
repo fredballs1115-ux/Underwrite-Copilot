@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { RECORD_FLOOR, marginWords } from "@/lib/track-record";
+import { NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 
@@ -267,7 +267,9 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 ];
 
 /** Whether the screen was right: scored, never claimed (lib/track-record's
- *  rules, its floor imported). */
+ *  rules, its floor and its lists of what can score a row imported; the
+ *  margins lib/stress-snapshot's `rowThreshold`: the survey's margin of
+ *  error where it decided a vacancy, else `snapshotThreshold`). */
 const margin = (key: StressKey) => {
   const t = snapshotThreshold(key);
   return t ? marginWords(t).replace("-point", " points") : "";
@@ -276,11 +278,14 @@ const margin = (key: StressKey) => {
 export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
-    "Every row of the stress test is scored, holds included: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
+    "Each row of the stress test, holds included, is scored where a later figure can speak to it: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
     "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    SCORED_BY,
+    NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands at or better than the OM's.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
-    `The margin is the one the row's own verdict draws: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: the survey's margin of error on a vacancy the survey decided, else ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
     "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",

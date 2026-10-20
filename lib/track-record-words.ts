@@ -19,9 +19,26 @@ export const TAX_INSURANCE_NOT_SCORED = "A seller's T-12 cannot show a new owner
 export const DOCUMENT_DATE_RULE =
   "A rent roll or T-12 scores a row only where its own date — the roll's as-of, the T-12's period end — falls after the verdict, not merely its upload.";
 
+/**
+ * What can score which row, as lib/track-record's `laterFor` reads it: a
+ * vacancy by a rent roll or a T-12, the NOI by a T-12, the price by a
+ * reported trade; a Dead decision on price or on financing answers the price
+ * or the loan as a direction, counted apart. No later figure on the deal
+ * speaks to the rest (lib/track-record.test.ts holds these lists to what the
+ * scorer scores, key by key).
+ */
+export const SCORED_BY =
+  "A row is scored only where a later figure can speak to it: a vacancy by a rent roll or T-12 dated after the verdict, the NOI by a T-12, the price by a reported trade. A Dead decision on price or financing answers the price or the loan, counted apart.";
+
+/** The rows nothing on the deal can score yet — every key `laterFor` has no
+ *  later figure for, the taxes and insurance said apart
+ *  (`TAX_INSURANCE_NOT_SCORED`). */
+export const NOT_YET_SCORABLE =
+  "Rent growth, expense growth, the exit cap, taxes, insurance and a renovation premium have nothing yet that can score them, so those rows stay unscored.";
+
 /** What the deal page's card scores against, in one sentence. */
 export const CARD_SCOPE =
-  "Each row of the stress test, holds included, is scored only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload), your decision, a reported trade. A document the screen read is not evidence of it.";
+  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) for a vacancy or the NOI, a reported trade for the price, your decision. A document the screen read is not evidence of it.";
 
 /** Under this many scored rows the record is a start, and no share is
  *  printed (the owner's decision of 2026-10-20: five, not the comps' three).

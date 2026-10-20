@@ -1,12 +1,13 @@
 import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
-import { CARD_SCOPE, OUTCOME_WORD, TAX_INSURANCE_NOT_SCORED, dealRecordLine } from "@/lib/track-record-words";
+import { CARD_SCOPE, NOT_YET_SCORABLE, OUTCOME_WORD, TAX_INSURANCE_NOT_SCORED, dealRecordLine } from "@/lib/track-record-words";
 
 /**
  * What came after the screen (the track record, 2026-10-19; every stress-test
  * row since 2026-10-20): the deal's own later evidence — a T-12 or rent roll
  * added after the verdict, the decision, a reported trade — and each row of
  * the stress test as it stood at the verdict, holds included, set against
- * it: right or wrong, said in words. A screen whose test was not kept has
+ * it where a later figure can speak to it: right or wrong, said in words
+ * (the rows nothing can score yet named, `NOT_YET_SCORABLE`). A screen whose test was not kept has
  * its challenges scored instead, by which side the later figure landed on,
  * and the card says the rows were not snapshotted. Pure: the record is
  * scored in lib/track-record and handed in as data. Drawn only where
@@ -29,6 +30,9 @@ export function TrackRecordCard({ record }: { record: DealRecord | null }) {
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
         {record.screenedOn ? `Screened ${record.screenedOn}. ` : ""}
         {CARD_SCOPE}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-not-scorable">
+        {NOT_YET_SCORABLE}
       </p>
       {(record.snapshotNotes ?? []).map((line) => (
         <p key={line} className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-not-snapshotted">

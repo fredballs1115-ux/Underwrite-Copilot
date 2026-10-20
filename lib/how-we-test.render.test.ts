@@ -42,7 +42,7 @@ import {
   RENT_GROWTH_UNSUPPORTED_PTS,
   VACANCY_UNSUPPORTED_PTS,
 } from "./stress-test";
-import { RECORD_FLOOR } from "./track-record";
+import { NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -225,11 +225,20 @@ describe("/how-we-test draws every method from the table", () => {
     // Every row scored, holds included, each outcome said, and the margins
     // the snapshot keeps (lib/stress-snapshot) printed as the reader's own.
     const record = TRACK_RECORD.lines.join(" ");
-    expect(record).toContain("Every row of the stress test is scored, holds included");
+    // Scored where a later figure can speak to a row, never "every row": the
+    // rows nothing can score yet are named (lib/track-record-words, held to
+    // the scorer key by key in lib/track-record.test.ts).
+    expect(record).toContain("Each row of the stress test, holds included, is scored where a later figure can speak to it");
+    expect(record).not.toMatch(/every row/i);
+    expect(TRACK_RECORD.lines).toContain(SCORED_BY);
+    expect(TRACK_RECORD.lines).toContain(NOT_YET_SCORABLE);
     expect(record).toContain("a false hold");
     expect(record).toContain("An unchecked row is not scored.");
     expect(record).toContain('"3 of 5 rows"');
-    expect(record).toContain("0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    // The margin is the verdict's own tolerance: the survey's margin of error
+    // where the survey decided a vacancy, else the key's own.
+    expect(record).toContain("the survey's margin of error on a vacancy the survey decided, else 0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    expect(record).toContain("A row kept before its tolerance was carried keeps the margin it was stored with.");
     expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });
     expect(snapshotThreshold("noi")).toEqual({ value: 0.05, unit: "share" });
     expect(snapshotThreshold("basis")).toEqual({ value: 0.05, unit: "share" });
