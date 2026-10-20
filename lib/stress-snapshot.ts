@@ -11,9 +11,10 @@
 // Its rules:
 //   - one row a stress row, in the test's order, with the code's verdict,
 //     the OM's figure and its validated page, and the ONE piece of evidence
-//     that decided it — the figure its re-run swapped in, else the first
-//     piece with a figure (the row prints the kind that decides first; the
-//     rule lib/stress-test `vacancyDecidedBy` reads);
+//     that decided it — the row's own `decidedBy` (lib/stress-deciders, the
+//     one figure its verdict was struck on), else, on a row built before that
+//     field, the figure its re-run swapped in, else the first piece with a
+//     figure;
 //   - a piece judged on a yardstick of its own (a basis row's per-SF piece
 //     beside a per-unit OM figure) is kept on that yardstick, the OM's figure
 //     with it, so the two figures kept are always on one yardstick;
@@ -122,7 +123,14 @@ const finite = (n: unknown): n is number => typeof n === "number" && Number.isFi
 export function stressSnapshotOf(test: StressTest | null | undefined): StressSnapshot | null {
   if (!test || test.rows.length === 0) return null;
   const rows = test.rows.map((r): StressSnapshotRow => {
-    const picked = r.verdict === "unchecked" ? null : r.impact ? r.evidence[r.impact.evidenceIndex] : r.evidence.find((e) => e.value != null);
+    const picked =
+      r.verdict === "unchecked"
+        ? null
+        : r.decidedBy != null
+          ? r.evidence[r.decidedBy]
+          : r.impact
+            ? r.evidence[r.impact.evidenceIndex]
+            : r.evidence.find((e) => e.value != null);
     const decider = picked && finite(picked.value) ? picked : null;
     const own = decider?.ownYardstick && finite(decider.ownYardstick.om) ? decider.ownYardstick : null;
     const om = own ? own.om : finite(r.omSays.value) ? r.omSays.value : null;

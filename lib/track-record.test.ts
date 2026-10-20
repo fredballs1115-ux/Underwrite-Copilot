@@ -753,6 +753,20 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
     expect(stressSnapshotOf(test())).toBeNull();
   });
 
+  it("keeps the row's own deciding figure (decidedBy) ahead of the re-run's", () => {
+    const vac: StressRow = {
+      ...base,
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      omSays: { text: "Vacancy 5%", value: 5, page: 9 },
+      evidence: [ev({ value: 9, label: "The deal's rent roll" }), ev({ kind: "published", label: "Rental vacancy, metro area", value: 6.2, asOf: "2026-04-01", publisher: "Census Bureau" })],
+      verdict: "stretched",
+      decidedBy: 1,
+      impact: { input: "vacancyPct", evidenceIndex: 0, omValue: 0.05, altValue: 0.09, baseIrrPct: 10, altIrrPct: 9, baseMultiple: 1.8, altMultiple: 1.7, note: "" },
+    };
+    expect(stressSnapshotOf(test(vac))!.rows[0].evidence).toMatchObject({ kind: "published", value: 6.2 });
+  });
+
   it("a piece judged on its own yardstick is kept on it, the OM's figure with it", () => {
     const basisRow: StressRow = {
       ...base,
