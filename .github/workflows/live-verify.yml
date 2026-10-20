@@ -102,6 +102,26 @@ jobs:
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
+          # The sample's stress test as the live site prints it (2026-10-20):
+          # the headline and each row's verdict, on /demo and the homepage,
+          # so the figures the tests quote can be read against today's feeds.
+          # The two pages draw one build, so the lines should match.
+          for f in p_demo.html body.html; do
+            [ -f "$f" ] || continue
+            python3 - "$f" <<'PY' || true
+          import html, re, sys
+          name = sys.argv[1]
+          src = open(name, encoding="utf-8", errors="replace").read()
+          def text(fragment):
+              t = re.sub(r"<!-- -->", "", fragment)
+              t = re.sub(r"<[^>]+>", " ", t)
+              return re.sub(r"\s+", " ", html.unescape(t)).strip()
+          m = re.search(r'data-qa="stress-headline-line"[^>]*>(.*?)</p>', src, re.S)
+          print(f"STRESS {name}: headline: {text(m.group(1)) if m else 'none drawn'}")
+          rows = re.findall(r'data-qa="stress-row-([a-z_]+)" data-verdict="([a-z]+)"', src)
+          print(f"STRESS {name}: rows: {', '.join(f'{k} {v}' for k, v in rows) or 'none drawn'}")
+          PY
+          done
           # /how-we-test (2026-10-19, the refocus): the methodology page, its
           # marker one JS string with no interpolation inside it.
           grep -q "The arithmetic is run in code, never by the AI." p_how-we-test.html && echo "/how-we-test: methodology page present" || echo "/how-we-test: not yet deployed"
