@@ -149,7 +149,10 @@ export const PUBLISHERS: readonly Publisher[] = [
 export const CADENCE_RULE = {
   heading: "A figure is dated, and stale by its own cadence",
   lines: [
-    "Every published figure carries the day or period it is for and a link to its source.",
+    // What a StressEvidence carries (lib/stress-test-types): a publisher and
+    // an `asOf` on every published figure but the reader's own past screens,
+    // and an `href` only on recorded sales, where the provider gives one.
+    "A published figure names its publisher and the day or period it is for (your own past screens, pooled across days, carry no date); a recorded sale links to its record where the source gives one.",
     "A daily series is stale in days, a monthly one in weeks, a quarterly one in months: each is judged by its own cadence, never one threshold for all.",
     "A stale figure still shows with its date, and is set against nothing.",
     `A research print is stale past ${RESEARCH_STALE_DAYS} days from the day it was read.`,
@@ -165,6 +168,18 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
   {
     heading: "Not investment advice",
     line: "A first-pass screen for an analyst to check against the documents, never a reason to buy or pass.",
+  },
+  // lib/stress-test's `impactsWithheld`: a plan deal (lib/deal-strategy
+  // `isPlanDeal`) re-runs no return, and neither does a placeholder price,
+  // an assumed NOI (`modelReadsWithheld`) or a price that buys no building
+  // (`basisWithheldOf`).
+  {
+    heading: "No return is re-run on a plan",
+    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and no return is re-run.",
+  },
+  {
+    heading: "No return is re-run on a figure nobody stated",
+    line: "Where the price is a placeholder or the year-one NOI assumed, or the price buys no building (a note, a position, the land, a share that cannot be grossed up), the gaps stand and no return is re-run.",
   },
   {
     heading: "A metro figure is the metro's",
