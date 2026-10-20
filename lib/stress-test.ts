@@ -157,6 +157,7 @@ import {
   type StressAtEvidence,
   type StressKept,
   type PlanYieldInput,
+  TAX_RESET_CONDITION,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
 import {
@@ -278,6 +279,10 @@ export interface StressTestArgs {
    *  (the shared screen) — said ahead of the default "No model was derived
    *  for this deal", which would read as a failure */
   withheldReason?: string | null;
+  /** the sample deal (its row's `is_sample`): its model is pinned, never
+   *  seeded from today's figures, and the test says so where the evidence's
+   *  case runs a figure the model does not (`StressTest.sample`) */
+  sample?: boolean;
   /** ISO day the published figures were read */
   readOn: string;
 }
@@ -289,14 +294,15 @@ type Row = { label: string; value: string; page?: string };
 const isRow = (m: unknown): m is Row =>
   !!m && typeof m === "object" && typeof (m as Row).label === "string" && typeof (m as Row).value === "string";
 
-const pct1 = (n: number) => `${n.toFixed(1)}%`;
-// A negative to two places carries the true minus (U+2212), as
-// lib/stress-test-words' own `signedPct` writes it; one that rounds to
+// A negative carries the true minus (U+2212), as lib/stress-test-words' own
+// `signedPct` writes it ("to \u22120.2%", never "to -0.2%"); one that rounds to
 // nothing carries none.
-const pct2 = (n: number) => {
-  const t = n.toFixed(2);
+const signedPct = (n: number, places: number) => {
+  const t = n.toFixed(places);
   return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
 };
+const pct1 = (n: number) => signedPct(n, 1);
+const pct2 = (n: number) => signedPct(n, 2);
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 const bps = (n: number) => `${Math.round(Math.abs(n))} bps`;
 const pts = (n: number) => `${Math.abs(n).toFixed(1)} point${Math.abs(Math.abs(n) - 1) < 0.05 ? "" : "s"}`;
@@ -391,7 +397,9 @@ function round(n: number, unit: NonNullable<StressRow["gap"]>["unit"]): number {
 // ── The model, run again with one input swapped ──────────────────────────
 
 const pctOrNone = (n: number | null): string => (n == null ? "does not solve" : pct1(n * 100));
-const multOrNone = (n: number | null): string => (n == null ? "—" : `${n.toFixed(2)}x`);
+// An equity multiple under zero (the sale does not repay the loan) carries
+// the true minus too.
+const multOrNone = (n: number | null): string => (n == null ? "—" : signedPct(n, 2).replace(/%$/, "x"));
 
 /**
  * The engine on the model's inputs with ONE input replaced, twice: the base
@@ -752,6 +760,11 @@ export const PLAN_VACANCY_TODAY =
 export const PLAN_VACANCY_DOCUMENT =
   "Today's vacancy is the gap the plan closes, not evidence of the stabilized figure, so no yield on cost is re-run on it.";
 
+/** Why a plan deal's stated stabilized vacancy stands unchecked where only
+ *  the deal's own documents carry a figure: they are today's building. */
+export const PLAN_VACANCY_UNCHECKED =
+  "The deal's rent roll and T-12 are the building before the plan is done, the gap the plan closes, not evidence of the stabilized figure, and no published figure or class norm could be held to it.";
+
 /** The vacancy row's no-re-run where the OM states no stabilized gross. */
 export const PLAN_NO_GROSS =
   "The OM states no stabilized gross potential rent or effective gross income, so the vacancy gap cannot be carried to the stabilized NOI and no yield on cost is re-run on it.";
@@ -766,6 +779,35 @@ export const PLAN_TAX_NOT_PRO_FORMA =
  *  today, and the building the plan delivers is assessed when finished. */
 export const PLAN_TAX_NOT_ASSESSED =
   "The finished building is not assessed at the price, so the reset bill struck on it is a floor, not the bill the stabilized NOI carries, and no yield on cost is re-run on it.";
+
+/** Each reason a row carries no re-run, in a few words: the reason's whole
+ *  sentence (or a phrase it holds) against the words a cell prints after
+ *  "no yield-on-cost re-run:" (or "no re-run:"). */
+const NO_RERUN_SHORT: readonly [(why: string) => boolean, string][] = [
+  [(w) => w === PLAN_NO_YIELD_MEANING.rent_growth || w === PLAN_NO_YIELD_MEANING.expense_growth, "a growth rate"],
+  [(w) => w === PLAN_NO_YIELD_MEANING.exit_cap, "the exit cap prices the sale"],
+  [(w) => w === PLAN_NO_YIELD_MEANING.debt, "struck before debt"],
+  [(w) => w === PLAN_NO_YIELD_MEANING.noi, "the row tests today's income"],
+  [(w) => w === PLAN_VACANCY_TODAY, "today's occupancy"],
+  [(w) => w === PLAN_VACANCY_DOCUMENT, "today's vacancy"],
+  [(w) => w === PLAN_NO_GROSS, "no stabilized gross stated"],
+  [(w) => w === PLAN_TAX_NOT_PRO_FORMA, "no pro forma tax line"],
+  [(w) => w === PLAN_TAX_NOT_ASSESSED, "the reset bill is a floor"],
+  [(w) => /the figures do not tie/.test(w), "the figures do not tie"],
+  [(w) => /^No achieved premium is stated/.test(w), "no achieved premium stated"],
+  [(w) => w === INSURANCE_NO_RERUN, "nothing tests the premium"],
+  [(w) => /no count of doors to renovate/.test(w), "no doors to renovate stated"],
+];
+
+/** A row's `noRerun` in a few words, for a cell with no room for the
+ *  sentence (`StressRow.noRerunShort`): "no yield-on-cost re-run: a growth
+ *  rate"; the bare lead where no short reason is filed for the sentence. */
+export function noRerunShortOf(row: Pick<StressRow, "noRerun">): string {
+  const why = row.noRerun?.trim() ?? "";
+  const lead = /yield on cost/i.test(why) ? "no yield-on-cost re-run" : "no re-run";
+  const short = NO_RERUN_SHORT.find(([is]) => is(why))?.[1];
+  return short ? `${lead}: ${short}` : lead;
+}
 
 /** Why the tax row stands unchecked where the OM's only bill is its pro
  *  forma's line: a pro forma bill over today's assessment is no rate. */
@@ -817,7 +859,10 @@ function statedYocOf(rows: Row[], ex: ExtractionResult | null, kind: Ctx["kind"]
   const row = findMetric(rows, STATED_YOC_ROW, STATED_YOC_NOT) ?? (builds && !renovates ? findMetric(rows, RETURN_ON_COST_ROW, STATED_YOC_NOT) : null);
   const pct = row ? parsePct(row.value) : null;
   if (!row || pct == null || !(pct > 0) || pct >= IMPLIED_CAP_CEILING * 100 || statesRange(row.value)) return null;
-  return { pct, label: row.label, page: pageOf(row, ex) };
+  // Whether the row names the cost it is struck on: a dollar figure in its
+  // label or its value, as stated.
+  const namesCost = /\$\s?\d/.test(`${row.label} ${row.value}`);
+  return { pct, label: row.label, page: pageOf(row, ex), namesCost };
 }
 
 const TITLES: Record<StressKey, string> = {
@@ -1008,42 +1053,51 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     });
   }
   if (!om && docs.length + market.length === 0 && !rot) return null;
-  // ONE figure decides (lib/stress-deciders `vacancyDecider`). A stabilized
-  // assumption on a deal read as stabilized is the market's to judge
-  // (`stabilizedVacancyStated`): the metro survey inside its margin, else a
-  // commercial class's tracker band at its low read, the Census region, the
-  // state; and the documents' vacancy is today's — shown beside it as the
-  // gap a lease-up has to close, or as support where the building already
-  // runs at or under the assumption. Where no published figure is fresh, the
-  // rent roll, then the T-12, decide, and the row says so. Any other
-  // vacancy (today's occupancy, a plan deal's figure) is the rent roll's,
-  // then the T-12's, then the published figures', then the class's norm's.
-  // Every other piece is shown beside the one that decides, never in its
-  // place: a region's or a state's figure beside the metro's, a T-12 beside
-  // the rent roll, a rule of thumb beside a document.
-  const stabilized = om?.from === "vacancy" && !ctx.plan;
+  // ONE figure decides (lib/stress-deciders `vacancyDecider`). A stated
+  // stabilized assumption is the market's to judge: the metro survey inside
+  // its margin, else a commercial class's tracker band at its low read, the
+  // Census region, the state; and the documents' vacancy is today's — shown
+  // beside it as the gap a lease-up has to close (on a plan deal, the gap
+  // the plan closes), or as support where the building already runs at or
+  // under the assumption. Where no published figure is fresh, on a deal read
+  // as stabilized the rent roll, then the T-12, decide, and the row says so;
+  // on a plan deal the class's norm does, since the documents are the
+  // building before the plan is done (`planVacancyStated`, the track
+  // record's own rule: a later rent roll or T-12 scores neither). Today's
+  // occupancy is the rent roll's, then the T-12's, then the published
+  // figures', then the class's norm's. Every other piece is shown beside the
+  // one that decides, never in its place: a region's or a state's figure
+  // beside the metro's, a T-12 beside the rent roll, a rule of thumb beside
+  // a document.
+  const stabilized = om?.from === "vacancy";
   const pool: Piece[] = [...docs, ...market, ...(rot ? [rot] : [])];
   const decided = vacancyDecider(
     pool.map((p) => ({ evidence: p.e, held: p.compare })),
-    { stabilized },
+    { stabilized, plan: ctx.plan },
   );
   const best = decided ? pool[decided.index] : null;
   const marketDecides = stabilized && best != null && best.e.kind === "published";
+  // Where a stabilized assumption is decided by anything but a document, the
+  // documents stand beside it as today's.
+  const docsBeside = stabilized && best != null && best.e.kind !== "document";
+  const gapClosed = ctx.plan ? "the gap the plan closes" : "the gap a lease-up has to close";
   // The documents' vacancy against the stabilized assumption, said as
-  // today's: the gap a lease-up has to close, or support for the figure.
+  // today's: the gap a lease-up (or the plan) has to close, or support for
+  // the figure.
   const todayWords = (docPct: number, omPct: number, what: string): string => {
     const diff = docPct - omPct;
     return diff > SAME
-      ? `${pts(diff)} over ${what} — the gap a lease-up has to close`
+      ? `${pts(diff)} over ${what} — ${gapClosed}`
       : `${diff < -SAME ? `${pts(diff)} under` : "at"} ${what} — support for it`;
   };
-  if (marketDecides && om) {
+  if (docsBeside && om) {
     for (const d of docs) d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
   }
   // The figure that decides first, then the rest in the order of the kind
-  // that decides: the market's, then the documents', where the market
-  // decides; else the documents', then the market's.
-  const rest: Piece[] = marketDecides ? [...market, ...docs, ...(rot ? [rot] : [])] : pool;
+  // that decides: the market's, then the documents', where the market (or,
+  // on a plan deal, the class's norm) decides a stabilized assumption; else
+  // the documents', then the market's.
+  const rest: Piece[] = docsBeside ? [...market, ...docs, ...(rot ? [rot] : [])] : pool;
   const ordered: Piece[] = best ? [best, ...rest.filter((p) => p !== best)] : pool;
   const evidence = ordered.map((p) => p.e);
   // Where the OM states no vacancy allowance, the figure is its occupancy
@@ -1063,7 +1117,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"));
-  if (!best) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, title);
+  if (!best) return unchecked("vacancy", omSays, evidence, stabilized && ctx.plan && docs.length > 0 ? PLAN_VACANCY_UNCHECKED : NO_EVIDENCE, title);
   const bestValue = best.e.value!;
   let judged: Judged;
   if (marketDecides) {
@@ -1085,7 +1139,9 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           // Past the row's own threshold, the building today is materially
           // emptier than the stabilized figure the market holds: whatever
           // the verdict, neither run models getting from one to the other.
-          doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
+          // A plan deal's yield is struck on the building stabilized, so the
+          // lease-up is the plan itself, not a run's omission.
+          !ctx.plan && doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
         }`
       : "";
     judged = judge(om.pct, bestValue, "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) => {
@@ -1103,8 +1159,19 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     });
   } else {
     // A stabilized assumption with no fresh published figure to hold it to:
-    // the documents decide, said so.
-    const noMarket = stabilized && best.e.kind === "document" ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide." : "";
+    // on a deal read as stabilized the documents decide, on a plan deal the
+    // class's norm, said so.
+    const doc = docs[0];
+    const noMarket =
+      stabilized && best.e.kind === "document"
+        ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide."
+        : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
+          ? ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
+              doc
+                ? `; ${doc.e.label === RENT_ROLL_VACANCY_LABEL ? `today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `the deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at`
+                : ""
+            }.`
+          : "";
     judged = judge(om.pct, bestValue, "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) =>
       Math.abs(gap) < SAME
         ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}`
@@ -2058,13 +2125,15 @@ export const INSURANCE_MOVED_LABEL = (premium: string): string => `The OM's ${pr
 export const INSURANCE_NO_QUOTE =
   "No quote for a new owner on file: the OM's premium is the seller's expiring policy, the T-12's is the same seller's history, and the national index moves the OM's own figure, so nothing here tests what a buyer will be quoted.";
 
+/** Why the insurance row carries no re-run where the OM states a premium:
+ *  nothing on file tests it, and a run at the seller's own T-12 premium would
+ *  print a move no evidence makes. */
+export const INSURANCE_NO_RERUN =
+  "No return is re-run: nothing on file tests the premium, and the T-12's premium beside it is the same seller's history, not a figure to swap in.";
+
 /** What the T-12's premium is beside the OM's, said on its evidence line. */
 export const INSURANCE_T12_HISTORY = "the seller's history, not a test of a new owner's quote";
 
-/** What the insurance row's re-run is, appended to its note: the T-12's
- *  premium is a real figure for the building, so the return is re-run at it,
- *  but it tests nothing. */
-export const INSURANCE_RERUN_NOTE = "The T-12's premium is the seller's own history, not a quote for a new owner, so this re-run is no test of the OM's premium.";
 
 /**
  * The insurance row. The OM's premium is the seller's expiring policy, and
@@ -2073,12 +2142,11 @@ export const INSURANCE_RERUN_NOTE = "The T-12's premium is the seller's own hist
  * its history, never the figure that decides), and the national premium
  * index applied to the OM's own premium is the OM's figure moved by the
  * nation's carriers' year (shown, held to nothing, carrying no figure of
- * its own). So the row stands unchecked (`INSURANCE_NO_QUOTE`). Where a
- * T-12 is on file its premium is a real figure for the building, and the
- * return is re-run at it, said as no test (`INSURANCE_RERUN_NOTE`); the
- * headline keeps the OM's premium in both cases, as it keeps every
- * unchecked row's. Without a T-12 nothing is re-run: the index-moved
- * figure is no alternative to the OM's, only the OM's grown.
+ * its own). So the row stands unchecked (`INSURANCE_NO_QUOTE`), and no
+ * return is re-run on it: an unchecked row has nothing on file that tests
+ * it, so a re-run at the seller's own T-12 premium would print a move no
+ * evidence makes. The T-12's premium stays shown beside the OM's, and both
+ * headline cases keep the model's own premium.
  */
 function insuranceRow(ctx: Ctx): StressRow | null {
   const premiumRow =
@@ -2130,19 +2198,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   // Nothing on file is held against the OM's premium (lib/stress-deciders
   // `insuranceDecider`): every piece is shown beside it.
   if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"));
-  const row = unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE);
-  // The re-run at the seller's own premium, where the T-12 states one.
-  const t12At = t12Ins && t12Ins.amount > 0 ? evidence.findIndex((e) => e.label === "The deal's T-12 insurance line") : -1;
-  if (t12At >= 0 && ctx.derived && irrRuns(ctx)) {
-    const impact = expenseImpact(ctx, premium, evidence[t12At].value!, t12Ins!.amount, "insurance line", t12At, {
-      what: "the insurance line",
-      om: money(premium),
-      alt: money(evidence[t12At].value!),
-      evidence: "the deal's T-12",
-    });
-    if (impact) row.impact = { ...impact, note: `${impact.note} ${INSURANCE_RERUN_NOTE}` };
-  }
-  return row;
+  return { ...unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE), noRerun: INSURANCE_NO_RERUN };
 }
 
 // — Basis —
@@ -2913,6 +2969,12 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     }
   }
   for (const row of Object.values(built)) if (row) finishRow(row);
+  // An unchecked row has nothing on file that tests it, so it carries no
+  // re-run on any surface: a move struck at a figure that tests nothing
+  // would read as one the evidence makes.
+  for (const row of Object.values(built)) if (row && row.verdict === "unchecked") row.impact = null;
+  // Each row's reason for no re-run, in a few words for a cell.
+  for (const row of Object.values(built)) if (row && !row.impact && row.noRerun) row.noRerunShort = noRerunShortOf(row);
   // The challenger's words: the first challenge for a key rides on its row
   // (the list is most severe first); every other challenge — a second for
   // the same key, one no key matches — is a row of its own.
@@ -2967,6 +3029,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     impactsWithheld,
     ...(planYield ? { measure: "yield_on_cost" as const } : {}),
     ...(planYield?.plan.forward ? { forward: true as const } : {}),
+    ...(args.sample ? { sample: true as const } : {}),
     headline,
   };
 }
@@ -3066,6 +3129,16 @@ function noSwapWhy(row: StressRow): string {
   if (row.key === "renovation_premium") return "the premium is no model input: the model grows today's rent at one rate";
   if (!row.impact) return "no return is re-run on it, so it has no figure to swap";
   return "its re-run moves an input the two cases cannot combine";
+}
+
+/** The condition a row's evidence holds on, where it holds on one
+ *  (`StressHeadlinePart.conditional`): the taxes' reset bill holds only if
+ *  the sale resets the assessment to the price, which is the jurisdiction's
+ *  to say — never the stated unabated bill an abatement ends into. */
+function conditionOf(row: StressRow): string | null {
+  if (row.key !== "taxes") return null;
+  const at = row.decidedBy ?? row.impact?.evidenceIndex ?? null;
+  return at != null && row.evidence[at]?.label === RESET_BILL_LABEL ? TAX_RESET_CONDITION : null;
 }
 
 const swaps = (s: HeadlineSwap) => s.kind === "noi" || Math.abs(s.alt - s.om) > (s.kind === "expense" ? 1e-6 : 1e-12);
@@ -3212,6 +3285,7 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
         pts: split.shares[i].leveredIrr * 100,
         multiple: omMultiple != null && evidenceMultiple != null ? split.shares[i].leveredEquityMultiple : null,
         ...(s.row.ruleOfThumbOnly ? { ruleOfThumb: true } : {}),
+        ...(conditionOf(s.row) ? { conditional: conditionOf(s.row)! } : {}),
       }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
@@ -3284,7 +3358,7 @@ export const PLAN_BASIS_LEFT_OUT_FORWARD =
  */
 export function planStressHeadline(
   rows: readonly StressRow[],
-  base: { noi: number; totalCost: number; plan?: Pick<PlanSummary, "forward"> },
+  base: { noi: number; totalCost: number; plan?: Pick<PlanSummary, "forward"> & Partial<Pick<PlanSummary, "price" | "budget">> },
   carrier: UnderwriteInputs,
   statedYoc: StressHeadline["statedYoc"] = null,
 ): StressHeadline | null {
@@ -3343,7 +3417,14 @@ export function planStressHeadline(
       },
     );
     parts = players
-      .map((s, i) => ({ key: s.row.key, label: s.row.title, pts: split.shares[i].leveredIrr * 100, multiple: null }))
+      .map((s, i) => ({
+        key: s.row.key,
+        label: s.row.title,
+        pts: split.shares[i].leveredIrr * 100,
+        multiple: null,
+        ...(s.row.ruleOfThumbOnly ? { ruleOfThumb: true } : {}),
+        ...(conditionOf(s.row) ? { conditional: conditionOf(s.row)! } : {}),
+      }))
       .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
   }
   const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
@@ -3352,6 +3433,7 @@ export function planStressHeadline(
     omYocPct,
     evidenceYocPct,
     statedYoc,
+    planCost: planCostOf(base),
     omIrrPct: null,
     evidenceIrrPct: null,
     omMultiple: null,
@@ -3361,6 +3443,20 @@ export function planStressHeadline(
     omitted: omitted.sort((a, b) => order(a.key) - order(b.key)),
     unsolved: 0,
     noiRest: null,
+  };
+}
+
+/** What a plan's yield on cost is struck on (`StressHeadline.planCost`): its
+ *  total cost, and the price and the budget that make it where the plan adds
+ *  the two (a forward purchase's price alone; a budget the OM stated as the
+ *  whole cost, the total alone). */
+function planCostOf(base: { totalCost: number; plan?: Partial<Pick<PlanSummary, "forward" | "price" | "budget">> }): NonNullable<StressHeadline["planCost"]> {
+  const p = base.plan;
+  const whole = p?.budget?.isTotal === true;
+  return {
+    total: base.totalCost,
+    price: whole ? null : (p?.price ?? null),
+    budget: p?.forward || whole ? null : (p?.budget?.budget ?? null),
   };
 }
 

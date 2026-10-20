@@ -1508,6 +1508,7 @@ export default async function DealPage({
     // held by its test).
     recordedSales,
     pastScreens,
+    sample: isSampleDeal,
     readOn: todayIso,
   });
   // The test at a glance beside the call, and in the bar that keeps the deal

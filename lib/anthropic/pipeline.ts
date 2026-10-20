@@ -676,6 +676,7 @@ async function screenStressTest(
       recordedSales,
       pastScreens: null,
       pastScreensWithheld: PAST_SCREENS_IN_BRIEF,
+      sample: !!row.is_sample,
       readOn: today,
     });
   } catch (err) {

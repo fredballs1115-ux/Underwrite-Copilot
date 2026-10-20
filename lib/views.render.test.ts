@@ -1515,11 +1515,13 @@ describe("ModelView — the sample model renders every panel", () => {
       // renovation premium are tested.
       expect(visibleText(html)).toContain("3 could not be checked: debt, rent growth, insurance");
       expect(visibleText(html)).toContain("Read why (3)");
-      // The insurance row's re-run at the seller's own T-12 premium is said
-      // in its own words, which say it tests nothing.
+      // The insurance row is unchecked and re-runs nothing (the walkthrough
+      // of 2026-10-20): the T-12's premium is shown beside it, no move.
       const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));
       expect(ins).toContain('data-verdict="unchecked"');
-      expect(visibleText(ins.slice(0, ins.indexOf('data-qa="stress-row-', 10)))).toContain("so this re-run is no test of the OM's premium.");
+      const insRow = ins.slice(0, ins.indexOf('data-qa="stress-row-', 10));
+      expect(insRow).not.toContain('data-qa="stress-unchecked-rerun"');
+      expect(visibleText(insRow)).toContain("$385k");
       // The taxes' reset is the jurisdiction's to make: stretched at most.
       for (const [k, v] of [["taxes", "stretched"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);

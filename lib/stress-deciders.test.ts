@@ -71,6 +71,14 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     // No metro figure: the region's, never the documents', on a stabilized assumption.
     expect(vacancyDecider(held(t12, region, rot), { stabilized: true })!.label).toBe("Rental vacancy, South Census region");
     expect(vacancyDecider(held(rot), { stabilized: true })!.label).toBe(rot.label);
+    // A plan deal's stated stabilized figure: the market's, then the class's
+    // norm, never the documents, which are the building before the plan is
+    // done (the walkthrough of 2026-10-20: a T-12 had decided it).
+    expect(vacancyDecider(all, { stabilized: true, plan: true })!.label).toBe(METRO_VACANCY_LABEL);
+    expect(vacancyDecider(held(t12, rr, rot), { stabilized: true, plan: true })!.label).toBe(rot.label);
+    expect(vacancyDecider(held(t12, rr), { stabilized: true, plan: true })).toBeNull();
+    // A plan deal's occupancy today is the documents' still.
+    expect(vacancyDecider(all, { stabilized: false, plan: true })!.label).toBe(RENT_ROLL_VACANCY_LABEL);
     // A tracker band decides at its low read, never its high one.
     const lo = piece("Office vacancy (research tracker), the District, low read", 21.3, { publisher: "research tracker" });
     const hi = piece("Office vacancy (research tracker), the District, high read", 22.2, { publisher: "research tracker" });

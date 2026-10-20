@@ -127,6 +127,7 @@ function signedInParts(reads: TodayReads | null): { stress: StressTest; derived:
     brokerComps: SAMPLE_DEAL.comps,
     recordedSales: null,
     pastScreens: null,
+    sample: true,
     readOn: TODAY,
   });
   return { stress, derived };
@@ -198,28 +199,32 @@ describe("the sample's stress test, one build on every surface", () => {
     const h = page.headline!;
     const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
-    // vacancy, its 4.0% rent growth, its tax bill and premium.
-    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
+    // vacancy, its 4.0% rent growth and its tax bill. Insurance is unchecked
+    // (no quote for a new owner is on file), so it carries no re-run and
+    // both cases keep the model's premium.
+    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes"]);
     expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 12.5]);
-    // The insurance row swaps the T-12's $385k inside the model's one expense
-    // line (the T-12's $3.09M total) for the OM's $310k, never adding the gap
-    // on top of a line that already holds the T-12's premium (audit H3): its
-    // evidence's run is the model's own. The T-12's premium is the seller's
-    // history, not a new owner's quote, so the row is unchecked and both
-    // cases keep the OM's $310k.
-    const ins = page.rows.find((r) => r.key === "insurance")!.impact!;
-    expect([Math.round(ins.omValue), Math.round(ins.altValue)]).toEqual([3_010_000, 3_085_000]);
-    expect([r1(ins.baseIrrPct), r1(ins.altIrrPct)]).toEqual([10.3, 9.3]);
-    expect(ins.note).toMatch(/^If the insurance line is the deal's T-12's \$385k, not the OM's \$310k, the levered IRR moves from 10\.3% to 9\.3% /);
-    expect(ins.note).toMatch(/so this re-run is no test of the OM's premium\.$/);
+    // An unchecked row re-runs nothing, the T-12's $385k shown beside the
+    // OM's $310k as the seller's history (the walkthrough of 2026-10-20: the
+    // row had printed a move no evidence makes).
+    const insRow = page.rows.find((r) => r.key === "insurance")!;
+    expect(insRow.verdict).toBe("unchecked");
+    expect(insRow.impact).toBeNull();
+    expect(insRow.evidence[0]).toMatchObject({ kind: "document", value: 385_000 });
+    expect(insRow.noRerunShort).toBe("no re-run: nothing tests the premium");
     expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.77"]);
     // The split, largest first: the reset tax bill and the exit at the
     // going-in cap lower it; the vacancy holds to the metro's survey and rent
     // growth to CPI rent, and insurance is unchecked, so none carries a part.
     expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
-      ["taxes", -2.8],
+      ["taxes", -2.7],
       ["exit_cap", -1.4],
     ]);
+    // The reset bill holds only if the sale resets the assessment: the part
+    // says so on every surface, as a rule of thumb's part is marked.
+    expect(h.parts.find((p) => p.key === "taxes")!.conditional).toBe("if the sale resets the assessment");
+    expect(h.parts.find((p) => p.key === "exit_cap")!.conditional).toBeUndefined();
+    expect(headlineSentence(page)).toContain("the taxes −2.8 pts (if the sale resets the assessment) and the exit cap −1.4 pts");
     expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
     // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
     // and insurance the rows move on their own; the premium is no model input.
@@ -267,7 +272,6 @@ describe("the sample's stress test, one build on every surface", () => {
       ["noi", "left_out"],
       ["vacancy", "holds"],
       ["rent_growth", "holds"],
-      ["insurance", "unchecked"],
     ]);
     // The NOI row left out keeps the rent line that makes the OM's $3.88M NOI
     // at the OM's vacancy and expenses, never the NOI itself: the tax swap
@@ -275,28 +279,27 @@ describe("the sample's stress test, one build on every surface", () => {
     // evidence's case runs the reset tax bill where the model runs the
     // seller's (M4), so the sentence says every figure the two differ on.
     const kept =
-      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the model's 3.0%/yr); where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M); and where a row is unchecked: insurance $310k (the model's $385k). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.41M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
     expect(h.atEvidence!.map((e) => e.key)).toEqual(["taxes"]);
     // Complete: the model with the kept figures and the evidence's figures
     // set, and nothing else, IS the evidence's case, to the engine's figure.
     const fig = (k: string) => h.keptAtOm!.find((x) => x.key === k)!.om;
     const tax = h.atEvidence!.find((e) => e.key === "taxes")!;
-    const ins = h.keptAtOm!.find((x) => x.key === "insurance")!;
     const m = derived.inputs;
     const rebuilt = {
       ...m,
       vacancyPct: fig("vacancy") / 100,
       rentGrowthPct: fig("rent_growth") / 100,
       inPlaceRentAnnual: fig("noi"),
-      expenseLines: m.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + (tax.evidence - tax.model) + (ins.om - ins.model) } : l)),
+      expenseLines: m.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + (tax.evidence - tax.model) } : l)),
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
     expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 12.5% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
-    expect(rerunWords(page, row("insurance").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");
+    expect(rerunWords(page, row("taxes").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");
     // The rent growth holds against the CPI's rent, a lagging measure, and
     // its re-run says so rather than reading as an endorsement.
     expect(row("rent_growth").verdict).toBe("holds");
@@ -400,6 +403,12 @@ describe("the sample's stress test, one build on every surface", () => {
     // the walkthrough (`walkthroughData`), on the reads it makes itself.
     const home = src("app/page.tsx");
     expect(home).toContain("const reads = await sampleTodayReads();");
+    // The signed-in sample, its memo, its report and its brief say its model
+    // is pinned as the public build does (`StressTest.sample`).
+    expect(src("app/(app)/deals/[id]/page.tsx")).toContain("sample: isSampleDeal,");
+    for (const f of ["app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) expect(src(f), f).toContain("sample: !!(deal as { is_sample?: boolean }).is_sample,");
+    expect(src("lib/anthropic/pipeline.ts")).toContain("sample: !!row.is_sample,");
+    expect(src("lib/sample-stress.ts")).toContain("sample: true,");
     // On the reader's day, the one the memo tile and the downloads date the
     // sample by (lib/reader-day, New York with no reader's zone), never the
     // UTC day: from 8 pm Eastern the two are a day apart.
@@ -519,5 +528,23 @@ describe("/demo's Overview, in the deal page's order", () => {
     expect(PLAN_YIELD_LEAD).toMatch(/^On a value-add, lease-up, conversion or development deal /);
     expect(SAMPLE_PLAN_NOTE).toContain("A value-add, lease-up, conversion or development OM");
     expect(SAMPLE_PLAN_NOTE).toContain("re-run on its yield on total cost");
+  });
+});
+
+describe("the sample's printed figures", () => {
+  it("print no hyphen before a digit: a negative carries the true minus (U+2212), with today's figures read and without", () => {
+    // A hyphen-minus before a figure, where no word or figure runs into it
+    // ("to -0.2%"); "T-12" and "2026-06-30" are no minus.
+    const HYPHEN_MINUS = /(?:^|[^\w.])-\d/;
+    for (const reads of [READS, null]) {
+      const t = sampleStressTest({ today: TODAY, reads });
+      const texts = [
+        ...t.rows.flatMap((r) => [r.gap?.text ?? "", r.impact?.note ?? "", r.noRerun ?? "", r.noRerunShort ?? "", r.unchecked ?? "", r.method, ...r.evidence.map((e) => e.text)]),
+        headlineSentence(t) ?? "",
+        keptSentence(t) ?? "",
+        ...stressSection(t),
+      ];
+      for (const s of texts) expect(s, s).not.toMatch(HYPHEN_MINUS);
+    }
   });
 });

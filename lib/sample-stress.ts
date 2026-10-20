@@ -93,6 +93,7 @@ export function sampleStressTest({
     derived,
     storedAssetClass: SAMPLE_DEAL.asset_class,
     brokerComps: SAMPLE_DEAL.comps,
+    sample: true,
     readOn: today,
   });
 }

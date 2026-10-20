@@ -139,6 +139,8 @@ const signedPct = (n: number, places: number): string => {
   return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
 };
 const pct1 = (n: number) => signedPct(n, 1);
+/** An equity multiple at two places, a negative with the true minus. */
+const multipleText = (n: number) => signedPct(n, 2).replace(/%$/, "x");
 const pct2 = (n: number) => signedPct(n, 2);
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 
@@ -253,9 +255,9 @@ export function moveShort(impact: StressImpact | null): string {
 export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run.";
 
 /** Whether a surface draws the row's re-run as a return: a row that holds
- *  draws none (`HOLDS_NO_RERUN`), an unchecked row's re-run (the insurance
- *  line at the seller's own premium) is said in its note alone, and a row
- *  with no impact has none to draw. */
+ *  draws none (`HOLDS_NO_RERUN`), an unchecked row carries none (nothing on
+ *  file tests it; lib/stress-test drops any), and a row with no impact has
+ *  none to draw. */
 export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
 
 /**
@@ -300,6 +302,17 @@ export function tickPositions(row: StressRow): { om: number; evidence: number } 
   return { om: pos(om), evidence: pos(ev) };
 }
 
+/** Why a tested row prints no move where the test re-runs others, in a few
+ *  words for a cell: the row's own short reason (`StressRow.noRerunShort`,
+ *  a plan's "no yield-on-cost re-run: a growth rate"); "" on an unchecked
+ *  row, which was tested against nothing, and on a row whose gap says why
+ *  (a stabilized deal's premium, no model input — the one-page memo has no
+ *  line to spare for it). */
+export function noMoveShort(row: StressRow): string {
+  if (row.impact || row.verdict === "unchecked") return "";
+  return row.noRerunShort ?? "";
+}
+
 /** One row as a document prints it in short: the five cells and the ticks. */
 export interface StressRowWords {
   key: StressKey;
@@ -311,7 +324,9 @@ export interface StressRowWords {
   against: string;
   /** "3.1 pts" */
   gap: string;
-  /** "IRR 9.3% to 7.1%", or "" */
+  /** "IRR 9.3% to 7.1%"; where the row carries no re-run, why in a few
+   *  words ("no yield-on-cost re-run: a growth rate"); "" on a row read and
+   *  not tested */
   move: string;
   ticks: { om: number; evidence: number } | null;
 }
@@ -324,7 +339,7 @@ export function rowWords(row: StressRow): StressRowWords {
     om: omShort(row),
     against: evidenceShort(row, bestEvidence(row)),
     gap: gapShort(row),
-    move: row.verdict === "holds" ? "no re-run" : moveShort(row.impact),
+    move: row.verdict === "holds" ? "no re-run" : row.impact ? moveShort(row.impact) : noMoveShort(row),
     ticks: tickPositions(row),
   };
 }
@@ -372,6 +387,21 @@ export function ptsText(n: number, places: 1 | 2 = 1): string {
 export function partAgainst(part: Pick<StressHeadlinePart, "key" | "ruleOfThumb">): string | null {
   if (!part.ruleOfThumb) return null;
   return part.key === "debt" ? "against a screening default" : "against a rule of thumb";
+}
+
+/** The condition a part's evidence holds on, as every surface says it beside
+ *  the part ("if the sale resets the assessment"); null on a part that holds
+ *  on none. */
+export function partConditional(part: Pick<StressHeadlinePart, "conditional">): string | null {
+  return part.conditional?.trim() ? part.conditional.trim() : null;
+}
+
+/** What a surface prints in brackets after a part's figure: its rule of
+ *  thumb, then its condition — "against a rule of thumb; if the sale resets
+ *  the assessment"; null with neither. */
+export function partNote(part: Pick<StressHeadlinePart, "key" | "ruleOfThumb" | "conditional">): string | null {
+  const notes = [partAgainst(part), partConditional(part)].filter((t): t is string => !!t);
+  return notes.length > 0 ? notes.join("; ") : null;
 }
 
 /** A part as the headline prints it: its Shapley share, and `shown`, the
@@ -449,26 +479,47 @@ export function headlineLine(test: StressTest, arrow = "to"): string | null {
   return `Levered IRR on the OM's figures ${om} ${arrow} ${irrText(h.evidenceIrrPct)} with the evidence`;
 }
 
-/** "the price +3.7 pts, vacancy −3.2 pts and the loan rate −1.4 pts
- *  (against a screening default)", each part as printed (`shownHeadline`). */
+/** "the price +3.7 pts, vacancy −3.2 pts, the taxes −3.0 pts (if the sale
+ *  resets the assessment) and the loan rate −1.4 pts (against a screening
+ *  default)", each part as printed (`shownHeadline`), a part struck against
+ *  a rule of thumb or on a condition marked so. */
 export function headlineSplit(test: StressTest): string {
   const h = liveHeadline(test);
   if (!h) return "";
   return joinAnd(
     shownHeadline(h).parts.map((p) => {
-      const against = partAgainst(p);
-      return `${headlineName(p.key)} ${ptsText(p.shown, headlinePlaces(h))}${against ? ` (${against})` : ""}`;
+      const note = partNote(p);
+      return `${headlineName(p.key)} ${ptsText(p.shown, headlinePlaces(h))}${note ? ` (${note})` : ""}`;
     }),
   );
 }
 
+/** "the $43.8M total cost, the $42M price plus the $1.8M budget" — what a
+ *  plan's own yield on cost is struck on, from its stated figures; null
+ *  where the headline carries none. */
+export function planCostWords(h: StressHeadline): string | null {
+  const c = isYieldHeadline(h) ? h.planCost : null;
+  if (!c || !(c.total > 0)) return null;
+  if (c.price != null && c.budget != null) return `the ${money(c.total)} total cost, the ${money(c.price)} price plus the ${money(c.budget)} budget`;
+  if (c.price != null && Math.abs(c.price - c.total) < 0.5) return `the ${money(c.total)} price, the buyer's whole cost`;
+  return `the ${money(c.total)} total cost`;
+}
+
 /** "The OM states its own yield on cost of 7.00% (Untrended yield on cost,
  *  p. 12)." — a plan deal's stated figure beside its two cases, said as the
- *  OM's; "" where it states none. */
+ *  OM's; where it differs from the plan's own at two places, what each is
+ *  struck on: "…, its row naming no cost it is struck on; the plan's 6.85% is
+ *  struck on the $43.8M total cost, the $42M price plus the $1.8M budget."
+ *  "" where it states none. */
 export function statedYocSentence(h: StressHeadline): string {
   const s = isYieldHeadline(h) ? h.statedYoc : null;
   if (!s) return "";
-  return `The OM states its own yield on cost of ${pct2(s.pct)} (${s.label}${s.page != null ? `, p. ${s.page}` : ""}).`;
+  const stated = `The OM states its own yield on cost of ${pct2(s.pct)} (${s.label}${s.page != null ? `, p. ${s.page}` : ""})`;
+  const own = h.omYocPct;
+  const cost = planCostWords(h);
+  if (own == null || !Number.isFinite(own) || !cost || pct2(own) === pct2(s.pct)) return `${stated}.`;
+  const its = s.namesCost ? "on the cost its row states" : "its row naming no cost it is struck on";
+  return `${stated}, ${its}; the plan's ${pct2(own)} is struck on ${cost}.`;
 }
 
 /** "2 mixes of the swaps had no IRR and were counted at the engine's floor
@@ -620,6 +671,16 @@ export function rerunWords(test: StressTest, impact?: StressImpact | null): stri
   return same ? `${base}, this input alone set to the OM's figure, which is the evidence's` : `${base}, this input alone set to the OM's figure, then to the evidence's`;
 }
 
+/** The inputs the sample's model is pinned on (lib/sample-stress): its
+ *  growth rates at the default, its exit at the going-in cap, its loan at
+ *  the flat placeholder — never seeded from today's figures. */
+const SAMPLE_PINNED: readonly StressKey[] = ["rent_growth", "expense_growth", "exit_cap", "debt"];
+
+/** "(the model's 3.0%/yr)", or on the sample where the input is pinned,
+ *  "(the sample's model is pinned at 3.0%/yr)". */
+const modelBeside = (test: StressTest, key: StressKey, model: number): string =>
+  test.sample && SAMPLE_PINNED.includes(key) ? `(the sample's model is pinned at ${figureText(key, model)})` : `(the model's ${figureText(key, model)})`;
+
 const KEPT_LEAD: Record<StressKept["why"], string> = {
   holds: "where a row holds",
   left_out: "where a row is left out",
@@ -629,11 +690,11 @@ const KEPT_LEAD: Record<StressKept["why"], string> = {
 
 /** One kept figure with the model's beside it. The NOI row keeps the rent
  *  line that makes the OM's NOI, never the NOI itself, and is said so. */
-function keptText(k: StressKept): string {
+function keptText(test: StressTest, k: StressKept): string {
   if (k.key === "noi" && k.noi != null) {
     return `the rent line ${money(k.om)} that makes the OM's ${money(k.noi)} NOI at the OM's vacancy and expenses (the model's rent line ${money(k.model)})`;
   }
-  return `${headlineName(k.key)} ${figureText(k.key, k.om)} (the model's ${figureText(k.key, k.model)})`;
+  return `${headlineName(k.key)} ${figureText(k.key, k.om)} ${modelBeside(test, k.key, k.model)}`;
 }
 
 /**
@@ -659,11 +720,11 @@ export function keptSentence(test: StressTest): string | null {
   const clauses = order.flatMap((why) => {
     const items = kept.filter((k) => k.why === why);
     if (items.length === 0) return [];
-    return [`${KEPT_LEAD[why]}: ${joinAnd(items.map(keptText))}`];
+    return [`${KEPT_LEAD[why]}: ${joinAnd(items.map((k) => keptText(test, k)))}`];
   });
   const model = h.modelIrrPct == null ? "its levered IRR does not solve" : irrText(h.modelIrrPct);
   const lead = `Against the screening model as it runs (${model}), the evidence's case`;
-  const evidenceSaid = atEvidence.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.evidence)} (the model's ${figureText(k.key, k.model)})`);
+  const evidenceSaid = atEvidence.map((k) => `${headlineName(k.key)} ${figureText(k.key, k.evidence)} ${modelBeside(test, k.key, k.model)}`);
   const evidenceClause = evidenceSaid.length > 0 ? `the evidence's figure where the model runs another: ${joinAnd(evidenceSaid)}` : "";
   if (clauses.length === 0) return `${lead} runs ${evidenceClause}.`;
   const joined = clauses.length === 1 ? clauses[0] : `${clauses.slice(0, -1).join("; ")}; and ${clauses[clauses.length - 1]}`;
@@ -696,7 +757,7 @@ export function headlineSentence(test: StressTest): string | null {
   if (isYieldHeadline(h)) return yieldHeadlineSentence(test, h);
   const line = headlineLine(test)!;
   const multiples =
-    h.omMultiple != null && h.evidenceMultiple != null && h.parts.length > 0 ? ` (equity multiple ${h.omMultiple.toFixed(2)}x to ${h.evidenceMultiple.toFixed(2)}x)` : "";
+    h.omMultiple != null && h.evidenceMultiple != null && h.parts.length > 0 ? ` (equity multiple ${multipleText(h.omMultiple)} to ${multipleText(h.evidenceMultiple)})` : "";
   // The gap as printed: from the two rounded IRRs, which the parts add up to.
   const gap = shownHeadline(h).gap;
   const split =
