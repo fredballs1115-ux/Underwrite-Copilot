@@ -144,6 +144,13 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(r.rows[2].text).toContain("the T-12 to Sep 30, 2026 earned $3.71M");
   });
 
+  it("a combined 'Taxes & insurance' line scores neither, whatever key it was filed under", () => {
+    const taxes: Challenge = { ...insurance, assumption: "Taxes not reset", key: "taxes", omFigure: 900_000, altFigure: 1_300_000 };
+    const combined = { ...t12, opex: [{ key: "taxes", label: "Taxes & insurance", amount: 1_525_000, page: "p. 1" }] };
+    const r = scoreDeal({ screenedAt: T, challenges: [insurance, taxes], t12: { arrivedAt: AFTER, dated: null, summary: combined } });
+    expect(r.rows.map((x) => x.landing)).toEqual(["unscored", "unscored"]);
+  });
+
   it("a figure at or past the OM's end lands on the OM's side", () => {
     const r = scoreDeal({
       screenedAt: T,

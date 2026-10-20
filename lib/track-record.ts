@@ -42,7 +42,7 @@ import { t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { compactUsd } from "@/lib/money";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
-import { challengeKey } from "@/lib/stress-test";
+import { T12_INSURANCE_NOT, T12_TAX_NOT, challengeKey } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey } from "@/lib/stress-test-types";
 
 /** Which side of the screen's test the later figure landed on. */
@@ -201,8 +201,11 @@ interface Later {
   decision?: boolean;
 }
 
-function t12Line(summary: T12Summary, re: RegExp, key: string): number | null {
-  const line = summary.opex.find((l) => l.key === key) ?? summary.opex.find((l) => re.test(l.label));
+/** A T-12 line by its key, else its label — never one whose label `not`
+ *  refuses (lib/stress-test's own exclusions: a "Taxes & insurance" line is
+ *  neither line alone, whatever key the extraction filed it under). */
+function t12Line(summary: T12Summary, re: RegExp, key: string, not: RegExp): number | null {
+  const line = summary.opex.find((l) => l.key === key && !not.test(l.label)) ?? summary.opex.find((l) => re.test(l.label) && !not.test(l.label));
   const n = line?.amount;
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -478,12 +481,12 @@ function laterFor(
       return null;
     }
     case "insurance": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance") : null;
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance", T12_INSURANCE_NOT) : null;
       if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of insurance` };
       return null;
     }
     case "taxes": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes") : null;
+      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes", T12_TAX_NOT) : null;
       if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of real estate taxes` };
       return null;
     }

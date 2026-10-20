@@ -378,16 +378,26 @@ const VACANCY_ROW = /\bvacancy\b/i;
 const VACANCY_NOT = /\$|market vacancy|submarket|metro|physical|economic/i;
 const VACANCY_VALUE_NOT = /\$/;
 const VACANCY_PLAN = /stabili[sz]ed|pro ?forma|underwritten|year ?\d|yr\.? ?\d/i;
+// A combined "Taxes & insurance" row is neither line alone: the tax finder
+// refuses a label naming insurance, the insurance finder one naming a tax,
+// and the T-12 line finders the same (`T12_TAX_NOT`, `T12_INSURANCE_NOT`).
 const TAX_BILL_ROW = /\b(?:real\s+estate|property|re)\s+tax(?:es)?\b|^tax(?:es)?\b/i;
-const TAX_BILL_NOT = /abat|exempt|pilot|saving|unabated|phase|\brate\b|\bper\b|\/|psf|millage|credit|transfer|recordation|increase|growth|escalat|reassess/i;
+const TAX_BILL_NOT = /abat|exempt|pilot|saving|unabated|phase|\brate\b|\bper\b|\/|psf|millage|credit|transfer|recordation|increase|growth|escalat|reassess|insurance/i;
 const ASSESSED_ROW = /\bassess(?:ed|ment)\b/i;
 const ASSESSED_NOT = /special|ratio|\brate\b|\bper\b|\/|millage|reassess/i;
 // The building's premium, never what insurance brings in: a storage
 // facility's "Tenant insurance" row is the platform's income (#471), and a
 // value whose own words say income is no premium whatever its label.
 const INSURANCE_ROW = /\binsurance\b/i;
-const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|tenant|income|revenue|proceeds|program|\brate\b|\bper\b|\/|psf|increase|growth|claim/i;
+const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|tenant|income|revenue|proceeds|program|\brate\b|\bper\b|\/|psf|increase|growth|claim|\btax/i;
 const INSURANCE_VALUE_NOT = /income|revenue|proceeds|commission/i;
+/** A T-12 line that is not the real estate tax line: an abatement, payroll
+ *  or transfer tax, or a line combined with insurance. Exported for the
+ *  track record's own T-12 reader. */
+export const T12_TAX_NOT = /abat|payroll|transfer|insurance/i;
+/** A T-12 line that is not the property's premium: a mortgage or title
+ *  policy, or a line combined with taxes. */
+export const T12_INSURANCE_NOT = /mortgage|title|\btax/i;
 // The acquisition loan's rate, never another loan's: a "Note rate" is the
 // note being sold (lib/note-yield's row), an existing, in-place or current
 // loan's is the seller's, and a balance's row is no rate at all.
@@ -1183,7 +1193,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
   }
   // The T-12's own tax line.
   const t12 = ctx.actuals?.t12;
-  const t12Tax = t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !/abat|payroll|transfer/i.test(l.label)) ?? null;
+  const t12Tax = t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !T12_TAX_NOT.test(l.label)) ?? null;
   if (t12Tax && t12Tax.amount > 0) {
     evidence.push({
       kind: "document",
@@ -1270,7 +1280,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const evidence: StressEvidence[] = [];
   // The T-12's own insurance line.
   const t12 = ctx.actuals?.t12;
-  const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !/mortgage|title/i.test(l.label)) ?? null;
+  const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
   if (t12Ins && t12Ins.amount > 0) {
     evidence.push({
       kind: "document",

@@ -663,6 +663,27 @@ describe("the premium the insurance row reads is the building's, never insurance
   });
 });
 
+describe("a combined 'Taxes & insurance' row is neither line alone", () => {
+  const combined: ExtractionResult = {
+    ...APARTMENT,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Insurance" && m.label !== "Real estate taxes"), row("Taxes & insurance", "$500,000", "p. 15")],
+  };
+  const t12Combined = { ...T12, opex: [{ key: "taxes", label: "Taxes & insurance", amount: 530_000, page: "p. 2" }, ...T12.opex.filter((l) => l.key !== "taxes" && l.key !== "insurance")] };
+
+  it("the OM's combined row reads as no tax bill and no premium", () => {
+    const t = buildStressTest(apartmentArgs({ extraction: combined }));
+    expect(rowOf(t, "taxes").omSays.text).toBe("The OM states no tax bill.");
+    expect(rowOf(t, "insurance").omSays.text).toBe("The OM states no insurance premium.");
+  });
+
+  it("the T-12's combined line is neither the tax line nor the insurance line", () => {
+    const actuals = readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), rentRoll: null, t12: { summary: t12Combined, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+    const t = buildStressTest(apartmentArgs({ actuals }));
+    expect(rowOf(t, "taxes").evidence.some((e) => e.label === "The deal's T-12 tax line")).toBe(false);
+    expect(rowOf(t, "insurance").evidence.some((e) => e.label === "The deal's T-12 insurance line")).toBe(false);
+  });
+});
+
 describe("the loan rate the debt row reads is the acquisition loan's", () => {
   const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
     ...APARTMENT,
