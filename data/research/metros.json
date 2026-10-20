@@ -107,7 +107,7 @@
             "https://www.institutionalpropertyadvisors.com/research/market-report/retail/washington-dc/washingtondc-2026-investment-forecast-retail-market-report",
             "https://dmped.dc.gov/release/mayor-bowser-releases-key-findings-new-study-and-strategic-plan-grow-dcs-retail-market-and"
           ],
-          "note": "Institutional Property Advisors (Marcus & Millichap’s institutional arm) 2026 Investment Forecast: District retail vacancy at a HISTORIC HIGH 6.3% entering 2026 — record restaurant closures through 2025 on rising labor costs, softer consumer spending, federal workforce reductions, and weaker tourism. VINTAGE: “entering 2026” = a year-end-2025 read, the newest district-wide figure to clear the source bar after four earlier sweeps returned only national prints or a stale 2022 article (rejected on URL vintage). The city’s own WDCEP/Streetsense Retail Strategic Plan (2026) corroborates the restructuring story. Asking-rent level not published — held null.",
+          "note": "Institutional Property Advisors (Marcus & Millichap’s institutional arm), 2026 Investment Forecast: District retail vacancy at a historic high of 6.3% entering 2026, after record restaurant closures through 2025 on rising labor costs, softer consumer spending, federal workforce reductions, and weaker tourism. “Entering 2026” makes this a year-end-2025 read, the newest district-wide figure from a named house. The city’s own WDCEP/Streetsense Retail Strategic Plan (2026) corroborates the restructuring story. No asking-rent level is published, so none is shown.",
           "vacancy_read": {
             "house": "Institutional Property Advisors (Marcus & Millichap's institutional arm)",
             "area": "the District",
@@ -502,7 +502,7 @@
             "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report",
             "https://www.yardimatrix.com/blog/baltimore-multifamily-market-report/"
           ],
-          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration. Aug 25 sweep: Yardi Matrix (March 2026 Baltimore report) prints occupancy 94.8% for STABILIZED assets as of December (construct declared: stabilized-only base — not comparable to the vacancy band above), avg advertised asking $1,744/mo (+0.4% YoY, double the national pace), Q1 2026 absorption 219 units vs 260 delivered. Cap still null: the same hunt surfaced only an unattributed 'averaging 8.5–9%' claim (guru-site-shaped, no research house named — rejected) and the loan-store '5.6% across all classes combined' boilerplate spliced into a digest under Berkadia's Q1 framing (eighth loan-store sighting; the fingerprint phrase gave it away).",
+          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. The band rests on one house (M&M) until a second confirms it. Yardi Matrix (March 2026 Baltimore report) prints occupancy of 94.8% for stabilized assets as of December — a stabilized-only base, not comparable to the vacancy band above — with an average advertised asking rent of $1,744/mo (+0.4% YoY, double the national pace) and Q1 2026 absorption of 219 units against 260 delivered. No cap rate is shown: no figure from two sources is on file, and a cap is never estimated. Two figures in circulation are not used: an unattributed 'averaging 8.5–9%' claim that names no research house, and a '5.6% across all classes combined' line presented under Berkadia's Q1 framing, which is templated boilerplate from loan-marketing pages that recurs across many metros.",
           "vacancy_read": {
             "house": "Marcus & Millichap",
             "period": "Q2 2026",
@@ -516,7 +516,7 @@
           "sources": [
             "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report"
           ],
-          "note": "NUMERIC FIELD HELD OPEN — direction sourced, level not yet. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its LOWEST since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively HIGH level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A digest print of “$11.04/SF NNN with BW-Corridor transport slots at $12.84” was REJECTED as industrial-shaped warehouse figures spliced under a retail heading (sixth sector-conflation catch). A dated vacancy level from a named house has not cleared the bar."
+          "note": "No dated retail vacancy level from a named house is on file yet, so no figure is shown; the direction is sourced. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its lowest since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively high level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A circulating “$11.04/SF NNN with BW-Corridor transport slots at $12.84” is not used: those are warehouse figures printed under a retail heading."
         }
       }
     },
@@ -629,7 +629,7 @@
             "https://rebusinessonline.com/richmonds-mixed-use-boom-fuels-the-citys-retail-market/",
             "https://rebusinessonline.com/mid-atlantic-retail-market-is-experiencing-methodical-growth/"
           ],
-          "note": "Cushman & Wakefield | Thalhimer (Jim Ashby, SVP Retail Services — the dominant local house): greater Richmond retail vacancy ~4.4% on ~81M SF of inventory, held tight by years of limited new development and zoning constraints. VINTAGE CAVEAT: the accessible articles do not print the survey quarter — treated as a recent-cycle (2025–26 era) read, not a dated quarterly print. Pipeline to watch: Diamond District, Genworth HQ, Nunnally Village add supply over the next several years. Asking-rent level not published — held null.",
+          "note": "Cushman & Wakefield | Thalhimer (Jim Ashby, SVP Retail Services — the dominant local house): greater Richmond retail vacancy ~4.4% on ~81M SF of inventory, held tight by years of limited new development and zoning constraints. The articles do not print the survey quarter, so this is a recent-cycle (2025–26 era) read, not a dated quarterly figure. Pipeline to watch: Diamond District, Genworth HQ, Nunnally Village add supply over the next several years. No asking-rent level is published, so none is shown.",
           "vacancy_read": {
             "house": "Cushman & Wakefield | Thalhimer",
             "area": "greater Richmond",
@@ -876,7 +876,7 @@
             "https://centercityphila.org/research-reports/retail",
             "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report"
           ],
-          "note": "NUMERIC FIELD HELD OPEN — two reads exist and neither is an SF-based metro vacancy print. Center City District’s on-foot storefront survey (April 2026, PRIMARY): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. CONSTRUCT DECLARED: a storefront COUNT, not square-footage vacancy — never compare it to the SF-based figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019), but a digest of that report interleaved multifamily-shaped numbers ($1.56/SF rent, 4.7% inventory growth) into the retail answer, so its “7.3%” print is REJECTED as probable report conflation until the primary confirms."
+          "note": "No square-foot vacancy figure for the metro is on file, so none is shown; the two reads below measure something else. Center City District’s own on-foot storefront survey (April 2026): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. That is a count of storefronts, not square-footage vacancy, and is not comparable with the square-foot figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019); a “7.3%” figure circulating from a secondary summary of that report, printed beside apartment figures ($1.56/SF rent, 4.7% inventory growth), is not used until the primary report confirms it."
         }
       }
     },
@@ -992,7 +992,7 @@
             "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop",
             "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
           ],
-          "note": "VINTAGE DECLARED: the 3.4% vacancy (Hudson County 1.7%, reported lowest of any major US submarket) and $17.92/SF with +12.0% YoY are Marcus & Millichap-era prints of 2024 vintage, recycled since by trade digests. Aug 2026 re-verification found NO dated 2026 named-house NNJ retail report — and one 2026 digest attaches an 8.2% “vacancy” to the same $17.92 rent print, a probable conflation with the industrial series (8%+ vacancy at 3.5M SF of half-year leasing is an industrial-shaped number), rejected. Treat the tightness story as directional and the levels as dated until a 2026 report clears the bar.",
+          "note": "The 3.4% vacancy (Hudson County 1.7%, reported lowest of any major US submarket) and $17.92/SF with +12.0% YoY are Marcus & Millichap figures from 2024, repeated since by trade press. A re-check in Aug 2026 found no dated 2026 North Jersey retail report from a named house. One 2026 summary pairs an 8.2% “vacancy” with the same $17.92 rent; that looks like the industrial series (8%+ vacancy at 3.5M SF of half-year leasing is an industrial-shaped number) and is not used. Read the tightness as directional and the levels as 2024’s until a 2026 report confirms them.",
           "vacancy_read": {
             "house": "Marcus & Millichap",
             "area": "North Jersey",
@@ -1634,7 +1634,7 @@
             "https://kidder.com/wp-content/uploads/market_report/multifamily-market-research-san-francisco-2026-1q.pdf",
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook"
           ],
-          "note": "1Q26: Kidder's own table reads 4.7% (4Q25 4.8%, 1Q25 5.3% — tightening 60bps YoY); Moody's via JPMorgan has 4.4% stable with rents +7% YoY, above pre-pandemic. Kidder 1Q26: average asking $2,652/unit (-3.0% YoY — the trend now corroborated by a second independent digest, resolving the earlier summary conflict), average sale $323,825/unit (-18% YoY). A third-party prose summary had inverted Kidder's vacancy trend; the report's own table text is carried here. Cap held null: an agent-reported Q1 average of ~5.9% (in line with the past three years, well above last cycle's sub-4s) is single-source — below the bar, on record.",
+          "note": "1Q26: Kidder's own table reads 4.7% (4Q25 4.8%, 1Q25 5.3% — tightening 60bps YoY); Moody's via JPMorgan has 4.4% stable with rents +7% YoY, above pre-pandemic. Kidder 1Q26: average asking $2,652/unit (-3.0% YoY, a trend a second independent source confirms), average sale $323,825/unit (-18% YoY). The vacancy trend is taken from the report's own table, which a third-party summary had stated the wrong way round. No cap rate is shown: an agent-reported Q1 average of ~5.9% (in line with the past three years, well above last cycle's sub-4s) has a single source.",
           "vacancy_read": {
             "house": "Moody's via JPMorgan (4.4%) and Kidder Mathews (4.7%)",
             "period": "Q1 2026",
