@@ -113,6 +113,8 @@ const SERVER_KEY_READERS: Record<string, string> = {
   "app/api/email/unsubscribe/[token]/route.ts": "their one-click unsubscribe",
   "worker/index.ts": "the background work that runs your screens",
   "lib/anthropic/pipeline.ts": "the background work that runs your screens",
+  // A restart marks the screens this process was running as failed.
+  "lib/in-process-runs.ts": "the background work that runs your screens",
   "lib/anthropic/actuals-ingest.ts": "the analyses beside them",
   "lib/anthropic/comps-search.ts": "the analyses beside them",
   "lib/anthropic/reconcile-facts.ts": "the analyses beside them",
