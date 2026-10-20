@@ -5,6 +5,7 @@
 // figures it has read (lib/model-vs-market-read, lib/debt-index-read), so a
 // render test builds exactly what the page draws.
 
+import { cache } from "react";
 import type { DebtSeeds } from "@/lib/debt-index";
 import type { TodayReads } from "@/lib/model-vs-market-read";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
@@ -177,6 +178,16 @@ export function sampleDemoData({
 
   return { data, research };
 }
+
+/**
+ * `sampleDemoData`, built once a render for one day, one read of today's
+ * figures and one set of debt indices (React's `cache`, keyed on the three
+ * arguments as they are: the cached read hands every caller the same
+ * object): the homepage's header chip and its walkthrough draw one build.
+ */
+export const sampleDemoDataOnce = cache((today: string, reads: TodayReads | null, debt: DebtSeeds) =>
+  sampleDemoData({ today, reads, debt }),
+);
 
 /**
  * The homepage walkthrough's props, picked from /demo's own build: the two

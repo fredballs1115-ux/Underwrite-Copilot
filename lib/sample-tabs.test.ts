@@ -268,7 +268,7 @@ describe("the walkthrough draws /demo's build, part for part", () => {
     expect(data.demand).not.toBeNull();
     // The homepage builds it so, and hands it whole to its tabs.
     const page = src("app/page.tsx");
-    expect(page).toMatch(/const \{ data \} = sampleDemoData\(\{ today: fmrToday\(\), reads, debt: NO_DEBT_SEEDS \}\);/);
+    expect(page).toMatch(/const \{ data \} = sampleDemoDataOnce\(readerToday\(null\), reads, NO_DEBT_SEEDS\);/);
     expect(page).toContain("<DemoTabs {...walkthroughData(data)} />");
     // …and every prop the tabs take reaches their panel.
     const call = slice(HOME, "<DemoPanel", "/>");

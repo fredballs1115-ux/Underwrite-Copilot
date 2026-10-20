@@ -244,7 +244,18 @@ describe("the sample's stress test, one build on every surface", () => {
     // the walkthrough (`walkthroughData`), on the reads it makes itself.
     const home = src("app/page.tsx");
     expect(home).toContain("const reads = await sampleTodayReads();");
-    expect(home).toMatch(/sampleDemoData\(\{ today: fmrToday\(\), reads, debt: NO_DEBT_SEEDS \}\)/);
+    // On the reader's day, the one the memo tile and the downloads date the
+    // sample by (lib/reader-day, New York with no reader's zone), never the
+    // UTC day: from 8 pm Eastern the two are a day apart.
+    expect(home).toMatch(/sampleDemoDataOnce\(readerToday\(null\), reads, NO_DEBT_SEEDS\)/);
+    expect(home).not.toContain("fmrToday");
+    expect(src("lib/sample-memo.ts")).toContain("const readerDay = readerToday(null, now);");
+    expect(src("app/demo/page.tsx")).toContain("const today = readerToday(null);");
+    expect(src("app/demo/page.tsx")).not.toContain("fmrToday");
+    // One read and one build a render (React's cache), so the homepage's
+    // chip, memo tile and walkthrough draw one set of figures.
+    expect(src("lib/sample-stress-read.ts")).toContain("export const sampleTodayReads = cache(async ()");
+    expect(src("app/demo/demo-data.ts")).toContain("export const sampleDemoDataOnce = cache(");
     expect(home).toContain("<DemoTabs {...walkthroughData(data)} />");
     expect(home).not.toMatch(/buildStressTest|sampleStressTest\(/);
     expect(src("app/demo/page.tsx")).toContain("await sampleTodayReads()");

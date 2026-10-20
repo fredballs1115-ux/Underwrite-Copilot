@@ -5,14 +5,14 @@ import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { sampleHeader } from "@/lib/sample-header";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { fmrToday } from "@/lib/fmr";
+import { readerToday } from "@/lib/reader-day";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { ResearchPanelView } from "@/app/(app)/deals/[id]/research-panel";
 import { SamplePublicRecord } from "@/app/(app)/deals/[id]/public-record-card";
 import { SampleDealHero } from "@/app/sample-hero";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { DemoSections } from "./sections";
-import { sampleDemoData } from "./demo-data";
+import { sampleDemoDataOnce } from "./demo-data";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
@@ -55,8 +55,10 @@ export const metadata: Metadata = {
  */
 export default async function DemoPage() {
   // Today, read once outside the render (an ISO day), and its noon for the
-  // header, as the deal page reads the reader's noon.
-  const today = fmrToday();
+  // header, as the deal page reads the reader's noon: the reader's day
+  // (lib/reader-day, New York with no reader's zone), the day the homepage,
+  // the memo tile and the downloads date the sample's stress test by.
+  const today = readerToday(null);
   // Today's figures for the market the live figures are read for, through
   // the deal page's own read (lib/model-vs-market-read): the demand card
   // and the model's assumptions against the published figures. A failed
@@ -65,7 +67,7 @@ export default async function DemoPage() {
   // Today's debt indices (lib/debt-index-read) for the research panel's
   // leverage check: the week's survey and the 10-year beside it.
   const debt = await liveDebtSeeds(HOLD_MONTHS);
-  const { data, research } = sampleDemoData({ today, reads, debt });
+  const { data, research } = sampleDemoDataOnce(today, reads, debt);
 
   return (
     <div className="flex flex-1 flex-col bg-canvas">
