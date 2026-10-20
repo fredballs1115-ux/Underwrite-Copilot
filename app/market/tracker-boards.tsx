@@ -4,6 +4,7 @@ import { linkOk } from "@/lib/link-audit";
 import { rankLabel } from "@/lib/rank";
 import { sharedFigureWords, type LeaderRow, type Standing } from "@/lib/sector-leaderboard";
 import { figureNote, figureSources, figuresTitle, rentText, type CitedFigure } from "@/lib/tracker-read";
+import { ScrollX } from "../edge-fade";
 import { heatShade } from "./heat-shade";
 
 /**
@@ -110,11 +111,29 @@ function RowMarkets({ row }: { row: LeaderRow }) {
  * recorded" where it names one and no link. Never a credit that looks like
  * a source ("on file") for a figure a visitor cannot check.
  */
-export function RowSources({ figures }: { figures: readonly CitedFigure[] }) {
+export function RowSources({
+  figures,
+  publisherSaid = false,
+}: {
+  figures: readonly CitedFigure[];
+  /** the row already says "publisher not recorded" (its unranked reason),
+   *  so the column names those figures as having no source, once */
+  publisherSaid?: boolean;
+}) {
   const ok = (href: string) => linkOk(href) !== false;
   const links = figureSources(figures, ok);
   const missing = figures.filter((f) => !f.read.links[0] || !ok(f.read.links[0]));
-  const said = missing.map((f) => `${f.label.toLowerCase()}: ${f.read.house ? "no link recorded" : "publisher not recorded"}`);
+  // Each want said once a row, naming the figures it holds for: "vacancy,
+  // rent and cap: publisher not recorded", never the same words thrice.
+  const said = (["publisher not recorded", "no link recorded"] as const)
+    .map((want) => {
+      const labels = missing
+        .filter((f) => (f.read.house ? "no link recorded" : "publisher not recorded") === want)
+        .map((f) => f.label.toLowerCase());
+      if (labels.length === 0) return null;
+      return `${listWords(labels)}: ${want === "publisher not recorded" && publisherSaid ? "no source" : want}`;
+    })
+    .filter((x): x is string => x !== null);
   return (
     <span className="inline-flex flex-wrap gap-x-1.5" title={figuresTitle(figures)}>
       {links.map((l) => (
@@ -132,6 +151,11 @@ export function RowSources({ figures }: { figures: readonly CitedFigure[] }) {
       {said.length > 0 ? <span data-qa="missing-source">{said.join(" · ")}</span> : null}
     </span>
   );
+}
+
+/** "vacancy", "vacancy and cap", "vacancy, rent and cap". */
+function listWords(words: readonly string[]): string {
+  return words.length <= 1 ? (words[0] ?? "") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
 /** Each figure's own period, said beside it: "Q2 2026", or "undated". */
@@ -180,8 +204,26 @@ export function LeaderboardTable({
       <>
         {" "}
         <span className="block text-[10px] font-sans text-muted">{p}</span>
+        {caveat(r, l)}
       </>
     ) : null;
+  };
+  // A figure for a narrower stock than the class is said under it, with
+  // what kind of figure it is: Chicago's 8.3% cap is Essex Realty's
+  // transaction average for the small Class B/C buildings, not the city's
+  // multifamily cap, so it is read beside the others, never as one of them.
+  const caveat = (r: LeaderRow, l: CitedFigure["label"]) => {
+    const f = r.figures.find((x) => x.label === l);
+    if (!f?.read.slice) return null;
+    const words = [l === "Cap" ? f.read.construct : null, `for ${f.read.slice}`].filter(Boolean).join("; ");
+    return (
+      <>
+        {" "}
+        <span className="block max-w-[16rem] font-sans text-[10px] leading-snug text-caution" data-qa="figure-slice">
+          {`${words.charAt(0).toUpperCase()}${words.slice(1)}`}
+        </span>
+      </>
+    );
   };
   return (
     <div>
@@ -198,7 +240,7 @@ export function LeaderboardTable({
           {stale}
         </p>
       )}
-      <div className="mt-2 overflow-x-auto">
+      <ScrollX className="mt-2">
         <table className="w-full min-w-[440px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -249,14 +291,14 @@ export function LeaderboardTable({
                     </td>
                   )}
                   <td className="py-1.5 text-[11px] text-muted">
-                    <RowSources figures={r.figures} />
+                    <RowSources figures={r.figures} publisherSaid={!!r.reason?.includes("publisher not recorded")} />
                   </td>
                 </tr>
               </Fragment>
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
         {`A figure is ranked only where its source names its publisher and dates it within the last year, for the whole ${sectorWord(sector)} stock, as one read: a spread of two houses, two inventories or two periods is printed as the spread and never placed by its midpoint, and a range its publisher prints as one read is placed by its loosest end. Equal figures share one place ("=5") and one shade. Several markets that read one figure are one row.`}
       </p>
@@ -339,6 +381,37 @@ export function CoverageBoardCell({ sector, cell }: { sector: string; cell: Cove
       data-cell="ranked"
     >
       {body}
+    </div>
+  );
+}
+
+/**
+ * The coverage board's key, in one line: what a cell's shade, its dashed
+ * edge and a dash say. The shade is `heatShade` of the cell's rank within
+ * its column (0 the tightest vacancy, 1 the loosest), so a column compares
+ * to itself only; a dashed cell carries a figure the column does not rank.
+ */
+export function HeatKey() {
+  const steps = [0, 0.25, 0.5, 0.75, 1];
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted" data-qa="heat-key">
+      <span className="inline-flex items-center gap-1.5">
+        <span>Tightest vacancy</span>
+        <span aria-hidden className="inline-flex overflow-hidden rounded-sm">
+          {steps.map((t) => (
+            <span key={t} className="h-3 w-4" style={{ backgroundColor: heatShade(t) }} />
+          ))}
+        </span>
+        <span>loosest, ranked within each column</span>
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden className="h-3 w-4 rounded-sm border border-dashed border-line" />
+        <span>not ranked</span>
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden className="font-mono">—</span>
+        <span>no figure on file</span>
+      </span>
     </div>
   );
 }

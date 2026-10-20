@@ -46,7 +46,8 @@ import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
 import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
-import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { CoverageBoardCell, FigureCredits, HeatKey, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { ScrollX } from "../edge-fade";
 import { listSubmarkets } from "@/lib/market/store";
 import { readMarketMemory } from "@/lib/market-memory-read";
 import type { Submarket } from "@/lib/market/types";
@@ -497,7 +498,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
           )}
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
+      <ScrollX className="mt-3">
         <table className="w-full min-w-[520px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -522,7 +523,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       {dcFmr.length > 0 && (
         <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
           {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcWhen?.text ? `, ${dcWhen.text}` : ""}: `}
@@ -894,8 +895,18 @@ function SectorHeatGrid() {
           {` · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
+      <HeatKey />
+      <ScrollX className="mt-3">
+        {/* Fixed layout and equal sector columns: under auto layout a
+            column's width followed its longest period note, so the four
+            columns of one board ran 90px to 300px wide. */}
+        <table className="w-full min-w-[560px] table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[22%]" />
+            {HEAT_SECTORS.map((s) => (
+              <col key={s} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
               <th className="py-1.5 pr-3 font-medium">Market</th>
@@ -947,7 +958,7 @@ function SectorHeatGrid() {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
         Sourced figures, each with its own period; a band is shown as a band;
         a dashed cell is a figure the column does not rank (undated, over a
@@ -1157,7 +1168,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
         )}
 
         {ranges.length > 0 && (
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full min-w-[480px] text-left text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
@@ -1188,7 +1199,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         )}
         {unpriced.length > 0 && (
           <p className="text-[11px] text-muted">

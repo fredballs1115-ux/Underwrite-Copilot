@@ -11052,8 +11052,11 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     expect(text).toContain("Not ranked — the reason under each market");
     expect(html.indexOf("Not ranked — the reason")).toBeGreaterThan(html.lastIndexOf('data-row-rank="4"'));
     expect(text).toContain("undated; a spread of two reads");
-    // A figure with no house says so, plainly, and never "on file".
-    expect(text).toContain("vacancy: publisher not recorded");
+    // A figure with no house says so, plainly, and never "on file" — once a
+    // row: where the reason already says it, the source column names the
+    // figures with no source rather than saying it again.
+    expect((strip(dmv).match(/publisher not recorded/g) ?? []).length).toBe(1);
+    expect(strip(dmv)).toContain("vacancy and cap: no source");
     expect(text).not.toMatch(/\bon file\b/);
     // The caption says the rule the table keeps.
     expect(text).toContain("ranked only where its source names its publisher and dates it within the last year");
