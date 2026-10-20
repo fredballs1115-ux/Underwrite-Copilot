@@ -345,6 +345,12 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(row).toMatch(/data-bar="stress-impact" style="width:[\d.]+%"/);
     expect(row).toMatch(/data-bar="stress-impact-om" style="width:[\d.]+%"/);
     expect(t).toContain("At the OM's figure 9.3% At the evidence's figure 7.1%");
+    // A fall is the warning tone; a re-run the evidence lifts never is.
+    expect(row).toContain('class="h-full rounded-full bg-caution/70" data-direction="down" data-bar="stress-impact"');
+    const up: StressRow = { ...VACANCY, verdict: "holds", impact: { ...VACANCY.impact!, altValue: 0.058, altIrrPct: 9.6 } };
+    const upRow = render({ rows: [up], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(upRow).toContain('class="h-full rounded-full bg-pass/70" data-direction="up" data-bar="stress-impact"');
+    expect(upRow).not.toContain("bg-caution/70");
     expect(t).toContain(VACANCY.impact!.note);
     // The challenger's words, folded whole under the row.
     expect(t).toContain("The challenge · High severity");

@@ -341,6 +341,9 @@ function ImpactView({ impact }: { impact: StressImpact }) {
   // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
   // as lib/stress-test-words does, never off the note's words.
   const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
+  // A re-run the evidence lifts is the OM's cushion, never a warning: only
+  // a fall is drawn in the warning tone (`data-direction`).
+  const direction = base == null || alt == null || Math.abs(alt - base) < 0.05 ? "flat" : alt < base ? "down" : "up";
   return (
     <div className="mt-2.5" data-qa="stress-impact">
       <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
@@ -353,7 +356,7 @@ function ImpactView({ impact }: { impact: StressImpact }) {
           </BarRow>
         )}
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
-          <div className="h-full rounded-full bg-caution/70" data-bar="stress-impact" style={{ width: widthOf(alt) }} />
+          <div className={`h-full rounded-full ${direction === "down" ? "bg-caution/70" : direction === "up" ? "bg-pass/70" : "bg-muted/40"}`} data-direction={direction} data-bar="stress-impact" style={{ width: widthOf(alt) }} />
         </BarRow>
       </BarRows>
       <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink/85`}>
