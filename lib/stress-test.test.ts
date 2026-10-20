@@ -1563,6 +1563,11 @@ describe("the plan re-runs strike no yield on a figure the plan does not reach",
     expect(t.impactsWithheld).toBe(
       "No yield on cost is struck: the price buys a master lease of the building, sublet to its tenants — the position between two rents, not the building, so the building's stabilized NOI over that price is no yield on cost; no return is re-run.",
     );
+    // The deal page's plan card reads the same: no yield struck, said why.
+    const p = planSummary(master, inferStrategy(master, null))!;
+    expect(p.yieldOnCost).toBeNull();
+    expect(p.yieldWithheld).toMatch(/^No yield on cost is struck: the price buys a master lease of the building/);
+    expect(planSummary(ex, inferStrategy(ex, null))!.yieldOnCost).not.toBeNull();
     expect(t.measure).toBeUndefined();
     expect(t.headline).toBeNull();
     expect(t.rows.every((r) => r.impact == null)).toBe(true);
