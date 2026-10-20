@@ -87,7 +87,7 @@ export async function PublicShell({ children }: { children: ReactNode }) {
               Start free
             </Link>
           </span>
-          <span className="flex flex-wrap gap-x-4 gap-y-2">
+          <span className="flex flex-wrap gap-x-4 gap-y-2 whitespace-nowrap">
             <Link href="/tools" className="transition-colors hover:text-ink">
               Deal math
             </Link>

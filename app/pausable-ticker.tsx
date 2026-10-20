@@ -19,11 +19,14 @@ import { useState, type ReactNode } from "react";
 export function PausableTicker({
   what,
   className,
+  place = "right-3 top-2",
   children,
 }: {
   /** what is moving, for the button's name: "Pause the {what}" */
   what: string;
   className?: string;
+  /** where the button sits in the band: its corner by default */
+  place?: string;
   children: ReactNode;
 }) {
   const [paused, setPaused] = useState(false);
@@ -33,7 +36,7 @@ export function PausableTicker({
         type="button"
         onClick={() => setPaused((p) => !p)}
         aria-label={`${paused ? "Play" : "Pause"} the ${what}`}
-        className="absolute right-3 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 motion-reduce:hidden print:hidden"
+        className={`absolute ${place} z-10 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 motion-reduce:hidden print:hidden`}
       >
         {paused ? (
           <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="currentColor" aria-hidden>

@@ -240,9 +240,15 @@ export function MarketsMarquee({ today = todayIso() }: { today?: string }) {
     </div>
   );
   // The band never stops on its own, so it carries a pause button
-  // (app/pausable-ticker); the heading keeps clear of it at the right.
+  // (app/pausable-ticker); the heading keeps clear of it at the right. The
+  // button keeps to the page's column (max-w-6xl, 72rem less its 1.5rem
+  // gutter), not the window's edge, where it sat alone at 1280.
   return (
-    <PausableTicker what="markets band" className="overflow-hidden border-y border-line bg-faint/70 py-3">
+    <PausableTicker
+      what="markets band"
+      place="top-2 right-[max(0.75rem,calc(50%-34.5rem))]"
+      className="overflow-hidden border-y border-line bg-faint/70 py-3"
+    >
       <p className="mb-1.5 px-10 text-center text-[11px] font-medium uppercase tracking-wider text-muted">
         {`The ${MARKET_COUNT} covered markets — dated research${shared ? `, ${researchReadOn(shared)}` : ""}`}
         {stale && (

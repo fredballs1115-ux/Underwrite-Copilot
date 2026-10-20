@@ -179,7 +179,7 @@ export default function WhyPage() {
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>Underwrite Copilot</span>
-          <span className="flex gap-4">
+          <span className="flex flex-wrap gap-x-4 gap-y-2 whitespace-nowrap">
             <Link href="/why" className="transition-colors hover:text-ink">
               Why
             </Link>
