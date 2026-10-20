@@ -10,6 +10,7 @@ import type { StageChange } from "@/lib/stages";
 import {
   RECORD_FLOOR,
   RECORD_NONE_LINE,
+  TAX_INSURANCE_NOT_SCORED,
   accountRecord,
   arrivalOf,
   recordCountsLine,
@@ -21,7 +22,7 @@ import {
 
 const T = "2026-10-01T12:00:00Z";
 const BEFORE = "2026-09-20T09:00:00Z";
-const AFTER = "2026-10-05T09:00:00Z";
+const AFTER = "2026-11-05T09:00:00Z";
 
 const vacancy: Challenge = {
   assumption: "Stabilized vacancy of 6%",
@@ -47,6 +48,7 @@ const basis: Challenge = {
 };
 const debt: Challenge = { assumption: "A 5.0% all-in rate", severity: "medium", challenge: "Today's index plus spread is 6.8%.", question: "", key: "debt", omFigure: 5, altFigure: 6.8, altBasis: "the 5-yr Treasury plus the class spread" };
 const insurance: Challenge = { assumption: "Insurance at the seller's $300k premium", severity: "medium", challenge: "", question: "", key: "insurance", omFigure: 300_000, altFigure: 400_000, altBasis: "the index's year" };
+const noi: Challenge = { assumption: "Pro forma NOI of $4.0M", severity: "medium", challenge: "", question: "", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000, altBasis: "the trailing year" };
 const older: Challenge = { assumption: "Exit cap of 5.25% inside the going-in cap", severity: "high", challenge: "", question: "" };
 
 const t12: T12Summary = {
@@ -85,17 +87,17 @@ const dead = (reason: "price" | "financing", at = AFTER): { stage: string; histo
 
 describe("scoreDeal — only what arrived after the screen scores a challenge", () => {
   it("a T-12 added after the screen scores vacancy on the screen's side, by its economic vacancy", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
     expect(r.screenedAt).toBe(T);
     expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
-    expect(r.evidence[0].label).toBe("T-12 to Sep 30, 2026 (added Oct 5, 2026)");
+    expect(r.evidence[0].label).toBe("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
     const row = r.rows[0];
     expect(row.key).toBe("vacancy");
     expect(row.landing).toBe("screen_side");
     // 650,500 over 7,150,000 is 9.1%: past the screen's 9.0%.
     expect(row.later?.value).toBe(9.1);
     expect(row.text).toBe(
-      "Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Sep 30, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
+      "Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Oct 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
     );
     expect(r.notScored).toEqual([]);
   });
@@ -104,8 +106,8 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     const r = scoreDeal({
       screenedAt: T,
       challenges: [vacancy],
-      rentRoll: { arrivedAt: AFTER, dated: "2026-09-30", summary: { ...roll, sfWeightedOccupancy: 0.925 } },
-      t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 },
+      rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: { ...roll, sfWeightedOccupancy: 0.925 } },
+      t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
     });
     expect(r.rows[0].later?.source).toBe("rent_roll");
     expect(r.rows[0].later?.value).toBe(7.5);
@@ -113,14 +115,14 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
   });
 
   it("reads the roll's vacancy as the stress test does: by count on an apartment building, by area on an office", () => {
-    const rentRoll = { arrivedAt: AFTER, dated: "2026-09-30", summary: roll };
+    const rentRoll = { arrivedAt: AFTER, dated: "2026-10-31", summary: roll };
     // 218 of 240 units is 9.2% by count; 90.6% of the area is 9.4%.
-    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "multifamily" }).rows[0].later).toMatchObject({ value: 9.2, text: "the rent roll as of Sep 30, 2026 ran 9.2% vacant by units" });
-    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "office" }).rows[0].later).toMatchObject({ value: 9.4, text: "the rent roll as of Sep 30, 2026 ran 9.4% vacant by area" });
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "multifamily" }).rows[0].later).toMatchObject({ value: 9.2, text: "the rent roll as of Oct 31, 2026 ran 9.2% vacant by units" });
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "office" }).rows[0].later).toMatchObject({ value: 9.4, text: "the rent roll as of Oct 31, 2026 ran 9.4% vacant by area" });
   });
 
   it("a later document never scores a stabilized assumption the stress test holds to the market: its vacancy is today's", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 }, vacancyHeldToMarket: true });
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 }, vacancyHeldToMarket: true });
     // Still on record as what came after, and the figure still shown.
     expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
     const row = r.rows[0];
@@ -130,7 +132,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(row.why).toBe(
       "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.",
     );
-    expect(row.text).toMatch(/^Stabilized vacancy: the T-12 to Sep 30, 2026 ran 9\.1% economic vacancy .*, but the OM's vacancy is a stabilized assumption .* not a test of it, so it is not scored\.$/);
+    expect(row.text).toMatch(/^Stabilized vacancy: the T-12 to Oct 31, 2026 ran 9\.1% economic vacancy .*, but the OM's vacancy is a stabilized assumption .* not a test of it, so it is not scored\.$/);
     // The shares count it nowhere.
     expect(accountRecord([r]).scored).toBe(0);
   });
@@ -138,57 +140,109 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
   it("a T-12 the screen read is unscored, said as before the screen, and never evidence", () => {
     const r = scoreDeal({ screenedAt: T, challenges: [vacancy, insurance], t12: { arrivedAt: BEFORE, dated: "2026-08-31", summary: t12 } });
     expect(r.evidence).toEqual([]);
+    expect(r.refusedLater).toBe(false);
     expect(r.notScored).toEqual([
       "T-12 to Aug 31, 2026 was on the deal before the screen (added Sep 20, 2026): the screen read it, so it is not scored against it.",
     ]);
-    for (const row of r.rows) {
-      expect(row.landing).toBe("unscored");
-      expect(row.why).toBe("nothing that arrived after the screen speaks to it.");
-    }
+    for (const row of r.rows) expect(row.landing).toBe("unscored");
+    expect(r.rows.map((x) => x.why)).toEqual([
+      "nothing that arrived after the screen speaks to it.",
+      "a seller's T-12 cannot show a new owner's premium, and no document on the deal is the buyer's own quote, so no document scores it.",
+    ]);
   });
 
   it("a T-12 with no arrival on record is not scored either", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [insurance], t12: { arrivedAt: null, dated: null, summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: null, dated: null, summary: t12 } });
     expect(r.evidence).toEqual([]);
     expect(r.notScored[0]).toContain("no arrival time on record");
     expect(r.rows[0].landing).toBe("unscored");
   });
 
-  it("the T-12's insurance and tax lines and its NOI each score their own key", () => {
-    const taxes: Challenge = { ...insurance, assumption: "Taxes not reset", key: "taxes", omFigure: 900_000, altFigure: 1_300_000 };
-    const noi: Challenge = { ...insurance, assumption: "Pro forma NOI", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000 };
-    const r = scoreDeal({ screenedAt: T, challenges: [insurance, taxes, noi], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
-    // Insurance $385k sits between $300k and $400k; taxes $1.14M between
-    // $900k and $1.3M; NOI $3.71M is past the screen's $3.6M? No: $3.71M
-    // sits between $3.6M and $4.0M.
-    expect(r.rows.map((x) => [x.key, x.landing, x.later?.value])).toEqual([
-      ["insurance", "between", 385_000],
-      ["taxes", "between", 1_140_000],
-      ["noi", "between", 3_706_500],
+  it("a T-12 uploaded after the screen whose period ended on or before the verdict is history, not news: refused and said so", () => {
+    for (const periodEnd of ["2026-09-30", "2026-10-01"]) {
+      const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: periodEnd, summary: t12 } });
+      expect(r.evidence).toEqual([]);
+      expect(r.refusedLater).toBe(true);
+      expect(r.rows[0].landing).toBe("unscored");
+      expect(accountRecord([r])).toMatchObject({ scored: 0, dealsWithLater: 0 });
+    }
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } }).notScored).toEqual([
+      "T-12 to Sep 30, 2026 was added Nov 5, 2026, after the screen, but its period ended on or before the verdict (Oct 1, 2026): it is history the screen could have been handed, only uploaded later, so it is not scored.",
     ]);
-    expect(r.rows[2].text).toContain("the T-12 to Sep 30, 2026 earned $3.71M");
+    // The day after the verdict's is after it.
+    const next = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-02", summary: t12 } });
+    expect(next.refusedLater).toBe(false);
+    expect(next.rows[0].landing).toBe("screen_side");
+    // A rent roll by its as-of date, the same rule.
+    const early = scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll: { arrivedAt: AFTER, dated: "2026-09-15", summary: roll } });
+    expect(early.notScored).toEqual([
+      "Rent roll as of Sep 15, 2026 was added Nov 5, 2026, after the screen, but it is dated on or before the verdict (Oct 1, 2026): it is history the screen could have been handed, only uploaded later, so it is not scored.",
+    ]);
   });
 
-  it("a combined 'Taxes & insurance' line scores neither, whatever key it was filed under", () => {
+  it("a document uploaded after the screen with no date of its own on record is not scored, and says so", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll: { arrivedAt: AFTER, dated: null, summary: roll }, t12: { arrivedAt: AFTER, dated: null, summary: t12 } });
+    expect(r.evidence).toEqual([]);
+    expect(r.refusedLater).toBe(true);
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.notScored).toEqual([
+      "T-12 (period not stated) was added Nov 5, 2026, after the screen, but with no period end on record nothing shows its figures postdate the verdict, so it is not scored.",
+      "Rent roll (as-of not stated) was added Nov 5, 2026, after the screen, but with no as-of date on record nothing shows its figures postdate the verdict, so it is not scored.",
+    ]);
+  });
+
+  it("a taxes or insurance challenge is never scored by a document: a seller's T-12 cannot show a new owner's bill or premium", () => {
     const taxes: Challenge = { ...insurance, assumption: "Taxes not reset", key: "taxes", omFigure: 900_000, altFigure: 1_300_000 };
-    const combined = { ...t12, opex: [{ key: "taxes", label: "Taxes & insurance", amount: 1_525_000, page: "p. 1" }] };
-    const r = scoreDeal({ screenedAt: T, challenges: [insurance, taxes], t12: { arrivedAt: AFTER, dated: null, summary: combined } });
+    const noi: Challenge = { ...insurance, assumption: "Pro forma NOI", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000 };
+    const r = scoreDeal({ screenedAt: T, challenges: [insurance, taxes, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+    // The T-12 is evidence (it scores the NOI, $3.71M between $3.6M and
+    // $4.0M); its tax and insurance lines score nothing, and those rows
+    // carry no later figure.
+    expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
+    expect(r.rows.map((x) => [x.key, x.landing, x.later?.value ?? null])).toEqual([
+      ["insurance", "unscored", null],
+      ["taxes", "unscored", null],
+      ["noi", "between", 3_706_500],
+    ]);
+    expect(r.rows[0].text).toBe("Insurance: a seller's T-12 cannot show a new owner's premium, and no document on the deal is the buyer's own quote, so no document scores it.");
+    expect(r.rows[1].text).toBe("Real estate taxes: a seller's T-12 cannot show a new owner's tax bill, and no document on the deal is the buyer's own, so no document scores it.");
+    expect(r.rows[2].text).toContain("the T-12 to Oct 31, 2026 earned $3.71M");
+    expect(accountRecord([r]).byKey.map((k) => k.key)).toEqual(["noi"]);
+    expect(TAX_INSURANCE_NOT_SCORED).toBe("A seller's T-12 cannot show a new owner's tax bill or premium, so taxes and insurance challenges are not scored by documents.");
+    // Nothing reads a T-12's tax or insurance line to score a row.
+    const src = readFileSync(join(process.cwd(), "lib/track-record.ts"), "utf8");
+    expect(src).not.toMatch(/case "(?:taxes|insurance)":/);
+    expect(src).not.toMatch(/T12_(?:TAX|INSURANCE)_NOT/);
+  });
+
+  it("on a plan deal a later T-12 scores no NOI challenge and a later document no stated stabilized vacancy: the building before the plan is done", () => {
+    const noi: Challenge = { ...insurance, assumption: "Stabilized NOI", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000 };
+    const later = { t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 }, rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll } };
+    const r = scoreDeal({ screenedAt: T, challenges: [noi, vacancy], ...later, plan: true, vacancyIsPlanTarget: true });
     expect(r.rows.map((x) => x.landing)).toEqual(["unscored", "unscored"]);
+    expect(r.rows[0].why).toBe("on a plan deal the OM's NOI is the finished project's, and a T-12 is the building's year before the plan is done, not a test of it.");
+    expect(r.rows[0].text).toBe(
+      "NOI: the T-12 to Oct 31, 2026 earned $3.71M, but on a plan deal the OM's NOI is the finished project's, and a T-12 is the building's year before the plan is done, not a test of it, so it is not scored.",
+    );
+    expect(r.rows[1].why).toBe("the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.");
+    expect(accountRecord([r]).scored).toBe(0);
+    // A plan deal whose OM states today's occupancy, not an allowance: the
+    // documents' vacancy is today's too, and scores it.
+    expect(scoreDeal({ screenedAt: T, challenges: [vacancy], ...later, plan: true, vacancyIsPlanTarget: false }).rows[0].landing).not.toBe("unscored");
+    // Off a plan deal the NOI is scored as before.
+    expect(scoreDeal({ screenedAt: T, challenges: [noi], ...later }).rows[0].landing).toBe("between");
   });
 
   it("a figure at or past the OM's end lands on the OM's side", () => {
-    const r = scoreDeal({
-      screenedAt: T,
-      challenges: [insurance],
-      t12: { arrivedAt: AFTER, dated: null, summary: { ...t12, opex: [{ key: "insurance", label: "Insurance", amount: 290_000, page: "" }] } },
-    });
+    const noi: Challenge = { ...insurance, assumption: "Pro forma NOI", key: "noi", omFigure: 4_000_000, altFigure: 3_600_000 };
+    const r = scoreDeal({ screenedAt: T, challenges: [noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: { ...t12, noi: 4_100_000 } } });
     expect(r.rows[0].landing).toBe("om_side");
-    expect(r.rows[0].text).toContain("the T-12 paid $290k of insurance — on the OM's side.");
+    expect(r.rows[0].text).toContain("the T-12 to Oct 31, 2026 earned $4.10M — on the OM's side.");
   });
 
   it("a Dead-on-price decision after the screen scores the basis challenge as a decision on the screen's side; financing scores the debt", () => {
     const r = scoreDeal({ screenedAt: T, challenges: [basis, debt, vacancy], ...dead("price") });
-    expect(r.evidence[0].label).toBe("Moved to Dead on price (Oct 5, 2026)");
+    expect(r.evidence[0].label).toBe("Moved to Dead on price (Nov 5, 2026)");
     expect(r.rows.map((x) => [x.key, x.landing])).toEqual([
       ["basis", "screen_side"],
       ["debt", "unscored"],
@@ -221,7 +275,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
         { stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: "2026-10-03", reportedBy: "Jane", reportedAt: AFTER } } },
       ],
     });
-    expect(r.evidence[0].label).toBe("The building traded at $60.00M on Oct 3, 2026, reported by Jane (recorded Oct 5, 2026)");
+    expect(r.evidence[0].label).toBe("The building traded at $60.00M on Oct 3, 2026, reported by Jane (recorded Nov 5, 2026)");
     const row = r.rows[0];
     expect(row.later?.source).toBe("trade");
     // $60.0M over the $65.76M ask is 0.9124; on $274k a unit, $250k a unit.
@@ -263,17 +317,17 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
   });
 
   it("a screen's figure equal to the OM's has no side to land on", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, altFigure: 6 }], t12: { arrivedAt: AFTER, dated: null, summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, altFigure: 6 }], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.rows[0].why).toContain("the screen's figure is the OM's own");
   });
 
   it("a verdict with no stamp scores nothing: there is no after without a when", () => {
-    const r = scoreDeal({ screenedAt: undefined, challenges: [vacancy, basis], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 }, ...dead("price") });
+    const r = scoreDeal({ screenedAt: undefined, challenges: [vacancy, basis], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 }, ...dead("price") });
     expect(r.screenedAt).toBeNull();
     expect(r.evidence).toEqual([]);
     expect(r.notScored).toEqual([
-      "T-12 to Sep 30, 2026 is on the deal, but the verdict carries no screen time to set it after.",
+      "T-12 to Oct 31, 2026 is on the deal, but the verdict carries no screen time to set it after.",
       "The deal died on price, but the verdict carries no screen time to set the decision after.",
     ]);
     for (const row of r.rows) expect(row.why).toBe("the verdict carries no screen time, so nothing can be said to have come after it.");
@@ -302,11 +356,11 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
       screenedAt: T,
       challenges: [vacancy, insurance],
       priorScreen,
-      t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 },
+      t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 },
     });
     expect(r.prior).toEqual({ screenedAt: PRIOR_T, screenedOn: "Sep 10, 2026" });
     // The evidence is the earlier screen's, said so.
-    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Aug 31, 2026 (added Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)"]);
+    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Sep 20, 2026 (added Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)"]);
     // One row a key: the prior's vacancy row in the current's unscored one's
     // place, on the prior's own figures (5% and 8%, not 6% and 9%).
     expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([
@@ -315,19 +369,28 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
     ]);
     expect(r.rows[0].figures).toEqual({ om: "5.0%", alt: "8.0%", later: "9.1%" });
     expect(r.rows[0].text).toBe(
-      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Aug 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
+      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Sep 20, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
     );
     // The current screen's refusal says where the T-12 is scored instead.
     expect(r.notScored).toEqual([
-      "T-12 to Aug 31, 2026 was on the deal before this screen (added Sep 25, 2026): this screen read it, so it is scored against the screen of Sep 10, 2026 instead.",
+      "T-12 to Sep 20, 2026 was on the deal before this screen (added Sep 25, 2026): this screen read it, so it is scored against the screen of Sep 10, 2026 instead.",
     ]);
     // The prior's basis challenge has nothing after it either, and an
     // unscored prior row is never added.
     expect(r.rows.some((x) => x.key === "basis")).toBe(false);
   });
 
+  it("a T-12 uploaded after both screens but dated between them scores the prior screen's challenge, and says it is dated between", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-09-20", summary: t12 } });
+    expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "screen_side", "Sep 10, 2026"]]);
+    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Sep 20, 2026 (added Nov 5, 2026; dated after the screen of Sep 10, 2026 and before this one)"]);
+    expect(r.notScored).toEqual([
+      "T-12 to Sep 20, 2026 was added Nov 5, 2026, but its period ended on or before this screen's verdict (Oct 1, 2026), so it is scored against the screen of Sep 10, 2026 instead.",
+    ]);
+  });
+
   it("a figure that arrived after BOTH screens scores the current challenge once, never the prior's of the same key", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
     expect(r.evidence).toHaveLength(1);
     expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "screen_side", null]]);
     expect(r.rows[0].figures?.om).toBe("6.0%");
@@ -349,7 +412,7 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
   });
 
   it("an older snapshot without challenges, one without a stamp, or one stamped after the current screen reads exactly as before", () => {
-    const plain = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 } });
+    const plain = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } });
     for (const prior of [
       { verdict: { generatedAt: PRIOR_T } },
       { verdict: { generatedAt: PRIOR_T }, challenges: { challenges: [] } },
@@ -357,7 +420,7 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
       { verdict: { generatedAt: "2026-10-02T00:00:00Z" }, challenges: { challenges: [priorVacancy] } },
       null,
     ]) {
-      const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen: prior, t12: { arrivedAt: BETWEEN, dated: "2026-08-31", summary: t12 } });
+      const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen: prior, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } });
       expect(r.prior).toBeNull();
       expect(r.rows).toEqual(plain.rows);
       expect(r.evidence).toEqual([]);
@@ -374,21 +437,21 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
   });
 
   it("the account's record counts a prior screen's scored row as the deal's", () => {
-    const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: BETWEEN, dated: null, summary: t12 } })]);
+    const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } })]);
     expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 1, scored: 1, screenSide: 1 });
   });
 });
 
 describe("accountRecord — counts, by key, and the floor", () => {
   const scoredDeal = (...extra: Challenge[]): DealRecord =>
-    scoreDeal({ screenedAt: T, challenges: [vacancy, ...extra], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } });
+    scoreDeal({ screenedAt: T, challenges: [vacancy, ...extra], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
 
   it("says no record and claims none with nothing scored, and names what it will be scored against", () => {
     const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy] }), scoreDeal({ screenedAt: null, challenges: [vacancy] })]);
     expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 0, scored: 0, byKey: [], shares: null });
     expect(recordState(r)).toBe("none");
     expect(recordLine(r)).toBe(RECORD_NONE_LINE);
-    for (const thing of ["the T-12 or rent roll you add after the screen", "what you decided (dead, and why)", "what the building traded for"]) expect(RECORD_NONE_LINE).toContain(thing);
+    for (const thing of ["a T-12 or rent roll dated after the screen", "what you decided (dead, and why)", "what the building traded for"]) expect(RECORD_NONE_LINE).toContain(thing);
     expect(recordCountsLine(r)).toBe("1 deal tested · 0 with later evidence · 0 rows scored");
   });
 
@@ -403,11 +466,11 @@ describe("accountRecord — counts, by key, and the floor", () => {
   });
 
   it("at the floor the shares are said, and the keys ranked by rows scored", () => {
-    const r = accountRecord([scoredDeal(insurance), scoredDeal(), scoredDeal()]);
+    const r = accountRecord([scoredDeal(noi), scoredDeal(), scoredDeal()]);
     expect(r.scored).toBe(4);
     expect(r.byKey.map((k) => [k.key, k.screenSide, k.omSide, k.between])).toEqual([
       ["vacancy", 3, 0, 0],
-      ["insurance", 0, 0, 1],
+      ["noi", 0, 0, 1],
     ]);
     expect(r.shares).toEqual({ screenSidePct: 75, omSidePct: 0, betweenPct: 25 });
     expect(recordState(r)).toBe("record");
@@ -418,9 +481,9 @@ describe("accountRecord — counts, by key, and the floor", () => {
   it("a decision is counted apart: never a scored row, never in a share or a key's bar", () => {
     const decided = scoreDeal({ screenedAt: T, challenges: [basis], ...dead("price") });
     expect(decided.rows[0]).toMatchObject({ landing: "screen_side", decision: true });
-    const r = accountRecord([scoredDeal(insurance), scoredDeal(), decided]);
+    const r = accountRecord([scoredDeal(noi), scoredDeal(), decided]);
     expect(r).toMatchObject({ scored: 3, decisions: 1, screenSide: 2, between: 1 });
-    expect(r.byKey.map((k) => k.key)).toEqual(["vacancy", "insurance"]);
+    expect(r.byKey.map((k) => k.key)).toEqual(["vacancy", "noi"]);
     expect(r.shares).toEqual({ screenSidePct: 67, omSidePct: 0, betweenPct: 33 });
     expect(recordLine(r)).toBe(
       "Of 3 scored rows, 2 landed on the screen's side (67%), 0 on the OM's (0%) and 1 between (33%). 1 more row was a decision (Dead, and why), counted apart and in no share.",

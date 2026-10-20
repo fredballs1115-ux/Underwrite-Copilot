@@ -14,6 +14,19 @@
 //     the day a screen extracted its figures (`arrivalOf`): the pipeline
 //     re-reads every document on each screen, so the extraction row's own
 //     `created_at` is the screen's, not the document's;
+//   - an upload after the verdict is not enough: a document scores only
+//     where its own date — a rent roll's as-of, a T-12's period end — falls
+//     on a day after the verdict's. A T-12 whose year ended before the screen
+//     is history the screen could have been handed, only uploaded later; a
+//     document with no such date on record is not scored, and is said so;
+//   - a document scores only what it can speak to. A seller's T-12 shows the
+//     seller's tax bill and premium, never the bill a sale resets or the
+//     premium a new owner is quoted (the stress test's own tax row refuses it
+//     as evidence too), and no document kind on the deal is the buyer's bill
+//     or quote, so a taxes or insurance challenge is never scored by a
+//     document (`TAX_INSURANCE_NOT_SCORED`). On a plan deal the OM's NOI and
+//     its stated vacancy are the finished project's, and a T-12 or rent roll
+//     is the building before the plan is done, so neither scores them;
 //   - a challenge is scored only on its own figures: the OM's figure and the
 //     screen's alternative as the challenger wrote them (`omFigure`,
 //     `altFigure`, in the assumption's own unit); a challenge stored before
@@ -47,8 +60,10 @@ import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
-import { T12_INSURANCE_NOT, T12_TAX_NOT, challengeKey } from "@/lib/stress-test";
+import { challengeKey } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey } from "@/lib/stress-test-types";
+
+export { CARD_SCOPE, DOCUMENT_DATE_RULE, TAX_INSURANCE_NOT_SCORED } from "@/lib/track-record-words";
 
 /** Which side of the screen's test the later figure landed on. */
 export type Landing = "om_side" | "screen_side" | "between" | "unscored";
@@ -108,6 +123,11 @@ export interface DealRecord {
   /** evidence on the deal that is NOT scored, with why: a document the
    *  screen read, one with no arrival time, an outcome recorded before it */
   notScored: string[];
+  /** a rent roll or T-12 was uploaded after the verdict and refused for its
+   *  own date (none on record, or one on or before the verdict's day): the
+   *  deal page still draws the card, so the refusal is said where the reader
+   *  looks for the score */
+  refusedLater?: boolean;
   /** the earlier screen whose challenges were scored beside the current
    *  one's (deals.prior_screen with its challenges), where the snapshot
    *  holds them and a stamp */
@@ -157,6 +177,14 @@ export interface ScoreDealArgs {
    *  vacancy today again — the gap a lease-up has to close — so it scores no
    *  vacancy challenge, and the row says why */
   vacancyHeldToMarket?: boolean;
+  /** the deal is a plan deal (lib/deal-strategy `isPlanDeal`): the OM's NOI
+   *  is the finished project's, which a T-12 of the building before the plan
+   *  cannot speak to, so a later T-12 scores no NOI challenge */
+  plan?: boolean;
+  /** the OM's vacancy is a stated allowance on a plan deal (lib/stress-test
+   *  `planVacancyStated`): the stabilized figure the plan is to reach, which a
+   *  later document's vacancy — the building mid-plan — cannot speak to */
+  vacancyIsPlanTarget?: boolean;
   /** the previous screen's snapshot (the deal row's `prior_screen`), whose
    *  challenges are scored against what arrived after ITS verdict — a
    *  document that arrived between the two screens scores the challenge
@@ -218,14 +246,18 @@ interface Later {
   decision?: boolean;
 }
 
-/** A T-12 line by its key, else its label — never one whose label `not`
- *  refuses (lib/stress-test's own exclusions: a "Taxes & insurance" line is
- *  neither line alone, whatever key the extraction filed it under). */
-function t12Line(summary: T12Summary, re: RegExp, key: string, not: RegExp): number | null {
-  const line = summary.opex.find((l) => l.key === key && !not.test(l.label)) ?? summary.opex.find((l) => re.test(l.label) && !not.test(l.label));
-  const n = line?.amount;
-  return n != null && Number.isFinite(n) && n > 0 ? n : null;
-}
+/** The row's own why, a key at a time (the record's one line is
+ *  `TAX_INSURANCE_NOT_SCORED`, lib/track-record-words). */
+const DOCUMENTS_CANNOT_SCORE: Record<"taxes" | "insurance", string> = {
+  taxes: "a seller's T-12 cannot show a new owner's tax bill, and no document on the deal is the buyer's own, so no document scores it.",
+  insurance: "a seller's T-12 cannot show a new owner's premium, and no document on the deal is the buyer's own quote, so no document scores it.",
+};
+
+/** A plan deal's NOI against a later T-12. */
+const PLAN_NOI_WHY = "on a plan deal the OM's NOI is the finished project's, and a T-12 is the building's year before the plan is done, not a test of it.";
+
+/** A plan deal's stated vacancy against a later document. */
+const PLAN_VACANCY_WHY = "the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.";
 
 /** The rent roll's vacancy as a percent, the stress test's own reading: by
  *  count on a class priced by the unit, by area on one priced by the foot,
@@ -248,6 +280,8 @@ interface ScreenScore {
   evidence: LaterEvidence[];
   rows: ScoredRow[];
   notScored: { source: LaterSource | null; text: string; instead?: (priorDay: string) => string }[];
+  /** a document uploaded after this screen was refused for its own date */
+  refusedLater: boolean;
 }
 
 /**
@@ -275,6 +309,7 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
     evidence: s.evidence,
     rows: s.rows,
     notScored: s.notScored.map((n) => n.text),
+    refusedLater: s.refusedLater,
     prior: priorMeta,
   });
   if (!prior) return record(current, null);
@@ -303,10 +338,16 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
   const seen = new Set(current.evidence.map((e) => `${e.source}@${e.at}`));
   const evidence = [...current.evidence];
   const betweenSources = new Set<LaterSource>();
+  const currentT = parseTime(screenedAt);
   for (const e of earlier.evidence) {
     if (seen.has(`${e.source}@${e.at}`)) continue;
     betweenSources.add(e.source);
-    evidence.push({ ...e, label: `${e.label.replace(/\)$/, "")}, after the screen of ${priorDay} and before this one)` });
+    // A document uploaded after both screens, which the current one refused
+    // for its own date, is DATED between the two; anything else arrived
+    // between them.
+    const uploadedAfterBoth = (e.source === "t12" || e.source === "rent_roll") && currentT != null && (parseTime(e.at) ?? 0) > currentT;
+    const between = uploadedAfterBoth ? `; dated after the screen of ${priorDay} and before this one)` : `, after the screen of ${priorDay} and before this one)`;
+    evidence.push({ ...e, label: `${e.label.replace(/\)$/, "")}${between}` });
   }
   evidence.sort((a, b) => a.at.localeCompare(b.at));
   // A thing the current screen refused as read by it, and the earlier
@@ -315,7 +356,10 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
     ...current.notScored.map((n) => (n.source && n.instead && betweenSources.has(n.source) ? n.instead(priorDay) : n.text)),
     ...earlier.notScored.filter((n) => !n.instead).map((n) => `The screen of ${priorDay}: ${n.text}`),
   ];
-  return record({ evidence, rows, notScored: notScored.map((text) => ({ source: null, text })) }, { screenedAt: prior.screenedAt, screenedOn: priorDay });
+  return record(
+    { evidence, rows, notScored: notScored.map((text) => ({ source: null, text })), refusedLater: current.refusedLater || earlier.refusedLater },
+    { screenedAt: prior.screenedAt, screenedOn: priorDay },
+  );
 }
 
 /** The prior screen's stamp and challenges, where the snapshot holds both
@@ -335,12 +379,17 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
   const notScored: ScreenScore["notScored"] = [];
 
   // The documents, each admitted only where its arrival is on record and
-  // after the screen.
+  // after the screen, and its own date — a roll's as-of, a T-12's period end
+  // — falls on a day after the verdict's: an upload alone is not news.
+  let refusedLater = false;
+  const verdictDay = T != null ? new Date(T).toISOString().slice(0, 10) : null;
   const admit = <S,>(doc: LaterDocument<S> | null | undefined, name: string, datedWord: string): LaterDocument<S> | null => {
     if (!doc) return null;
     const source: LaterSource = name === "T-12" ? "t12" : "rent_roll";
     const at = parseTime(doc.arrivedAt);
-    const dated = doc.dated ? `${name} ${datedWord} ${statedDay(doc.dated)}` : `${name} (${datedWord === "to" ? "period" : "as-of"} not stated)`;
+    const datedT = parseTime(doc.dated);
+    const datedDay = datedT != null ? new Date(datedT).toISOString().slice(0, 10) : null;
+    const dated = doc.dated && datedDay ? `${name} ${datedWord} ${statedDay(doc.dated)}` : `${name} (${datedWord === "to" ? "period" : "as-of"} not stated)`;
     if (T == null) {
       notScored.push({ source, text: `${dated} is on the deal, but the verdict carries no screen time to set it after.` });
       return null;
@@ -358,7 +407,28 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
       });
       return null;
     }
-    evidence.push({ source, label: `${dated} (added ${statedDay(doc.arrivedAt!)})`, at: doc.arrivedAt! });
+    const added = statedDay(doc.arrivedAt!);
+    if (datedDay == null) {
+      refusedLater = true;
+      const missing = source === "t12" ? "period end" : "as-of date";
+      notScored.push({
+        source,
+        text: `${dated} was added ${added}, after the screen, but with no ${missing} on record nothing shows its figures postdate the verdict, so it is not scored.`,
+      });
+      return null;
+    }
+    if (verdictDay != null && datedDay <= verdictDay) {
+      refusedLater = true;
+      const what = source === "t12" ? "its period ended" : "it is dated";
+      const onDay = statedDay(verdictDay);
+      notScored.push({
+        source,
+        text: `${dated} was added ${added}, after the screen, but ${what} on or before the verdict (${onDay}): it is history the screen could have been handed, only uploaded later, so it is not scored.`,
+        instead: (priorDay) => `${dated} was added ${added}, but ${what} on or before this screen's verdict (${onDay}), so it is scored against the screen of ${priorDay} instead.`,
+      });
+      return null;
+    }
+    evidence.push({ source, label: `${dated} (added ${added})`, at: doc.arrivedAt! });
     return doc;
   };
   const t12 = admit(args.t12, "T-12", "to");
@@ -419,14 +489,29 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
     const unscored = (why: string): ScoredRow => ({ ...base, later: null, figures: null, landing: "unscored", why, text: `${title}: ${why}` });
 
     if (T == null) return unscored("the verdict carries no screen time, so nothing can be said to have come after it.");
+    // A seller's T-12 shows the seller's bill and premium, never a new
+    // owner's, and no document kind on the deal is the buyer's own: no
+    // document scores these, whatever arrives.
+    if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
     const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null, perUnit: args.assetClass !== undefined && assetWords(args.assetClass).basis === "unit" });
     if (!later) return unscored("nothing that arrived after the screen speaks to it.");
     // The stress test's own rule: a stabilized assumption on a deal read as
     // stabilized is held to the market's published figures, and a
     // document's vacancy is today's — never the test of it.
-    if (key === "vacancy" && args.vacancyHeldToMarket && (later.source === "rent_roll" || later.source === "t12")) {
-      const why = "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.";
+    // And on a plan deal the OM's NOI and stated vacancy are the finished
+    // project's: a document of the building before the plan is done cannot
+    // speak to them.
+    const fromDocument = later.source === "rent_roll" || later.source === "t12";
+    const why =
+      key === "vacancy" && args.vacancyHeldToMarket && fromDocument
+        ? "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it."
+        : key === "vacancy" && args.vacancyIsPlanTarget && fromDocument
+          ? PLAN_VACANCY_WHY
+          : key === "noi" && args.plan && fromDocument
+            ? PLAN_NOI_WHY
+            : null;
+    if (why) {
       return {
         ...base,
         later: { source: later.source, value: later.value, text: later.text },
@@ -479,7 +564,7 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
     };
   });
 
-  return { evidence, rows, notScored };
+  return { evidence, rows, notScored, refusedLater };
 }
 
 /** The later figure that speaks to a key, where one arrived. A figure beats
@@ -515,16 +600,8 @@ function laterFor(
       if (n != null && Number.isFinite(n) && n !== 0) return { source: "t12", value: n, text: `${t12When} earned ${compactUsd(n, { millions: 2 })}${ev.t12!.summary.noiDerived ? " (derived)" : ""}` };
       return null;
     }
-    case "insurance": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\binsurance\b/i, "insurance", T12_INSURANCE_NOT) : null;
-      if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of insurance` };
-      return null;
-    }
-    case "taxes": {
-      const n = ev.t12 ? t12Line(ev.t12.summary, /\btax/i, "taxes", T12_TAX_NOT) : null;
-      if (n != null) return { source: "t12", value: n, text: `${t12When} paid ${compactUsd(n, { millions: 2 })} of real estate taxes` };
-      return null;
-    }
+    // Taxes and insurance are never here: a seller's T-12 cannot show a new
+    // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`).
     case "basis": {
       if (ev.trade) {
         // On the OM figure's own basis: the trade over the ask, applied to
@@ -566,7 +643,7 @@ export const RECORD_FLOOR = MEDIAN_FLOOR;
  * deal, so it holds every stated stabilized vacancy back as the market's.
  */
 export const ACCOUNT_VACANCY_NOTE =
-  "Here a stabilized vacancy the OM states is never scored by a later rent roll or T-12; a deal's own page scores it where the documents, not the market, decided it.";
+  "Here a stabilized vacancy the OM states is never scored by a later rent roll or T-12; a deal's own page scores it on a deal read as stabilized where the documents, not the market, decided it.";
 
 export interface KeyRecord {
   key: StressKey;
@@ -657,7 +734,7 @@ export function recordState(r: Pick<AccountRecord, "scored">): RecordState {
 /** What the record is scored against — the homepage's FAQ promises exactly
  *  these three, and this sentence keeps it true. */
 export const RECORD_NONE_LINE =
-  "No track record yet, and none is claimed. Every test is scored later against three things you supply: the T-12 or rent roll you add after the screen, what you decided (dead, and why), and what the building traded for.";
+  "No track record yet, and none is claimed. Every test is scored later against three things you supply: a T-12 or rent roll dated after the screen, what you decided (dead, and why), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
   // A decision is a direction, not a figure: said apart, never in a share.

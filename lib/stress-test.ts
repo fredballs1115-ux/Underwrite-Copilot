@@ -632,6 +632,18 @@ export function stabilizedVacancyStated(extraction: ExtractionResult | null, fir
 }
 
 /**
+ * Whether the OM's vacancy is a stated allowance on a plan deal — the
+ * stabilized figure a lease-up, value-add, conversion or development is to
+ * reach. The track record reads it (lib/track-record `vacancyIsPlanTarget`):
+ * a rent roll or T-12 that arrives later is the building before the plan is
+ * done, which cannot speak to the figure it is meant to reach.
+ */
+export function planVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
+  const om = omVacancy(rowsOf(extraction));
+  return om?.from === "vacancy" && isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
  * The kind of evidence that decided a built test's vacancy row: the figure
  * its re-run swapped in, else the first piece with a figure (the row prints
  * the kind that decides first) — "published" where the market's figure held

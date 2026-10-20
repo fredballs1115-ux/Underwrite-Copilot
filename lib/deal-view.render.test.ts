@@ -233,7 +233,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(words).toContain("A T-12 tests the OM's NOI, vacancy and insurance against the building's own year");
     expect(words).toContain("a rent roll tests its vacancy against the occupancy it runs at");
-    expect(words).toContain("Added after this screen, either one lets the track record score its challenges.");
+    expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score its challenges.");
     // The T-12's tax line judges no row, so taxes are never promised.
     expect(words).not.toMatch(/\btax/i);
     expect(html).toContain('href="/deals/sample?tab=analyses&amp;a=reconciler"');
@@ -2384,7 +2384,7 @@ describe("DealView — what came after the screen (lib/track-record) closes the 
   const record = scoreDealForTest({
     screenedAt: "2026-10-01T12:00:00Z",
     challenges: [{ assumption: "Stabilized vacancy of 6%", severity: "high", challenge: "", question: "", key: "vacancy", omFigure: 6, altFigure: 9, altBasis: "a rule of thumb" }],
-    t12: { arrivedAt: "2026-10-05T09:00:00Z", dated: "2026-09-30", summary: SAMPLE_DEAL.t12.summary },
+    t12: { arrivedAt: "2026-11-05T09:00:00Z", dated: "2026-10-31", summary: SAMPLE_DEAL.t12.summary },
   });
 
   it("draws the card after the decision log where something arrived after the screen, and nothing where nothing did", () => {

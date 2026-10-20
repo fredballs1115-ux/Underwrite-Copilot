@@ -269,8 +269,10 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
-    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 by the day it was uploaded, a Dead decision with its reason, a reported trade.",
-    "A document the screen itself read is never scored: the challenger was handed it.",
+    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 uploaded after it and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
+    "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
+    "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,

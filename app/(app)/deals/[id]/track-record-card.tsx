@@ -1,4 +1,5 @@
 import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
+import { CARD_SCOPE, TAX_INSURANCE_NOT_SCORED } from "@/lib/track-record-words";
 
 /**
  * What came after the screen (the track record, 2026-10-19): the deal's own
@@ -10,24 +11,35 @@ import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
  * since there is nothing to score and nothing to claim.
  */
 export function TrackRecordCard({ record }: { record: DealRecord | null }) {
-  if (!record || record.evidence.length === 0) return null;
+  // Drawn where something arrived after the screen — or where a document
+  // uploaded after it was refused for its own date, so the refusal is said
+  // where the reader looks for the score.
+  if (!record || (record.evidence.length === 0 && !record.refusedLater)) return null;
   const scored = record.rows.filter((r) => r.landing !== "unscored");
   const unscored = record.rows.filter((r) => r.landing === "unscored");
+  const taxOrInsurance = record.rows.some((r) => r.key === "taxes" || r.key === "insurance");
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record">
       <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
         {record.screenedOn ? `Screened ${record.screenedOn}. ` : ""}
-        Each challenge is scored only against what arrived after the verdict — a document the screen read is not evidence of it.
+        {CARD_SCOPE}
       </p>
-      <ul className="mt-3 space-y-1 text-xs text-muted" data-qa="track-record-evidence">
-        {record.evidence.map((e) => (
-          <li key={`${e.source}-${e.at}`} className="flex gap-2">
-            <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-            <span>{e.label}</span>
-          </li>
-        ))}
-      </ul>
+      {taxOrInsurance && (
+        <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-tax-insurance">
+          {TAX_INSURANCE_NOT_SCORED}
+        </p>
+      )}
+      {record.evidence.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs text-muted" data-qa="track-record-evidence">
+          {record.evidence.map((e) => (
+            <li key={`${e.source}-${e.at}`} className="flex gap-2">
+              <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+              <span>{e.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {scored.length > 0 ? (
         <ul className="mt-4 space-y-3" data-qa="track-record-rows">

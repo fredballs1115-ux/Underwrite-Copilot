@@ -1,4 +1,4 @@
-import { ACCOUNT_VACANCY_NOTE, recordCountsLine, recordLine, recordState, type AccountRecord } from "@/lib/track-record";
+import { ACCOUNT_VACANCY_NOTE, DOCUMENT_DATE_RULE, TAX_INSURANCE_NOT_SCORED, recordCountsLine, recordLine, recordState, type AccountRecord } from "@/lib/track-record";
 
 /**
  * The account's track record (2026-10-19): what the screens' challenges
@@ -50,7 +50,10 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
           }`}
         </p>
       )}
-      <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-vacancy">
+      <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-documents">
+        {`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`}
+      </p>
+      <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-vacancy">
         {ACCOUNT_VACANCY_NOTE}
       </p>
     </section>
