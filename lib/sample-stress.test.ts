@@ -214,8 +214,10 @@ const ACCOUNT_ONLY = new Set([
 
 describe("/demo's Overview, in the deal page's order", () => {
   it("draws the deal page's Overview components in its order, leaving off only what needs an account", () => {
-    const deal = overviewOrder("app/(app)/deals/[id]/deal-view.tsx", 'section === "overview"', 'section === "financials"');
-    const demoOrder = overviewOrder("app/demo/sections.tsx", 'section === "overview"', 'section === "financials"');
+    // The sections' own JSX, `{section === "overview" && (`: the deal page
+    // also tests the section in its code (the stress chip's jump).
+    const deal = overviewOrder("app/(app)/deals/[id]/deal-view.tsx", '{section === "overview" && (', '{section === "financials" && (');
+    const demoOrder = overviewOrder("app/demo/sections.tsx", '{section === "overview" && (', '{section === "financials" && (');
     expect(deal).toContain("OverviewView");
     expect(demoOrder).toEqual(deal.filter((c) => !ACCOUNT_ONLY.has(c)));
   });
@@ -233,5 +235,16 @@ describe("/demo's Overview, in the deal page's order", () => {
     expect(view.indexOf("<VerdictHero")).toBeGreaterThan(0);
     expect(view.indexOf("<StressTestPanel")).toBeGreaterThan(view.indexOf("<VerdictHero"));
     expect(view.indexOf("Risk digest")).toBeGreaterThan(view.indexOf("<StressTestPanel"));
+    // The deal page's slot under the panel (the rent roll and T-12 prompt,
+    // 2026-10-20) is drawn after the panel and its method link and before
+    // the meter and the risk digest; /demo and the homepage fill it with
+    // nothing, so the three Overviews stay one order.
+    expect(view.indexOf("{afterStress}")).toBeGreaterThan(view.indexOf("how-we-test-link"));
+    expect(view.indexOf("{afterStress}")).toBeLessThan(view.indexOf("Risk digest"));
+    expect(overview).not.toContain("afterStress");
+    expect(src("app/demo/sections.tsx")).not.toContain("afterStress");
+    const deal = src("app/(app)/deals/[id]/deal-view.tsx");
+    const slot = deal.slice(deal.indexOf("afterStress={"), deal.indexOf("<SensitivityPlayground"));
+    expect(slot).toContain("<ActualsPrompt");
   });
 });

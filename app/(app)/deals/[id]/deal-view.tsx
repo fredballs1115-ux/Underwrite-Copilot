@@ -14,6 +14,7 @@ import {
 } from "@/lib/market-memory";
 import { PropertyActuals, type ActualsData } from "./property-actuals";
 import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
+import { STRESS_TEST_ANCHOR } from "./stress-chip";
 import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
@@ -666,6 +667,38 @@ export function DealView({
     );
     if (left != null) strip.scrollLeft = left;
   }, [section]);
+
+  // The header's stress-test chip, and the bar that keeps the deal in view,
+  // link to the Overview's panel (`#stress-test`). On the Overview the
+  // browser follows the link itself; from another section the panel is not
+  // drawn, so the link opens the Overview first and lands on the panel once
+  // it is (its wrapper takes the focus, so a keyboard carries on from it).
+  const stressJump = useRef(false);
+  const onOverview = section === "overview";
+  useEffect(() => {
+    if (onOverview) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (!(e.target instanceof Element) || !e.target.closest(`a[href="#${STRESS_TEST_ANCHOR}"]`)) return;
+      e.preventDefault();
+      stressJump.current = true;
+      setSection("overview");
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "overview");
+      url.searchParams.delete("a");
+      url.hash = STRESS_TEST_ANCHOR;
+      window.history.replaceState(null, "", url);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [onOverview]);
+  useEffect(() => {
+    if (!onOverview || !stressJump.current) return;
+    stressJump.current = false;
+    const panel = document.getElementById(STRESS_TEST_ANCHOR);
+    panel?.scrollIntoView({ block: "start" });
+    panel?.focus({ preventScroll: true });
+  }, [onOverview]);
   function selectAnalysis(key: AnalysisKey) {
     setAnalysis(key);
     setSection("analyses");
@@ -809,26 +842,6 @@ export function DealView({
             )}
             {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
             <PropertyActuals data={actuals} />
-            {/* Feature 1: prompt for the actuals docs. Hidden while a screen
-                runs, on the sample, and once both docs are folded in. */}
-            {(() => {
-              if (live || isSample || !hasOm) return null;
-              const slot = (
-                kind: "rent_roll" | "t12",
-                stored: boolean,
-              ): ActualsSlotState =>
-                stored
-                  ? "done"
-                  : documents.some((d) => d.kind === kind)
-                    ? "uploaded"
-                    : "missing";
-              const rrState = slot("rent_roll", !!actuals.rentRoll);
-              const t12State = slot("t12", !!actuals.t12);
-              if (rrState === "done" && t12State === "done") return null;
-              return (
-                <ActualsPrompt dealId={dealId} rentRoll={rrState} t12={t12State} />
-              );
-            })()}
             <OverviewView
               results={results}
               active={live}
@@ -838,6 +851,27 @@ export function DealView({
               staleWhy={staleWhy}
               stopped={stopped != null}
               stressTest={stressTest}
+              // Feature 1: prompt for the actuals docs, directly under the
+              // stress test whose rows they turn into tests. Hidden while a
+              // screen runs, on the sample, and once both docs are folded in.
+              afterStress={(() => {
+                if (live || isSample || !hasOm) return null;
+                const slot = (
+                  kind: "rent_roll" | "t12",
+                  stored: boolean,
+                ): ActualsSlotState =>
+                  stored
+                    ? "done"
+                    : documents.some((d) => d.kind === kind)
+                      ? "uploaded"
+                      : "missing";
+                const rrState = slot("rent_roll", !!actuals.rentRoll);
+                const t12State = slot("t12", !!actuals.t12);
+                if (rrState === "done" && t12State === "done") return null;
+                return (
+                  <ActualsPrompt dealId={dealId} rentRoll={rrState} t12={t12State} />
+                );
+              })()}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (

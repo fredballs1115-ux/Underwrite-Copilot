@@ -25,7 +25,7 @@ export function ActualsPrompt({
   const anyUploaded = rentRoll === "uploaded" || t12 === "uploaded";
 
   return (
-    <section className="rounded-2xl border border-dashed border-brand/40 bg-brand/[0.03] p-5">
+    <section className="rounded-2xl border border-dashed border-brand/40 bg-brand/[0.03] p-5" data-qa="actuals-prompt">
       <h2 className="text-sm font-semibold tracking-tight">
         Add rent roll or T-12 for deeper analysis{" "}
         <span className="font-normal text-muted">(optional)</span>
