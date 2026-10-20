@@ -47,7 +47,7 @@ jobs:
           # The Sep 8 simplification (#240) cut the homepage to one idea per
           # section — the markers below are the pieces that still exist. The
           # decisive freshness evidence is the build sha stamp, not any copy.
-          grep -c "Test the OM before you model it" body.html && echo "HERO: CURRENT (the stress-test headline)" || echo "HERO: OLD OR MISSING"
+          grep -c "Test the OM before you" body.html && echo "HERO: CURRENT (the stress-test headline)" || echo "HERO: OLD OR MISSING"
           grep -c "The OM lands Thursday" body.html && echo "SUPERSEDED HERO STILL PRESENT" || true
           grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
@@ -466,7 +466,7 @@ jobs:
         # beside this run's main tip) is what tells a fresh build from a stale
         # one — no copy marker can, since copy is exactly what changes.
         run: |
-          if ! grep -q "Test the OM before you model it" body.html; then
+          if ! grep -q "Test the OM before you" body.html; then
             echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."
             exit 1
           fi
