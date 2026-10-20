@@ -586,16 +586,17 @@ export default async function DealPage({
   const emailWhenDoneRead: Promise<boolean> =
     jobActive && user && isScreenJob(job?.step) && emailEnabled()
       ? wantsAnalysisEmail(supabase, user.id)
-          .then((switchOn) =>
-            screenEmailPromised({
+          .then((switchOn) => {
+            const row = deal as unknown as { is_sample?: boolean | null; user_id?: string | null; team_id?: string | null };
+            return screenEmailPromised({
               emailOn: true,
-              isSample: !!deal.is_sample,
+              isSample: !!row.is_sample,
               switchOn,
               viewerId: user.id,
-              creatorId: (deal.user_id as string | null) ?? null,
-              teamId: (deal.team_id as string | null) ?? null,
-            }),
-          )
+              creatorId: row.user_id ?? null,
+              teamId: row.team_id ?? null,
+            });
+          })
           .catch(() => false)
       : Promise.resolve(false);
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
