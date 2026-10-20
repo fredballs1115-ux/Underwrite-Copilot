@@ -14,18 +14,20 @@ import { modelReturnsRead } from "@/lib/compare-interest";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { readOmFacts } from "@/lib/underwrite/om-facts";
 import { readerToday } from "@/lib/reader-day";
+import { DEMO_DOC_CACHE_CONTROL, heldRenderFresh, type HeldRender } from "@/lib/demo-doc-cache";
 
 export const runtime = "nodejs";
 
-// The fixture never changes within a day, so build the workbook once per day
-// per process and serve the same bytes: this is a public unauthenticated
-// route, and Render doesn't edge-cache dynamic responses, so without this
-// every request would pay a full ExcelJS build. The promise (not the buffer)
-// is cached so concurrent first hits share one build; a failed build clears
-// the slot to allow retry. By the day, as the demo memo and report are: the
-// cover's "Prepared" date and its dated lines read on it, and the Market
-// Read tab is today's.
-let cachedBuild: { day: string; xlsx: Promise<Buffer> } | null = null;
+// Build the workbook once per /demo ISR window per process and serve the
+// same bytes inside it (lib/demo-doc-cache, as the demo memo and report
+// are): this is a public unauthenticated route, and Render doesn't
+// edge-cache dynamic responses, so without this every request would pay a
+// full ExcelJS build, while the Market Read tab is today's published
+// figures, which a day's hold would leave behind /demo's. The promise (not
+// the buffer) is cached so concurrent first hits share one build; a failed
+// build clears the slot to allow retry. The cover's "Prepared" date and its
+// dated lines read on the reader's day.
+let cachedBuild: (HeldRender & { xlsx: Promise<Buffer> }) | null = null;
 
 /**
  * The workbook the signed-in route (app/api/deals/[id]/underwrite.xlsx)
@@ -85,10 +87,11 @@ async function buildSampleWorkbook(readerDay: string): Promise<Buffer> {
   return buffer;
 }
 
-function getSampleWorkbook(readerDay: string): Promise<Buffer> {
-  if (cachedBuild && cachedBuild.day === readerDay) return cachedBuild.xlsx;
+function getSampleWorkbook(readerDay: string, now: number): Promise<Buffer> {
+  if (cachedBuild && heldRenderFresh(cachedBuild, readerDay, now)) return cachedBuild.xlsx;
   const next = {
     day: readerDay,
+    at: now,
     xlsx: buildSampleWorkbook(readerDay).catch((err) => {
       if (cachedBuild === next) cachedBuild = null;
       throw err;
@@ -107,17 +110,19 @@ function getSampleWorkbook(readerDay: string): Promise<Buffer> {
 export async function GET() {
   // On the day the signed-in route reads for a reader whose browser has not
   // told it a time zone (lib/reader-day).
-  const readerDay = readerToday(null, new Date());
+  const now = new Date();
+  const readerDay = readerToday(null, now);
   try {
-    const buffer = await getSampleWorkbook(readerDay);
+    const buffer = await getSampleWorkbook(readerDay, now.getTime());
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition":
           'attachment; filename="sample-underwrite-copilot.xlsx"',
-        // Fixture-only output — safe to cache at the edge for a day.
-        "Cache-Control": "public, max-age=86400",
+        // Held as long as /demo's own page is, never a day: its Market Read
+        // tab is today's published figures.
+        "Cache-Control": DEMO_DOC_CACHE_CONTROL,
       },
     });
   } catch (err) {

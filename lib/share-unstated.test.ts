@@ -44,6 +44,18 @@ describe("a share of no stated percentage runs at its own price, said so on the 
     expect(basisWithheldOf(bare)?.why).toBe("the price buys a share the memorandum states no percentage for, which cannot be grossed up to the building's price");
   });
 
+  it("withholds a master lease's building basis, and leaves its grids the position's own", () => {
+    const master = {
+      ...share("", false),
+      interest: { kind: "leasehold", summary: "The master lease of the building, sublet to its tenants", share: "", groundLease: "", loan: "", page: "p. 2" },
+    } as unknown as ExtractionResult;
+    expect(basisWithheldOf(master)).toEqual({
+      word: "master lease",
+      why: "the price buys a master lease of the building, sublet to its tenants — the position between two rents, not the building",
+    });
+    expect(gridSubjectOf(master)).toBeNull();
+  });
+
   it("says a GP stake beside its entity's loan runs at its own price too", () => {
     const gp = share("A 50% interest in the general partner of the owning partnership", true);
     expect(gridSubjectOf(gp)).toBe("the whole building, run at the share's own price");

@@ -22,6 +22,7 @@ import {
   interestOf,
   interestShortLine,
   isGpStake,
+  isMasterLeasehold,
   isTenancyInCommon,
   isWholeShare,
   readInterest,
@@ -461,6 +462,12 @@ function interestMeta(extraction: ExtractionResult | null, asOf: Date): Workbook
     : null;
 }
 
+/** `basisWithheldOf`'s word for a master lease of the building: the one
+ *  withheld basis whose model is still the deal's own (a leasehold's, the
+ *  position's income run at its price), so the stress test still re-runs it
+ *  and the report's grids need no subject of their own. */
+export const MASTER_LEASE_WORD = "master lease";
+
 /**
  * Why no building basis or going-in cap is struck on the price, where the
  * price did not buy the building — CLAUDE.md's rule, read through the one
@@ -469,6 +476,12 @@ function interestMeta(extraction: ExtractionResult | null, asOf: Date): Workbook
  * buys alone, so any positive figure asks it. Null where it is.
  */
 export function basisWithheldOf(extraction: ExtractionResult | null): { word: string; why: string } | null {
+  // A master lease of the building, sublet to its tenants (a sandwich
+  // position, lib/interest `isMasterLeasehold`): the price buys the position
+  // between the master rent and the sublease income, not the building, so no
+  // building basis is struck on it — the pipeline card's basis had left it
+  // out while the stress test judged its price over the building's units.
+  if (isMasterLeasehold(extraction)) return { word: MASTER_LEASE_WORD, why: "the price buys a master lease of the building, sublet to its tenants — the position between two rents, not the building" };
   if (buildingPriceOf(extraction, 1) != null) return null;
   const { kind, sharePct, entityLoan } = interestOf(extraction);
   switch (kind) {

@@ -1893,7 +1893,7 @@ describe("the sensitivity playground says whose figures it runs", () => {
   it("names its model — the workbook's and the report's — beside the Financials tab's first-draft model (research pass 34)", () => {
     // The Overview's 9.3% and the Financials tab's 8.72% for one deal, with
     // no word on either which model it was.
-    expect(textOf(playground(null))).toContain("The screening model — the one the Excel workbook and the full report carry.");
+    expect(textOf(playground(null))).toContain("The screening model, read off the memorandum's terms: the one the stress test re-runs and the Excel workbook and the full report carry.");
   });
 
   it("says a plan deal's returns are the screening model's, not the plan's", () => {

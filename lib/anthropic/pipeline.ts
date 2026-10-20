@@ -81,6 +81,8 @@ import { modelMarketFor } from "@/lib/model-market";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { buildStressTest } from "@/lib/stress-test";
+import { PAST_SCREENS_IN_BRIEF, compsCallSubjectOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
+import type { RecordCompsResult } from "@/lib/public-comps/core";
 import type { StressTest } from "@/lib/stress-test-types";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor, type ZoriRead } from "@/lib/zori";
@@ -583,6 +585,7 @@ async function screenStressTest(
     challenges?: unknown;
     comps?: unknown;
     market?: unknown;
+    public_comps?: unknown;
   },
   reads: VerdictReads | undefined,
 ): Promise<StressTest | null> {
@@ -612,6 +615,16 @@ async function screenStressTest(
         )
       : null;
     const assetClass = shownAssetClass((row.asset_class as string | null | undefined) ?? null, extraction) || null;
+    // The recorded sales the deal's public-record pull stored, through the
+    // one builder the deal page calls (lib/stress-basis-evidence). The
+    // reader's past screens are never handed in: the call's words reach the
+    // shared screen, and the brief says so by name.
+    const { recordedSales } = stressBasisEvidence({
+      publicComps: (row.public_comps as RecordCompsResult | null | undefined) ?? null,
+      subject: compsCallSubjectOf(extraction, firstSignal, (row.asset_class as string | null | undefined) ?? null),
+      memoryGroup: null,
+      isSample: !!row.is_sample,
+    });
     return buildStressTest({
       extraction,
       firstSignal,
@@ -622,6 +635,9 @@ async function screenStressTest(
       derived,
       storedAssetClass: (row.asset_class as string | null | undefined) ?? null,
       brokerComps: (row.comps as BrokerCompsResult | null | undefined) ?? null,
+      recordedSales,
+      pastScreens: null,
+      pastScreensWithheld: PAST_SCREENS_IN_BRIEF,
       readOn: today,
     });
   } catch (err) {
@@ -935,7 +951,7 @@ async function regenerateVerdict(
 ): Promise<void> {
   const { data, error: readErr } = await admin
     .from("deals")
-    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps")
     .eq("id", dealId)
     .single();
   // A verdict synthesized over a read that failed would judge a deal with

@@ -24,6 +24,16 @@ import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { ReturnsHeadline } from "./returns-headline";
 import { Sensitivity, StressPanel, Conflicts, Assumptions, CapexPanel, CashFlow } from "./model-panels";
 
+/** Which model the card is, and why its returns are not the stress test's:
+ *  the first draft's assumptions are the AI's reconciliation of the
+ *  documents (lib/anthropic/model-reconcile), with its own exit, growth or
+ *  vacancy where none is stated; the stress test runs the screening model
+ *  (lib/underwrite/inputs), read off the memorandum's terms. */
+const FIRST_DRAFT_MODEL_LINE =
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test runs the screening model, read off the memorandum's terms, so its returns can differ.";
+const FIRST_DRAFT_MODEL_LINE_PLAYGROUND =
+  "The first-draft model: its assumptions are the AI's reconciliation of the documents, with its own where none is stated. The Overview's stress test and sensitivity playground run the screening model, read off the memorandum's terms, so their returns can differ.";
+
 /** The card's body with a model, as the deal page stacks it. */
 export function ModelBody({
   model,
@@ -57,6 +67,13 @@ export function ModelBody({
   return (
     <>
       <FirstDraftBanner model={model} documents={documents} compare={compare} sample={sample} />
+      {/* Which model this is beside the other, and why the two differ: the
+          Overview's stress test (and playground, where the page draws it)
+          runs the screening model, a different set of assumptions. One
+          string a branch, one text node. */}
+      <p data-qa="model-which" className="-mt-2 max-w-2xl text-xs leading-relaxed text-muted">
+        {playground ? FIRST_DRAFT_MODEL_LINE_PLAYGROUND : FIRST_DRAFT_MODEL_LINE}
+      </p>
       <ReturnsHeadline model={model} interest={interest} />
       {!withheld && <StressPanel model={model} />}
       {!withheld && <Sensitivity model={model} />}

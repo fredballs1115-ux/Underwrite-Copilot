@@ -11,7 +11,25 @@ import { HVS_RATES_URL } from "@/lib/hvs-tables";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { REALTOR_CREDIT, REALTOR_SOURCE_URL } from "@/lib/realtor";
 import { RESEARCH_STALE_DAYS } from "@/lib/research-age";
-import { STRESS_METHODS, type EvidenceKind, type StressMethod } from "@/lib/stress-test-types";
+import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
+import {
+  BASIS_STRETCH_PCT,
+  BASIS_UNSUPPORTED_PCT,
+  DEBT_UNSUPPORTED_BPS,
+  EXIT_CAP_UNSUPPORTED_BPS,
+  EXPENSE_GROWTH_UNSUPPORTED_PTS,
+  INSURANCE_UNSUPPORTED_SHARE,
+  IRR_MOVE_STRETCH_BPS,
+  NOI_UNSUPPORTED_SHARE,
+  PREMIUM_UNSUPPORTED_SHARE,
+  RENT_GROWTH_UNSUPPORTED_PTS,
+  SAME,
+  SAME_SHARE,
+  TAX_UNSUPPORTED_SHARE,
+  VACANCY_UNSUPPORTED_PTS,
+} from "@/lib/stress-test";
+import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
+import { RECORD_FLOOR } from "@/lib/track-record";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 
 export { STRESS_METHODS };
@@ -20,11 +38,16 @@ export { STRESS_METHODS };
 export const HOW_WE_TEST_TITLE = "How each assumption is tested";
 
 /**
- * The phrase live-verify greps in the served HTML: one JS string rendered
- * as one text node, so React's `<!-- -->` never lands inside it
- * (lib/live-verify-markers.test.ts's rule).
+ * The phrase live-verify greps in the served HTML
+ * (.github/workflows/live-verify.yml greps "The arithmetic is run in code,
+ * never by the AI."): one JS string rendered as one text node, so React's
+ * `<!-- -->` never lands inside it (lib/live-verify-markers.test.ts's rule).
+ * It is scoped to the stress test, since the call's ranges and the
+ * challenger's critique carry figures of the AI's own reading
+ * (`WHO_DOES_WHAT.ai`); the grepped sentence stays whole inside it.
  */
-export const HOW_WE_TEST_MARKER = "The arithmetic is run in code, never by the AI.";
+export const HOW_WE_TEST_MARKER =
+  "In the stress test, every return, re-run, comparison and verdict word is computed. The arithmetic is run in code, never by the AI.";
 
 /** What the AI does and what code does, each a short list. */
 export const WHO_DOES_WHAT = {
@@ -34,6 +57,7 @@ export const WHO_DOES_WHAT = {
       "the memorandum, the rent roll, the T-12 and the model you add",
       "names each assumption and the page it comes from",
       "names the question the figure raises for the broker",
+      "writes the call, its ranges and the critique: their figures are its reading of the documents, not the engine's",
     ],
   },
   code: {
@@ -41,19 +65,58 @@ export const WHO_DOES_WHAT = {
     items: [
       "the lookup: which published figure, document or rule of thumb speaks to it",
       "the arithmetic: the gap in the assumption's own unit",
+      "the verdict word, from the gap and the row's own threshold",
       "the re-run: the return again with the evidence's figure in the OM's place",
     ],
   },
 } as const;
+
+/** The four verdict words, each one line, the thresholds read off
+ *  lib/stress-test's own constants. */
+export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
+  {
+    word: "holds",
+    line: "The OM's figure sits inside the evidence, or on its conservative side. A row held only to a rule of thumb says so and is never drawn green.",
+  },
+  {
+    word: "stretched",
+    line: `Past the evidence by less than the row's threshold; or inside it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
+  },
+  { word: "unsupported", line: "Past the evidence by more than the row's threshold, below." },
+  { word: "unchecked", line: "The OM states no figure, or no evidence with a figure could be read for the deal." },
+];
+
+const pctOf = (share: number) => `${Math.round(share * 100)}%`;
+
+/**
+ * How each row picks the figure it is held to, and its threshold, one line
+ * a key: what lib/stress-test does, each figure its constant.
+ */
+export const VERDICT_RULES: Record<StressKey, string> = {
+  basis: `Held to the first median that stands, in the order above. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
+  exit_cap: `Held to the going-in cap, else the published cap range's low end. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported; where a published cap range reaches the exit, compression is stretched at worst.`,
+  debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
+  noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
+  vacancy: `A stabilized assumption is held to the market: the metro survey inside its margin, else the tracker's band, the region, the state. The rent roll or T-12 shows today's gap; with no fresh market figure, they decide. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
+  rent_growth: `Held to the deal's own kind of rent: Zillow's apartment asking rents, else its all-homes rents, else CPI rent; a commercial building, its lessors' national index. The others are shown beside it. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
+  expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
+  taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
+  insurance: `Held to the T-12's premium, else the OM's premium moved by the index's year. Holds within ${pctOf(SAME_SHARE)} or over it; unsupported past ${pctOf(INSURANCE_UNSUPPORTED_SHARE)} under it.`,
+  renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,
+  other: "No verdict is struck: the row carries the challenger's words.",
+};
 
 /**
  * The kind an `against` item is marked by, read off the table's own words
  * — a rule of thumb where the item names itself one (the reader's
  * own past asks among them, other memoranda's asking prices: lib/
  * stress-test files them so), a published figure where it names a
- * publisher, an index or a survey, the deal's documents where it names the
- * memorandum, the rent roll or the T-12 — and null where the words name
- * none of the three (the lender tests, the break-even, the challenger's
+ * publisher, an index or a survey, the OM against itself where it names
+ * the memorandum's own figures (its comps, its going-in cap, its in-place
+ * NOI, its tax bill, its abatement, its achieved premium — lib/stress-test
+ * files each `om_internal`, as the panel marks it), the deal's documents
+ * where it names the rent roll or the T-12 — and null where the words name
+ * none of these (the lender tests, the break-even, the challenger's
  * words), which the page leaves unmarked rather than guesses.
  */
 export function evidenceKindOf(item: string): EvidenceKind | null {
@@ -67,18 +130,18 @@ export function evidenceKindOf(item: string): EvidenceKind | null {
   }
   // "The going-in cap: …" is the memorandum's own figure; "a going-in cap
   // under the all-in rate" (negative leverage) is arithmetic, left unmarked.
-  if (/memorandum|deal's own|deal's T-12|rent roll|T-12|^The going-in cap\b|achieved premium|stated tax abatement/i.test(item)) {
-    return "document";
-  }
+  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
+  if (/deal's own|deal's T-12|rent roll|T-12/i.test(item)) return "document";
   return null;
 }
 
-/** The kind's mark on the page. */
+/** The kind's mark on the page: the stress-test panel's own words for it
+ *  (app/stress-test-panel `KIND`), so a reader meets one name a kind. */
 export const KIND_LABEL: Record<EvidenceKind, string> = {
-  published: "Published figure",
-  document: "The deal's documents",
-  rule_of_thumb: "Rule of thumb",
-  om_internal: "The memorandum against itself",
+  published: "A published figure",
+  document: "The deal's own document",
+  rule_of_thumb: "A rule of thumb",
+  om_internal: "The OM against itself",
 };
 
 /** Whether the engine runs the return again on this method's evidence —
@@ -187,8 +250,30 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
     heading: "A metro figure is the metro's",
     line: "Never the submarket's and never the building's: a published figure is said as whose it is, and a submarket's vacancy is not read.",
   },
+  // The research tracker's cap ranges and vacancy bands are a brokerage's
+  // published research (data/research/metros.json, each figure's house,
+  // area and period in its `cap_read` / `vacancy_read`), and the exit and
+  // vacancy rows read them; a licensed survey database is never read.
   {
-    heading: "Licensed data is not read",
-    line: "Broker cap-rate surveys and private price indexes are licensed, so no cap range from one is read, and the research tracker says so where it has none.",
+    heading: "Licensed databases are not read",
+    line: "Published broker research is read: each cap range or vacancy band on the research tracker is dated, its house named where the file records one. Licensed survey databases are not read.",
   },
 ];
+
+/** Whether the screen was right: scored, never claimed (lib/track-record's
+ *  rules, its floor imported). */
+export const TRACK_RECORD = {
+  heading: "Whether it is right",
+  lines: [
+    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 by the day it was uploaded, a Dead decision with its reason, a reported trade.",
+    "A document the screen itself read is never scored: the challenger was handed it.",
+    "A decision is a direction, not a figure: it is counted apart and in no share.",
+    `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,
+    "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
+  ],
+} as const;
+
+// The headline's method (lib/stress-test-types `HEADLINE_METHOD`, held to
+// lib/stress-test `stressHeadline` by lib/stress-test.test.ts): the page's
+// "The headline" section draws it, never a copy.
+export { HEADLINE_METHOD } from "@/lib/stress-test-types";

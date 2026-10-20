@@ -100,7 +100,7 @@ import { condoShortLine, readCondo } from "@/lib/condo";
 import { condoUnitsOffered } from "@/lib/condo-units";
 import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import type { AssumableView } from "@/lib/assumable-debt";
-import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
+import { MASTER_LEASE_WORD, basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisTracks, compBarsCaption, subjectBasis } from "@/lib/comp-detail";
@@ -110,7 +110,7 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { VERDICT_WORD, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -458,7 +458,16 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
   const c = verdictCounts(test);
   const rank: Record<StressRow["verdict"], number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
   const rows = test.rows.map((r, i) => ({ r, i })).sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.i - b.i).map((x) => x.r);
-  const count = [`${test.rows.length} ${test.rows.length === 1 ? "assumption" : "assumptions"}`, c.unsupported ? `${c.unsupported} unsupported` : "", c.stretched ? `${c.stretched} stretched` : ""]
+  // Every verdict counted, as the panel and the header's chip count them
+  // (`verdictCounts`): the rows that hold and the unchecked too, so the
+  // count adds up to the assumptions it heads.
+  const count = [
+    `${test.rows.length} ${test.rows.length === 1 ? "assumption" : "assumptions"}`,
+    c.unsupported ? `${c.unsupported} unsupported` : "",
+    c.stretched ? `${c.stretched} stretched` : "",
+    c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
+    c.unchecked ? `${c.unchecked} unchecked` : "",
+  ]
     .filter(Boolean)
     .join(" · ");
   const publishers = test.rows.flatMap((r) => r.evidence.filter((e) => e.kind === "published").map((e) => e.publisher));
@@ -477,6 +486,15 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
           `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
+      {/* The headline (lib/stress-test-words): the OM's case against the
+          evidence's, the gap split by assumption, what is left out and why
+          — or, where no return is re-run, that it is withheld with them. */}
+      {liveHeadline(test) ? (
+        <Text style={{ fontSize: 9, color: C.ink, fontFamily: "Helvetica-Bold", marginBottom: 8 }}>{str(headlineSentence(test))}</Text>
+      ) : test.impactsWithheld ? (
+        // The read line above already gives the reason.
+        <Text style={{ fontSize: 8.5, color: C.muted, marginBottom: 8 }}>{str(HEADLINE_WITHHELD)}</Text>
+      ) : null}
       {rows.map((r, i) => (
         <StressRowBlock key={`${r.key}-${i}`} row={r} test={test} />
       ))}
@@ -1982,6 +2000,10 @@ export function gridSubjectOf(extraction: ExtractionResult | null): string | nul
   const withheld = basisWithheldOf(extraction);
   if (!withheld) return null;
   switch (withheld.word) {
+    // A master lease's grids are the position's own model, a leasehold's:
+    // the deal itself, as before its basis was withheld.
+    case MASTER_LEASE_WORD:
+      return null;
     case "note":
       return "the collateral, run at the note's price";
     case "position":

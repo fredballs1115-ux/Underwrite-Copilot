@@ -453,15 +453,25 @@ type MetroMeta = LiveRate["meta"] & { metric?: string; area?: string; source?: S
 const metricOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).metric;
 const areaOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).area;
 
+/**
+ * Who publishes a figure: the BLS or the Census Bureau where the site pulls
+ * from them; where FRED carries another's series, that publisher with FRED
+ * as the channel ("BLS via FRED", the CPI figures' own credit here) — the
+ * CPI's rent of primary residence is the BLS's, and the Housing Vacancy
+ * Survey's regional and state rental vacancy the Census Bureau's. FRED
+ * alone only for what no other publisher is named for.
+ */
 function publisherOf(r: LiveRate): string {
   switch ((r.meta as MetroMeta).source) {
     case "bls":
       return "BLS";
     case "census":
       return "Census Bureau";
-    default:
-      return "FRED";
   }
+  const metric = metricOf(r);
+  if (metric === "rent_cpi_yoy") return "BLS via FRED";
+  if (metric === "rental_vacancy" || metric === "rental_vacancy_state" || metric === "rental_vacancy_msa") return "Census Bureau via FRED";
+  return "FRED";
 }
 
 /** The list "a, b and c" — or "a and b", or "a". */

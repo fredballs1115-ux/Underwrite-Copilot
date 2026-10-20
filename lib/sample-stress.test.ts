@@ -140,6 +140,15 @@ describe("the sample's stress test, one build on every surface", () => {
     const row = (k: string) => page.rows.find((r) => r.key === k)!;
     expect(row("rent_growth").verdict).not.toBe("unchecked");
     expect(row("vacancy").evidence.map((e) => e.label)).toContain("Rental vacancy, metro area");
+    // The sample's 6.0% pro forma vacancy is a stabilized assumption on a
+    // stabilized deal: held to the metro's 5.8% ±1.9 survey, its rent roll's
+    // 9.3% shown beside it as today's. With no Zillow figure in this read,
+    // its 4.0% rent growth is held to the CPI rent's +5.0%.
+    expect(row("vacancy")).toMatchObject({ verdict: "holds", gap: { value: -0.2, unit: "pts" } });
+    expect(row("vacancy").evidence[0].label).toBe("Rental vacancy, metro area");
+    expect(row("vacancy").gap!.text).toContain("Today the deal's rent roll runs 9.3% vacant, 3.3 points over the assumption — the gap a lease-up has to close.");
+    expect(row("rent_growth")).toMatchObject({ verdict: "holds", gap: { value: -1, unit: "pts" } });
+    expect(row("rent_growth").gap!.text).toMatch(/^Held to the rent sitting tenants pay \(CPI rent\)/);
     expect(row("exit_cap").evidence.map((e) => e.label)).toContain("10-year Treasury");
     expect(page.rows.some((r) => r.key === "expense_growth")).toBe(true);
   });
@@ -151,6 +160,37 @@ describe("the sample's stress test, one build on every surface", () => {
     const rent = page.rows.find((r) => r.key === "rent_growth")!;
     expect(rent.verdict).toBe("unchecked");
     expect(page.rows.flatMap((r) => r.evidence).some((e) => e.kind === "published" && e.publisher === "FRED")).toBe(false);
+  });
+
+  it("leads with one headline on every surface: the OM's figures against the evidence's, split by assumption", () => {
+    const page = signedInSample(READS);
+    expect(homepage(READS)!.headline).toEqual(page.headline);
+    expect(demo(READS)!.headline).toEqual(page.headline);
+    const h = page.headline!;
+    const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
+    // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
+    // vacancy, its 4.0% rent growth, its tax bill and premium.
+    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.6]);
+    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.70"]);
+    // The split, largest first: the reset tax bill, the exit at the
+    // going-in cap and the T-12's premium lower it; the vacancy holds to the
+    // metro's survey and rent growth to CPI rent, so neither carries a part.
+    expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
+      ["taxes", -2.8],
+      ["exit_cap", -1.4],
+      ["insurance", -0.9],
+    ]);
+    expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
+    // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
+    // and insurance the rows move on their own; the premium is no model input.
+    expect(h.omitted.map((o) => o.key)).toEqual(["basis", "noi", "renovation_premium"]);
+    // With the read failed: the published rows unchecked, rent growth out of
+    // both cases, and the vacancy held to the deal's own rent roll.
+    const bare = signedInSample(null).headline!;
+    expect(bare.omKeys).not.toContain("rent_growth");
+    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
+    expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
   });
 
   it("places the sample where the deal page places it", () => {
@@ -177,8 +217,8 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(demoData).not.toContain("buildStressTest");
     expect(demoData).not.toMatch(/modelVsMarketFor\(|sampleDerivedInputs\(/);
     const page = src("app/(app)/deals/[id]/page.tsx");
-    expect(page).toContain("recordedSales: isSampleDeal ? null : recordedSales,");
-    expect(page).toContain("pastScreens: isSampleDeal ? null : pastScreens,");
+    // The one builder hands the sample neither (lib/stress-basis-evidence).
+    expect(page).toMatch(/stressBasisEvidence\(\{[^}]*isSample: isSampleDeal,/);
     // The sample is never seeded from today's rates (lib/model-market).
     expect(page).toContain("modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt)");
   });

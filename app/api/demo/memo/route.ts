@@ -3,16 +3,19 @@ import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { readerDateLong, readerToday } from "@/lib/reader-day";
 import { sampleActualsLine, sampleCover, sampleDocumentChecks, sampleDocumentRow, sampleStressTest } from "@/lib/sample-cover";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
+import { DEMO_DOC_CACHE_CONTROL, heldRenderFresh, type HeldRender } from "@/lib/demo-doc-cache";
 
 export const runtime = "nodejs";
 
-// The memo prints today's date but is otherwise pure fixture, so render it
-// once per day per process and serve the same bytes: this is a public
+// The memo prints today's date and today's published figures (the stress
+// test's), so it is rendered once per /demo ISR window per process and the
+// same bytes served inside it (lib/demo-doc-cache): this is a public
 // unauthenticated route, and Render doesn't edge-cache dynamic responses, so
-// without this every request would pay a full @react-pdf render. The promise
-// (not the buffer) is cached so concurrent first hits share one render; a
-// failed render clears the slot to allow retry.
-let cachedRender: { day: string; pdf: Promise<Buffer> } | null = null;
+// without this every request would pay a full @react-pdf render, while a
+// day's hold could print figures /demo no longer shows. The promise (not the
+// buffer) is cached so concurrent first hits share one render; a failed
+// render clears the slot to allow retry.
+let cachedRender: (HeldRender & { pdf: Promise<Buffer> }) | null = null;
 
 /**
  * The memo the signed-in route (app/api/deals/[id]/memo) builds for the
@@ -52,10 +55,11 @@ async function renderSampleMemo(dateStr: string, readerDay: string): Promise<Buf
   return renderMemoPdf(memo);
 }
 
-function getSampleMemo(dateStr: string, readerDay: string): Promise<Buffer> {
-  if (cachedRender && cachedRender.day === readerDay) return cachedRender.pdf;
+function getSampleMemo(dateStr: string, readerDay: string, now: number): Promise<Buffer> {
+  if (cachedRender && heldRenderFresh(cachedRender, readerDay, now)) return cachedRender.pdf;
   const next = {
     day: readerDay,
+    at: now,
     pdf: renderSampleMemo(dateStr, readerDay).catch((err) => {
       // Only clear our own entry — a newer day's render may have replaced it.
       if (cachedRender === next) cachedRender = null;
@@ -80,13 +84,14 @@ export async function GET() {
   const readerDay = readerToday(null, now);
 
   try {
-    const buffer = await getSampleMemo(dateStr, readerDay);
+    const buffer = await getSampleMemo(dateStr, readerDay, now.getTime());
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="sample-ic-memo.pdf"',
-        // Fixture-only output — safe to cache at the edge for a day.
-        "Cache-Control": "public, max-age=86400",
+        // Held as long as /demo's own page is, never a day: it prints
+        // today's published figures.
+        "Cache-Control": DEMO_DOC_CACHE_CONTROL,
       },
     });
   } catch (err) {

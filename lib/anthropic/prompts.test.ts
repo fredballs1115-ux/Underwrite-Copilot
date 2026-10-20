@@ -284,6 +284,13 @@ describe("what the screen established reaches the steps that read the OM", () =>
     expect(withCtx.indexOf("<deal_context>")).toBeGreaterThan(withCtx.indexOf("no comps at all"));
   });
 
+  it("the broker-comp scrutiny names a missing trade only on the memorandum's own grounds, never from memory", () => {
+    const bare = brokerCompsInstruction();
+    expect(bare).toContain("only where the memorandum itself gives the grounds");
+    expect(bare).toContain("Never name a trade, a price or a property from memory");
+    expect(bare).not.toContain("recent weaker trades omitted");
+  });
+
   it("the market check and the reconciler carry the same block; a blank context adds nothing", () => {
     expect(marketCheckInstruction("office", ctx)).toContain(`<deal_context>\n${ctx}\n</deal_context>`);
     expect(marketCheckInstruction("office", "  ")).toBe(marketCheckInstruction("office"));

@@ -17,6 +17,7 @@ import { compactUsd } from "@/lib/money";
 import {
   STRESS_KEYS,
   type StressEvidence,
+  type StressHeadline,
   type StressImpact,
   type StressKey,
   type StressRow,
@@ -89,8 +90,14 @@ export function bestEvidence(row: StressRow): StressEvidence | null {
   return row.evidence.find((e) => e.value != null) ?? row.evidence[0] ?? null;
 }
 
-const pct1 = (n: number) => `${n.toFixed(1)}%`;
-const pct2 = (n: number) => `${n.toFixed(2)}%`;
+/** A percent at one or two places, a negative with the minus sign (U+2212),
+ *  and none on a figure that rounds to nothing. */
+const signedPct = (n: number, places: number): string => {
+  const t = n.toFixed(places);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
+const pct1 = (n: number) => signedPct(n, 1);
+const pct2 = (n: number) => signedPct(n, 2);
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 
 /**
@@ -246,6 +253,115 @@ export function rowWords(row: StressRow): StressRowWords {
     move: moveShort(row.impact),
     ticks: tickPositions(row),
   };
+}
+
+// ── The headline: the OM's case against the evidence's ───────────────────
+
+/** Each assumption named mid-sentence in the headline's split. */
+const HEADLINE_NAME: Record<StressKey, string> = {
+  basis: "the price",
+  exit_cap: "the exit cap",
+  debt: "the loan rate",
+  noi: "the NOI",
+  vacancy: "vacancy",
+  rent_growth: "rent growth",
+  expense_growth: "expense growth",
+  taxes: "the taxes",
+  insurance: "insurance",
+  renovation_premium: "the renovation premium",
+  other: "another assumption",
+};
+
+/** The headline a surface prints: none wherever the re-runs are withheld,
+ *  whatever the test carries — the headline goes with them. */
+export function liveHeadline(test: StressTest): StressHeadline | null {
+  return test.impactsWithheld ? null : (test.headline ?? null);
+}
+
+/** An assumption as the headline names it mid-sentence: "the exit cap". */
+export function headlineName(key: StressKey): string {
+  return HEADLINE_NAME[key];
+}
+
+/** A part's move in levered-IRR points, signed with a true minus: "+3.7
+ *  pts", "−1.4 pts"; "0.0 pts" where it rounds to nothing. */
+export function ptsText(n: number): string {
+  const r = Math.round(n * 10) / 10;
+  if (r === 0) return "0.0 pts";
+  return `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(1)} pts`;
+}
+
+/**
+ * The headline's one line: "Levered IRR on the OM's figures 16.7% to 12.3%
+ * with the evidence". `arrow` is "to" on paper (WinAnsi has no arrow) and
+ * "→" on the page. Where nothing is past its evidence, the OM's case alone
+ * and why the evidence's is the same run. Null where the test carries no
+ * headline.
+ */
+export function headlineLine(test: StressTest, arrow = "to"): string | null {
+  const h = liveHeadline(test);
+  if (!h) return null;
+  const om = irrText(h.omIrrPct);
+  if (h.parts.length === 0 && h.omIrrPct != null && h.evidenceIrrPct != null && Math.abs(h.evidenceIrrPct - h.omIrrPct) < 1e-9) {
+    return `Levered IRR on the OM's figures ${om}; no figure the model takes is past its evidence, so the evidence moves nothing`;
+  }
+  return `Levered IRR on the OM's figures ${om} ${arrow} ${irrText(h.evidenceIrrPct)} with the evidence`;
+}
+
+/** "the price +3.7 pts, vacancy −3.2 pts and the exit cap −1.4 pts" */
+export function headlineSplit(test: StressTest): string {
+  return joinAnd((liveHeadline(test)?.parts ?? []).map((p) => `${headlineName(p.key)} ${ptsText(p.pts)}`));
+}
+
+function joinAnd(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * The headline in one short clause, for the one-page memo, which has no
+ * line to spare (measured on the sample: the line alone fits beside the
+ * read line, the split does not): "Levered IRR on the OM's figures 16.7%
+ * to 12.3% with the evidence; the report splits the gap by assumption."
+ * The report prints `headlineSentence`, the split and what is left out
+ * with why. Null with no headline.
+ */
+export function headlineShort(test: StressTest): string | null {
+  const h = liveHeadline(test);
+  if (!h) return null;
+  return `${headlineLine(test)!}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
+}
+
+/** The sentence a document prints where the headline is withheld: the
+ *  test's own reason, then that the headline goes with it. */
+export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.";
+
+/**
+ * The headline in whole sentences, for the memo, the report and the
+ * verdict's brief: the line with the equity multiples, the split (the
+ * Shapley share of each assumption past its evidence, the parts adding up
+ * to the gap), and what is left out with why. Where the re-runs are
+ * withheld, the reason and that the headline goes with it. Null where the
+ * test has no headline and withholds nothing (no row carries a re-run).
+ */
+export function headlineSentence(test: StressTest): string | null {
+  const h = liveHeadline(test);
+  if (!h) return test.impactsWithheld ? `${test.impactsWithheld} ${HEADLINE_WITHHELD}` : null;
+  const line = headlineLine(test)!;
+  const multiples =
+    h.omMultiple != null && h.evidenceMultiple != null && h.parts.length > 0 ? ` (equity multiple ${h.omMultiple.toFixed(2)}x to ${h.evidenceMultiple.toFixed(2)}x)` : "";
+  const gap = h.omIrrPct != null && h.evidenceIrrPct != null ? Math.abs(h.evidenceIrrPct - h.omIrrPct) : null;
+  const split =
+    h.parts.length > 1 && gap != null
+      ? `: ${headlineSplit(test)}, each assumption's share of the ${gap.toFixed(1)}-point gap averaged over every order the swaps could be made in.`
+      : h.parts.length === 1
+        ? `: ${headlineSplit(test)}, the one assumption past its evidence that the model takes.`
+        : h.omIrrPct == null || h.evidenceIrrPct == null
+          ? ", so the gap is not split."
+          : ".";
+  const unsolved = h.unsolved > 0 ? ` ${h.unsolved} mix${h.unsolved === 1 ? "" : "es"} of the swaps had no IRR and ${h.unsolved === 1 ? "was" : "were"} counted at the engine's floor in the split.` : "";
+  const left = h.omitted.length > 0 ? ` Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
+  return `${line}${multiples}${split}${unsolved}${left}`;
 }
 
 /** The rows in STRESS_KEYS' order, as the test holds them. */

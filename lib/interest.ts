@@ -357,10 +357,16 @@ export function interestOf(ex: ExtractionResult | null | undefined): {
   kind: InterestKind;
   sharePct: number | null;
   entityLoan: number | null;
+  /** a leasehold that is a master lease of the building, sublet to its
+   *  tenants (`isMasterLeasehold`): its price buys the position between two
+   *  rents, never the building, so no building basis is struck on it
+   *  (lib/comp-detail `subjectBasis`). Absent on anything else. */
+  masterLeasehold?: true;
 } {
   const kind = interestKindOf(ex);
   const share = kind === "partial_interest";
   return {
+    ...(kind === "leasehold" && isMasterLeasehold(ex) ? { masterLeasehold: true as const } : {}),
     kind,
     // A share of the general partner's interest is a share of a share: no
     // percentage of the entity is stated, so nothing is grossed up and no

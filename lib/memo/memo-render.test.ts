@@ -1537,15 +1537,25 @@ describe("the memo leads with the stress test", () => {
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
     expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (3 unsupported, 4 stretched), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    // The headline, in the read line's paragraph: the OM's case against the
+    // evidence's (lib/stress-test `stressHeadline`); the split is the
+    // report's, since the one page has no line to spare for it.
+    expect(text).toContain(`in code. ${test.headline ? "Levered IRR on the OM's figures" : ""}`);
+    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.3% by count, one input apart.
     expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.3% (the deal's rent roll, May 31, 2026) · gap 3.3 pts · IRR 12.4% to 9.1%");
-    // The basis row: the ask against the median of the comps the comps step
-    // graded clean, and the engine's move, spelled, since standard
-    // Helvetica has no arrow.
-    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $257k/unit (the offering memorandum) · gap 6.9% · IRR 9.3% to 12.7%");
+    // The basis row: the ask against the one comp the comps step graded
+    // supports (Parkside leans the seller's way, and is left out), and the
+    // engine's move, spelled, since standard Helvetica has no arrow.
+    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the offering memorandum) · gap 8.8% · IRR 9.3% to 13.6%");
     expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
+    // The key says what each of a row's two IRRs is run at — the one-page
+    // memo has no room to say it on every row — and claims no more of the
+    // report than that it prints every row.
+    expect(text).toContain("Each row's IRR: the model run at the OM's figure, then at the evidence's; the report prints every row.");
+    expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
     expect(text).toContain("Value-add program: 192 doors to renovate; $18,000 a door; $200 a month premium (13% on cost); $140 achieved on renovated units");

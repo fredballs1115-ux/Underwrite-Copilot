@@ -39,6 +39,7 @@ import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { buildStressTest } from "@/lib/stress-test";
+import { readStressBasisEvidence } from "@/lib/stress-basis-read";
 import type { StressTest } from "@/lib/stress-test-types";
 import type { BrokerCompsResult, ChallengerResult, MarketResult } from "@/lib/anthropic/types";
 
@@ -392,6 +393,10 @@ export async function GET(
       // and the assumptions read (its dated figures are the test's
       // published evidence), with the stored challenger, market check and
       // memorandum comps, on the reader's day.
+      // The recorded sales and the reader's own past screens, as the deal
+      // page sets the basis against them (lib/stress-basis-read, the one
+      // builder): the report is the reader's own document.
+      const { recordedSales, pastScreens } = await readStressBasisEvidence(supabase, deal, { readerId: user.id, pastScreens: true });
       stressTest = buildStressTest({
         extraction,
         firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
@@ -402,6 +407,8 @@ export async function GET(
         derived,
         storedAssetClass: deal.asset_class as string | null,
         brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+        recordedSales,
+        pastScreens,
         readOn: readerDay,
       });
     }

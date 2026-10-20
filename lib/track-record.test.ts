@@ -119,6 +119,22 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll, assetClass: "office" }).rows[0].later).toMatchObject({ value: 9.4, text: "the rent roll as of Sep 30, 2026 ran 9.4% vacant by area" });
   });
 
+  it("a later document never scores a stabilized assumption the stress test holds to the market: its vacancy is today's", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 }, vacancyHeldToMarket: true });
+    // Still on record as what came after, and the figure still shown.
+    expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
+    const row = r.rows[0];
+    expect(row.landing).toBe("unscored");
+    expect(row.later?.value).toBe(9.1);
+    expect(row.figures).toBeNull();
+    expect(row.why).toBe(
+      "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.",
+    );
+    expect(row.text).toMatch(/^Stabilized vacancy: the T-12 to Sep 30, 2026 ran 9\.1% economic vacancy .*, but the OM's vacancy is a stabilized assumption .* not a test of it, so it is not scored\.$/);
+    // The shares count it nowhere.
+    expect(accountRecord([r]).scored).toBe(0);
+  });
+
   it("a T-12 the screen read is unscored, said as before the screen, and never evidence", () => {
     const r = scoreDeal({ screenedAt: T, challenges: [vacancy, insurance], t12: { arrivedAt: BEFORE, dated: "2026-08-31", summary: t12 } });
     expect(r.evidence).toEqual([]);

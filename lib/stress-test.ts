@@ -42,8 +42,12 @@
 //
 // The thresholds, each named here and read nowhere else:
 //   vacancy          VACANCY_UNSUPPORTED_PTS   3 pts past the best evidence
+//                    (a stabilized assumption on a stabilized deal: the
+//                    market's figure, past the survey's margin; else the
+//                    deal's documents)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
-//                    trailing year's highest market figure
+//                    trailing year's figure for the deal's own kind of rent
+//                    (`RENT_GROWTH_DECIDERS`)
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under the lowest
 //                    price index
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
@@ -72,10 +76,25 @@ import type { ActualsRead } from "@/lib/actuals/actuals-read";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
-import { assetWords } from "@/lib/asset-words";
+import { assetWords, countNoun } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
-import { findGoingInCap, findMetric, findPriceRow, occupancyRow, parsePct, screenYearOf, unitCountFromMetrics, buildingSfFromMetrics } from "@/lib/criteria";
-import { askingPriceOf, buildingPriceOf, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { findGoingInCap, findMetric, occupancyRow, parsePct, planCountRow, screenYearOf, unitCountFromMetrics, unitCountRow, buildingSfFromMetrics } from "@/lib/criteria";
+import { condoUnitsOffered } from "@/lib/condo-units";
+import {
+  askingPriceOf,
+  assessPlausibility,
+  basisOutsideBand,
+  buildingPriceOf,
+  findPricedMetric,
+  inferStrategy,
+  isOutdoorStorageYard,
+  isPlanDeal,
+  noiFigures,
+  notYetDelivered,
+  planSummary,
+  planWithBasisChecked,
+  type DealStrategy,
+} from "@/lib/deal-strategy";
 import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
@@ -86,9 +105,9 @@ import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
 import { readTaxAbatement, taxBillOf } from "@/lib/tax-abatement";
 import { sizeLoan } from "@/lib/tools/deal-math";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
-import { HOLD_MONTHS, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
-import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
+import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
 import {
   STRESS_KEYS,
@@ -98,7 +117,11 @@ import {
   type StressRow,
   type StressTest,
   type StressVerdict,
+  HEADLINE_BASIS_LEFT_OUT,
+  HEADLINE_NOI_LEFT_OUT,
+  type StressHeadline,
 } from "@/lib/stress-test-types";
+import { attributeOverPlayers } from "@/lib/bridge/attribution";
 
 export const VACANCY_UNSUPPORTED_PTS = 3;
 export const RENT_GROWTH_UNSUPPORTED_PTS = 2;
@@ -115,9 +138,9 @@ export const PREMIUM_UNSUPPORTED_SHARE = 0.15;
 export const IRR_MOVE_STRETCH_BPS = 100;
 
 /** Two percent figures within this are one figure (lib/model-vs-market's own). */
-const SAME = 0.05;
+export const SAME = 0.05;
 /** A dollar figure within this share of another is the same figure. */
-const SAME_SHARE = 0.02;
+export const SAME_SHARE = 0.02;
 
 /** Recorded sales from public property records, as the page already read
  *  them (lib/public-comps): a median only where the count reaches the
@@ -129,6 +152,9 @@ const SAME_SHARE = 0.02;
 export interface RecordedSalesEvidence {
   count: number;
   medianPerSqft: number | null;
+  /** the sales the $/SF median is taken over — those stating an area
+   *  (lib/public-comps `RecordCompsStats.perSqftCount`); absent, all of them */
+  perSqftCount?: number | null;
   medianPerUnit: number | null;
   providerName: string;
   /** the day the records were read, ISO */
@@ -141,6 +167,9 @@ export interface RecordedSalesEvidence {
  *  memorandum's asking price, never a price anyone paid. */
 export interface PastScreensEvidence {
   count: number;
+  /** the screens the median is taken over — those that state a basis
+   *  (lib/market-memory `Stat.n`); absent, all of them */
+  medianCount?: number | null;
   perUnitMedian: number | null;
   perSfMedian: number | null;
   market: string;
@@ -163,6 +192,10 @@ export interface StressTestArgs {
   brokerComps?: BrokerCompsResult | null;
   recordedSales?: RecordedSalesEvidence | null;
   pastScreens?: PastScreensEvidence | null;
+  /** why the reader's past screens are not handed in, where a surface's
+   *  words reach someone other than the reader (the shared screen, the
+   *  verdict's brief): said by name on the basis row, never as none found */
+  pastScreensWithheld?: string | null;
   /** the index the derived model's rate was seeded off (lib/debt-index
    *  `debtSeeds`' tenor, the one handed to `deriveUnderwriteInputs`), with
    *  its own date; absent, the index is read back off the seed's note */
@@ -198,6 +231,9 @@ function joinWords(parts: string[]): string {
 }
 
 /** "The OM's" → "the OM's"; an acronym ("NOI") keeps its letters. */
+/** "the deal's T-12's $385k", or "$385k (BLS via FRED)" — a publisher named
+ *  with its channel takes no possessive. */
+const whose = (publisher: string, figure: string) => (/ via /.test(publisher) ? `${figure} (${publisher})` : `${publisher}'s ${figure}`);
 const lowerFirst = (s: string) => (s && !/^[A-Z]{2,}\b/.test(s) ? `${s[0].toLowerCase()}${s.slice(1)}` : s);
 
 function pageOf(row: Row | null | undefined, ex: ExtractionResult | null): number | null {
@@ -317,7 +353,9 @@ function runImpact(
   const alt = computeUnderwrite(altInputs).returns;
   const same = Math.abs(altValue - omValue) < 1e-9;
   const omSide = words.omSide ?? "the OM's";
-  const altSaid = words.evidence ? `${words.evidence}'s ${words.alt}` : words.alt;
+  // A publisher named with its channel ("BLS via FRED") takes no
+  // possessive: the figure, then whose it is.
+  const altSaid = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
   const modelClause =
     Math.abs(modelValue - omValue) < 1e-9 ? "" : Math.abs(modelValue - altValue) < 1e-9 ? " The model itself already runs at it." : ` The model itself runs ${words.model}.`;
   const note = same
@@ -475,6 +513,7 @@ interface Ctx {
   ex: ExtractionResult | null;
   rows: Row[];
   kind: ReturnType<typeof inferStrategy>["kind"];
+  strategy: DealStrategy;
   plan: boolean;
   assetClass: string | null;
   mvm: ModelVsMarket | null;
@@ -486,6 +525,7 @@ interface Ctx {
   brokerComps: BrokerCompsResult | null;
   recordedSales: RecordedSalesEvidence | null;
   pastScreens: PastScreensEvidence | null;
+  pastScreensWithheld: string | null;
   indexGiven: DebtIndex | null;
   readOn: string;
 }
@@ -541,19 +581,51 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
 
 // — Vacancy —
 
+/**
+ * Whether the OM's vacancy is a stabilized assumption on a deal read as
+ * stabilized — the case the vacancy row holds to the market's published
+ * figures before the deal's documents, whose vacancy is today's. A stated
+ * vacancy allowance (a stabilized or pro forma row first, `omVacancy`), on a
+ * deal no plan deal: an occupancy the OM states is today's, and a lease-up,
+ * value-add, conversion or development is judged on what the documents say
+ * the building runs at today (its plan is the gap). The track record reads
+ * it too (lib/track-record `vacancyHeldToMarket`), so a later rent roll's
+ * vacancy — today's again — never scores a challenge the stress test holds
+ * to the market.
+ */
+export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
+  const om = omVacancy(rowsOf(extraction));
+  return om?.from === "vacancy" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
+ * Where a published vacancy figure stands in the order a stabilized
+ * assumption is held to them — the order lib/model-vs-market's vacancy check
+ * anchors in: the metro area's survey, inside its own margin; for a
+ * commercial class, the research tracker's band (where the read holds the
+ * model to it); the Census region's; the state's annual figure. The first
+ * present decides and the rest are shown beside it. Read off the figure's
+ * label, never its picture's marks, which a withheld read drops.
+ */
+function marketVacancyRank(label: string): number {
+  if (/research tracker/i.test(label)) return 1;
+  if (/metro area/i.test(label)) return 0;
+  if (/census region/i.test(label)) return 2;
+  return 3;
+}
+
 function vacancyRow(ctx: Ctx): StressRow | null {
   const om = omVacancy(ctx.rows);
-  const evidence: StressEvidence[] = [];
-  const comparables: { value: number; tolerance: number; kind: StressEvidence["kind"] }[] = [];
-  const compared = new Set<number>();
-  const push = (e: StressEvidence, tolerance = SAME) => {
-    evidence.push(e);
-    if (e.value != null) {
-      comparables.push({ value: e.value, tolerance, kind: e.kind });
-      compared.add(evidence.length - 1);
-    }
-  };
-  // The deal's own documents first: the rent roll's occupancy, the T-12's
+  // Each piece is gathered apart and set in order once the row knows which
+  // kind decides: the deal's documents, the published figures (each with its
+  // own tolerance — the survey's margin reaches the survey's figure, never
+  // the region's or the state's beside it), the class's rule of thumb.
+  type Piece = { e: StressEvidence; tolerance: number; compare: boolean; rank: number };
+  const docs: Piece[] = [];
+  const market: Piece[] = [];
+  let rot: Piece | null = null;
+  const piece = (e: StressEvidence, tolerance = SAME, compare = true, rank = 0): Piece => ({ e, tolerance, compare: compare && e.value != null, rank });
+  // The deal's own documents: the rent roll's occupancy, the T-12's
   // vacancy loss over gross potential rent — whether its rent line already
   // nets the vacancy is the statement's own EGI to say (lib/actuals/analyze
   // `t12Vacancy`, the track record's one reading), and the sentence says
@@ -573,7 +645,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const v = Math.round((1 - occ) * 1000) / 10;
       const asOf = rr.asOf ?? s.asOfUsed ?? null;
       const noun = assetWords(ctx.assetClass).noun?.many ?? "units";
-      push({
+      docs.push(piece({
         kind: "document",
         label: "The deal's rent roll: the occupancy it runs at",
         text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${asOf}` : ", no stated as-of"})`,
@@ -581,13 +653,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         asOf,
         publisher: "the deal's rent roll",
         scope: "deal",
-      });
+      }));
     }
   }
   const t12 = ctx.actuals?.t12;
   const tv = t12 ? t12Vacancy(t12.summary) : null;
   if (t12 && tv) {
-    push({
+    docs.push(piece({
       kind: "document",
       label: "The deal's T-12: vacancy loss over gross potential rent",
       text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${t12.periodEnd}` : "; period not stated"})`,
@@ -595,7 +667,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
       scope: "deal",
-    });
+    }));
   }
   // The published figures the model-vs-market read already carries: the
   // survey (with its margin as the tolerance), the region's, the state's,
@@ -608,14 +680,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const tracker = /research tracker/i.test(f.label);
       const e = published(check, f, ctx.mvm?.grain ?? null);
       const compare = tracker ? held && !assetWords(ctx.assetClass).residential : !(check.marks?.[i]?.role === "apart");
-      if (compare) push(e, moeOf(f) ?? SAME);
-      else evidence.push(e);
+      market.push(piece(e, moeOf(f) ?? SAME, compare, marketVacancyRank(f.label)));
     });
   }
   // The class's norm, a rule of thumb named as one.
   const cd = classVacancyDefault(ctx.ex?.assetClass ?? ctx.assetClass);
   if (assetWords(ctx.assetClass).operating) {
-    push({
+    rot = piece({
       kind: "rule_of_thumb",
       label: `${cd.classWord[0].toUpperCase()}${cd.classWord.slice(1)} vacancy, a rule of thumb`,
       text: `${pct1(cd.pct)} — the class's screening default, a rule of thumb, not this market's figure`,
@@ -625,10 +696,44 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       scope: "class",
     });
   }
-  if (!om && evidence.length === 0) return null;
+  if (!om && docs.length + market.length === 0 && !rot) return null;
+  // A stabilized assumption on a deal read as stabilized is the market's to
+  // judge (`stabilizedVacancyStated`): the published figure first in
+  // `marketVacancyRank`'s order decides, inside its own margin, and the
+  // documents' vacancy is today's — shown beside it as the gap a lease-up
+  // has to close, or as support where the building already runs at or under
+  // the assumption. Where no published figure is fresh, the documents decide
+  // as on every other deal, and the row says so.
+  const stabilized = om?.from === "vacancy" && !ctx.plan;
+  const heldTo = stabilized ? market.filter((m) => m.compare) : [];
+  const topRank = heldTo.length > 0 ? Math.min(...heldTo.map((m) => m.rank)) : null;
+  const deciding = topRank == null ? [] : heldTo.filter((m) => m.rank === topRank);
+  const marketDecides = deciding.length > 0;
+  // The documents' vacancy against the stabilized assumption, said as
+  // today's: the gap a lease-up has to close, or support for the figure.
+  const todayWords = (docPct: number, omPct: number, what: string): string => {
+    const diff = docPct - omPct;
+    return diff > SAME
+      ? `${pts(diff)} over ${what} — the gap a lease-up has to close`
+      : `${diff < -SAME ? `${pts(diff)} under` : "at"} ${what} — support for it`;
+  };
+  if (marketDecides && om) {
+    for (const d of docs) {
+      d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
+      d.compare = false;
+    }
+    for (const m of market) if (!deciding.includes(m)) m.compare = false;
+    if (rot) rot.compare = false;
+  }
+  // The row prints the kind that decides first.
+  const ordered: Piece[] = marketDecides
+    ? [...deciding, ...market.filter((m) => !deciding.includes(m)), ...docs, ...(rot ? [rot] : [])]
+    : [...docs, ...market, ...(rot ? [rot] : [])];
+  const evidence = ordered.map((p) => p.e);
+  const compared = indexesOf(evidence, (_, i) => ordered[i].compare);
   // Where the OM states no vacancy allowance, the figure is its occupancy
-  // TODAY, not a pro forma assumption: the row is titled and worded so. The
-  // test against the evidence is unchanged (the method is the owner's).
+  // TODAY, not a pro forma assumption: the row is titled and worded so, and
+  // the documents — today's figures too — decide it.
   const title = om?.from === "occupancy" ? OCCUPANCY_TITLE : undefined;
   const omSays: StressRow["omSays"] = om
     ? {
@@ -641,81 +746,156 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"), compared);
+  const comparables = ordered.filter((p) => p.compare);
   if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared, title);
-  // The verdict is the best kind's: the deal's own document where one
-  // states the figure, else the published figures, else the rule of thumb.
-  // A rule of thumb never widens the range a document decides (a 5% class
-  // default beside a T-12's 9.1% had read the OM's 6% as "inside").
+  // The verdict is the best kind's: the published figure that decides a
+  // stabilized assumption; else the deal's own document where one states
+  // the figure, else the published figures, else the rule of thumb. A rule
+  // of thumb never widens the range a document decides (a 5% class default
+  // beside a T-12's 9.1% had read the OM's 6% as "inside").
   const best = comparables[0];
-  const decisive = comparables.filter((c) => c.kind === best.kind);
+  const bestValue = best.e.value!;
+  const decisive = marketDecides ? deciding : comparables.filter((c) => c.e.kind === best.e.kind);
   // Each figure carries its own tolerance: the survey's margin reaches the
   // survey's figure, never the region's or the state's beside it.
-  const judged = judge(om.pct, decisive.map((c) => ({ value: c.value, tolerance: c.tolerance })), "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
-    Math.abs(gap) < SAME
-      ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(best.value)}.`
-      : gap > 0
-        ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(best.value)}.`
-        : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(best.value)} — the conservative side.`,
-  );
-  const evidenceIndex = evidence.findIndex((e) => e.value === best.value);
+  const figures = decisive.map((c) => ({ value: c.e.value!, tolerance: c.tolerance }));
+  let judged: Judged;
+  if (marketDecides) {
+    // Said by the figure that decided — its margin, or its band — and why
+    // it decides: the assumption is the building stabilized, which the
+    // market's own vacancy speaks to and today's documents do not.
+    const band = figures.length > 1 ? { lo: Math.min(...figures.map((f) => f.value)), hi: Math.max(...figures.map((f) => f.value)) } : null;
+    const moe = band || best.tolerance === SAME ? null : best.tolerance;
+    const said = `${lowerFirst(best.e.label.replace(/, low read$/, ""))} (${best.e.publisher}), ${band ? `${pct1(band.lo)}–${pct1(band.hi)}` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
+    const edge = band ? band.lo - SAME : bestValue - (moe ?? SAME);
+    const doc = docs[0];
+    const docLine = doc
+      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.`
+      : "";
+    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) => {
+      const where =
+        om.pct < edge
+          ? `${pts(gap)} under it${moe != null ? `, ${pts(edge - om.pct)} past its margin` : ""}`
+          : band && om.pct <= band.hi + SAME
+            ? "inside its band"
+            : Math.abs(gap) < SAME
+              ? "at it"
+              : gap > 0
+                ? `${pts(gap)} under it, inside its margin`
+                : `${pts(gap)} over it — the conservative side`;
+      return `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}`;
+    });
+  } else {
+    // A stabilized assumption with no fresh published figure to hold it to:
+    // the documents decide, said so.
+    const noMarket = stabilized && best.e.kind === "document" ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide." : "";
+    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
+      Math.abs(gap) < SAME
+        ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}`
+        : gap > 0
+          ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(bestValue)}.${noMarket}`
+          : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(bestValue)} — the conservative side.${noMarket}`,
+    );
+  }
+  // The engine is re-run at the figure that decided.
+  const evidenceIndex = ordered.indexOf(best);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, best.value, {
+      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, bestValue, {
           what: "vacancy",
           om: pct1(om.pct),
-          alt: pct1(best.value),
-          evidence: evidence[evidenceIndex].publisher,
+          alt: pct1(bestValue),
+          evidence: best.e.publisher,
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
+  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
 }
 
 // — Rent growth —
 
+/**
+ * The published figures a rent growth may be held to, in the order the
+ * first present decides — the one that speaks to the deal's own kind of
+ * rent (the read hands a residential class Zillow's and the CPI's figures,
+ * a commercial class its lessors' index, never both):
+ *   - an apartment building: Zillow's asking rents over multifamily
+ *     listings alone, else over all home types (the nearest Zillow reads
+ *     where its apartment index has no figure for the month), else the rent
+ *     sitting tenants pay (the CPI's rent of primary residence), which
+ *     averages every lease in place and lags the rents new leases sign at;
+ *   - a commercial class: the national index of rents its kind of lessor
+ *     charges (lib/live-market-brief `rentIndexFor`), the nation's.
+ * Each figure is the trailing year's, and every other figure the read
+ * carries stays shown beside the one that decides, never in its place.
+ */
+const RENT_GROWTH_DECIDERS: readonly { re: RegExp; name: (label: string) => string; why: string }[] = [
+  { re: /^Asking rent, apartments$/, name: () => "Zillow's apartment asking rents", why: "the figure for this kind of rent" },
+  {
+    re: /^Asking rent, all home types$/,
+    name: () => "Zillow's asking rents across all home types",
+    why: "the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month",
+  },
+  {
+    re: /\(CPI rent\)$/,
+    name: () => "the rent sitting tenants pay (CPI rent)",
+    why: "the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at",
+  },
+  {
+    re: /^Rents charged by .+, national \(PPI\)$/,
+    name: (label) => `the national index of ${lowerFirst(label.replace(/, national \(PPI\)$/, ""))}`,
+    why: "the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's",
+  },
+];
+
 function rentGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
-  const evidence: StressEvidence[] = [];
-  const comparables: number[] = [];
-  const compared = new Set<number>();
+  // A regulation's allowance is the regime's, for the units it regulates —
+  // shown first and never in the market's range (the read's own rule), so
+  // never the figure that decides.
   const check = checkOf(ctx.mvm, "rent_growth");
-  if (check) {
-    check.published.forEach((f, i) => {
-      const e = published(check, f, ctx.mvm?.grain ?? null);
-      evidence.push(e);
-      // An allowance is the regime's, for the units it regulates — shown
-      // first and never in the market's range (the read's own rule).
-      if (check.marks?.[i]?.role !== "apart") {
-        comparables.push(f.value);
-        compared.add(evidence.length - 1);
-      }
-    });
-  }
-  if (!om && evidence.length === 0) return null;
+  const apart: StressEvidence[] = [];
+  const market: StressEvidence[] = [];
+  check?.published.forEach((f, i) => {
+    const e = published(check, f, ctx.mvm?.grain ?? null);
+    if (check.marks?.[i]?.role === "apart" || /allowance on the regulated units/i.test(f.label)) apart.push(e);
+    else market.push(e);
+  });
+  if (!om && apart.length + market.length === 0) return null;
+  // The one figure that decides, the first of RENT_GROWTH_DECIDERS present,
+  // printed first among the market's; the rest beside it.
+  const found = RENT_GROWTH_DECIDERS.flatMap((d) => {
+    const e = market.find((m) => d.re.test(m.label));
+    return e ? [{ e, d }] : [];
+  })[0];
+  const evidence = [...apart, ...(found ? [found.e] : []), ...market.filter((m) => m !== found?.e)];
+  const pick = found ? { i: apart.length, d: found.d } : null;
+  const compared = new Set<number>(pick ? [pick.i] : []);
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
   if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
-  if (comparables.length === 0) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
-  // The best figure is the highest market figure — the generous side of the
-  // trailing year, which the assumption is asked to beat.
-  const bestValue = Math.max(...comparables);
-  const ordered = [bestValue, ...comparables.filter((v) => v !== bestValue)];
-  const judged = judge(om.pct, ordered, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
+  if (!pick) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
+  const decider = evidence[pick.i];
+  const bestValue = decider.value!;
+  const name = pick.d.name(decider.label);
+  // "Held to Zillow's apartment asking rents, the figure for this kind of
+  // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
+  const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
+  const judged = judge(om.pct, [bestValue], "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `The OM's ${pct1(om.pct)}/yr is at the trailing year's ${pct1(bestValue)}.`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
       : gap > 0
-        ? `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over the trailing year's highest published figure, ${pct1(bestValue)}.`
-        : `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under the trailing year's ${pct1(bestValue)} — the conservative side.`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.`,
   );
-  const evidenceIndex = evidence.findIndex((e) => e.value === bestValue);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "rentGrowthPct", evidenceIndex, om.pct, bestValue, {
+      ? pctImpact(ctx.derived, "rentGrowthPct", pick.i, om.pct, bestValue, {
           what: "rent growth",
           om: `${pct1(om.pct)}/yr`,
           alt: `${pct1(bestValue)}/yr`,
-          evidence: evidence[evidenceIndex].publisher,
+          evidence: decider.publisher,
           model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
         })
       : null;
@@ -813,6 +993,11 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
         const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
+        // The going-in cap's spread over the same yield, beside the exit's,
+        // where the going-in cap is one the exit is held to.
+        const entry = goingInOk && spread != null ? Math.round((goingIn! - f.value) * 100) : null;
+        const entryWords =
+          entry == null ? "" : entry === 0 ? "; the going-in cap sits at it" : `; the going-in cap's spread ${entry > 0 ? "over" : "under"} it is ${bps(entry)}`;
         // A yield, not a cap: no figure on the cap's track (the panel would
         // draw a 4.9% tick beside a 5.5% exit), the spread said in words.
         evidence.push({
@@ -822,8 +1007,8 @@ function exitCapRow(ctx: Ctx): StressRow | null {
             spread == null
               ? f.text
               : spread === 0
-                ? `${f.text} — the exit sits at it`
-                : `${f.text} — the exit's spread ${spread > 0 ? "over" : "under"} it is ${bps(spread)}`,
+                ? `${f.text} — the exit sits at it${entryWords}`
+                : `${f.text} — the exit's spread ${spread > 0 ? "over" : "under"} it is ${bps(spread)}${entryWords}`,
         });
       }
     }
@@ -1391,10 +1576,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     unit: "usd",
     text:
       Math.abs(share) <= SAME_SHARE
-        ? `The OM's ${money(premium)} is at ${best.publisher}'s ${money(best.value!)}.`
+        ? `The OM's ${money(premium)} is at ${whose(best.publisher, money(best.value!))}.`
         : share > 0
-          ? `The OM's ${money(premium)} is ${money(best.value! - premium)} (${pct1(share * 100)}) under ${best.publisher}'s ${money(best.value!)}.`
-          : `The OM's ${money(premium)} is over ${best.publisher}'s ${money(best.value!)} — the conservative side.`,
+          ? `The OM's ${money(premium)} is ${money(best.value! - premium)} (${pct1(share * 100)}) under ${whose(best.publisher, money(best.value!))}.`
+          : `The OM's ${money(premium)} is over ${whose(best.publisher, money(best.value!))} — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
   const impact =
@@ -1406,159 +1591,383 @@ function insuranceRow(ctx: Ctx): StressRow | null {
 
 // — Basis —
 
+/** A basis is struck per unit (the class's noun) or per foot. */
+type Per = "unit" | "sf";
+
+/** One piece of the basis row's evidence with a figure: its figure, the
+ *  yardstick it states it on, and — for the memorandum's comps — the names
+ *  of the comps graded clean behind it where fewer than three are (no median
+ *  is struck on them). */
+interface BasisComparable {
+  e: StressEvidence;
+  value: number;
+  on: Per;
+  few: { count: 1 | 2; names: string[] } | null;
+}
+
+/** What the comps step's grades mean, as its prompt defines them
+ *  (lib/anthropic/prompts `brokerCompsInstruction`). */
+const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
+  favorable: "favorable by the comps step (it leans the seller's way)",
+  stretched: "stretched by the comps step (it does not support the deal)",
+};
+
 function basisRow(ctx: Ctx): StressRow | null {
-  const screenYear = screenYearOf(ctx.ex);
-  const interest = interestOf(ctx.ex);
-  const basis = subjectBasis(ctx.rows, ctx.kind, screenYear, interest, ctx.ex?.assetClass ?? null);
+  const ex = ctx.ex;
+  const screenYear = screenYearOf(ex);
+  const interest = interestOf(ex);
   const words = assetWords(ctx.assetClass);
-  const per: "unit" | "sf" = words.basis === "sf" || basis.perUnit == null ? "sf" : "unit";
-  const om = per === "unit" ? basis.perUnit : basis.perSf;
-  const noun = words.noun?.one ?? "unit";
-  const perWord = per === "unit" ? `/${noun}` : "/SF";
-  const priceRow = findPriceRow(ctx.rows, ctx.kind, screenYear) as Row | null;
-  const evidence: StressEvidence[] = [];
-  const pick = (c: { perUnit: number | null; perSf: number | null }) => (per === "unit" ? c.perUnit : c.perSf);
-  // The memorandum's own sale comps, each graded by the comps step: the
-  // median is struck only over the comps it graded clean ("supports",
-  // "favorable"), and one it graded "stretched" is named and left out — the
-  // comps step's own word that it does not hold the ask up.
-  const comps = (ctx.brokerComps?.saleComps ?? []).map((c) => ({ comp: c, figure: pick(compFigures(c.detail)) })).filter((c) => c.figure != null);
-  const clean = comps.filter((c) => c.comp.support === "supports" || c.comp.support === "favorable");
-  const left = comps.filter((c) => !clean.includes(c));
-  if (comps.length > 0) {
-    const med = clean.length > 0 ? median(clean.map((c) => c.figure!)) : null;
-    const listed = clean.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord} (${c.comp.support})`).join("; ");
-    const leftOut = left.length > 0 ? `; left out, graded ${joinWords([...new Set(left.map((c) => c.comp.support))])} by the comps step: ${left.map((c) => `${c.comp.name} ${money(c.figure!)}${perWord}`).join("; ")}` : "";
-    evidence.push({
-      kind: "om_internal",
-      label: "The memorandum's sale comps",
-      text:
-        med != null
-          ? `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}: ${listed} — median ${money(med)}${perWord} over the ${clean.length} graded clean${leftOut}`
-          : `${comps.length} of ${ctx.brokerComps!.saleComps.length} state a figure ${perWord}, none graded clean, so no median is struck${leftOut}`,
-      value: med != null ? Math.round(med) : null,
-      asOf: null,
-      publisher: "the offering memorandum",
-      scope: "deal",
-    });
+  const withheld = basisWithheldOf(ex);
+  // The one price row: the figure divided and the page cited are read off
+  // the same row (the price reader's own, `findPricedMetric`, which
+  // lib/comp-detail's `subjectBasis` divides) — never a "Call for offers"
+  // row cited beside the figure of the row under it.
+  const priceRow = findPricedMetric(ctx.rows, ctx.kind, screenYear) as Row | null;
+  // A bulk condominium purchase's price a unit divides by the units offered
+  // (lib/condo-units), as the card's basis, the comps' tick and the brief do.
+  const unitsOffered = condoUnitsOffered(ex);
+  // A plan deal is judged on its all-in cost (lib/deal-strategy
+  // `planSummary`, held to the plausibility band by `planWithBasisChecked`),
+  // never the shell's price set against finished buildings' trades; a
+  // forward purchase's all-in cost is its price, the buyer's whole cost at
+  // delivery.
+  const plan = ctx.plan ? planWithBasisChecked(ex, ctx.strategy, planSummary(ex, ctx.strategy)) : null;
+  // What one is called: the counting row's own noun (a hotel counting
+  // "Rooms" is per room), as the pipeline card's basis says it.
+  const nounMany = countNoun((plan ? planCountRow(ctx.rows, ctx.kind) : unitCountRow(ctx.rows))?.label, ctx.assetClass);
+  const nounOne = nounMany.replace(/s$/, "");
+  const yard = isOutdoorStorageYard(ex?.assetClass ?? null);
+  const sfCount = yard ? null : buildingSfFromMetrics(ctx.rows);
+  let unitCount: number | null;
+  let omUnit: number | null;
+  let omSf: number | null;
+  if (plan) {
+    unitCount = plan.units;
+    omUnit = plan.basisWithheld ? null : plan.costPerUnit;
+    omSf = plan.basisWithheld || plan.totalCost == null || sfCount == null || !(sfCount > 0) ? null : plan.totalCost / sfCount;
+  } else {
+    const b = subjectBasis(ctx.rows, ctx.kind, screenYear, interest, ex?.assetClass ?? null, unitsOffered);
+    unitCount = unitsOffered != null && unitsOffered > 0 ? unitsOffered : unitCountFromMetrics(ctx.rows);
+    omUnit = b.perUnit;
+    omSf = b.perSf;
   }
-  // Recorded sales from public records, a median only from three sales up
-  // — the comps page's own floor, applied by the caller. Where the count
-  // clears the floor and still no median stands, the count is not why: a
-  // per-unit median is struck on no recorded sales (a record states no
-  // unit count), and a $/SF one only over the sales that state an area.
+  // A basis outside the band any market trades at is a misread, never a
+  // figure to judge (the plausibility check's rule 4, `basisOutsideBand`):
+  // the check's own finding is the row's reason; a yardstick it does not
+  // test is dropped where the band refuses it.
+  const outOfBand = !plan && (omUnit != null || omSf != null) ? (assessPlausibility(ex, ctx.strategy).find((f) => f.code === "basis_out_of_band") ?? null) : null;
+  if (omUnit != null && basisOutsideBand(omUnit, "unit", ctx.assetClass)) omUnit = null;
+  if (omSf != null && basisOutsideBand(omSf, "sf", ctx.assetClass)) omSf = null;
+  const per: Per = words.basis === "sf" || omUnit == null ? "sf" : "unit";
+  const omOn = (on: Per) => (on === "unit" ? omUnit : omSf);
+  const perWordOf = (on: Per) => (on === "unit" ? `/${nounOne}` : "/SF");
+  const perWord = perWordOf(per);
+  const pick = (c: { perUnit: number | null; perSf: number | null }, on: Per) => (on === "unit" ? c.perUnit : c.perSf);
+  // The yardstick a piece is judged on: the class's where the piece states a
+  // figure on it, else per SF where it states that and the subject has a
+  // price a foot (lib/comp-detail `basisTracks`' own rule) — so a per-SF
+  // comp or a per-SF recorded-sales median is never dropped on a deal
+  // priced by the unit.
+  const onFor = (c: { perUnit: number | null; perSf: number | null }): Per | null =>
+    pick(c, per) != null && omOn(per) != null ? per : per === "unit" && c.perSf != null && omSf != null ? "sf" : pick(c, per) != null ? per : null;
+  const evidence: StressEvidence[] = [];
+  const comparables: BasisComparable[] = [];
+  const pushComparable = (e: StressEvidence, on: Per, few: BasisComparable["few"] = null) => {
+    evidence.push(e);
+    if (e.value != null) comparables.push({ e, value: e.value, on, few });
+  };
+
+  // The memorandum's own sale comps, each graded by the comps step: a figure
+  // is struck only over the comps it graded `supports`. One it graded
+  // `favorable` leans the seller's way and one graded `stretched` does not
+  // support the deal: each is named and left out. Three or more clean comps
+  // make a median; one or two are named, never called a median (the
+  // recorded sales' own floor, lib/public-comps `MEDIAN_FLOOR`).
+  const sale = ctx.brokerComps?.saleComps ?? [];
+  type Stating = { comp: (typeof sale)[number]; on: Per; figure: number };
+  const stating: Stating[] = [];
+  for (const comp of sale) {
+    const f = compFigures(comp.detail);
+    const on = onFor(f);
+    const figure = on ? pick(f, on) : null;
+    if (on && figure != null) stating.push({ comp, on, figure });
+  }
+  const groups: Per[] = per === "unit" ? ["unit", "sf"] : ["sf"];
+  for (const on of groups) {
+    const group = stating.filter((c) => c.on === on);
+    if (group.length === 0) continue;
+    const pw = perWordOf(on);
+    const named = (cs: Stating[]) => cs.map((c) => `${c.comp.name} ${money(c.figure)}${pw}`).join("; ");
+    const clean = group.filter((c) => c.comp.support === "supports");
+    const leftOut = (["favorable", "stretched"] as const)
+      .map((grade) => {
+        const cs = group.filter((c) => c.comp.support === grade);
+        return cs.length > 0 ? `; left out, graded ${LEFT_OUT_GRADE[grade]}: ${named(cs)}` : "";
+      })
+      .join("");
+    const figure =
+      clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : clean.length === 2 ? (clean[0].figure + clean[1].figure) / 2 : clean.length === 1 ? clean[0].figure : null;
+    const head =
+      on === per ? `${group.length} of ${sale.length} state a figure ${pw}` : `${group.length} of ${sale.length} state a figure ${pw} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
+    const graded = clean.length > 0 ? `; graded clean (supports): ${named(clean)}` : "";
+    const struck =
+      clean.length >= MEDIAN_FLOOR
+        ? ` — median ${money(figure!)}${pw} over the ${clean.length}`
+        : clean.length === 2
+          ? ` — the two graded clean, midpoint ${money(figure!)}${pw}, too few for a median`
+          : clean.length === 1
+            ? " — the one comp graded clean, too few for a median"
+            : ", none graded clean (supports), so none is set against the ask";
+    pushComparable(
+      {
+        kind: "om_internal",
+        label: on === per || !stating.some((c) => c.on === per) ? "The memorandum's sale comps" : "The memorandum's sale comps stating a price per SF alone",
+        text: `${head}${graded}${struck}${leftOut}`,
+        value: figure != null ? Math.round(figure) : null,
+        asOf: null,
+        publisher: "the offering memorandum",
+        scope: "deal",
+      },
+      on,
+      clean.length === 1 || clean.length === 2 ? { count: clean.length as 1 | 2, names: clean.map((c) => c.comp.name) } : null,
+    );
+  }
+  // Recorded sales from public records, a median only from three sales up —
+  // the comps page's own floor, applied by the caller. A per-unit median is
+  // struck on no recorded sales (a record states no unit count), and a $/SF
+  // one only over the sales that state an area, said with that count
+  // ("over 5 of 12 recorded sales"), "thin" under five (lib/public-comps
+  // `compEvidence`). On a deal priced by the unit, a $/SF median is judged
+  // per SF where the subject has a price a foot.
   const rs = ctx.recordedSales;
   if (rs && rs.count > 0) {
-    const v = per === "unit" ? rs.medianPerUnit : rs.medianPerSqft;
+    const on = onFor({ perUnit: rs.medianPerUnit, perSf: rs.medianPerSqft }) ?? per;
+    const areaCount = rs.perSqftCount ?? rs.count;
+    const v = on === "unit" ? rs.medianPerUnit : areaCount >= MEDIAN_FLOOR ? rs.medianPerSqft : null;
+    const n = on === "unit" ? rs.count : areaCount;
     const sales = `${rs.count} recorded ${rs.count === 1 ? "sale" : "sales"}`;
-    evidence.push({
-      kind: "published",
-      label: `Recorded sales (${rs.providerName})`,
-      text:
-        v != null
-          ? `median ${money(v)}${perWord} over ${rs.count} recorded sales`
-          : rs.count < MEDIAN_FLOOR
-            ? `${sales}, too few for a median ${perWord}`
-            : per === "unit"
-              ? `${sales}; no per-${noun} median is struck on recorded sales`
-              : `${sales}, too few of them stating an area for a median /SF`,
-      value: v != null ? Math.round(v) : null,
-      asOf: rs.retrievedAt,
-      publisher: rs.providerName,
-      scope: "metro",
-      href: rs.href ?? null,
-    });
+    const over = n === rs.count ? `${n} recorded ${n === 1 ? "sale" : "sales"}` : `${n} of ${rs.count} recorded sales, those that state an area`;
+    pushComparable(
+      {
+        kind: "published",
+        label: `Recorded sales (${rs.providerName})`,
+        text:
+          v != null
+            ? `${medianLabel(n)} ${money(v)}${perWordOf(on)} over ${over}${compEvidence(n) === "thin" ? ", thin" : ""}${on !== per ? ", judged per SF" : ""}`
+            : rs.count < MEDIAN_FLOOR
+              ? `${sales}, too few for a median ${perWord}`
+              : on === "unit"
+                ? `${sales}; no per-${nounOne} median is struck on recorded sales`
+                : `${sales}, too few of them stating an area for a median /SF`,
+        value: v != null ? Math.round(v) : null,
+        asOf: rs.retrievedAt,
+        publisher: rs.providerName,
+        scope: "metro",
+        href: rs.href ?? null,
+      },
+      on,
+    );
   }
   // The reader's own past screens, each at its ask: other memoranda's
   // asking prices in the same market — asks, not trades, and nobody's
   // publication — so filed as a rule of thumb under the reader's own name,
-  // never a published figure. (The class's price band, which the
-  // plausibility check holds a misread to, is no pricing evidence and is
-  // not read here.)
+  // never a published figure. A median only from three screens that state a
+  // basis (`medianCount`), said with that count. (The class's price band,
+  // which the plausibility check holds a misread to, is no pricing evidence
+  // and is not read here.)
   const ps = ctx.pastScreens;
   if (ps && ps.count > 0) {
-    const v = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
+    const n = ps.medianCount ?? ps.count;
+    const raw = per === "unit" ? ps.perUnitMedian : ps.perSfMedian;
+    const v = n >= MEDIAN_FLOOR ? raw : null;
+    const of = n === ps.count ? `${n}` : `${n} of ${ps.count}`;
+    pushComparable(
+      {
+        kind: "rule_of_thumb",
+        label: `Other memoranda's asking prices in ${ps.market} (your past screens): asks, not trades`,
+        text:
+          v != null
+            ? `median ${money(v)}${perWord} over ${of} screens, each at its memorandum's asking price, never a price anyone paid`
+            : raw != null
+              ? `${ps.count} screens, ${n} with a basis ${perWord}, too few for a median`
+              : `${ps.count} screens, none with a basis ${perWord}`,
+        value: v != null ? Math.round(v) : null,
+        asOf: null,
+        publisher: "your past screens",
+        scope: "metro",
+      },
+      per,
+    );
+  }
+  // A surface whose words reach someone other than the reader (the shared
+  // screen, the verdict's brief) is handed no past screens: they are the
+  // reader's own other deals. Said by name, never as none found.
+  const psWithheld = ctx.pastScreensWithheld?.trim() || null;
+
+  // A price that buys no building keeps its row, to say why no basis is
+  // struck; so does a plan deal whose all-in cost cannot be struck, and a
+  // basis the plausibility check calls misread. Anything else with nothing
+  // stated and nothing found is left out.
+  const planWhy = plan && omUnit == null && omSf == null && !withheld ? planBasisWhy(plan, priceRow, nounOne) : null;
+  const om = omOn(per);
+  if (om == null && evidence.length === 0 && !withheld && !planWhy && !outOfBand) return null;
+  if (psWithheld) {
     evidence.push({
       kind: "rule_of_thumb",
-      label: `Other memoranda's asking prices in ${ps.market} (your past screens): asks, not trades`,
-      text: v != null ? `median ${money(v)}${perWord} over ${ps.count} screens, each at its memorandum's asking price, never a price anyone paid` : `${ps.count} screens, none with a basis ${perWord}`,
-      value: v != null ? Math.round(v) : null,
+      label: "Other memoranda's asking prices from past screens: withheld",
+      text: psWithheld,
+      value: null,
       asOf: null,
-      publisher: "your past screens",
+      publisher: "past screens",
       scope: "metro",
     });
   }
-  const withheld = basisWithheldOf(ctx.ex);
-  // A price that buys no building keeps its row, to say why no basis is
-  // struck; anything else with nothing stated and nothing found is left out.
-  if (om == null && evidence.length === 0 && !withheld) return null;
   // The basis is the whole building's: on a share, the whole its price
   // implies (lib/comp-detail's own rule), said so rather than the share's
   // price over every unit.
-  const whole = interest.sharePct != null ? buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex)) : null;
-  // The count the basis divides by, where the memorandum states one; never
-  // a "?" in its place.
-  const count = per === "unit" ? unitCountFromMetrics(ctx.rows) : buildingSfFromMetrics(ctx.rows);
-  const over = count == null ? "" : per === "unit" ? ` over ${count.toLocaleString("en-US")} ${words.noun?.many ?? "units"}` : ` over ${count.toLocaleString("en-US")} SF`;
-  const priced = priceRow
-    ? whole != null
-      ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}${over ? `,${over}` : ""})`
-      : ` (${priceRow.label} ${priceRow.value}${over})`
-    : "";
+  const whole = interest.sharePct != null ? buildingPriceOf(ex, askingPriceOf(ex)) : null;
+  const offered = unitsOffered != null && unitsOffered > 0 ? " offered" : "";
+  const plannedWord = plan && notYetDelivered(ctx.kind) ? " planned" : "";
+  const overOn = (on: Per) =>
+    on === "unit"
+      ? unitCount == null
+        ? ""
+        : `over ${unitCount.toLocaleString("en-US")}${plannedWord} ${unitCount === 1 ? nounOne : nounMany}${offered}`
+      : sfCount == null
+        ? ""
+        : `over ${sfCount.toLocaleString("en-US")} SF`;
+  // The yardstick the verdict is struck on: the first comparable's, the
+  // best kind present (below); the OM's figure on the other yardstick rides
+  // beside it where a piece is judged on that one.
+  const asks = comparables.filter((c) => c.e.publisher === "your past screens");
+  const judgedOn = comparables.length > asks.length ? comparables.filter((c) => !asks.includes(c)) : asks;
+  const lead: Per = judgedOn[0]?.on ?? per;
+  const other: Per | null = judgedOn.some((c) => c.on !== lead) ? (lead === "unit" ? "sf" : "unit") : null;
+  const omLead = omOn(lead);
+  const omText = (on: Per) => `${money(omOn(on)!)}${perWordOf(on)}`;
+  const overs = [lead, ...(other ? [other] : [])].map(overOn).filter(Boolean);
+  const over = overs.length ? ` ${overs.join(" and ")}` : "";
+  const priced = !priceRow
+    ? ""
+    : plan?.forward
+      ? ` (the price, the buyer's whole cost at delivery: ${priceRow.label} ${priceRow.value}${over})`
+      : plan && plan.totalCost != null
+        ? ` (the ${money(plan.totalCost)} total cost: ${priceRow.label} ${priceRow.value}${plan.budget && !plan.budget.isTotal ? ` plus the ${money(plan.budget.budget)} budget for the plan` : ""}${over ? `,${over}` : ""})`
+        : whole != null
+          ? ` (the whole the ${interest.sharePct}% share's ${priceRow.value} price implies, ${money(whole)}${over ? `,${over}` : ""})`
+          : ` (${priceRow.label} ${priceRow.value}${over})`;
+  const allIn = plan && !plan.forward ? " all-in" : "";
   const omSays: StressRow["omSays"] =
-    om != null
-      ? { text: `${money(om)}${perWord}${priced}`, value: om, page: pageOf(priceRow, ctx.ex) }
-      : { text: withheld ? `No basis is struck: ${withheld.why}.` : ctx.kind === "conversion" || ctx.kind === "development" ? "No price basis on a plan deal: the basis is the all-in cost." : NO_FIGURE(`price ${perWord}`), value: null, page: pageOf(priceRow, ctx.ex) };
-  if (om == null) return unchecked("basis", omSays, evidence, omSays.text);
+    omLead != null
+      ? { text: `${omText(lead)}${allIn}${other && omOn(other) != null ? `, ${omText(other)}${allIn}` : ""}${priced}`, value: omLead, page: pageOf(priceRow, ex) }
+      : {
+          text: withheld ? `No basis is struck: ${withheld.why}.` : outOfBand ? `${outOfBand.title}.` : (planWhy ?? NO_FIGURE(`price ${perWord}`)),
+          value: null,
+          page: pageOf(priceRow, ex),
+        };
+  if (withheld) return unchecked("basis", omSays, evidence, omSays.text);
+  if (outOfBand) return unchecked("basis", omSays, evidence, `The plausibility check finds the basis outside the band any market trades at: ${outOfBand.title}. ${outOfBand.detail}`);
+  if (omLead == null) return unchecked("basis", omSays, evidence, planWhy ?? omSays.text);
   // The verdict is struck on the best kind of evidence present: the
   // memorandum's graded comps and the recorded sales before the reader's
   // own past asking prices, which decide only where nothing else carries a
   // figure — another memorandum's ask never turns a stretched basis into
   // one that holds.
-  const withFigure = evidence.filter((e) => e.value != null);
-  const asks = withFigure.filter((e) => e.publisher === "your past screens");
-  const comparables = withFigure.length > asks.length ? withFigure.filter((e) => !asks.includes(e)) : asks;
-  if (comparables.length === 0) return unchecked("basis", omSays, evidence, "No comp with a figure could be read for this deal.");
-  const compared = indexesOf(evidence, (e) => comparables.includes(e));
-  const best = comparables[0];
-  // "the median of …": every basis comparable is a median, and its label is
-  // a phrase no possessive fits ("Recorded sales (Philadelphia OPA)").
-  const ofBest = `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.label)}, ${money(best.value!)}${perWord}`;
-  const judged = judge(om, comparables.map((e) => e.value!), "high", "pct", BASIS_UNSUPPORTED_PCT, 0, (gap) =>
-    Math.abs(gap) / best.value! < 0.005
-      ? `The ask's ${money(om)}${perWord} is at ${ofBest}.`
-      : gap > 0
-        ? `The ask's ${money(om)}${perWord} is ${pct1((gap / best.value!) * 100)} over ${ofBest}.`
-        : `The ask's ${money(om)}${perWord} is ${pct1((-gap / best.value!) * 100)} under ${ofBest} — the conservative side.`,
-  );
+  if (judgedOn.length === 0) {
+    return unchecked(
+      "basis",
+      omSays,
+      evidence,
+      evidence.some((e) => e.publisher !== "past screens") ? "No evidence above carries a figure the ask can be set against." : "No comp with a figure could be read for this deal.",
+    );
+  }
+  const compared = indexesOf(evidence, (e) => judgedOn.some((c) => c.e === e));
+  const best = judgedOn[0];
+  const bestOm = omOn(best.on)!;
+  const pw = perWordOf(best.on);
+  // "the median of …": every basis comparable with three figures behind it
+  // is a median, and its label is a phrase no possessive fits ("Recorded
+  // sales (Philadelphia OPA)"); one or two comps graded clean are named.
+  const ofBest = best.few
+    ? best.few.count === 1
+      ? `the one comp graded clean, ${best.few.names[0]}, ${money(best.value)}${pw}`
+      : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")}), ${money(best.value)}${pw}`
+    : `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.e.label)}, ${money(best.value)}${pw}`;
+  const subject = plan ? (plan.forward ? "The price's" : "The all-in cost's") : "The ask's";
   // The verdict is read in percent of the best figure, so the gap's unit is
-  // a share, not a dollar: struck again here on the best figure.
-  const sharePct = ((om - best.value!) / best.value!) * 100;
-  // The verdict, the sentence and the re-run are all against the one best
-  // median, so the row never prints "18% over" beside "Holds".
-  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
-  const gap = { value: Math.round(sharePct * 10) / 10, unit: "pct" as const, text: judged.gap.text };
-  const evidenceIndex = evidence.indexOf(best);
+  // a share, not a dollar. The verdict, the sentence and the re-run are all
+  // against the one best figure, so the row never prints "18% over" beside
+  // "Holds".
+  const sharePct = ((bestOm - best.value) / best.value) * 100;
+  const gapText =
+    Math.abs(sharePct) < 0.5
+      ? `${subject} ${money(bestOm)}${pw} is at ${ofBest}.`
+      : sharePct > 0
+        ? `${subject} ${money(bestOm)}${pw} is ${pct1(sharePct)} over ${ofBest}.`
+        : `${subject} ${money(bestOm)}${pw} is ${pct1(-sharePct)} under ${ofBest} — the conservative side.`;
+  let verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  // One or two comps are sightings, not a market: they can stretch a basis,
+  // never call it unsupported.
+  const capped = verdict === "unsupported" && best.few != null;
+  if (capped) verdict = "stretched";
+  const gap = {
+    value: Math.round(sharePct * 10) / 10,
+    unit: "pct" as const,
+    text: capped ? `${gapText} On ${best.few!.count === 1 ? "one comp" : "two comps"}, no worse than stretched.` : gapText,
+  };
+  const evidenceIndex = evidence.indexOf(best.e);
   // The price is a direct input: re-run at the evidence's basis — only
   // where the model's price is the building's own as stated (not a share
-  // grossed up, not a placeholder).
+  // grossed up, not a placeholder; a plan deal re-runs nothing). The ratio
+  // is the same on either yardstick.
   let impact: StressImpact | null = null;
-  if (ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
+  if (!plan && ctx.derived && ctx.impactsWithheld == null && interest.sharePct == null) {
     const price = ctx.derived.inputs.purchasePrice;
-    const altPrice = (price * best.value!) / om;
-    // Whose median the alternative is — the memorandum's comps', the
+    const altPrice = (price * best.value) / bestOm;
+    // Whose figure the alternative is — the memorandum's comps', the
     // recorded sales' or the reader's past screens' — and that the model's
     // loan is a share of the price, so it re-sizes with it.
-    const median = best.kind === "om_internal" ? "the memorandum's sale comps' median" : best.label.startsWith("Recorded sales") ? `the recorded sales' median (${best.publisher})` : "the median of your past screens' asking prices";
+    const whose =
+      best.e.kind === "om_internal"
+        ? best.few
+          ? best.few.count === 1
+            ? `the one comp graded clean (${best.few.names[0]})`
+            : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")})`
+          : "the memorandum's sale comps' median"
+        : best.e.label.startsWith("Recorded sales")
+          ? `the recorded sales' median (${best.e.publisher})`
+          : "the median of your past screens' asking prices";
     impact = runImpact("purchasePrice", ctx.derived.inputs, { ...ctx.derived.inputs, purchasePrice: altPrice }, evidenceIndex, price, altPrice, price, {
       what: "the price",
-      om: `${money(price)} (${money(om)}${perWord})`,
-      alt: `${median}, ${money(altPrice)} (${money(best.value!)}${perWord}), at the model's loan-to-cost (the loan re-sizes with the price)`,
+      om: `${money(price)} (${money(bestOm)}${pw})`,
+      alt: `${whose}, ${money(altPrice)} (${money(best.value)}${pw}), at the model's loan-to-cost (the loan re-sizes with the price)`,
       evidence: "",
       model: money(price),
     });
   }
-  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(comparables === asks ? { ruleOfThumbOnly: true } : {}) };
+  // A piece on the other yardstick carries the OM's own figure on it, and is
+  // drawn on no track shared with the OM's figure.
+  for (const c of comparables) {
+    if (c.on !== best.on && omOn(c.on) != null) c.e.ownYardstick = { om: omOn(c.on)!, per: perWordOf(c.on) };
+  }
+  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(judgedOn === asks ? { ruleOfThumbOnly: true } : {}) };
+}
+
+/** Why a plan deal's all-in basis cannot be struck, in one sentence: the
+ *  plan's own words where it says why, else what the memorandum does not
+ *  state — never the price alone set against finished buildings' trades. */
+function planBasisWhy(plan: NonNullable<ReturnType<typeof planSummary>>, priceRow: Row | null, nounOne: string): string {
+  if (plan.basisWithheld) return plan.basisWithheld;
+  if (plan.costPerUnitWithheld) return plan.costPerUnitWithheld;
+  if (plan.costWithheld) return plan.costWithheld;
+  if (plan.priceWithheld) return `No all-in basis is struck: the price is ${plan.priceWithheld}.`;
+  if (plan.forward) return priceRow ? `No basis is struck: the memorandum states no count of what the price buys at delivery to set it per ${nounOne}.` : NO_FIGURE("price");
+  if (plan.totalCost == null) {
+    return priceRow
+      ? "No all-in basis is struck: the memorandum states no budget for the plan beside the price, so no total cost is read, and the price alone, before the plan's cost, is never set against finished buildings' trades."
+      : NO_FIGURE("price or total cost");
+  }
+  return `No all-in basis is struck: the memorandum states no count to set the ${money(plan.totalCost)} total cost per ${nounOne}.`;
 }
 
 function median(nums: number[]): number {
@@ -1716,13 +2125,16 @@ export function buildStressTest(args: StressTestArgs): StressTest {
         ? `No return is re-run: ${lowerFirst(readsWithheld.trim())}${/[.!?]$/.test(readsWithheld.trim()) ? "" : "."}`
         : plan
           ? PLAN_REASON
-          : withheld
+          : // A master lease's basis is withheld, but its model is the
+            // position's own, run as a leasehold's is: its other rows re-run.
+            withheld && withheld.word !== MASTER_LEASE_WORD
             ? `No return is re-run: ${withheld.why}.`
             : null;
   const ctx: Ctx = {
     ex,
     rows: rowsOf(ex),
     kind: strategy.kind,
+    strategy,
     plan,
     assetClass: shownAssetClass(args.storedAssetClass ?? null, ex) || null,
     mvm: args.modelVsMarket,
@@ -1733,6 +2145,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     brokerComps: args.brokerComps ?? null,
     recordedSales: args.recordedSales ?? null,
     pastScreens: args.pastScreens ?? null,
+    pastScreensWithheld: args.pastScreensWithheld ?? null,
     indexGiven: args.indexGiven ?? null,
     readOn: args.readOn,
   };
@@ -1786,5 +2199,222 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     });
   }
   const rows = STRESS_KEYS.flatMap((k) => (k === "other" ? others : built[k] ? [built[k]!] : []));
-  return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld };
+  // The headline is struck on the rows as finished: a row `finishRow` reads
+  // stretched is swapped in the evidence's case.
+  const headline = derived && impactsWithheld == null ? stressHeadline(rows, derived.inputs) : null;
+  return { rows, readOn: args.readOn, publishedRead: args.modelVsMarket != null, impactsWithheld, headline };
+}
+
+// ── The headline: the OM's case against the evidence's ───────────────────
+
+/** The rows whose figures the NOI already holds: where one of them is swapped
+ *  in the evidence's case, the NOI's own swap is left out of the headline
+ *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
+export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
+
+/** The percent and dollar inputs a row's re-run swaps whole, which the two
+ *  cases set directly. */
+const HEADLINE_SCALARS = ["purchasePrice", "exitCapPct", "allInRatePct", "vacancyPct", "rentGrowthPct", "expenseGrowthPct"] as const;
+type HeadlineScalar = (typeof HEADLINE_SCALARS)[number];
+const isHeadlineScalar = (k: string): k is HeadlineScalar => (HEADLINE_SCALARS as readonly string[]).includes(k);
+
+/** The evidence a tax row's re-run swapped in is the reset bill its own
+ *  figures imply on the price (`taxesRow`), not an abatement's stated bill. */
+const isResetBill = (row: StressRow): boolean =>
+  row.key === "taxes" && !!row.impact && (row.evidence[row.impact.evidenceIndex]?.label ?? "").startsWith("The bill the OM's own figures imply");
+
+/** How each row in the OM's case sets the model's inputs, the OM's side or
+ *  the evidence's — the same swap its own re-run makes:
+ *   - a percent or the price: the input itself (`pctImpact`, the basis row);
+ *   - the tax or insurance line: the model's first expense line moved by the
+ *     gap (`expenseImpact`), the gaps of both lines added — a reset tax bill
+ *     struck on the price the case pays;
+ *   - the NOI: the rent line that makes the OM's NOI, or the evidence's, at
+ *     the case's own vacancy and expenses (`rentForNoi`). */
+type HeadlineSwap =
+  | { kind: "scalar"; row: StressRow; input: HeadlineScalar; om: number; alt: number }
+  | { kind: "expense"; row: StressRow; delta: number; reset: { bill: number; reset: number } | null }
+  | { kind: "noi"; row: StressRow; omNoi: number; altNoi: number };
+
+function headlineSwap(row: StressRow): HeadlineSwap | null {
+  const i = row.impact;
+  if (!i) return null;
+  if (isHeadlineScalar(i.input)) return { kind: "scalar", row, input: i.input, om: i.omValue, alt: i.altValue };
+  if (i.input === "expenseLines") {
+    const e = row.evidence[i.evidenceIndex];
+    const reset = isResetBill(row) && row.omSays.value != null && e?.value != null ? { bill: row.omSays.value, reset: e.value } : null;
+    return { kind: "expense", row, delta: i.altValue - i.omValue, reset };
+  }
+  if (row.key === "noi" && i.input === "inPlaceRentAnnual") {
+    const altNoi = row.evidence[i.evidenceIndex]?.value ?? null;
+    if (row.omSays.value == null || altNoi == null) return null;
+    return { kind: "noi", row, omNoi: row.omSays.value, altNoi };
+  }
+  return null;
+}
+
+/** "the renovation premium is no model input" — why a row past its evidence
+ *  carries no swap into the headline. */
+function noSwapWhy(row: StressRow): string {
+  if (row.key === "renovation_premium") return "the premium is no model input: the model grows today's rent at one rate";
+  if (!row.impact) return "no return is re-run on it, so it has no figure to swap";
+  return "its re-run moves an input the two cases cannot combine";
+}
+
+const swaps = (s: HeadlineSwap) => s.kind !== "scalar" || Math.abs(s.alt - s.om) > 1e-12;
+const passed = (r: StressRow) => r.verdict === "stretched" || r.verdict === "unsupported";
+
+/**
+ * The stress test's headline (lib/stress-test-types `StressHeadline`): the
+ * derived model run once with every re-run row at the OM's figure (the OM's
+ * case) and once with every row read stretched or unsupported at its
+ * evidence's (the evidence's case), each row's swap the same one its own
+ * re-run makes, and the gap split by assumption with Shapley values through
+ * the Assumption Bridge's walk (lib/bridge/attribution
+ * `attributeOverPlayers`): a player an assumption past its evidence, the
+ * scenario at each coalition the OM's case with that coalition's swaps made.
+ *
+ * THE OVERLAP RULE. The NOI's swap re-strikes the rent line so the year-one
+ * NOI is the evidence's, and that NOI already holds the building's vacancy,
+ * taxes and insurance — which the vacancy, tax and insurance rows swap on
+ * their own. Where any of those three is a player, the NOI is no player: it
+ * stays at the OM's figure in both cases (the rent that makes the OM's NOI
+ * at the OM's vacancy and expenses, held there), the component swaps move
+ * the NOI from it, and the headline names the NOI as left out
+ * (`HEADLINE_NOI_LEFT_OUT`). Where none of the three is, the NOI's own swap
+ * stands. Every other row swaps an input no other row touches: the exit
+ * cap, the loan rate, the growth rates and the price are one input each,
+ * and the tax and insurance lines add their gaps to the one expense line.
+ * The one figure that rides on another row's is a reset tax bill, struck on
+ * the price: where the price is swapped too, it is struck on the case's
+ * price (the reset scaled by the price's own ratio), never on the ask.
+ *
+ * With one row past its evidence and no other re-run in the OM's case, the
+ * headline is that row's own re-run, to the figure: the OM's case IS its
+ * base run and the evidence's case its alternative. Null where no row
+ * carries a re-run (there is no OM's case to strike).
+ */
+export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInputs): StressHeadline | null {
+  // The rows in the OM's case: each re-run row whose swap the cases can make,
+  // the first row to swap an input (no two rows swap one input; a second
+  // would be left out, said so).
+  const inCase: HeadlineSwap[] = [];
+  const omitted: StressHeadline["omitted"] = [];
+  const taken = new Set<string>();
+  for (const row of rows) {
+    const s = headlineSwap(row);
+    if (!s) {
+      if (passed(row)) omitted.push({ key: row.key, label: row.title, why: noSwapWhy(row) });
+      continue;
+    }
+    const slot = s.kind === "scalar" ? s.input : s.kind === "noi" ? "inPlaceRentAnnual" : `expense:${row.key}`;
+    if (taken.has(slot) || taken.has(`key:${row.key}`)) {
+      if (passed(row)) omitted.push({ key: row.key, label: row.title, why: "another row already swaps the same input" });
+      continue;
+    }
+    taken.add(slot);
+    taken.add(`key:${row.key}`);
+    inCase.push(s);
+  }
+  if (inCase.length === 0) return null;
+
+  // The players: the rows past their evidence whose swap moves a figure.
+  let players = inCase.filter((s) => passed(s.row) && swaps(s));
+  const noi = players.find((s) => s.kind === "noi");
+  if (noi && players.some((s) => HEADLINE_NOI_COMPONENTS.includes(s.row.key))) {
+    players = players.filter((s) => s !== noi);
+    omitted.push({ key: noi.row.key, label: noi.row.title, why: HEADLINE_NOI_LEFT_OUT });
+  }
+
+  // The price is no player: both cases pay the ask, so the headline is what
+  // the ask earns on each set of figures (the price row says the rest).
+  const price = players.find((s) => s.row.key === "basis");
+  if (price) {
+    players = players.filter((s) => s !== price);
+    omitted.push({ key: price.row.key, label: price.row.title, why: HEADLINE_BASIS_LEFT_OUT });
+  }
+
+  // The OM's case before its NOI: every swap at the OM's side.
+  const scalarsAt = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
+    const out: UnderwriteInputs = { ...model };
+    for (const s of inCase) if (s.kind === "scalar") out[s.input] = alt(s) ? s.alt : s.om;
+    return out;
+  };
+  const omBase = scalarsAt(() => false);
+  const noiSwap = inCase.find((s): s is Extract<HeadlineSwap, { kind: "noi" }> => s.kind === "noi") ?? null;
+  // The rent that makes the OM's NOI at the OM's vacancy and expenses: the
+  // NOI's anchor in both cases unless the NOI is itself a player.
+  const anchorRent = noiSwap ? rentForNoi(omBase, noiSwap.omNoi) : null;
+  if (noiSwap && anchorRent == null) {
+    // No rent makes the OM's NOI on the OM's own vacancy and expenses (a
+    // building run fully vacant): the NOI cannot anchor the case.
+    const at = inCase.indexOf(noiSwap);
+    inCase.splice(at, 1);
+    if (players.includes(noiSwap)) players = players.filter((s) => s !== noiSwap);
+    if (passed(noiSwap.row)) omitted.push({ key: "noi", label: noiSwap.row.title, why: "no rent line makes the OM's NOI at the OM's own vacancy and expenses" });
+  }
+  const noiIn = noiSwap && anchorRent != null ? noiSwap : null;
+
+  /** The model with the swaps `alt` answers true for at the evidence's
+   *  figure and every other swap in the OM's case at the OM's. */
+  const scenario = (alt: (s: HeadlineSwap) => boolean): UnderwriteInputs => {
+    const inputs = scalarsAt(alt);
+    // The price the case pays against the OM's, for a reset tax bill.
+    const priceRatio = omBase.purchasePrice > 0 ? inputs.purchasePrice / omBase.purchasePrice : 1;
+    let delta = 0;
+    for (const s of inCase) {
+      if (s.kind !== "expense") continue;
+      // A reset bill is struck on the case's price on the evidence's side;
+      // the OM's side is the OM's bill, which the model's lines carry.
+      if (alt(s)) delta += s.reset ? s.reset.reset * priceRatio - s.reset.bill : s.delta;
+    }
+    if (delta !== 0 && inputs.expenseLines.length > 0) {
+      inputs.expenseLines = inputs.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l));
+    }
+    if (noiIn) {
+      const rent = alt(noiIn) ? rentForNoi(inputs, noiIn.altNoi) : anchorRent;
+      if (rent != null) inputs.inPlaceRentAnnual = rent;
+    }
+    return inputs;
+  };
+
+  const omCase = scenario(() => false);
+  const evidenceCase = scenario((s) => players.includes(s));
+  const om = computeUnderwrite(omCase).returns;
+  const ev = computeUnderwrite(evidenceCase).returns;
+  const omIrrPct = om.leveredIrrPct == null ? null : om.leveredIrrPct * 100;
+  const evidenceIrrPct = ev.leveredIrrPct == null ? null : ev.leveredIrrPct * 100;
+  const multipleOf = (m: number | null | undefined) => (m != null && Number.isFinite(m) ? m : null);
+  const omMultiple = multipleOf(om.leveredEquityMultiple);
+  const evidenceMultiple = multipleOf(ev.leveredEquityMultiple);
+
+  let parts: StressHeadline["parts"] = [];
+  let unsolved = 0;
+  if (players.length > 0 && omIrrPct != null && evidenceIrrPct != null) {
+    const split = attributeOverPlayers(
+      players.map((s) => s.row.key),
+      (inCoalition) => scenario((s) => players.indexOf(s) >= 0 && inCoalition(players.indexOf(s))),
+      { exactLimit: STRESS_KEYS.length },
+    );
+    unsolved = split.flooredScenarios;
+    parts = players
+      .map((s, i) => ({
+        key: s.row.key,
+        label: s.row.title,
+        pts: split.shares[i].leveredIrr * 100,
+        multiple: omMultiple != null && evidenceMultiple != null ? split.shares[i].leveredEquityMultiple : null,
+      }))
+      .sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts));
+  }
+  const order = (k: StressKey) => STRESS_KEYS.indexOf(k);
+  return {
+    omIrrPct,
+    evidenceIrrPct,
+    omMultiple,
+    evidenceMultiple,
+    omKeys: inCase.map((s) => s.row.key).sort((a, b) => order(a) - order(b)),
+    parts,
+    omitted: omitted.sort((a, b) => order(a.key) - order(b.key)),
+    unsolved,
+  };
 }

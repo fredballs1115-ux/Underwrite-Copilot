@@ -31,6 +31,8 @@ import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { challengerInstruction } from "@/lib/anthropic/prompts";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
+import { headlineSentence } from "@/lib/stress-test-words";
+import { pdfSafe } from "./pdf-text";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -2928,8 +2930,14 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeGreaterThan(at("The call, in full"));
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     const page = pages[stress] + (pages[stress + 1] ?? "");
-    expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched");
+    expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched · 2 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
+    // The headline under the read line, whole: the two cases, the split and
+    // what is left out with why, in the words the memo and the brief read
+    // (standard Helvetica: a hyphen for the minus, "to" for the arrow).
+    expect(page).toContain(pdfSafe(headlineSentence(test)!).replace(/\s+/g, " "));
+    expect(page).toMatch(/Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple/);
+    expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Stabilized vacancy"));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
     expect(test.publishedRead).toBe(false);
@@ -2964,7 +2972,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("Ask: What's the absorption schedule to get from 9% to 6%?");
     // The basis row's move is the engine's, spelled.
     expect(page).toContain(
-      "The return: If the price is the memorandum's sale comps' median, $63.61M ($257k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 12.7%",
+      "The return: If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
     );
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the

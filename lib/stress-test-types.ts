@@ -50,6 +50,12 @@ export interface StressEvidence {
   scope: "deal" | "metro" | "region" | "state" | "nation" | "class";
   /** a link to the source where one exists */
   href?: string | null;
+  /** a basis row's piece judged on a yardstick other than the OM figure's
+   *  (`omSays`) — per SF where the OM's figure is per unit, say: the OM's
+   *  own figure on the piece's yardstick and that yardstick's word ("/SF").
+   *  Its value is on that yardstick, so it is drawn on no track shared with
+   *  the OM's figure. Absent on every other piece. */
+  ownYardstick?: { om: number; per: string } | null;
 }
 
 /** The return's move when the OM's figure is replaced by the evidence's,
@@ -131,7 +137,95 @@ export interface StressTest {
    *  sentence that says so and why ("No return is re-run: …"), printed as it
    *  stands on every surface */
   impactsWithheld: string | null;
+  /** the headline: the OM's case against the evidence's, the gap split by
+   *  assumption (lib/stress-test `stressHeadline`). Null wherever no return
+   *  is re-run (`impactsWithheld` says why, and the headline is withheld
+   *  with it) or where no row carries a re-run; absent on a test built
+   *  before the headline was struck */
+  headline?: StressHeadline | null;
 }
+
+/** One assumption's share of the move from the OM's case to the
+ *  evidence's: its Shapley value, in levered-IRR points and equity
+ *  multiple. */
+export interface StressHeadlinePart {
+  key: StressKey;
+  /** the row's own title */
+  label: string;
+  /** levered-IRR points, signed: negative where the evidence lowers the return */
+  pts: number;
+  /** the equity multiple's share, signed; null where a case's multiple is none */
+  multiple: number | null;
+}
+
+/**
+ * The stress test's headline: the derived model run ONCE on every tested
+ * figure of the OM's (the OM's case) and ONCE with every figure read
+ * stretched or unsupported swapped for its evidence (the evidence's case),
+ * the gap between the two levered IRRs split by assumption with Shapley
+ * values (lib/bridge/attribution), so the parts sum to the gap.
+ */
+export interface StressHeadline {
+  /** levered IRR in percent; null where that case's cash flows have no root */
+  omIrrPct: number | null;
+  evidenceIrrPct: number | null;
+  omMultiple: number | null;
+  evidenceMultiple: number | null;
+  /** the rows whose OM figure the OM's case runs on, in the test's order */
+  omKeys: StressKey[];
+  /** the evidence's swaps, largest move first; empty where nothing is past
+   *  its evidence, or where either case does not solve */
+  parts: StressHeadlinePart[];
+  /** a row past its evidence that the headline leaves out, with why */
+  omitted: { key: StressKey; label: string; why: string }[];
+  /** mixes of the swaps (coalitions) whose levered IRR had no root, each
+   *  counted at the engine's floor in the split; 0 in the normal case */
+  unsolved: number;
+}
+
+/** Why the NOI's own swap is left out of the headline where a component
+ *  of it is swapped too: one clause, the omitted row's `why` and the
+ *  method's own words. */
+export const HEADLINE_NOI_LEFT_OUT =
+  "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
+
+/** Why the price is in neither side of the headline's split: both cases pay
+ *  the ask, so the headline is what the ask earns on each set of figures. */
+export const HEADLINE_BASIS_LEFT_OUT =
+  "both cases pay the asking price, so the headline says what the ask earns on each set of figures; the price row says how far the ask sits from the comps and what the return is at their figure";
+
+/** The headline's method, as /how-we-test prints it and
+ *  lib/stress-test.test.ts holds it to `stressHeadline`. */
+export const HEADLINE_METHOD = {
+  title: "The headline: the OM's case against the evidence's",
+  claim: "The return the memorandum's figures make, all of them at once.",
+  omCase: [
+    "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
+    "That is the price, the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, insurance and the NOI.",
+    "The NOI is struck as the rent line that makes the OM's year-one NOI at the OM's own vacancy and expenses.",
+    "An assumption with no re-run keeps the model's own figure.",
+  ],
+  evidenceCase: [
+    "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
+    "One that holds or is unchecked stays at the OM's figure.",
+    "The price stays at the ask in both cases: the headline asks what the ask earns, and the price row says how far the ask sits from the comps.",
+  ],
+  split: [
+    "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic.",
+    "Each swap's move is averaged over every order the swaps could be made in, so the parts add up to the gap.",
+    "With one assumption past its evidence, the headline is that row's own re-run.",
+  ],
+  overlap: [
+    `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
+    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
+    "A reset tax bill is struck on the asking price, which both cases pay.",
+  ],
+  limits: [
+    "An assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
+    "No headline on a plan deal, a placeholder price, an assumed NOI or a price that buys no building: no return is re-run there, and the headline is withheld with the reason.",
+    "Neither case is a forecast: each is the model run once on one set of figures.",
+  ],
+} as const;
 
 /**
  * What each assumption is set against, as the methodology page says it and
@@ -158,15 +252,17 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, each graded for how hard it supports the ask, the median struck only over those graded clean",
-      "Recorded sales from public property records where the site has them, a median only from three sales up",
-      "Other memoranda's asking prices from your own past screens in the same market and class: asks, not trades, a rule of thumb that decides only where nothing above carries a figure",
+      "The memorandum's own sale comps, graded by the comps step: a median only over three or more graded as supporting the ask, one or two named, never a median, and those graded favorable (leaning the seller's way) or stretched named and left out",
+      "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
+      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb that decides only where nothing above carries a figure, and never on a shared screen or in the verdict's brief",
     ],
-    engine: "The price is a direct input: the return is re-run at the evidence's price.",
+    engine: "The price is a direct input: the return is re-run at the evidence's price, each piece judged per unit where the class is, else per SF where it states only that.",
     limits: [
-      "No broker cap-rate survey: they are licensed, so none is read.",
+      "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
       "Replacement cost only where the memorandum states one.",
-      "A note's, a share's or a leased fee's price is not the building's, and no basis is struck on it.",
+      "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
+      "A basis outside the band any market trades at is the plausibility check's misread, never judged.",
+      "A value-add, lease-up, conversion or development is judged on its all-in cost (the price plus the plan's budget), a forward purchase on its price, and none of them is re-run.",
     ],
   },
   {
@@ -175,7 +271,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
       "The going-in cap: an exit tighter than the entry is cap compression, said as such",
-      "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread",
+      "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread where the exit is held to it",
       "The research tracker's cap range for the class and market, with its period, where one is on file",
     ],
     engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
@@ -207,13 +303,13 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The NOI",
     claim: "The pro forma's net operating income is what the building earns.",
     against: [
-      "The deal's own T-12, read in the same period, with the sign of every deduction read once",
+      "The deal's own T-12 NOI, with its period printed beside it and the sign of every deduction read once",
       "The rent roll's in-place rent against the pro forma's",
       "The memorandum's own in-place figures against its stabilized ones",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
     limits: [
-      "A T-12 and a pro forma for different periods are said to differ, never scaled to one another.",
+      "The T-12's period is not matched to the OM's figure: it is printed beside the T-12's NOI, and neither figure is scaled to the other's period.",
       "A stated figure is never dropped for a derived one.",
     ],
   },
@@ -222,15 +318,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Stabilized vacancy",
     claim: "The building runs at the pro forma's occupancy.",
     against: [
-      "The deal's own rent roll or T-12: the occupancy it actually ran at",
-      "The Census Bureau's rental vacancy for the metro area, inside its own margin of error, then the region's and the state's",
-      "The research tracker's vacancy band for a commercial class, with its period",
-      "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied)",
+      "A stabilized vacancy on a deal read as stabilized is held to the market's published figure, the first present deciding and the rest shown beside it: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
+      "For a commercial class, the research tracker's vacancy band, with its period, where the market check holds the model to it",
+      "The deal's own rent roll or T-12, the occupancy the building runs at today: beside a stabilized assumption it is the gap a lease-up has to close (or support, where the building already runs at or under it); it decides an occupancy the OM states for today, a value-add, lease-up, conversion or development deal, and a stabilized assumption no fresh published figure speaks to, said so",
+      "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above carries a figure",
     ],
-    engine: "Vacancy is a direct input: the return is re-run at the evidence's vacancy.",
+    engine: "Vacancy is a direct input: the return is re-run at the figure that decided — the market's for a stabilized assumption, else the documents'.",
     limits: [
       "A survey's quarterly move inside its margin is noise and is said so.",
-      "A submarket's vacancy is not read: a metro figure is the metro's.",
+      "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
     ],
   },
   {
@@ -238,14 +334,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Rent growth",
     claim: "Rents grow at the pro forma's rate every year.",
     against: [
-      "Zillow's asking rents against a year ago, all homes and apartments alone, for the metro",
-      "The rent sitting tenants pay (the CPI's rent of primary residence), where the BLS publishes it for the metro",
+      "One figure decides, the one for the deal's own kind of rent; every other is shown beside it. For an apartment building, Zillow's asking rents for the metro against a year ago: apartments alone, else all home types",
+      "Where no Zillow asking rent was read, the rent sitting tenants pay (the CPI's rent of primary residence), where the BLS publishes it for the metro: it averages every lease in place, so it lags the rents new leases sign at",
       "For a commercial class, the national index of rents its kind of lessor charges (the BLS producer price indexes), said as the nation's",
-      "A rent regulation's published allowance for the units it reaches, shown first and never folded into the market's range",
+      "A rent regulation's published allowance for the units it reaches, shown first and never the figure that decides",
     ],
-    engine: "Rent growth is a direct input: the return is re-run at the evidence's trailing year.",
+    engine: "Rent growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
     limits: [
       "A trailing year is what the assumption is asked to beat, not a forecast.",
+      "The highest figure is not the test: where Zillow's asking rents are read, a sitting-tenant index running ahead of them is shown beside them, never held to.",
       "Lodging and licensed care read no rent index: they sell nights and care, not leases.",
     ],
   },
@@ -294,8 +391,11 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The memorandum's own classic and renovated rents against its comps' rents",
       "The break-even premium at the model's exit cap: the premium that pays for a door's cost",
     ],
-    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, and the pace against the building's turnover.",
-    limits: ["The model grows today's rent at one rate, so the premium is in none of its returns, said so."],
+    engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost.",
+    limits: [
+      "The model grows today's rent at one rate, so the premium is in none of its returns, said so.",
+      "The program's pace against the building's turnover is not tested here.",
+    ],
   },
   {
     key: "other",

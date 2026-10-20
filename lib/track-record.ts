@@ -18,6 +18,10 @@
 //     screen's alternative as the challenger wrote them (`omFigure`,
 //     `altFigure`, in the assumption's own unit); a challenge stored before
 //     the challenger wrote figures is unscored, with why;
+//   - a vacancy challenge is scored on a later document only where the
+//     stress test would hold the OM's figure to the documents: a stabilized
+//     assumption on a deal read as stabilized is the market's to judge
+//     (`vacancyHeldToMarket`), and a later rent roll's vacancy is today's;
 //   - a decision is a direction, not a figure: a deal walked away from on
 //     price agrees with a basis challenge, one walked away from on financing
 //     with a debt challenge, and such a row says it was a decision;
@@ -146,6 +150,13 @@ export interface ScoreDealArgs {
    *  priced by the unit, by area on one priced by the foot; absent, by area
    *  where the roll carries it */
   assetClass?: string | null;
+  /** the OM's vacancy is a stabilized assumption on a deal read as
+   *  stabilized (lib/stress-test `stabilizedVacancyStated`), which the stress
+   *  test holds to the market's published figures, not to the documents:
+   *  a rent roll's or T-12's vacancy that arrives later is the building's
+   *  vacancy today again — the gap a lease-up has to close — so it scores no
+   *  vacancy challenge, and the row says why */
+  vacancyHeldToMarket?: boolean;
   /** the previous screen's snapshot (the deal row's `prior_screen`), whose
    *  challenges are scored against what arrived after ITS verdict — a
    *  document that arrived between the two screens scores the challenge
@@ -411,6 +422,20 @@ function scoreScreen(screenedAt: string | null, challenges: readonly Challenge[]
 
     const later = laterFor(key, { t12, roll, decision, trade, omFigure, askingPrice: args.askingPrice ?? null, perUnit: args.assetClass !== undefined && assetWords(args.assetClass).basis === "unit" });
     if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+    // The stress test's own rule: a stabilized assumption on a deal read as
+    // stabilized is held to the market's published figures, and a
+    // document's vacancy is today's — never the test of it.
+    if (key === "vacancy" && args.vacancyHeldToMarket && (later.source === "rent_roll" || later.source === "t12")) {
+      const why = "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.";
+      return {
+        ...base,
+        later: { source: later.source, value: later.value, text: later.text },
+        figures: null,
+        landing: "unscored",
+        why,
+        text: `${title}: ${later.text}, but ${why.replace(/\.$/, "")}, so it is not scored.`,
+      };
+    }
 
     if (later.decision) {
       return {

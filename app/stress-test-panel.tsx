@@ -2,8 +2,8 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
-import { noMoveWhy } from "@/lib/stress-test-words";
-import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
+import { HEADLINE_WITHHELD, headlineLine, headlineName, liveHeadline, noMoveWhy, ptsText } from "@/lib/stress-test-words";
+import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
  * The OM's assumptions, tested (2026-10-19, the refocus) — the pure panel
@@ -11,6 +11,9 @@ import type { EvidenceKind, StressEvidence, StressImpact, StressKey, StressRow, 
  * call, by the shared screen under the call, and by /demo and the
  * homepage's walkthrough on the sample. Plain data in: the deal page builds
  * the test on the server from what it already holds, and this draws it.
+ *
+ * THE HEADLINE leads (`HeadlineView`): the levered IRR on the OM's figures
+ * against the evidence's, and the bridge between them split by assumption.
  *
  * One row an assumption, most severe first (unsupported, stretched, holds).
  * Each tested row has its words beside its picture, so nothing rides on
@@ -121,7 +124,12 @@ function figureText(key: StressKey, v: number): string {
   }
 }
 
-const pctText = (n: number | null): string => (n == null ? "does not solve" : `${n.toFixed(1)}%`);
+const pctText = (n: number | null): string => {
+  if (n == null) return "does not solve";
+  // A negative return with the minus sign (U+2212), none on one that rounds to nothing.
+  const t = n.toFixed(1);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
 
 /** Most severe first, the reader's order inside a verdict. */
 export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
@@ -213,7 +221,9 @@ function trackScale(row: StressRow): ((v: number) => string) | null {
   if (om == null) return null;
   const points: number[] = [om];
   for (const e of row.evidence) {
-    if (e.value == null) continue;
+    // A piece on another yardstick (a basis per SF beside the OM's per
+    // unit) shares no track with the OM's figure.
+    if (e.value == null || e.ownYardstick) continue;
     const moe = marginOf(e);
     points.push(e.value);
     if (moe != null) points.push(e.value - moe, e.value + moe);
@@ -286,7 +296,7 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
       </div>
       <div className="relative mt-1 h-2 rounded-full bg-faint" aria-hidden>
         {row.evidence.map((e, i) => {
-          if (e.value == null) return null;
+          if (e.value == null || e.ownYardstick) return null;
           const moe = marginOf(e);
           if (e.kind === "rule_of_thumb") {
             return <Tick key={i} at={at(e.value)} bar="stress-evidence" tone={KIND.rule_of_thumb.mark} dashed track="secondary" />;
@@ -339,6 +349,9 @@ function ImpactView({ impact }: { impact: StressImpact }) {
   // figure, not "9.3% → 9.3%". Read off the values the engine was run on,
   // as lib/stress-test-words does, never off the note's words.
   const same = Math.abs(impact.altValue - impact.omValue) < 1e-9;
+  // A re-run the evidence lifts is the OM's cushion, never a warning: only
+  // a fall is drawn in the warning tone (`data-direction`).
+  const direction = base == null || alt == null || Math.abs(alt - base) < 0.05 ? "flat" : alt < base ? "down" : "up";
   return (
     <div className="mt-2.5" data-qa="stress-impact">
       <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
@@ -351,7 +364,7 @@ function ImpactView({ impact }: { impact: StressImpact }) {
           </BarRow>
         )}
         <BarRow label="At the evidence's figure" figure={pctText(alt)}>
-          <div className="h-full rounded-full bg-caution/70" data-bar="stress-impact" style={{ width: widthOf(alt) }} />
+          <div className={`h-full rounded-full ${direction === "down" ? "bg-caution/70" : direction === "up" ? "bg-pass/70" : "bg-muted/40"}`} data-direction={direction} data-bar="stress-impact" style={{ width: widthOf(alt) }} />
         </BarRow>
       </BarRows>
       <p className={`mt-1.5 ${MEASURE} text-xs leading-relaxed text-ink/85`}>
@@ -594,6 +607,79 @@ function Tally({ rows }: { rows: readonly StressRow[] }) {
   );
 }
 
+/**
+ * THE HEADLINE, above the rows: the levered IRR with every tested figure
+ * at the OM's ("the OM's case") against the same model with every figure
+ * past its evidence swapped for the evidence's, as one line, then the
+ * bridge between them — a bar from zero to the OM's case, one floating
+ * segment an assumption from where the walk stands to where its share
+ * takes it (signed, largest first: the Shapley split, so the segments end
+ * exactly on the evidence's case), and a bar from zero to the evidence's
+ * case — on one scale. What the headline leaves out is named under it,
+ * the reasons folded. Where the re-runs are withheld, the panel's note says
+ * the headline is withheld with them.
+ */
+function HeadlineView({ headline: h, line }: { headline: StressHeadline; line: string }) {
+  const om = h.omIrrPct;
+  const ev = h.evidenceIrrPct;
+  const walk: { part: StressHeadline["parts"][number]; from: number; to: number }[] = [];
+  if (om != null) {
+    let at = om;
+    for (const part of h.parts) {
+      walk.push({ part, from: at, to: at + part.pts });
+      at += part.pts;
+    }
+  }
+  const points = [0, ...(om != null ? [om] : []), ...(ev != null ? [ev] : []), ...walk.flatMap((w) => [w.from, w.to])];
+  const lo = Math.min(...points);
+  const hi = Math.max(...points, lo + 1);
+  const span = (hi - lo) * 1.08;
+  const x = (v: number) => ((v - lo) / span) * 100;
+  const bar = (from: number, to: number) => ({ left: `${x(Math.min(from, to)).toFixed(2)}%`, width: `${Math.max(0.6, Math.abs(x(to) - x(from))).toFixed(2)}%` });
+  const zero = lo < 0 ? x(0) : null;
+  const left = h.omitted.map((o) => headlineName(o.key));
+  return (
+    <div className="mt-3 rounded-lg border border-line/80 bg-surface/80 px-3 py-3" data-qa="stress-headline">
+      <p className={`${MEASURE} text-base font-semibold leading-snug tabular-nums text-ink`} data-qa="stress-headline-line">
+        {line}
+      </p>
+      {h.parts.length > 0 && om != null && ev != null && (
+        <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-bridge">
+          <BarRow label="On the OM's figures" figure={pctText(om)}>
+            <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
+          </BarRow>
+          {walk.map(({ part, from, to }) => (
+            <BarRow key={part.key} label={part.label} figure={ptsText(part.pts)}>
+              {zero != null && <Tick at={`${zero.toFixed(2)}%`} bar="stress-headline-zero" tone="bg-ink/30" track="secondary" />}
+              <div
+                className={`absolute inset-y-0 rounded-full ${part.pts < 0 ? "bg-kill/70" : "bg-pass/70"}`}
+                data-bar="stress-headline-part"
+                data-key={part.key}
+                style={bar(from, to)}
+              />
+            </BarRow>
+          ))}
+          <BarRow label="With the evidence" figure={pctText(ev)}>
+            <div className="absolute inset-y-0 rounded-full bg-caution/70" data-bar="stress-headline-evidence" style={bar(0, ev)} />
+          </BarRow>
+        </BarRows>
+      )}
+      <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
+        {h.parts.length > 1
+          ? "Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the return."
+          : h.parts.length === 1
+            ? "One assumption the model takes is past its evidence, so the headline is that row's own re-run."
+            : "Every figure the model takes is at the OM's in both runs."}
+        {left.length > 0 ? ` Left out: ${left.join(", ")}.` : ""}{" "}
+        <Link href="/how-we-test#headline" className={`whitespace-nowrap font-medium text-brand hover:underline ${TAP}`}>
+          How the headline is struck
+        </Link>
+      </p>
+      {h.omitted.length > 0 && <PanelFold rest={h.omitted.map((o) => `${o.label}: ${o.why}.`)} />}
+    </div>
+  );
+}
+
 export function StressTestPanel({ test, className = "" }: { test: StressTest | null; className?: string }) {
   if (!test || test.rows.length === 0) return null;
   const rows = sortStressRows(test.rows);
@@ -610,7 +696,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         : { border: "border-line border-l-brand bg-surface", head: "text-brand" };
   const published = test.rows.some((r) => r.evidence.some((e) => e.kind === "published"));
   const kindsShown = new Set<EvidenceKind>();
-  for (const r of test.rows) for (const e of r.evidence) if (e.value != null && trackScale(r)) kindsShown.add(e.kind);
+  for (const r of test.rows) for (const e of r.evidence) if (e.value != null && !e.ownYardstick && trackScale(r)) kindsShown.add(e.kind);
 
   return (
     <section
@@ -622,8 +708,10 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
         <ReadLine rows={test.rows} />
       </PanelHead>
       <Tally rows={rows} />
-      {/* The reason is a whole sentence that already says no return is re-run. */}
-      {test.impactsWithheld && <PanelNote>{test.impactsWithheld}</PanelNote>}
+      {/* The reason is a whole sentence that already says no return is
+          re-run; the headline goes with the re-runs, said so. */}
+      {test.impactsWithheld && <PanelNote>{`${test.impactsWithheld} ${HEADLINE_WITHHELD}`}</PanelNote>}
+      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} />}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">

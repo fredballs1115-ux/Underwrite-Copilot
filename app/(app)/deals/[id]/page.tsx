@@ -78,7 +78,7 @@ import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { dealTypeLabel, interestOf, interestTag, isTenancyInCommon, readInterest } from "@/lib/interest";
 import { subjectBasis } from "@/lib/comp-detail";
 import { condoUnitsOffered } from "@/lib/condo-units";
-import { vsMedianRead, type SubjectForCall } from "@/lib/public-comps/vs-median";
+import type { SubjectForCall } from "@/lib/public-comps/vs-median";
 import { dbMarketsWithSales } from "@/lib/public-comps/db-coverage";
 import { marketNames } from "@/lib/public-comps/db-markets";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -95,8 +95,9 @@ import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
-import { MEDIAN_FLOOR, lastGoodOf, type RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest, type PastScreensEvidence, type RecordedSalesEvidence } from "@/lib/stress-test";
+import type { RecordCompsResult } from "@/lib/public-comps/core";
+import { buildStressTest, stabilizedVacancyStated } from "@/lib/stress-test";
+import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -108,7 +109,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
 import { publicRecordSubject } from "@/lib/public-record-subject";
-import { buildingSfRow, countNounOf, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
+import { buildingSfRow, countNounOf, findGoingInCap, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -177,7 +178,6 @@ import {
   signalGoingInCap,
   assessPlausibility,
   askingPriceOf,
-  buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -461,10 +461,7 @@ export default async function DealPage({
   // (lib/market-memory `memoryCandidates`), then read in full. Started now
   // and awaited where the view is built, so the second read overlaps the
   // page's other work rather than adding a round trip.
-  const currentClass =
-    deal.asset_class && deal.asset_class !== "auto"
-      ? (deal.asset_class as string)
-      : (extraction?.assetClass ?? "");
+  const currentClass = memoryClassOf(deal.asset_class as string | null, extraction);
   const memoryIds =
     extraction?.market && ownKeys.data
       ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
@@ -971,6 +968,9 @@ export default async function DealPage({
     // The class the page shows, so the roll's vacancy is read as the
     // stress test reads it (by count on a class priced by the unit).
     assetClass: shownAssetClass(deal.asset_class as string | null, extraction),
+    // A stabilized assumption the stress test holds to the market: a later
+    // document's vacancy is today's and scores no vacancy challenge.
+    vacancyHeldToMarket: stabilizedVacancyStated(extraction, firstSignal),
   });
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
@@ -1263,34 +1263,20 @@ export default async function DealPage({
   // claimRecordComps's sentinel makes double-fires harmless.
   const publicComps =
     ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
-  // The price the building's own figures describe (#415) — a share's
-  // grossed up to the whole, none for a note or a leased fee — which the
-  // public-record comps' median call divides (the research panel reads the
-  // pipeline card's basis instead); the header still shows the price as asked.
   // What the price buys beside it ("Price · Pref equity, 12% to Jun 2029"),
   // on the reader's day, as the cap slot beside it reads its dates.
   const priceTag = interestTag(extraction, readerNoon);
-  const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
   // What the recorded sales may be set against (lib/public-comps/vs-median):
-  // the building's price and its price a square foot (the comps tab's own
-  // reader, so the two never name different figures), the class the deal
-  // shows, and whether it is one building at a building's price.
+  // the price the building's own figures describe (#415) — a share's
+  // grossed up to the whole, none for a note, a leased fee or a master
+  // lease — and its price a square foot (the comps tab's own reader, so the
+  // two never name different figures), the class the deal shows, and
+  // whether it is one building at a building's price. One builder
+  // (lib/stress-basis-evidence), which the memo, the report, the shared
+  // screen and the verdict's brief read too; the header still shows the
+  // price as asked.
   const compsClassKey = dealClassKey(deal.asset_class as string | null, extraction);
-  const compsCallSubject: SubjectForCall = {
-    price: subjectPriceNumber,
-    perSf: subjectBasis(
-      extraction?.metrics ?? [],
-      strategy.kind,
-      screenYearOf(extraction),
-      interestOf(extraction),
-      extraction?.assetClass,
-      condoUnitsOffered(extraction),
-    ).perSf,
-    classKey: compsClassKey,
-    classLabel: assetClassLabel(shownAssetClass(deal.asset_class as string | null, extraction)),
-    portfolio: readPortfolio(extraction) !== null,
-    planOrLand: strategy.kind === "development" || strategy.kind === "conversion" || compsClassKey === "land_infill",
-  };
+  const compsCallSubject: SubjectForCall = compsCallSubjectOf(extraction, firstSignal, deal.asset_class as string | null);
   // Where no source reaches the deal, the no-source sentence names the
   // property database's markets that hold recorded sales (the cached count
   // read), read only then.
@@ -1420,34 +1406,17 @@ export default async function DealPage({
   // derived model, the memorandum's own comps, the recorded sales and the
   // reader's past screens — and the engine run again with ONE input swapped.
   // Nothing is re-read or recomputed here: the shapes are the page's own.
-  // The recorded sales' $/SF median only from three sales up, the comps
-  // page's own floor (lib/public-comps `MEDIAN_FLOOR`); the past screens'
-  // median as the market memory pooled it, each at its ask. The recorded
-  // sales stand as evidence only where the comps tab would set the deal
-  // against them (lib/public-comps/vs-median): sales of another class, or a
-  // portfolio's, a plan's or land's price, are no evidence of this basis.
-  const recordedSet = lastGoodOf(publicComps);
-  const recordedRead = recordedSet?.stats ? vsMedianRead(recordedSet.stats, recordedSet.params, compsCallSubject) : null;
-  const recordedSales: RecordedSalesEvidence | null =
-    recordedSet?.stats && recordedSet.stats.count > 0 && !(recordedRead?.kind === "withheld" && recordedRead.why !== "scale")
-      ? {
-          count: recordedSet.stats.count,
-          medianPerSqft: (recordedSet.stats.perSqftCount ?? recordedSet.stats.count) >= MEDIAN_FLOOR ? recordedSet.stats.medianPerSqft : null,
-          medianPerUnit: null,
-          providerName: recordedSet.providerName ?? "public property records",
-          retrievedAt: recordedSet.retrievedAt ?? null,
-          href: recordedSet.datasetUrl ?? null,
-        }
-      : null;
-  const pastScreens: PastScreensEvidence | null =
-    marketMemory?.perUnit && marketMemory.count > 0
-      ? {
-          count: marketMemory.count,
-          perUnitMedian: marketMemory.perUnit.basis === "unit" ? marketMemory.perUnit.median : null,
-          perSfMedian: marketMemory.perUnit.basis === "sf" ? marketMemory.perUnit.median : null,
-          market: marketMemory.market,
-        }
-      : null;
+  // The recorded sales stand as evidence only where the comps tab sets the
+  // deal against their price a foot (lib/public-comps/vs-median), over the
+  // sales that state an area; the past screens' median as the market memory
+  // pooled it, each at its ask, from three screens up — both built by the
+  // one builder every surface calls (lib/stress-basis-evidence).
+  const { recordedSales, pastScreens } = stressBasisEvidence({
+    publicComps,
+    subject: compsCallSubject,
+    memoryGroup: marketMemory,
+    isSample: isSampleDeal,
+  });
   const stressTest = buildStressTest({
     extraction,
     firstSignal,
@@ -1459,10 +1428,11 @@ export default async function DealPage({
     storedAssetClass: deal.asset_class as string | null,
     brokerComps: comps,
     // The sample's building and price are invented: no reader's recorded
-    // sales or past screens are set against them, so its test is the one
-    // /demo and the homepage draw (lib/sample-stress, held by its test).
-    recordedSales: isSampleDeal ? null : recordedSales,
-    pastScreens: isSampleDeal ? null : pastScreens,
+    // sales or past screens are set against them (the builder hands none),
+    // so its test is the one /demo and the homepage draw (lib/sample-stress,
+    // held by its test).
+    recordedSales,
+    pastScreens,
     readOn: todayIso,
   });
   // The test at a glance beside the call, and in the bar that keeps the deal

@@ -38,7 +38,7 @@ export const SHARE_REFUSAL_COPY: Record<ShareRefusal, string> = {
  *  ownership the sender check needs. Never the OM's storage path, the notes,
  *  the model or the buy box. */
 export const SHARED_DEAL_COLUMNS =
-  "name, asset_class, address, photo, extraction, first_signal, challenges, comps, market, verdict, updated_at, user_id, team_id, site_flags";
+  "name, asset_class, address, photo, extraction, first_signal, challenges, comps, market, verdict, updated_at, user_id, team_id, site_flags, public_comps, is_sample";
 
 export interface SharedDealRow {
   name: string;
@@ -61,6 +61,12 @@ export interface SharedDealRow {
   /** the stored FEMA / Opportunity Zone lookup (lib/site-flags) — the flood
    *  zone line reads it (#426) */
   site_flags?: unknown;
+  /** the deal's stored public-record pull (lib/public-comps): its recorded
+   *  sales, public records, are the stress test's basis evidence here as on
+   *  the sender's page (lib/stress-basis-read) */
+  public_comps?: unknown;
+  /** the sample deal, whose building is invented: no sales are set against it */
+  is_sample?: unknown;
 }
 
 export interface ResolvedShare {
