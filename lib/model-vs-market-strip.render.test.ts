@@ -73,11 +73,11 @@ describe("the checks' picture fields — display only", () => {
     expect(byKey("vacancy").modelValue).toBeCloseTo(5, 9);
   });
 
-  it("draws the price indexes as the range and the insurance index and the breakeven apart, all the nation's", () => {
+  it("draws all-items CPI as the one figure held to, core beside it, and the insurance index and the breakeven apart, all the nation's", () => {
     const c = byKey("expense_growth");
     expect(c.marks!.map((m) => [m.role, m.nation])).toEqual([
       ["range", true],
-      ["range", true],
+      ["beside", true],
       ["apart", true],
       ["apart", true],
     ]);
@@ -135,7 +135,9 @@ describe("ModelVsMarketCard — the strips", () => {
 
   it("draws the insurance index and the breakeven on a track apart, never in the range", () => {
     const exp = rowHtml(html, "expense_growth");
-    expect(count(exp, "mvm-figure")).toBe(2);
+    // All-items CPI is the one figure held to; core is drawn beside it.
+    expect(count(exp, "mvm-figure")).toBe(1);
+    expect(count(exp, "mvm-beside")).toBe(1);
     expect(count(exp, "mvm-apart")).toBe(2);
     expect(exp).toContain('data-qa="model-strip-apart"');
     expect(text).toContain("Commercial property insurance premiums (PPI, commercial multiple peril): +4.8% over the year to Aug 2026, the nation's (BLS via FRED) — shown apart, not in the range");

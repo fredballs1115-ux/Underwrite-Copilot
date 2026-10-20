@@ -63,7 +63,7 @@ export const WHO_DOES_WHAT = {
   code: {
     heading: "Code runs",
     items: [
-      "the lookup: which published figure, document or rule of thumb speaks to it",
+      "the lookup: the one published figure, document or rule of thumb that decides it, the rest shown beside it",
       "the arithmetic: the gap in the assumption's own unit",
       "the verdict word, from the gap and the row's own threshold",
       "the re-run: the return again with the evidence's figure in the OM's place",
@@ -76,34 +76,35 @@ export const WHO_DOES_WHAT = {
 export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
   {
     word: "holds",
-    line: "The OM's figure sits inside the evidence, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
+    line: "The OM's figure sits at the one figure that decides the row, within its margin, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
   },
   {
     word: "stretched",
-    line: `Past the evidence by less than the row's threshold; or inside it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
+    line: `Past the deciding figure by less than the row's threshold; or at it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
   },
-  { word: "unsupported", line: "Past the evidence by more than the row's threshold, below." },
+  { word: "unsupported", line: "Past the deciding figure by more than the row's threshold, below. Every other piece on the row is shown beside it and decides nothing." },
   { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
 ];
 
 const pctOf = (share: number) => `${Math.round(share * 100)}%`;
 
 /**
- * How each row picks the figure it is held to, and its threshold, one line
- * a key: what lib/stress-test does, each figure its constant.
+ * How each row picks the ONE figure it is held to, and its threshold, one
+ * line a key: what lib/stress-test does (its orders are lib/stress-deciders'),
+ * each figure its constant.
  */
 export const VERDICT_RULES: Record<StressKey, string> = {
   // lib/stress-test's price row: the first piece above that carries a
   // figure. A median needs three; under three comps graded clean none is
   // struck, and the row names what it holds the ask to by count.
   basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
-  exit_cap: `Held to the going-in cap, else the published cap range's low end. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported; where a published cap range reaches the exit, compression is stretched at worst.`,
+  exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
-  noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  vacancy: `A stabilized assumption is held to the market: the metro survey inside its margin, else the tracker's band, the region, the state. The rent roll or T-12 shows today's gap; with no fresh market figure, they decide. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
+  noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
+  vacancy: `A stabilized assumption is held to the market's figure: the metro survey in its margin, else the tracker band's low read, the region, the state; else the rent roll, then the T-12, which beside it show today's gap. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
   // lib/rent-growth-decider's order, one line.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
-  expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
+  expense_growth: `Held to all-items CPI, the broad price level the expense base moves with; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
   insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,

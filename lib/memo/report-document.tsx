@@ -111,7 +111,7 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, rerunWords, rowMoveText, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import { DECIDES_TAG, HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rerunWords, rowMoveText, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -429,11 +429,16 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
         ) : null}
       </View>
       <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 1 }}>{str(`OM says: ${row.omSays.text}${page}`)}</Text>
-      {row.evidence.map((e, i) => (
-        <Text key={i} style={{ fontSize: 8, color: C.muted, marginTop: 1, marginLeft: 8 }}>
-          {str(`${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : ""})`)}
-        </Text>
-      ))}
+      {row.evidence.map((e, i) => {
+        // The one figure the row was decided on, and every other beside it
+        // (lib/stress-deciders), said in words before the piece.
+        const tag = decidesTag(row, i);
+        return (
+          <Text key={i} style={{ fontSize: 8, color: tag === DECIDES_TAG ? C.ink : C.muted, marginTop: 1, marginLeft: 8 }}>
+            {str(`${tag ? `${tag}: ` : ""}${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : ""})`)}
+          </Text>
+        );
+      })}
       {row.evidence.length === 0 ? <Text style={{ fontSize: 8, color: C.muted, marginTop: 1, marginLeft: 8 }}>{str("No evidence with a figure or words could be read for this deal.")}</Text> : null}
       <Text style={{ fontSize: 8.5, color: tone, fontFamily: "Helvetica-Bold", marginTop: 2 }}>
         {str(row.gap ? `Gap: ${row.gap.text}` : `Unchecked: ${row.unchecked ?? "no figure to set against the OM's"}`)}

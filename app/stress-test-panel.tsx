@@ -5,6 +5,7 @@ import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote
 import {
   HEADLINE_WITHHELD,
   HOLDS_NO_RERUN,
+  decidesTag,
   drawsRerun,
   headlineLine,
   headlineName,
@@ -49,11 +50,14 @@ import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, Stress
  *     shaped by its kind — a dot for the deal's own document, a diamond for
  *     a published figure, a hollow dot for the memorandum contradicting
  *     itself, a dashed tick for a rule of thumb — the survey's margin as a
- *     whisker where the evidence states one, and under the track a bracket
- *     over the evidence's span labelled with its figures;
+ *     whisker where the evidence states one. ONE figure decides a row
+ *     (lib/stress-deciders): its mark is drawn full and labelled under the
+ *     track ("Decides 9.1%"), every other mark faded, so the comparison is
+ *     read off the one figure and never off a span the pieces make;
  *   - THE EVIDENCE, each item led by its kind's glyph (the track's own
- *     mark), with its kind, its publisher, its date and whose figure it is
- *     (a metro's figure is the metro's, never the building's);
+ *     mark), with its kind, a "Decides" or "Beside it, not deciding" tag in
+ *     words, its publisher, its date and whose figure it is (a metro's
+ *     figure is the metro's, never the building's);
  *   - THE GAP in words, and THE IMPACT: the levered IRR with the OM's figure
  *     and with the evidence's, the engine run again with that one input
  *     swapped (`StressImpact`), as a pair and two bars on one scale — or "no
@@ -299,23 +303,34 @@ function EvidenceGlyph({ kind }: { kind: EvidenceKind }) {
 }
 
 /**
+ * The piece a row was decided on: `decidedBy` (lib/stress-deciders), else,
+ * on a row built before it, the one its re-run swapped in, else the first
+ * that carries a figure; null on a row nothing decided.
+ */
+function decidingIndex(row: StressRow): number | null {
+  if (row.verdict === "unchecked") return null;
+  if (row.decidedBy != null) return row.decidedBy;
+  if (row.impact) return row.impact.evidenceIndex;
+  const i = row.evidence.findIndex((e) => e.value != null);
+  return i >= 0 ? i : null;
+}
+
+/**
  * The track: the OM's figure as a dark tick LABELLED over the track ("OM
- * 6.0%"), each piece of evidence that carries a figure as its kind's glyph,
- * and under the track a bracket over the evidence's span labelled with its
- * figures ("Evidence 4.6%–9.3%"), so the two sides of the comparison are
- * named where they are drawn. The labels sit in rows of their own above and
- * below, and never collide with each other.
+ * 6.0%"), each piece of evidence that carries a figure as its kind's glyph —
+ * the one that decided drawn full and LABELLED under the track ("Decides
+ * 9.1%"), every other faded, since it decides nothing — so the two sides of
+ * the comparison are named where they are drawn. The labels sit in rows of
+ * their own above and below, and never collide with each other.
  */
 function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string }) {
   const om = row.omSays.value!;
   const pos = (v: number) => parseFloat(at(v));
-  const figures = row.evidence.flatMap((e) => (e.value == null ? [] : [e.value]));
-  const lo = Math.min(...figures);
-  const hi = Math.max(...figures);
-  const span = lo === hi ? figureText(row.key, lo) : `${figureText(row.key, lo)}–${figureText(row.key, hi)}`;
+  const d = decidingIndex(row);
+  const decider = d != null && row.evidence[d]?.value != null && !row.evidence[d].ownYardstick ? row.evidence[d] : null;
   return (
     <div className="mt-3 text-[11px] leading-4" data-qa="stress-track">
-      <p className="text-muted">The OM against the evidence</p>
+      <p className="text-muted">The OM against the figure that decides</p>
       <div className="relative mt-1 h-4">
         <TrackLabel at={pos(om)} className="font-semibold text-ink" qa="stress-om-label">{`OM ${figureText(row.key, om)}`}</TrackLabel>
       </div>
@@ -323,22 +338,27 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
         {row.evidence.map((e, i) => {
           if (e.value == null || e.ownYardstick) return null;
           const moe = marginOf(e);
+          const deciding = i === d;
+          // A piece beside the one that decides is drawn faded: it is shown,
+          // and decides nothing.
+          const fade = deciding ? "" : " opacity-40";
           if (e.kind === "rule_of_thumb") {
-            return <Tick key={i} at={at(e.value)} bar="stress-evidence" tone={KIND.rule_of_thumb.mark} dashed track="secondary" />;
+            return <Tick key={i} at={at(e.value)} bar="stress-evidence" tone={`${KIND.rule_of_thumb.mark}${fade}`} dashed track="secondary" />;
           }
           return (
             <Fragment key={i}>
               {moe != null && (
                 <div
-                  className="absolute top-1/2 h-px -translate-y-1/2 bg-pass/60"
+                  className={`absolute top-1/2 h-px -translate-y-1/2 bg-pass/60${fade}`}
                   data-qa="stress-whisker"
                   style={{ left: at(e.value - moe), width: `${(pos(e.value + moe) - pos(e.value - moe)).toFixed(1)}%` }}
                 />
               )}
               <div
-                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ring-1 ring-surface ${KIND[e.kind].shape} ${KIND[e.kind].mark}`}
+                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ring-1 ring-surface ${KIND[e.kind].shape} ${KIND[e.kind].mark}${fade}`}
                 data-bar="stress-evidence"
                 data-kind={e.kind}
+                data-decides={deciding ? "true" : undefined}
                 style={{ left: at(e.value) }}
               />
             </Fragment>
@@ -346,17 +366,10 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
         })}
         <Tick at={at(om)} bar="stress-om" tone="bg-ink" />
       </div>
-      <div className={`relative ${lo === hi ? "h-6" : "h-8"}`}>
-        {/* A bracket over the evidence's span; one figure needs none. */}
-        {lo !== hi && (
-          <div
-            aria-hidden
-            className="absolute top-1 h-2 rounded-b-sm border-x border-b border-ink/30"
-            data-qa="stress-span"
-            style={{ left: at(lo), width: `${(pos(hi) - pos(lo)).toFixed(1)}%` }}
-          />
+      <div className="relative h-6">
+        {decider && (
+          <TrackLabel at={pos(decider.value!)} className="top-1.5 font-semibold text-ink" qa="stress-evidence-label">{`Decides ${figureText(row.key, decider.value!)}`}</TrackLabel>
         )}
-        <TrackLabel at={(pos(lo) + pos(hi)) / 2} className={`${lo === hi ? "top-1.5" : "top-3.5"} font-medium text-ink/80`} qa="stress-evidence-label">{`Evidence ${span}`}</TrackLabel>
       </div>
     </div>
   );
@@ -408,19 +421,33 @@ function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }
 }
 
 /** Each piece of evidence in one flowing line: the kind's glyph (where the
- *  track draws it), the kind, the figure in its own words, then whose it is
- *  and when, muted, and the source. */
-function EvidenceList({ evidence, marks = false }: { evidence: readonly StressEvidence[]; marks?: boolean }) {
+ *  track draws it), the kind, whether it decided the row or stands beside
+ *  the one that did, in words, the figure in its own words, then whose it
+ *  is and when, muted, and the source. */
+function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean }) {
+  const evidence = row.evidence;
   if (evidence.length === 0) return null;
+  const d = decidingIndex(row);
   return (
     <ul className="mt-1 space-y-1.5 text-[11px] leading-4" data-qa="stress-evidence-list">
       {evidence.map((e, i) => {
         const kind = KIND[e.kind];
+        const tag = decidesTag({ ...row, decidedBy: d }, i);
         return (
-          <li key={i} className="flex gap-2" data-evidence={e.kind}>
-            {marks && <span className="flex h-4 w-2.5 shrink-0 items-center justify-center">{e.value != null && <EvidenceGlyph kind={e.kind} />}</span>}
+          <li key={i} className="flex gap-2" data-evidence={e.kind} data-decides={tag == null ? undefined : i === d ? "true" : "false"}>
+            {marks && <span className={`flex h-4 w-2.5 shrink-0 items-center justify-center${i === d ? "" : " opacity-40"}`}>{e.value != null && <EvidenceGlyph kind={e.kind} />}</span>}
             <p className={`min-w-0 ${MEASURE}`}>
               <span className={`mr-1 inline-block rounded px-1 align-[1px] text-[9.5px] font-semibold uppercase leading-[14px] tracking-wide ${kind.chip}`}>{kind.word}</span>{" "}
+              {tag && (
+                <>
+                  <span
+                    className={`mr-1 inline-block rounded border px-1 align-[1px] text-[9.5px] leading-[12px] ${i === d ? "border-ink/60 font-semibold text-ink" : "border-line text-muted"}`}
+                    data-qa="stress-decides-tag"
+                  >
+                    {tag}
+                  </span>{" "}
+                </>
+              )}
               <span className="text-ink">
                 <Dated text={`${e.label}: ${e.text}`} />
               </span>{" "}
@@ -503,7 +530,7 @@ function UncheckedRow({ row }: { row: StressRow }) {
           {testedByHint(row)}
         </p>
       )}
-      <EvidenceList evidence={row.evidence} />
+      <EvidenceList row={row} />
       {/* A re-run on a row that stands unchecked (the insurance line at the
           seller's own T-12 premium) is said in its own words, which say it
           tests nothing; no bars, since nothing decided it. */}
@@ -567,7 +594,7 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
       <div className="@2xl/row:grid @2xl/row:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] @2xl/row:gap-x-6">
         <div className="min-w-0">
           {at && <EvidenceTrack row={row} at={at} />}
-          <EvidenceList evidence={row.evidence} marks={at != null} />
+          <EvidenceList row={row} marks={at != null} />
         </div>
 
         <div className="min-w-0 @2xl/row:pt-3">
@@ -854,6 +881,10 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
               {KIND[k].word}
             </KeyItem>
           ) : null,
+        )}
+        {/* One figure decides each row: its mark full, the rest faded. */}
+        {tested.some((r) => trackScale(r) && r.evidence.filter((e) => e.value != null && !e.ownYardstick).length > 1) && (
+          <KeyItem>{"A full mark decides its row; a faded one is shown beside it, not deciding"}</KeyItem>
         )}
         {published && (
           <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>

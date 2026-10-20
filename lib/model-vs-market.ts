@@ -1,6 +1,7 @@
 import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
 import { ALL_HOMES_RENT_LABEL, APARTMENT_RENT_LABEL, CPI_RENT_LABEL, rentGrowthDecider } from "@/lib/rent-growth-decider";
+import { CORE_CPI_LABEL, CPI_ALL_ITEMS_LABEL, EXPENSE_GROWTH_ORDER } from "@/lib/stress-deciders";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -114,7 +115,7 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   old: "beside a figure over a year old",
 };
 
-/** The rent-growth check's chip where ONE figure decides (lib/rent-growth-
+/** The rent-growth and expense-growth checks' chip where ONE figure decides (lib/rent-growth-
  *  decider): set against that figure, never a range the others make. */
 export const DECIDED_TONE_LABEL: Partial<Record<CheckTone, string>> = {
   ahead: "ahead of the figure it is held to",
@@ -682,22 +683,28 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const core = fresh(input.national, (r) => r.meta.id === "CPILFESL_YOY");
   const when = periodLabel(cpi.obsDate, cpi.meta.cadence);
   const published: PublishedFigure[] = [
-    { label: "Consumer prices (CPI, all items)", text: `${signed(cpi.value)}% over the year to ${when}`, value: cpi.value, asOf: cpi.obsDate, publisher: "BLS via FRED" },
+    { label: CPI_ALL_ITEMS_LABEL, text: `${signed(cpi.value)}% over the year to ${when}`, value: cpi.value, asOf: cpi.obsDate, publisher: "BLS via FRED" },
   ];
   if (core) {
-    published.push({ label: "Core CPI", text: `${signed(core.value)}% over the year to ${periodLabel(core.obsDate, core.meta.cadence)}`, value: core.value, asOf: core.obsDate, publisher: "BLS via FRED" });
+    published.push({ label: CORE_CPI_LABEL, text: `${signed(core.value)}% over the year to ${periodLabel(core.obsDate, core.meta.cadence)}`, value: core.value, asOf: core.obsDate, publisher: "BLS via FRED" });
   }
-  // The tone is read against the price indexes alone: the insurance index
-  // below is one line's repricing, not the expense base's, and folding it
-  // into the range would let a 3% model read "inside" a 3–8% band.
-  const values = published.map((p) => p.value);
+  // ONE figure decides (lib/stress-deciders `EXPENSE_GROWTH_ORDER`, the
+  // stress test's expense-growth row's own order): all-items CPI, the broad
+  // price level the expense base moves with; core is shown beside it, never
+  // held to. The range the two made had let a 2.5% model read "inside" with
+  // the CPI at 3.4% and core at 2.4%, beside a stress row that called the
+  // same figure stretched. The insurance index below is one line's
+  // repricing, not the expense base's, and is never in it either.
+  const decider = EXPENSE_GROWTH_ORDER[0];
+  const values = [cpi.value];
   const tone = rangeTone(e, values);
+  const besideCore = core ? "; core CPI is shown beside it, never held to" : "";
   const clause =
     tone === "ahead"
-      ? `The model runs ahead of the index, ${byPoints(e, values)}.`
+      ? `Held to ${decider.name}, ${decider.why}, the model runs ahead of it ${byPoints(e, values)}${besideCore}.`
       : tone === "behind"
-        ? `The model runs behind the index, ${byPoints(e, values)}.`
-        : "The model sits inside the published range.";
+        ? `Held to ${decider.name}, ${decider.why}, the model runs behind it ${byPoints(e, values)}${besideCore}.`
+        : `Held to ${decider.name}, ${decider.why}, the model sits at it${besideCore}.`;
   // The one line that reprices hardest: what commercial property insurance
   // costs nationally against a year ago. A memorandum's premium is the
   // seller's expiring policy, and the index says how far a new quote has
@@ -741,16 +748,16 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     modelSource: sourceWords(input.sources?.expenseGrowthPct),
     published,
     tone,
-    toneLabel: TONE_LABEL[tone],
+    toneLabel: DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone],
     scope: "national",
     read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}${breakevenClause}`,
-    // Every figure here is the nation's; the price indexes are the range the
-    // tone reads, and the insurance index and the breakeven are drawn apart,
-    // never folded into it.
+    // Every figure here is the nation's; all-items CPI is the one figure the
+    // tone reads, core is shown beside it, and the insurance index and the
+    // breakeven are drawn apart, never folded into it.
     modelValue: e,
     marks: [
       mark("range", true),
-      ...(core ? [mark("range", true)] : []),
+      ...(core ? [mark("beside", true)] : []),
       ...(insurance ? [mark("apart", true)] : []),
       ...(breakeven ? [mark("apart", true)] : []),
     ],

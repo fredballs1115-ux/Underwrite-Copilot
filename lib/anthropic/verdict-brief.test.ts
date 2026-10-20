@@ -563,7 +563,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
     expect(brief).toContain("the levered IRR moves from 9.3% to 5.9%");
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll, May 31, 2026; the deal's own document)",
+      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll, May 31, 2026; the deal's own document)",
     );
     // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
     expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.1%/);

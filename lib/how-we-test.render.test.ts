@@ -116,7 +116,7 @@ describe("/how-we-test draws every method from the table", () => {
       // documents' vacancy is today's.
       vacancy: ["published", "published", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
-      expense_growth: ["published", "published", "published"],
+      expense_growth: ["published", "published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
       insurance: ["published", "document"],
       // The break-even is said beside the row, never set against it.
@@ -207,10 +207,14 @@ describe("/how-we-test draws every method from the table", () => {
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
     expect(VERDICT_RULES.rent_growth).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} points`);
-    expect(VERDICT_RULES.expense_growth).toMatch(/^Held to the lowest price index/);
+    // ONE figure decides each row (lib/stress-deciders), never the lowest
+    // of several: all-items CPI for an expense growth, core only in its place.
+    expect(VERDICT_RULES.expense_growth).toMatch(/^Held to all-items CPI/);
+    expect(VERDICT_RULES.expense_growth).not.toMatch(/lowest/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
-    expect(VERDICT_RULES.exit_cap).toMatch(/compression is stretched at worst/);
+    expect(VERDICT_RULES.exit_cap).toMatch(/a cap range beside a going-in cap decides nothing/);
+    expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
     // The record: its heading, its lines, and its floor the reader's own.

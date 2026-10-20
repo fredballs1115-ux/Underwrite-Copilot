@@ -143,14 +143,21 @@ describe("modelVsMarket — the model's four assumptions against the published f
     ]);
     expect(c.published[3]).toMatchObject({ text: "2.33% a year (Sep 18, 2026)", value: 2.33, asOf: "2026-09-18", publisher: "FRED" });
     expect(c.published[2]).toMatchObject({ text: "+4.8% over the year to Aug 2026", value: 4.83683, asOf: "2026-08-01", publisher: "BLS via FRED" });
-    // The tone is read against the price indexes alone: 3.0% is inside
-    // 2.4–3.4, and the 4.8% premium index does not widen the band.
-    expect(c.tone).toBe("inside");
+    // ONE figure decides, all-items CPI (lib/stress-deciders, the stress
+    // row's own order): 3.0% is 0.4 points behind its +3.4%. Core's +2.4% is
+    // shown beside it, never held to — the range the two made had read 3.0%
+    // "inside" — and the 4.8% premium index widens nothing.
+    expect(c.tone).toBe("behind");
+    expect(c.toneLabel).toBe("behind the figure it is held to");
+    expect(c.marks!.map((m) => m.role)).toEqual(["range", "beside", "apart", "apart"]);
     expect(c.read).toBe(
-      "The model grows expenses 3.0%/yr against consumer prices +3.4% over the year to Aug 2026 (core +2.4%); BLS via FRED. The model sits inside the published range. Insurance is the line that reprices hardest: commercial property premiums are +4.8% nationally over the year to Aug 2026 (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote. The bond market expects inflation to average 2.33% a year over the next ten years (the 10-year breakeven, Sep 18, 2026; FRED) — its forecast over ten years, not the hold's.",
+      "The model grows expenses 3.0%/yr against consumer prices +3.4% over the year to Aug 2026 (core +2.4%); BLS via FRED. Held to consumer prices, all items (the CPI), the broad price level the expense base moves with, the model runs behind it by 0.4 points; core CPI is shown beside it, never held to. Insurance is the line that reprices hardest: commercial property premiums are +4.8% nationally over the year to Aug 2026 (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote. The bond market expects inflation to average 2.33% a year over the next ten years (the 10-year breakeven, Sep 18, 2026; FRED) — its forecast over ten years, not the hold's.",
     );
     const ahead = check({ ...base, inputs: { ...base.inputs, expenseGrowthPct: 0.05 } }, "expense_growth")!;
-    expect(ahead.read).toContain("The model runs ahead of the index, by 1.6 to 2.6 points.");
+    expect(ahead.read).toContain("Held to consumer prices, all items (the CPI), the broad price level the expense base moves with, the model runs ahead of it by 1.6 points; core CPI is shown beside it, never held to.");
+    const at = check({ ...base, inputs: { ...base.inputs, expenseGrowthPct: 0.034 } }, "expense_growth")!;
+    expect(at.tone).toBe("inside");
+    expect(at.read).toContain("the model sits at it; core CPI is shown beside it");
     // Without the index the sentence is the old one, and nothing claims a figure.
     const without = check({ ...base, national: (base.national ?? []).filter((r) => r.meta.id !== "PCU9241269241265_YOY" && r.meta.id !== "T10YIE") }, "expense_growth")!;
     expect(without.published.map((p) => p.label)).toEqual(["Consumer prices (CPI, all items)", "Core CPI"]);

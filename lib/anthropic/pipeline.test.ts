@@ -2657,7 +2657,7 @@ describe("runAnalysis — the verdict is handed the stress test, struck in code"
     const brief = buildBrief(input);
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
-    expect(brief).toContain("- NOI (noi) [UNSUPPORTED] — OM says: NOI (in place): $1,200,000 [p. 5]. Set against: The deal's T-12 NOI: $1M (derived: EGI less expenses) (TTM to Jun 30, 2026) (the deal's T-12, Jun 30, 2026; the deal's own document)");
+    expect(brief).toContain("- NOI (noi) [UNSUPPORTED] — OM says: NOI (in place): $1,200,000 [p. 5]. Set against: [DECIDES] The deal's T-12 NOI: $1M (derived: EGI less expenses) (TTM to Jun 30, 2026) (the deal's T-12, Jun 30, 2026; the deal's own document)");
     expect(brief).toContain("Gap: The OM's $1.2M is 20.0% ($200k) over the deal's T-12's $1M.");
     expect(brief).toMatch(/The levered IRR: [^\n]*\d+\.\d%/);
     expect(brief).toContain("The IRR moves above are the engine's own");

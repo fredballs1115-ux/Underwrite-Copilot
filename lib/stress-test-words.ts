@@ -85,11 +85,26 @@ export function stressReadLine(test: StressTest): string {
   return `${head}${tail}`;
 }
 
-/** The evidence a row is read against: the one its impact swapped in, else
- *  the first that carries a figure, else the first; null with none. */
+/** The evidence a row is read against: the one figure that decided it
+ *  (`decidedBy`), else the one its impact swapped in, else the first that
+ *  carries a figure, else the first; null with none. */
 export function bestEvidence(row: StressRow): StressEvidence | null {
+  if (row.decidedBy != null && row.evidence[row.decidedBy]) return row.evidence[row.decidedBy];
   if (row.impact && row.evidence[row.impact.evidenceIndex]) return row.evidence[row.impact.evidenceIndex];
   return row.evidence.find((e) => e.value != null) ?? row.evidence[0] ?? null;
+}
+
+/** The tag on the piece that decided a row (lib/stress-deciders' rule: ONE
+ *  figure decides), and on every other piece of a row a figure decided. */
+export const DECIDES_TAG = "Decides";
+export const BESIDE_TAG = "Beside it, not deciding";
+
+/** "Decides" on the piece a row was decided on, "Beside it, not deciding"
+ *  on every other; null on a row nothing decided (unchecked) or one built
+ *  before the rule. */
+export function decidesTag(row: StressRow, index: number): string | null {
+  if (row.decidedBy == null || row.verdict === "unchecked") return null;
+  return index === row.decidedBy ? DECIDES_TAG : BESIDE_TAG;
 }
 
 /** A percent at one or two places, a negative with the minus sign (U+2212),
