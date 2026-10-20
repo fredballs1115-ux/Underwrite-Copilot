@@ -100,7 +100,7 @@ import { condoShortLine, readCondo } from "@/lib/condo";
 import { condoUnitsOffered } from "@/lib/condo-units";
 import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import type { AssumableView } from "@/lib/assumable-debt";
-import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
+import { MASTER_LEASE_WORD, basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisTracks, compBarsCaption, subjectBasis } from "@/lib/comp-detail";
@@ -1991,6 +1991,10 @@ export function gridSubjectOf(extraction: ExtractionResult | null): string | nul
   const withheld = basisWithheldOf(extraction);
   if (!withheld) return null;
   switch (withheld.word) {
+    // A master lease's grids are the position's own model, a leasehold's:
+    // the deal itself, as before its basis was withheld.
+    case MASTER_LEASE_WORD:
+      return null;
     case "note":
       return "the collateral, run at the note's price";
     case "position":

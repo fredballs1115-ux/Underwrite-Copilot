@@ -143,8 +143,10 @@ export function subjectBasis(
    *  share's is grossed up to the whole the building's count and area
    *  describe — or withheld with no stated share, and beside a loan its
    *  entity carries (`entityLoan`), where the grossed-up figure is the
-   *  equity's whole and the building's cost is that plus the loan */
-  interest?: { kind: InterestKind; sharePct: number | null; entityLoan?: number | null },
+   *  equity's whole and the building's cost is that plus the loan; a
+   *  master lease of the building (`masterLeasehold`, a sandwich position)
+   *  buys the position between two rents, never the building, and has none */
+  interest?: { kind: InterestKind; sharePct: number | null; entityLoan?: number | null; masterLeasehold?: boolean },
   /** the deal's class in the deck's own words (`ExtractionResult.assetClass`),
    *  read for an outdoor-storage yard (lib/deal-strategy
    *  `isOutdoorStorageYard`) */
@@ -160,6 +162,7 @@ export function subjectBasis(
   // nobody's basis (lib/position).
   if (interest?.kind === "note" || interest?.kind === "leased_fee" || interest?.kind === "preferred_equity") return none;
   if (interest?.kind === "partial_interest" && (interest.sharePct == null || interest.entityLoan != null)) return none;
+  if (interest?.masterLeasehold) return none;
   const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
