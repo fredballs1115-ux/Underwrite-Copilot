@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-20",
+      "title": "The stress test's re-runs and headline, corrected and squared",
+      "href": "/how-we-test#headline",
+      "blurb": "Where the model's expense line is the T-12's, the taxes and insurance re-runs now swap the T-12's line for the OM's or the evidence's figure rather than adding the gap on top of it. The deal page's rent-growth check reads the same deciding figure as the stress test, the headline's parts add up to the gap it prints, a part held only to a screening default says so, and a current-vacancy line is read as today's, never as a stabilized assumption."
+    },
+    {
+      "date": "2026-10-20",
       "title": "A smoother first screen",
       "href": "/login",
       "blurb": "A confirmation link opened on another device no longer reads as an expired reset, a restart under a running screen says so at once instead of spinning, a failed rent roll or T-12 upload says what happened, the progress rail says the email is coming where it is, the screen-complete email leads with the stress test, and after a re-screen the call and the stress test stay at the top of the deal page."
