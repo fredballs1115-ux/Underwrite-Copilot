@@ -58,9 +58,23 @@ export async function addDealDocument(formData: FormData) {
   if (signatureMismatch(file.name, buffer)) {
     redirect(`/deals/${dealId}?error=docformat`);
   }
-  await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
+  // A storage failure says so on the deal page rather than throwing to the
+  // app's error page, and a record the database refused is said too — the
+  // file it would have listed is removed, so nothing is left unlisted in
+  // the bucket (the first-run audit of 2026-10-20). The redirects stand
+  // outside the try: `redirect` throws by design.
+  let uploaded = false;
+  try {
+    await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
+    uploaded = true;
+  } catch (err) {
+    console.error(
+      `[documents] upload failed for deal ${dealId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  if (!uploaded) redirect(`/deals/${dealId}?error=docupload`);
 
-  await supabase.from("deal_documents").insert({
+  const { error: insertErr } = await supabase.from("deal_documents").insert({
     id,
     deal_id: dealId,
     kind,
@@ -68,6 +82,13 @@ export async function addDealDocument(formData: FormData) {
     storage_path: path,
     content_type: file.type || null,
   });
+  if (insertErr) {
+    console.error(`[documents] record insert failed for deal ${dealId}: ${insertErr.message}`);
+    await removeSupplementFile(path, { kind: "deal", dealId }).catch(() => {
+      // the orphan is the lesser harm; the reader is told either way
+    });
+    redirect(`/deals/${dealId}?error=docupload`);
+  }
   revalidatePath(`/deals/${dealId}`);
 }
 

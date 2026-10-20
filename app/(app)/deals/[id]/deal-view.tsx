@@ -187,6 +187,9 @@ const MODEL_ERRORS: Record<string, string> = {
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: `That file is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit — save a smaller copy (a PDF compressed, a spreadsheet without its pictures) and upload that. Nothing was saved.`,
+  // A document's storage upload or its record failed (model-actions
+  // `addDealDocument`): nothing was added.
+  docupload: "That file didn’t finish uploading — nothing was added to the deal. Please try again.",
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   docformat:
