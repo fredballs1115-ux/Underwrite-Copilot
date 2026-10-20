@@ -257,7 +257,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
   it("says what would test an unchecked row only where the document named is one the test reads", () => {
     const noi: StressRow = { ...GROWTH, key: "noi", title: "NOI", omSays: { text: "NOI (pro forma): $3,880,000", value: 3_880_000, page: 8 }, unchecked: "No T-12 is on file, and the OM states no second NOI to hold its figure to." };
     expect(testedByHint(noi)).toBe("Add the T-12 to test this.");
-    expect(testedByHint({ ...noi, key: "insurance" })).toBe("Add the T-12 to test this.");
+    // The T-12's premium is the seller's history: it tests no new owner's
+    // quote, so no sentence promises it does.
+    expect(testedByHint({ ...noi, key: "insurance" })).toBeNull();
     expect(testedByHint({ ...noi, key: "vacancy" })).toBe("Add the rent roll or the T-12 to test this.");
     // A figure the OM does not state, a market figure, a tested row: none.
     expect(testedByHint({ ...noi, omSays: { ...noi.omSays, value: null } })).toBeNull();

@@ -451,11 +451,14 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Insurance",
     claim: "The premium stays at the seller's expiring policy.",
     against: [
-      "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's own premium: the OM's figure moved by the national premium index, not a figure of its own",
-      "The deal's T-12 premium against the pro forma's",
+      "Nothing: a new owner's quote would test the premium, and none is on file. Shown beside it, the producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, as the national move applied to the OM's own premium, not a test of it",
+      "Shown beside it too: the deal's T-12 premium, the same seller's history, not a test of a new owner's quote",
     ],
-    engine: "The insurance line is an expense input: the return is re-run at the T-12's premium where one is on file, else at the OM's premium moved by the index's year.",
-    limits: ["A quote is the carrier's: the index says how far the market moved, not what this building is quoted."],
+    engine: "No figure decides the row. With a T-12 on file the return is re-run at its premium, said as the seller's history and no test, and both headline cases keep the OM's premium; with none, nothing is re-run.",
+    limits: [
+      "A quote is the carrier's: neither the seller's T-12 nor the national index says what this building will be quoted.",
+      "No quote, binder or carrier's indication is read from the documents yet, so the row has nothing to test the premium against.",
+    ],
   },
   {
     key: "renovation_premium",

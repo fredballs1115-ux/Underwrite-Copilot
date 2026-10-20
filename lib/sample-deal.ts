@@ -366,8 +366,9 @@ const extraction: ExtractionResult = {
   totalPages: 48,
 };
 
-/** The T-12's insurance line (the statement below carries it): the figure
- *  the pro forma's premium is held to. */
+/** The T-12's insurance line (the statement below carries it): the seller's
+ *  own history, shown beside the pro forma's premium and held to nothing —
+ *  a new owner's quote would test it, and the sample states none. */
 const T12_INSURANCE = 385_000;
 
 /** The T-12's collected rent and its vacancy loss (the statement below

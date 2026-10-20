@@ -2934,7 +2934,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("9 assumptions · 3 unsupported · 4 stretched · 2 unchecked");
+    expect(page).toContain("9 assumptions · 2 unsupported · 4 stretched · 3 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, whole: the two cases, the split and
     // what is left out with why, in the words the memo and the brief read
@@ -3003,7 +3003,8 @@ describe("the report's stress-test page", () => {
     const withPage = await render(test);
     const without = await render(null);
     expect(await pdfTextOf(without)).not.toContain("The stress test");
-    const drawn = test.rows.filter((r) => r.omSays.value != null && r.evidence.some((e) => e.value != null)).length;
+    // An unchecked row was set against nothing, so it draws no ticks.
+    const drawn = test.rows.filter((r) => r.verdict !== "unchecked" && r.omSays.value != null && r.evidence.some((e) => e.value != null)).length;
     expect(drawn).toBeGreaterThanOrEqual(3);
     // The page's tracks (four fills a row drawn) plus the memo page's own
     // block (four a lead row): the difference counts both, over whatever
@@ -3018,7 +3019,7 @@ describe("the report's stress-test page", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
     // The reason is one whole sentence, never behind a second "No return re-run".
-    expect(text).toContain("2 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("3 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");

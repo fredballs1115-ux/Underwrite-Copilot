@@ -178,15 +178,15 @@ export function stressReadLine(rows: readonly StressRow[]): string {
 /**
  * What would test an unchecked row, in plain words — only where the OM
  * states the figure and the document named is one the test reads when it
- * is on the deal (the T-12's NOI, vacancy and insurance line, the rent
- * roll's occupancy). Null elsewhere: a sentence never promises a test the
- * code does not make.
+ * is on the deal (the T-12's NOI and vacancy, the rent roll's occupancy).
+ * Null elsewhere: a sentence never promises a test the code does not make —
+ * the T-12's insurance line is the seller's history, which tests no premium
+ * a new owner will be quoted.
  */
 export function testedByHint(row: StressRow): string | null {
   if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
   switch (row.key) {
     case "noi":
-    case "insurance":
       return "Add the T-12 to test this.";
     case "vacancy":
       return "Add the rent roll or the T-12 to test this.";
@@ -500,6 +500,14 @@ function UncheckedRow({ row }: { row: StressRow }) {
         </p>
       )}
       <EvidenceList evidence={row.evidence} />
+      {/* A re-run on a row that stands unchecked (the insurance line at the
+          seller's own T-12 premium) is said in its own words, which say it
+          tests nothing; no bars, since nothing decided it. */}
+      {row.impact && (
+        <p className={`mt-1 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-unchecked-rerun">
+          <Dated text={row.impact.note} />
+        </p>
+      )}
       {row.challenge && <ChallengeFold challenge={row.challenge} />}
       <MethodLine row={row} />
     </li>

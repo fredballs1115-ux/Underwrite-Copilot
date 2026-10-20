@@ -18,7 +18,6 @@ import {
   DEBT_UNSUPPORTED_BPS,
   EXIT_CAP_UNSUPPORTED_BPS,
   EXPENSE_GROWTH_UNSUPPORTED_PTS,
-  INSURANCE_UNSUPPORTED_SHARE,
   IRR_MOVE_STRETCH_BPS,
   NOI_UNSUPPORTED_SHARE,
   PREMIUM_UNSUPPORTED_SHARE,
@@ -83,7 +82,7 @@ export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
     line: `Past the evidence by less than the row's threshold; or inside it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
   },
   { word: "unsupported", line: "Past the evidence by more than the row's threshold, below." },
-  { word: "unchecked", line: "The OM states no figure, or no evidence with a figure could be read for the deal." },
+  { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
 ];
 
 const pctOf = (share: number) => `${Math.round(share * 100)}%`;
@@ -105,7 +104,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
-  insurance: `Held to the T-12's premium, else the OM's premium moved by the index's year. Holds within ${pctOf(SAME_SHARE)} or over it; unsupported past ${pctOf(INSURANCE_UNSUPPORTED_SHARE)} under it.`,
+  insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };

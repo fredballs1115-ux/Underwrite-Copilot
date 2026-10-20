@@ -30,6 +30,8 @@ import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./s
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
+  INSURANCE_NO_QUOTE,
+  INSURANCE_RERUN_NOTE,
   IRR_MOVE_STRETCH_BPS,
   SHARE_NO_MODEL,
   buildStressTest,
@@ -300,15 +302,37 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(t.impact!.note).toMatch(/^If the tax line is the \$532k bill if the sale resets the assessment to the price, not the OM's \$380k, the levered IRR moves from/);
     const i = rowOf(test, "insurance");
     expect(i.omSays.value).toBe(120_000);
+    // The T-12's premium is the same seller's policy: shown as its history,
+    // never the figure that decides.
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
-    expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED" });
+    expect(i.evidence[0].text).toMatch(/; the seller's history, not a test of a new owner's quote$/);
+    expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED", value: null });
     // The index's figure is the OM's own premium moved by it, labelled so —
-    // never set out as a premium of its own.
+    // never set out as a premium of its own, and carrying no figure any
+    // surface could hold the OM's to.
     expect(i.evidence[1].label).toBe("The OM's $120k moved by the national premium index (PPI, commercial multiple peril)");
-    expect(i.evidence[1].text).toMatch(/^\$\d+k \(the index [+-−]?\d+\.\d% over the year to .+\); the nation's carriers' move on the OM's own figure, not this building's quote$/);
-    expect(i.gap).toMatchObject({ value: 30_000, unit: "usd" });
-    expect(i.verdict).toBe("unsupported");
+    expect(i.evidence[1].text).toMatch(/^\$\d+k \(the index [+-−]?\d+\.\d% over the year to .+\); the national move applied to the OM's own figure, not a test of this premium$/);
+    // No quote for a new owner is on file, so nothing tests the premium.
+    expect(i.verdict).toBe("unchecked");
+    expect(i.gap).toBeNull();
+    expect(i.unchecked).toBe(INSURANCE_NO_QUOTE);
+    expect(i.method).toBe(
+      "The OM's insurance beside the deal's T-12 insurance line and the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED): none carries a figure it is held to.",
+    );
+    // The return is re-run at the seller's own premium, said as no test.
     expect(i.impact!.input).toBe("expenseLines");
+    expect(i.impact!.note.endsWith(INSURANCE_RERUN_NOTE)).toBe(true);
+  });
+
+  it("re-runs no insurance line without a T-12: the index only moves the OM's own premium", () => {
+    const derived = deriveUnderwriteInputs(APARTMENT, "x", undefined, { debtIndex: FIVE });
+    const t = buildStressTest(apartmentArgs({ derived, actuals: null, modelVsMarket: readFor(derived) }));
+    const i = rowOf(t, "insurance");
+    expect(i.verdict).toBe("unchecked");
+    expect(i.unchecked).toBe(INSURANCE_NO_QUOTE);
+    expect(i.evidence.map((e) => [e.kind, e.value])).toEqual([["published", null]]);
+    expect(i.impact).toBeNull();
+    expect(t.headline!.omKeys).not.toContain("insurance");
   });
 
   it("swaps a line the T-12's expense load already carries, never adding the gap on top of it (audit H3)", () => {
@@ -328,7 +352,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.baseIrrPct!).toBeCloseTo(irrAt(1_720_000), 9);
     expect(i.altIrrPct!).toBeCloseTo(irrAt(total), 9);
     expect(i.note).toMatch(/^If the insurance line is the deal's T-12's \$150k, not the OM's \$120k, the levered IRR moves from /);
-    expect(i.note).toMatch(/ The model itself already runs at it\.$/);
+    expect(i.note).toMatch(/ The model itself already runs at it\. The T-12's premium is the seller's own history/);
     // The reset tax bill, against the T-12's $380k tax line (the OM's own
     // figure here): the OM's run is the model's line, the evidence's the line
     // less the T-12's $380k plus the $532k reset.

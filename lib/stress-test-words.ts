@@ -217,6 +217,8 @@ export function noMoveWhy(test: StressTest, row: StressRow): string {
  * carries no two figures.
  */
 export function tickPositions(row: StressRow): { om: number; evidence: number } | null {
+  // An unchecked row was set against nothing: no two ticks on one track.
+  if (row.verdict === "unchecked") return null;
   const e = bestEvidence(row);
   const om = row.omSays.value;
   const ev = e?.value ?? null;

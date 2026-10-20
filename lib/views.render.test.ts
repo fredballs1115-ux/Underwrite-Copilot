@@ -1508,13 +1508,19 @@ describe("ModelView — the sample model renders every panel", () => {
       // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
       // by count (225 of 248 doors).
       expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.1%");
-      // The sample's two unchecked rows are one folded group at the end: the
-      // memorandum states no loan rate, and no figure was read today for
-      // rent growth. Its taxes, insurance and premium are tested.
-      expect(visibleText(html)).toContain("2 could not be checked: debt, rent growth");
-      expect(visibleText(html)).toContain("Read why (2)");
+      // The sample's three unchecked rows are one folded group at the end:
+      // the memorandum states no loan rate, no figure was read today for rent
+      // growth, and no quote for a new owner tests the premium. Its taxes and
+      // renovation premium are tested.
+      expect(visibleText(html)).toContain("3 could not be checked: debt, rent growth, insurance");
+      expect(visibleText(html)).toContain("Read why (3)");
+      // The insurance row's re-run at the seller's own T-12 premium is said
+      // in its own words, which say it tests nothing.
+      const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));
+      expect(ins).toContain('data-verdict="unchecked"');
+      expect(visibleText(ins.slice(0, ins.indexOf('data-qa="stress-row-', 10)))).toContain("so this re-run is no test of the OM's premium.");
       // The taxes' reset is the jurisdiction's to make: stretched at most.
-      for (const [k, v] of [["taxes", "stretched"], ["insurance", "unsupported"], ["renovation_premium", "unsupported"]]) {
+      for (const [k, v] of [["taxes", "stretched"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);
         expect(at, k).toBeGreaterThan(0);
         expect(at, k).toBeLessThan(html.indexOf('data-qa="stress-unchecked-group"'));

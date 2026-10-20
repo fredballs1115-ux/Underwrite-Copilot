@@ -24,7 +24,7 @@ describe("the sample's stress test", () => {
     return i ? [Number(i.baseIrrPct!.toFixed(1)), Number(i.altIrrPct!.toFixed(1))] : null;
   };
 
-  it("tests seven of its nine assumptions; the two unchecked are the loan rate no document states and a rent growth no figure was read for", () => {
+  it("tests six of its nine assumptions; the three unchecked are the loan rate no document states, a rent growth no figure was read for and a premium no new owner's quote tests", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["basis", "stretched"],
@@ -37,7 +37,9 @@ describe("the sample's stress test", () => {
       ["rent_growth", "unchecked"],
       // The reset is conditional on the jurisdiction: stretched at most.
       ["taxes", "stretched"],
-      ["insurance", "unsupported"],
+      // The T-12's premium is the same seller's history, and no quote for
+      // a new owner is on file: nothing tests the pro forma's $310k.
+      ["insurance", "unchecked"],
       ["renovation_premium", "unsupported"],
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");
@@ -58,7 +60,8 @@ describe("the sample's stress test", () => {
     expect(irr("taxes")).toEqual([9.3, 5.9]);
     // The OM's $310k in place of the T-12's $385k inside the model's one
     // expense line, the T-12's total; the evidence's run is the model's own
-    // (audit H3: the gap had been added on top of the T-12's premium).
+    // (audit H3: the gap had been added on top of the T-12's premium). The
+    // row is unchecked, so the re-run says it tests nothing.
     expect(irr("insurance")).toEqual([10.3, 9.3]);
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
@@ -86,10 +89,12 @@ describe("the sample's stress test", () => {
     expect(taxes.gap?.text).toMatch(/^If the sale resets the assessment to the price, the bill is/);
   });
 
-  it("holds the pro forma's insurance to the T-12's line", () => {
+  it("shows the T-12's insurance line beside the pro forma's as the seller's history, and holds it to nothing", () => {
     const t12 = SAMPLE_DEAL.t12.summary.opex.find((l) => l.key === "insurance")!.amount;
     expect(row("insurance").omSays.value).toBe(usd("Insurance (pro forma)"));
     expect(row("insurance").evidence[0].value).toBe(t12);
+    expect(row("insurance").verdict).toBe("unchecked");
+    expect(row("insurance").gap).toBeNull();
     expect(row("insurance").omSays.page).toBe(28);
   });
 
