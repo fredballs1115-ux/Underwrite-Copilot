@@ -110,7 +110,7 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { VERDICT_WORD, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -486,6 +486,15 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
           `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
+      {/* The headline (lib/stress-test-words): the OM's case against the
+          evidence's, the gap split by assumption, what is left out and why
+          — or, where no return is re-run, that it is withheld with them. */}
+      {liveHeadline(test) ? (
+        <Text style={{ fontSize: 9, color: C.ink, fontFamily: "Helvetica-Bold", marginBottom: 8 }}>{str(headlineSentence(test))}</Text>
+      ) : test.impactsWithheld ? (
+        // The read line above already gives the reason.
+        <Text style={{ fontSize: 8.5, color: C.muted, marginBottom: 8 }}>{str(HEADLINE_WITHHELD)}</Text>
+      ) : null}
       {rows.map((r, i) => (
         <StressRowBlock key={`${r.key}-${i}`} row={r} test={test} />
       ))}

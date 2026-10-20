@@ -1,5 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { buildBrief } from "./verdict";
+import { HEADLINE_WITHHELD, headlineSentence } from "@/lib/stress-test-words";
 import { dealContextFor } from "@/lib/deal-context";
 import type { ExtractedMetric, ExtractionResult, FirstSignal, MarketResult } from "./types";
 
@@ -573,6 +574,11 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // The instruction: the moves are the engine's, cited by figure and date.
     expect(brief).toContain("The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself");
     expect(brief).toContain("cite it by figure and date and name its publisher");
+    // The headline, one line under the read line, in the words the memo and
+    // the report read, and the instruction that its runs are the engine's.
+    expect(brief).toContain(`2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+    expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence/);
+    expect(brief).toContain("The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
     // None handed, no section.
     expect(buildBrief({ extraction: null, ...none })).not.toContain("STRESS TEST");
@@ -597,6 +603,10 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
     expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
     expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");
+    // The headline goes with the re-runs, said so, whatever the test carried.
+    expect(brief).toContain(`HEADLINE: ${HEADLINE_WITHHELD}`);
+    expect(brief).not.toContain("HEADLINE (the engine's");
+    expect(brief).not.toContain("The HEADLINE's two returns");
     // The instruction is said in a reader's words, never the phrase a verdict would echo.
     expect(brief).not.toContain("no impact was struck in code");
     expect(brief).not.toContain("The IRR moves above are the engine's own");

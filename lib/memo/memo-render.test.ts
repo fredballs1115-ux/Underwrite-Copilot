@@ -1537,6 +1537,11 @@ describe("the memo leads with the stress test", () => {
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
     expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (3 unsupported, 4 stretched), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    // The headline, in the read line's paragraph: the OM's case against the
+    // evidence's (lib/stress-test `stressHeadline`); the split is the
+    // report's, since the one page has no line to spare for it.
+    expect(text).toContain(`in code. ${test.headline ? "Levered IRR on the OM's figures" : ""}`);
+    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.3% by count, one input apart.

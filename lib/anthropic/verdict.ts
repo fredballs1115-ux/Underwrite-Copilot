@@ -33,7 +33,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
 import type { StressTest } from "@/lib/stress-test-types";
-import { VERDICT_WORD, noMoveWhy, stressReadLine, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, noMoveWhy, stressReadLine, whenWords } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -140,6 +140,11 @@ export const STRESS_SECTION_HEADING = "## STRESS TEST, STRUCK IN CODE";
  */
 export function stressSection(test: StressTest): string[] {
   const lines: string[] = [stressReadLine(test)];
+  // The headline, struck in code: the OM's case against the evidence's,
+  // the gap split by assumption (lib/stress-test `stressHeadline`), which
+  // the call may cite as it stands.
+  if (liveHeadline(test)) lines.push(`HEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+  else if (test.impactsWithheld) lines.push(`HEADLINE: ${HEADLINE_WITHHELD}`);
   for (const r of test.rows) {
     const page = r.omSays.page != null ? ` [p. ${r.omSays.page}]` : "";
     const evidence = r.evidence.length
@@ -170,7 +175,11 @@ export function stressSection(test: StressTest): string[] {
     "",
     test.impactsWithheld
       ? `${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.`
-      : "The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing.",
+      : `The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing.${
+          liveHeadline(test)
+            ? " The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself — each row starts from a different return, which is what the headline's one pair of runs answers."
+            : ""
+        }`,
     "Lead the reason with the unsupported rows, then the stretched. Wherever a figure above decides a sentence — the reason, a screen range, a deal-killer's read, a next step — cite it by figure and date and name its publisher (\"the rent roll's 9.1% vacancy, May 31, 2026\"; \"the Census Bureau's 6.2% for the metro, Q2 2026\"): an unsupported figure is the range's conservative end, and the matching next step is what the broker must show to support the OM's figure. A row the test leaves unchecked has nothing in code to cite, and you say so if you raise it.",
   );
   return lines;

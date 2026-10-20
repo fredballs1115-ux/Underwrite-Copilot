@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
-import { HEADLINE_WITHHELD, headlineLine, headlineName, noMoveWhy, ptsText } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, headlineLine, headlineName, liveHeadline, noMoveWhy, ptsText } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
 /**
@@ -706,7 +706,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
       {/* The reason is a whole sentence that already says no return is
           re-run; the headline goes with the re-runs, said so. */}
       {test.impactsWithheld && <PanelNote>{`${test.impactsWithheld} ${HEADLINE_WITHHELD}`}</PanelNote>}
-      {!test.impactsWithheld && test.headline && <HeadlineView headline={test.headline} line={headlineLine(test, "→")!} />}
+      {liveHeadline(test) && <HeadlineView headline={liveHeadline(test)!} line={headlineLine(test, "→")!} />}
 
       {tested.length > 0 && (
         <ol className="mt-2 divide-y divide-line" data-qa="stress-rows">

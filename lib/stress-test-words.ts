@@ -17,6 +17,7 @@ import { compactUsd } from "@/lib/money";
 import {
   STRESS_KEYS,
   type StressEvidence,
+  type StressHeadline,
   type StressImpact,
   type StressKey,
   type StressRow,
@@ -265,6 +266,12 @@ const HEADLINE_NAME: Record<StressKey, string> = {
   other: "another assumption",
 };
 
+/** The headline a surface prints: none wherever the re-runs are withheld,
+ *  whatever the test carries — the headline goes with them. */
+export function liveHeadline(test: StressTest): StressHeadline | null {
+  return test.impactsWithheld ? null : (test.headline ?? null);
+}
+
 /** An assumption as the headline names it mid-sentence: "the exit cap". */
 export function headlineName(key: StressKey): string {
   return HEADLINE_NAME[key];
@@ -286,7 +293,7 @@ export function ptsText(n: number): string {
  * headline.
  */
 export function headlineLine(test: StressTest, arrow = "to"): string | null {
-  const h = test.headline;
+  const h = liveHeadline(test);
   if (!h) return null;
   const om = irrText(h.omIrrPct);
   if (h.parts.length === 0 && h.omIrrPct != null && h.evidenceIrrPct != null && Math.abs(h.evidenceIrrPct - h.omIrrPct) < 1e-9) {
@@ -297,12 +304,26 @@ export function headlineLine(test: StressTest, arrow = "to"): string | null {
 
 /** "the price +3.7 pts, vacancy −3.2 pts and the exit cap −1.4 pts" */
 export function headlineSplit(test: StressTest): string {
-  return joinAnd((test.headline?.parts ?? []).map((p) => `${headlineName(p.key)} ${ptsText(p.pts)}`));
+  return joinAnd((liveHeadline(test)?.parts ?? []).map((p) => `${headlineName(p.key)} ${ptsText(p.pts)}`));
 }
 
 function joinAnd(parts: string[]): string {
   if (parts.length <= 1) return parts[0] ?? "";
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * The headline in one short clause, for the one-page memo, which has no
+ * line to spare (measured on the sample: the line alone fits beside the
+ * read line, the split does not): "Levered IRR on the OM's figures 16.7%
+ * to 12.3% with the evidence; the report splits the gap by assumption."
+ * The report prints `headlineSentence`, the split and what is left out
+ * with why. Null with no headline.
+ */
+export function headlineShort(test: StressTest): string | null {
+  const h = liveHeadline(test);
+  if (!h) return null;
+  return `${headlineLine(test)!}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
 }
 
 /** The sentence a document prints where the headline is withheld: the
@@ -318,7 +339,7 @@ export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evi
  * test has no headline and withholds nothing (no row carries a re-run).
  */
 export function headlineSentence(test: StressTest): string | null {
-  const h = test.headline;
+  const h = liveHeadline(test);
   if (!h) return test.impactsWithheld ? `${test.impactsWithheld} ${HEADLINE_WITHHELD}` : null;
   const line = headlineLine(test)!;
   const multiples =

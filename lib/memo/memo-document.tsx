@@ -64,7 +64,7 @@ import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { StressTest } from "@/lib/stress-test-types";
-import { leadRows, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
+import { headlineShort, leadRows, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -570,6 +570,10 @@ export interface MemoStressBlock {
   read: string;
   /** "1 unsupported · 2 stretched" — the count beside the title */
   count: string;
+  /** the headline (lib/stress-test-words `memoHeadline`): "Levered IRR on
+   *  the OM's figures 16.7% to 12.3% with the evidence: …", or "" where the
+   *  test carries none (the read line already says why no return is re-run) */
+  headline?: string;
   rows: StressRowWords[];
 }
 
@@ -589,6 +593,7 @@ export function memoStressBlock(test: StressTest | null | undefined): MemoStress
   return {
     read: pdfSafe(stressReadLine(test)),
     count: pdfSafe(count),
+    headline: pdfSafe(headlineShort(test) ?? ""),
     rows: leadRows(test, MEMO_STRESS_ROWS).map((r) => {
       const w = rowWords(r);
       return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move) };
@@ -1057,6 +1062,7 @@ const s = StyleSheet.create({
   // two ticks on one short track (plain Views, so the fill count can be
   // read back). It sits right after the verdict box, the product's lead.
   stressRead: { fontSize: 7.5, color: C.muted, marginBottom: 3 },
+  stressHeadline: { color: C.ink, fontFamily: "Helvetica-Bold" },
   stressRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1616,7 +1622,14 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
             evidence's in ink. */}
         {data.stressTest && (
           <Section title="The OM's assumptions, tested" keep count={data.stressTest.count}>
-            <Text style={s.stressRead}>{data.stressTest.read}</Text>
+            {/* The read line, then the headline in the same paragraph — the
+                OM's case against the evidence's, the gap split by
+                assumption (lib/stress-test-words) — so it takes the read
+                line's last line's room before a line of its own. */}
+            <Text style={s.stressRead}>
+              {data.stressTest.read}
+              {data.stressTest.headline ? <Text style={s.stressHeadline}>{` ${data.stressTest.headline}`}</Text> : null}
+            </Text>
             {data.stressTest.rows.map((r, i) => {
               const tone = STRESS_TONE[r.verdict] ?? C.muted;
               // The track is the column less its right padding (46 − 8).
