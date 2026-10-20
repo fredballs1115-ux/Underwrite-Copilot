@@ -16,6 +16,16 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
 import { TINY_PNG_DATA_URI } from "./test-png";
 
+/** The sample's memorandum without its renovation program's rows (p. 25):
+ *  the fixture the layout tests below were measured on, before the sample
+ *  stated a program — each of them is about other lines under the title,
+ *  and the program's own line is tested on its own. */
+const PROGRAM_ROW = /renovat|^classic rent$/i;
+const SAMPLE_WITHOUT_PROGRAM = {
+  ...SAMPLE_DEAL.extraction,
+  metrics: SAMPLE_DEAL.extraction.metrics.filter((m) => !PROGRAM_ROW.test(m.label)),
+};
+
 describe("MemoDocument (redesigned)", () => {
   it("renders the sample memo to a one-page PDF", async () => {
     const deal = {
@@ -402,11 +412,12 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).rosterLine).toBe("");
   }, 30000);
 
-  it("says a value-add program under the title (#460), and nothing on the sample", async () => {
+  it("says a value-add program under the title (#460), and the sample's own program as its memorandum states it", async () => {
+    // The sample states a program of its own (p. 25); this deal's replaces it.
     const extraction = {
       ...SAMPLE_DEAL.extraction,
       metrics: [
-        ...SAMPLE_DEAL.extraction.metrics,
+        ...SAMPLE_WITHOUT_PROGRAM.metrics,
         { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" },
         { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" },
         { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" },
@@ -430,7 +441,9 @@ describe("MemoDocument (redesigned)", () => {
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("Value-add program: 192 doors to renovate");
-    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe("");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe(
+      "Value-add program: 192 doors to renovate; $18,000 a door; $200 a month premium (13% on cost); $140 achieved on renovated units",
+    );
   }, 30000);
 
   it("says a student building's pre-leasing under the title (#468), and nothing on the sample", async () => {
@@ -961,7 +974,7 @@ describe("MemoDocument (redesigned)", () => {
         ...SAMPLE_DEAL.extraction,
         interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
         metrics: [
-          ...SAMPLE_DEAL.extraction.metrics,
+          ...SAMPLE_WITHOUT_PROGRAM.metrics,
           { label: "Ground lease expiration", value: "December 31, 2071", flagged: false, page: "p. 12", basis: "na" },
           { label: "Ground lease extension options", value: "Four 10-year options", flagged: false, page: "p. 12", basis: "na" },
         ],
@@ -1062,10 +1075,13 @@ describe("MemoDocument (redesigned)", () => {
       { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
       SAMPLE_DEMO_BOX,
     );
+    // The fixtures below were measured on the sample before it stated a
+    // renovation program, whose line under the title would move every
+    // break; the sample as it stands is held to one page on its own.
     const base = {
       name: SAMPLE_DEAL.name,
       asset_class: SAMPLE_DEAL.asset_class,
-      extraction: SAMPLE_DEAL.extraction,
+      extraction: SAMPLE_WITHOUT_PROGRAM,
       challenges: SAMPLE_DEAL.challenges,
       comps: SAMPLE_DEAL.comps,
       market: SAMPLE_DEAL.market,
@@ -1095,9 +1111,11 @@ describe("MemoDocument (redesigned)", () => {
       pages.some((p) => parts.every((part) => p.includes(part)));
 
     // The ordinary sample, its buy box included: one page, no continuation.
-    const sample = await render(base);
+    const sample = await render({ ...base, extraction: SAMPLE_DEAL.extraction });
     expect(sample).toHaveLength(1);
     expect(sample[0]).not.toContain("continued");
+    expect(sample[0]).toContain("Value-add program: 192 doors to renovate");
+    expect(await render(base)).toHaveLength(1);
 
     // The sample with an analyst's override: it travels on page one now the
     // lines under the title run the page's width (research pass 35).
@@ -1129,6 +1147,10 @@ describe("MemoDocument (redesigned)", () => {
     // student building's pre-leasing: one more line under the title each.
     const REGULATED = [row("Rent regulation", "Rent stabilization"), row("Rent-regulated units", "41")];
     const PRELEASED = [row("Pre-leased", "87% for fall 2026"), row("Beds", "612")];
+    // …and a note the seller offers to carry: one line more, which puts the
+    // second fixture's break back at the deal-killers once the sample's own
+    // exit card read the stress test's figures in a shorter sentence.
+    const SELLER_NOTE = [row("Seller financing amount", "$10,000,000"), row("Seller financing rate", "5.00%")];
     const crowd = (name: string, hotel: boolean, extra: ReturnType<typeof row>[] = []) => ({
       ...base,
       name,
@@ -1143,7 +1165,7 @@ describe("MemoDocument (redesigned)", () => {
         sale: { method: "receivership", terms: "", condition: "As-is", page: "" },
         ...(hotel ? { hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management", pip: "", page: "" } } : {}),
         metrics: [
-          ...SAMPLE_DEAL.extraction.metrics,
+          ...SAMPLE_WITHOUT_PROGRAM.metrics,
           row("Restricted units", "186"),
           row("Units under HAP contract", "82"),
           row("Affordability expiration", "December 31, 2054"),
@@ -1167,7 +1189,7 @@ describe("MemoDocument (redesigned)", () => {
     });
     const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", true, REGULATED), null, { checks: wideBox, cover: true });
     const killersAtBreak = await render(
-      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true, [...REGULATED, ...PRELEASED]),
+      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true, [...REGULATED, ...PRELEASED, ...SELLER_NOTE]),
       null,
       { checks: wideBox, cover: true },
     );
@@ -1308,9 +1330,9 @@ describe("MemoDocument (redesigned)", () => {
       React.createElement(MemoDocument, { data: buildMemoData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    // The sample's exit killer: "A 5.50% exit, 5 bps over going-in, knocks roughly N bps off
-    // the IRR" — the verdict step's estimate, computed by no engine.
-    expect(text).toMatch(/Breaks if \(screen's estimate\): A 5\.50% exit, 5 bps over going-in, knocks roughly \d+ bps off the IRR\./);
+    // The sample's exit killer quotes the stress test's own re-run, labelled
+    // as the card is: the verdict step's card, under the screen's heading.
+    expect(text).toMatch(/Breaks if \(screen's estimate\): At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
     expect(text).not.toContain("Breaks if: ");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
   }, 30000);
@@ -1497,26 +1519,34 @@ describe("the memo leads with the stress test", () => {
     const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
     const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
+    // The four rows the memo has room for, unsupported first in the test's
+    // own order; the basis and the exit, stretched, are the report's.
     expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["vacancy", "unsupported"],
-      ["basis", "stretched"],
-      ["exit_cap", "stretched"],
+      ["taxes", "unsupported"],
+      ["insurance", "unsupported"],
+      ["renovation_premium", "unsupported"],
     ]);
     const pdf = await renderMemoPdf(data);
     // One page, every row on it: the block takes the room the screen's
-    // estimates had, and the actuals line still fits beside the key terms.
+    // estimates had, the program's line still sits under the title, and the
+    // actuals line still fits beside the key terms.
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("9 assumptions of the memorandum's tested in code — 1 unsupported, 2 stretched, 1 holds, 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("9 assumptions of the memorandum's tested in code — 4 unsupported, 2 stretched, 1 holds, 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.1%, one input apart.
     expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.1% (the deal's rent roll, May 31, 2026) · gap 3.1 pts · IRR 12.4% to 9.3%");
-    // The basis row carries the engine's move, spelled, since standard
+    // The taxes row: the seller's bill against the bill its own rate makes
+    // on the price, and the engine's move, spelled, since standard
     // Helvetica has no arrow.
-    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $261k/unit (the offering memorandum) · gap 5.1% · IRR 9.3% to 11.8%");
-    expect(text).toContain("STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (the offering memorandum) · gap 20 bps · IRR 10.8% to 9.3%");
+    expect(text).toContain("UNSUPPORTED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · IRR 9.3% to 5.9%");
+    expect(text).toContain("UNSUPPORTED Insurance OM $310k (p. 28) · against $385k (the deal's T-12, May 31, 2026) · gap $75k · IRR 9.3% to 8.2%");
+    // The premium is no model input: its row has a gap and no IRR.
+    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
+    expect(text).toContain("Value-add program: 192 doors to renovate; $18,000 a door; $200 a month premium (13% on cost); $140 achieved on renovated units");
     expect(text).not.toMatch(/→|->/);
     // The block sits right after the verdict box and before the buy box.
     const verdictAt = text.indexOf(data.verdictReason.slice(0, 40));
@@ -1543,7 +1573,7 @@ describe("the memo leads with the stress test", () => {
     const withTicks = await render(data);
     const withoutTicks = await render({ ...data, stressTest: { ...data.stressTest!, rows: data.stressTest!.rows.map((r) => ({ ...r, ticks: null })) } });
     const drawn = data.stressTest!.rows.filter((r) => r.ticks).length;
-    expect(drawn).toBe(3);
+    expect(drawn).toBe(4);
     // The track, the span between the two and a tick each: four fills a row.
     expect(pdfFillCountOf(withTicks) - pdfFillCountOf(withoutTicks)).toBe(drawn * 4);
   }, 60000);

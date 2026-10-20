@@ -1408,7 +1408,7 @@ describe("ModelView — the sample model renders every panel", () => {
       // The sample's finding counts, as the deal page counts them.
       const text = visibleText(html);
       expect(text).toMatch(/Buy box\s*1\s*finding\b/);
-      expect(text).toMatch(/Analyses\s*9\s*findings/);
+      expect(text).toMatch(/Analyses\s*10\s*findings/);
       // No round pill tabs of the old design.
       expect(text).not.toContain("Buy box & fit");
       expect(text).not.toContain("Financials & model");
@@ -1474,9 +1474,17 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(visibleText(row)).toContain("the deal's T-12");
       // The engine at the OM's 6.0% against the engine at the roll's 9.1%.
       expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.3%");
-      // The sample's five unchecked rows are one folded group at the end.
-      expect(visibleText(html)).toContain("5 assumptions unchecked: debt, rent growth, real estate taxes, insurance, the renovation premium");
-      expect(visibleText(html)).toContain("Read why (5)");
+      // The sample's two unchecked rows are one folded group at the end: the
+      // memorandum states no loan rate, and no figure was read today for
+      // rent growth. Its taxes, insurance and premium are tested.
+      expect(visibleText(html)).toContain("2 assumptions unchecked: debt, rent growth");
+      expect(visibleText(html)).toContain("Read why (2)");
+      for (const k of ["taxes", "insurance", "renovation_premium"]) {
+        const at = html.indexOf(`data-qa="stress-row-${k}"`);
+        expect(at, k).toBeGreaterThan(0);
+        expect(at, k).toBeLessThan(html.indexOf('data-qa="stress-unchecked-group"'));
+        expect(html.slice(at, at + 400), k).toContain('data-verdict="unsupported"');
+      }
       expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-noi"'));
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
       expect(row).toContain('data-qa="stress-impact"');
@@ -1705,8 +1713,10 @@ describe("ModelView — the sample model renders every panel", () => {
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).not.toMatch(/every number traces to a source|every value sourced/);
-    expect(text).toMatch(/8 of the 13 assumptions below come from them, and the other 5, which no document states, are the model's own, marked “assumed”/);
-    expect(text).toMatch(/Assumptions\s*· 8 from your documents, 5 assumed/);
+    // The rate is a screening default no document states (no term sheet
+    // is among the sample's documents), so six are assumed.
+    expect(text).toMatch(/7 of the 13 assumptions below come from them, and the other 6, which no document states, are the model's own, marked “assumed”/);
+    expect(text).toMatch(/Assumptions\s*· 7 from your documents, 6 assumed/);
     // The table's first eight rows hold two the reconciliation chose: the exit cap and rent growth.
     expect(html.match(/data-qa="assumed"/g)).toHaveLength(2);
     expect(text).toMatch(/Market assumed/);
@@ -9123,11 +9133,14 @@ describe("ValueAddPanel — the doors, the premium against its break-even, and t
 });
 
 describe("ShareView — a value-add renovation program, under the title (#460)", () => {
-  it("draws the program and leads the key terms with the doors and the premium, and nothing on the sample", () => {
+  it("draws the program and leads the key terms with the doors and the premium, and the sample's own program as stated", () => {
+    // A memorandum read as a value-add, this program its own: the sample's
+    // program rows and its stabilized read are left out.
     const withProgram = {
       ...SAMPLE_DEAL.extraction,
+      strategy: undefined,
       metrics: [
-        ...SAMPLE_DEAL.extraction.metrics,
+        ...SAMPLE_DEAL.extraction.metrics.filter((m) => !/renovat|^classic rent$/i.test(m.label)),
         { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" as const },
         { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" as const },
         { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" as const },
@@ -9152,7 +9165,12 @@ describe("ShareView — a value-add renovation program, under the title (#460)",
     expect(text).toContain("Budget (doors × cost a door)");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
-    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("value-add-panel");
+    // The sample states its own program (p. 25), read as stabilized: the
+    // panel draws it, and no plan budget is struck on it.
+    const sample = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }));
+    expect(sample).toContain('data-qa="value-add-panel"');
+    expect(visibleText(sample)).toContain("The program renovates the 192 doors still to do at $18,000 each for $200 a month more rent");
+    expect(visibleText(sample)).not.toContain("Budget (doors × cost a door)");
   });
 });
 
@@ -9256,10 +9274,12 @@ describe("TaxAbatementPanel — the clock against the sale, the bill, and the NO
 
 describe("ShareView — a property-tax abatement, under the title (#461)", () => {
   it("draws the abatement and leads the key terms with it, and nothing on the sample", () => {
+    // The sample's own renovation program, which would lead the key terms
+    // ahead of an abatement, is left out of this fixture.
     const withAbatement = {
       ...SAMPLE_DEAL.extraction,
       metrics: [
-        ...SAMPLE_DEAL.extraction.metrics,
+        ...SAMPLE_DEAL.extraction.metrics.filter((m) => !/renovat|^classic rent$/i.test(m.label)),
         { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "", basis: "na" as const },
         { label: "Tax abatement expiration", value: "2099", flagged: false, page: "", basis: "na" as const },
         { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "", basis: "na" as const },

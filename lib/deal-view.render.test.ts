@@ -971,7 +971,9 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(risks.find((r) => r.title.startsWith("Year-1 NOI"))?.severity).toBe("low");
     // The vacancy gap, 300 bps on the model's 9.0%, stays outside the band.
     expect(risks.find((r) => r.title.startsWith("Vacancy"))?.severity).toBe("high");
-    expect(html).toContain('title="3 high · 6 med · 2 low"');
+    // The challenger's five (three high, the taxes among them) beside the
+    // reconciliation's and the market's rows.
+    expect(html).toContain('title="4 high · 7 med · 2 low"');
     // A row whose size cannot be read on that footing keeps its old grade.
     const unread = deriveRisks({
       ...(p.results as Parameters<typeof deriveRisks>[0]),

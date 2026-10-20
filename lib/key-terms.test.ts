@@ -26,8 +26,16 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
   it("on the sample deal: asking price, going-in cap and units first, then the flagged rows", () => {
     const rows = keyTermRows(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind, SCREEN_YEAR, 8);
     expect(rows.slice(0, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap", "Units"]);
-    // The flagged pro-forma rows still come before the unflagged rest.
-    expect(rows[3].flagged).toBe(true);
+    // Then the renovation program's unit economics (#460), the doors, a
+    // door's cost, the premium and its proof…
+    expect(rows.slice(3, 7).map((m) => m.label)).toEqual([
+      "Units to renovate",
+      "Renovation cost per unit",
+      "Renovation premium",
+      "Achieved renovation premium",
+    ]);
+    // …and the flagged pro-forma rows still come before the unflagged rest.
+    expect(rows[7].flagged).toBe(true);
     // Cut at four — the memo's width when the screen block is present — the
     // price is still on the page.
     expect(keyTermRows(SAMPLE_DEAL.extraction.metrics, "stabilized", SCREEN_YEAR, 4).map((m) => m.value)).toContain("$68,000,000");

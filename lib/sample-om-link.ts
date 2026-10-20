@@ -5,13 +5,13 @@
 
 /** Raised whenever the PDF's content changes, so a browser holding the old
  *  file (served immutable under its version) asks for the new one. */
-export const SAMPLE_OM_VERSION = "1";
+export const SAMPLE_OM_VERSION = "2";
 
 /** The sha256 of the file SAMPLE_OM_VERSION names (lib/sample-om
  *  `renderSampleOm`, the same bytes every build). The URL is cached for a
  *  year, so lib/sample-om.test.ts fails the moment the bytes change: raise
  *  the version and write the new hash here, together. */
-export const SAMPLE_OM_SHA256 = "0caf9d951fb9a673a3424cd9390e28ff97a5a05d50ded3e2d17d180a7ef9854b";
+export const SAMPLE_OM_SHA256 = "84777b4fcbd0bd78dff0098121fe60fdf15d6f4752cbc05f9af65d848f26d2c4";
 
 /** The route's path. */
 export const SAMPLE_OM_PATH = "/api/demo/om";

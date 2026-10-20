@@ -729,7 +729,11 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     for (const c of SAMPLE_DEAL.comps.saleComps) expect(comps).toContain(COMP_RATING[c.support].label);
     expect(comps).not.toContain("Genuine support");
     const challenger = text(panel("Analyses", "challenger"));
-    for (const c of SAMPLE_DEAL.challenges.challenges) expect(challenger).toContain(c.assumption);
+    // The panel's first three, most severe first; the rest one click away.
+    const all = SAMPLE_DEAL.challenges.challenges;
+    for (const c of all.slice(0, 3)) expect(challenger).toContain(c.assumption);
+    expect(all.length).toBe(5);
+    expect(challenger).toContain(`Show ${all.length - 3} more challenges`);
     expect(challenger).toContain("Ask the broker");
     for (const sub of ["verdict", "challenger", "comps", "market", "reconciler"]) {
       const html = panel("Analyses", sub);

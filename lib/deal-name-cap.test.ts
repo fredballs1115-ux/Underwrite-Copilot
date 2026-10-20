@@ -114,7 +114,11 @@ describe("a URL as a deal's name, on paper", () => {
     expect(stored.length).toBeGreaterThan(DEAL_NAME_MAX);
     const input = buildReportData(dealNamed(stored), "October 5, 2026", [], null);
     const buf = await renderReportPdf(input);
-    const second = (pdfPageTextsOf(buf)[1] ?? "").replace(/\s+/g, "");
-    expect(second).toContain(`${stored}—fullscreeningreport`);
+    // The first page under the report's running header: the memo, with a
+    // name this long over it, can run to a second page of its own first.
+    const pages = pdfPageTextsOf(buf).map((p) => p.replace(/\s+/g, ""));
+    const headed = pages.find((p) => p.includes("—fullscreeningreport")) ?? "";
+    expect(pages.indexOf(headed)).toBeGreaterThan(0);
+    expect(headed).toContain(`${stored}—fullscreeningreport`);
   }, 300_000);
 });

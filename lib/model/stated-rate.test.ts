@@ -22,9 +22,12 @@ const model = (metrics: ReconciledMetric[], ratePct = 6.25) => ({
 const source = (doc: string, basis: string, value = "6.25%") => ({ doc, value, locator: "", basis });
 
 describe("the first-draft model's loan rate is a quote only where a loan's own paper states it", () => {
-  it("takes a term sheet's rate, as the sample's", () => {
+  it("takes a term sheet's rate, and never the sample's screening default", () => {
     expect(statedModelRate(model([metric({})]))).toBe(6.25);
-    expect(statedModelRate(SAMPLE_DEAL.model)).toBe(6);
+    // The sample's documents are its OM, rent roll and T-12: no loan's paper
+    // states its 6.00%, a screening default.
+    expect(SAMPLE_DEAL.model.inputs.loan.ratePct).toBe(6);
+    expect(statedModelRate(SAMPLE_DEAL.model)).toBeNull();
   });
 
   it("takes a quote whatever words its basis uses", () => {

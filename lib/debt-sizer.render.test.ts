@@ -43,6 +43,23 @@ function clean(html: string) {
   expect(gluedWords(visibleText(html))).toEqual([]);
 }
 
+/** The sample's first-draft model with a term sheet stating its rate — the
+ *  sample's own carries a screening default, no loan's paper. */
+const withQuotedRate = (ratePct: number) => ({
+  ...SAMPLE_DEAL.model,
+  inputs: { ...SAMPLE_DEAL.model.inputs, loan: { ...SAMPLE_DEAL.model.inputs.loan!, ratePct } },
+  metrics: SAMPLE_DEAL.model.metrics.map((m) =>
+    m.key === "rate"
+      ? {
+          ...m,
+          chosenValue: `${ratePct.toFixed(2)}%`,
+          authority: "Loan terms",
+          sources: [{ doc: "Loan terms", value: `${ratePct.toFixed(2)}%`, locator: "term sheet", basis: "term sheet" }],
+        }
+      : m,
+  ),
+});
+
 describe("the debt sizer's starting rate is the model's, on a day the table seeds nothing", () => {
   it("starts from the derived screening model's own rate — the workbook's and the report's — and says it is a placeholder", () => {
     // A stale rates table: the model keeps its flat default and no seed.
@@ -96,15 +113,10 @@ describe("the debt sizer's starting rate is the model's, on a day the table seed
   });
 
   it("a rate a loan's own paper states outranks the model's placeholder and needs no placeholder note", () => {
-    // The sample's first-draft model states 6.00% from its term sheet; at
-    // 5.25% it is plainly not the derived model's 6.00%.
-    const model = {
-      ...SAMPLE_DEAL.model,
-      inputs: { ...SAMPLE_DEAL.model.inputs, loan: { ...SAMPLE_DEAL.model.inputs.loan!, ratePct: 5.25 } },
-      metrics: SAMPLE_DEAL.model.metrics.map((m) =>
-        m.key === "rate" ? { ...m, chosenValue: "5.25%", sources: [{ ...m.sources[0], value: "5.25%" }] } : m,
-      ),
-    };
+    // The sample's first-draft model with a term sheet's 5.25% in place of
+    // its 6.00% screening default: a loan's own paper, and plainly not the
+    // derived model's 6.00%.
+    const model = withQuotedRate(5.25);
     const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
     const html = render({ model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
     clean(html);
@@ -143,11 +155,18 @@ describe("the debt sizer's opening sentence names where its starting figures com
 
   it("from the first-draft model: its price, NOI, stated rate and amortization, and the lender tests as defaults", () => {
     const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
-    const html = render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    const html = render({ model: withQuotedRate(6), extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
     clean(html);
     expect(opening(html)).toBe(
       "Price, NOI, rate and amortization from the first-draft model; the lender tests are screening defaults — replace them with a lender&#x27;s terms.",
     );
+    // The sample's own model: no document states its rate, so the rate is
+    // left out of the model's list and said as the placeholder it is.
+    const sample = render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    expect(opening(sample)).toBe(
+      "Price, NOI and amortization from the first-draft model; the lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+    expect(visibleText(sample)).toContain("Rate starts from the screening model's 6.00% placeholder");
   });
 
   it("a first-draft model whose rate no document states keeps the rate out of the model's list — its note says what it is", () => {
