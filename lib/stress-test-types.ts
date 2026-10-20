@@ -164,7 +164,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     ],
     engine: "The price is a direct input: the return is re-run at the evidence's price.",
     limits: [
-      "No broker cap-rate survey: they are licensed, so none is read.",
+      "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
       "Replacement cost only where the memorandum states one.",
       "A note's, a share's or a leased fee's price is not the building's, and no basis is struck on it.",
     ],
