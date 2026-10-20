@@ -49,6 +49,32 @@ export interface YocGrid {
   refCapPct: number;
 }
 
+/** Yield on total cost: the stabilized NOI over the total cost, a decimal —
+ *  the one division the grid's cells, the breakevens and the stress test's
+ *  plan re-runs (lib/stress-test) all strike, so no surface carries a second
+ *  formula. Null where the cost is none. */
+export function yieldOnCost(noi: number, totalCost: number): number | null {
+  if (!Number.isFinite(noi) || !Number.isFinite(totalCost) || !(totalCost > 0)) return null;
+  return noi / totalCost;
+}
+
+/**
+ * The two figures a plan's yield on cost is struck on — its stabilized NOI
+ * and its total cost (the price plus the budget; a forward purchase's price
+ * alone; an all-in total the OM states with no price) — or null where the OM
+ * states either nowhere, or the yield is withheld as a misread
+ * (`yieldWithheld`) or the all-in basis is outside the band any market
+ * delivers at (`basisWithheld`, lib/deal-strategy `planWithBasisChecked`).
+ * A blank is null, never zero.
+ */
+export function planYieldBase(plan: PlanSummary | null): { noi: number; totalCost: number } | null {
+  if (!plan || plan.yieldWithheld || plan.basisWithheld) return null;
+  const noi = plan.stabilizedNoi?.value ?? null;
+  const totalCost = plan.totalCost;
+  if (noi == null || !(noi > 0) || totalCost == null || yieldOnCost(noi, totalCost) == null) return null;
+  return { noi, totalCost };
+}
+
 /** The three figures every function here needs, or null when the OM did not
  *  state one of them — a blank is null, never zero, and never a grid. */
 function planFigures(
@@ -82,8 +108,8 @@ export function buildYieldOnCostGrid(plan: PlanSummary | null, refCapPct: number
   });
   const cells = noiRows.map((r) =>
     budgetCols.map((c) => {
-      const yieldOnCost = r.noi / c.totalCost;
-      return { yieldOnCost, spreadBps: Math.round((yieldOnCost - refCapPct) * 10_000) };
+      const y = yieldOnCost(r.noi, c.totalCost) ?? 0;
+      return { yieldOnCost: y, spreadBps: Math.round((y - refCapPct) * 10_000) };
     }),
   );
   return {

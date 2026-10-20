@@ -66,6 +66,12 @@ export interface StressSnapshotRow {
   threshold: { value: number; unit: "pts" | "share" } | null;
   /** which way a figure moving is worse for the buyer */
   worse: "higher" | "lower";
+  /** what the row's re-run measured at the verdict: the derived model's
+   *  levered IRR, or — on a plan deal — the plan's yield on total cost
+   *  (lib/stress-test-types `StressImpact.measure`); null where the row
+   *  carried none. Absent on a snapshot kept before it was carried, read as
+   *  unknown, never as a levered IRR */
+  rerun?: "levered_irr" | "yield_on_cost" | null;
 }
 
 export interface StressSnapshot {
@@ -146,6 +152,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       per: own ? own.per : null,
       threshold: snapshotThreshold(r.key),
       worse: WORSE_WHEN[r.key],
+      rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
     };
   });
   return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows };
@@ -186,6 +193,9 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       per: str(r.per) ? r.per : null,
       threshold: t && finite(t.value) && (t.unit === "pts" || t.unit === "share") ? { value: t.value, unit: t.unit } : null,
       worse: r.worse === "higher" || r.worse === "lower" ? r.worse : WORSE_WHEN[key],
+      // Kept only as one of its two words or a stored null; anything else,
+      // or a snapshot kept before it was carried, is left absent (unknown).
+      ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
     });
   }
   if (rows.length === 0) return null;

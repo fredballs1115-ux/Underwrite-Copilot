@@ -16,7 +16,7 @@ import { modelMarketFor } from "./model-market";
 import { regulationForDeal } from "./rent-regulation";
 import { countyOf, placeDeal } from "./market-county";
 import { modelVsMarketFor } from "./model-vs-market";
-import { buildStressTest } from "./stress-test";
+import { PLAN_YIELD_LEAD, buildStressTest } from "./stress-test";
 import type { StressTest } from "./stress-test-types";
 import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
@@ -476,24 +476,32 @@ describe("/demo's Overview, in the deal page's order", () => {
     expect(slot).toContain("<ActualsPrompt");
   });
 
-  it("says under the sample's panel, on all three, that its re-runs are a stabilized deal's and a plan deal's OM gets none, in the plan rule's words", () => {
+  it("says under the sample's panel, on all three, that its re-runs are a stabilized deal's and a plan deal's OM re-runs its yield on cost, in the plan rule's words", () => {
     // The investor's walkthrough (2026-10-20): the sample re-runs every row,
     // and nothing on it said a value-add OM would not.
     const home = src("app/landing-interactive.tsx");
     expect(home).toMatch(/<OverviewView [^>]*stressTest=\{stressTest\} sample \/>/);
     expect(src("app/demo/sections.tsx")).toMatch(/<OverviewView [^>]*stressTest=\{data\.stressTest\} sample \/>/);
     expect(src("app/(app)/deals/[id]/deal-view.tsx")).toMatch(/stressTest=\{stressTest\}\s*sample=\{isSample\}/);
-    // The sample re-runs; the same memorandum read as a value-add re-runs
-    // nothing, for the reason the note gives in its own words.
-    expect(sampleStressTest({ today: "2026-10-20" }).impactsWithheld).toBeNull();
+    // The sample re-runs its levered return, read as stabilized; the same
+    // memorandum read as a value-add re-runs its yield on total cost, for the
+    // reason the note gives in its own words.
+    const sample = sampleStressTest({ today: "2026-10-20" });
+    expect(sample.impactsWithheld).toBeNull();
+    expect(sample.measure).toBeUndefined();
+    expect(sample.headline?.measure).toBeUndefined();
     const ex = { ...SAMPLE_DEAL.extraction, strategy: { ...SAMPLE_DEAL.extraction.strategy!, kind: "value_add" as const } };
     const derived = deriveUnderwriteInputs(ex, SAMPLE_DEAL.name);
     const plan = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: null, actuals: null, derived, storedAssetClass: "multifamily", readOn: "2026-10-20" });
-    expect(plan.impactsWithheld).toMatch(/no return is re-run\.$/);
-    const why = "the model runs today's income with the budget in year one, not the business plan";
-    expect(plan.impactsWithheld).toContain(why);
+    expect(plan.impactsWithheld).toBeNull();
+    expect(plan.measure).toBe("yield_on_cost");
+    expect(plan.headline?.measure).toBe("yield_on_cost");
+    expect(plan.rows.every((r) => r.impact == null || r.impact.measure === "yield_on_cost")).toBe(true);
+    const why = "the model runs today's income, not the business plan";
+    expect(PLAN_YIELD_LEAD).toContain(why);
     expect(SAMPLE_PLAN_NOTE).toContain(why);
-    expect(plan.impactsWithheld).toMatch(/^On a value-add, lease-up, conversion or development deal /);
+    expect(PLAN_YIELD_LEAD).toMatch(/^On a value-add, lease-up, conversion or development deal /);
     expect(SAMPLE_PLAN_NOTE).toContain("A value-add, lease-up, conversion or development OM");
+    expect(SAMPLE_PLAN_NOTE).toContain("re-run on its yield on total cost");
   });
 });

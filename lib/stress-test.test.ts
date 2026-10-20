@@ -17,7 +17,7 @@ import { regulationForDeal } from "./rent-regulation";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { summarizeT12 } from "./actuals/analyze";
 import { readActuals } from "./actuals/actuals-read";
-import { inferStrategy } from "./deal-strategy";
+import { IMPLIED_CAP_CEILING, inferStrategy, planSummary, planWithBasisChecked } from "./deal-strategy";
 import { subjectBasis } from "./comp-detail";
 import { interestOf } from "./interest";
 import { screenYearOf } from "./criteria";
@@ -39,6 +39,12 @@ import {
   leaseUpNotModelled,
   VACANCY_UNSUPPORTED_PTS,
   SHARE_NO_MODEL,
+  PLAN_BASIS_LEFT_OUT,
+  PLAN_NO_YIELD_MEANING,
+  PLAN_TAX_NOT_PRO_FORMA,
+  PLAN_VACANCY_TODAY,
+  PLAN_YIELD_LEAD,
+  planNoYieldReason,
   buildStressTest,
   challengeKey,
   headlinePrice,
@@ -48,7 +54,11 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, untestedSentence } from "./stress-test-words";
+import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, moveShort, noMoveWhy, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
+import { planYieldBase } from "./plan-sensitivity";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { StressTestPanel } from "@/app/stress-test-panel";
 import { readRoster } from "./tenant-roster";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
@@ -957,11 +967,68 @@ describe("a value-add plan deal", () => {
   const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
   const test = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: readFor(derived, { plan: true }), actuals: null, derived, storedAssetClass: "multifamily", readOn: READ_ON });
 
-  it("withholds every impact: the model runs today's income, not the business plan", () => {
-    expect(test.impactsWithheld).toBe("On a value-add, lease-up, conversion or development deal the model runs today's income with the budget in year one, not the business plan, so a re-run would measure the wrong deal; no return is re-run.");
-    expect(test.rows.every((r) => r.impact === null)).toBe(true);
+  it("re-runs no levered return: its rows re-run the plan's yield on total cost, and a row with no yield meaning says so", () => {
+    expect(test.impactsWithheld).toBeNull();
+    expect(test.measure).toBe("yield_on_cost");
+    // No levered-IRR re-run anywhere: the model runs today's income.
+    expect(test.rows.every((r) => r.impact == null || r.impact.measure === "yield_on_cost")).toBe(true);
+    expect(test.rows.every((r) => r.impact == null || (r.impact.baseIrrPct == null && r.impact.altIrrPct == null))).toBe(true);
     // The rows still read: the verdicts are the gaps', not the model's.
     expect(rowOf(test, "vacancy").verdict).not.toBe("unchecked");
+    // The OM's figure is today's occupancy, not the plan's stabilized
+    // vacancy: no yield on cost is re-run on it, said so.
+    expect(rowOf(test, "vacancy").title).toBe("Occupancy today");
+    expect(rowOf(test, "vacancy").noRerun).toBe(PLAN_VACANCY_TODAY);
+    // A growth rate, the exit and the debt have no yield-on-cost meaning;
+    // the NOI row tests today's income.
+    for (const k of ["rent_growth", "debt"] as const) {
+      const r = rowOf(test, k);
+      expect(r.verdict, k).not.toBe("unchecked");
+      expect(r.impact, k).toBeNull();
+      expect(r.noRerun, k).toBe(PLAN_NO_YIELD_MEANING[k]);
+      expect(noMoveWhy(test, r), k).toBe(PLAN_NO_YIELD_MEANING[k]);
+    }
+    // An unchecked row has no figure to re-run either way: no sentence of the
+    // plan's beside its own reason.
+    expect(rowOf(test, "noi").verdict).toBe("unchecked");
+    expect(rowOf(test, "noi").noRerun).toBeUndefined();
+    // The bill is the seller's, not the pro forma's line: no re-run, said why.
+    expect(rowOf(test, "taxes").verdict).toBe("stretched");
+    expect(rowOf(test, "taxes").noRerun).toBe(PLAN_TAX_NOT_PRO_FORMA);
+    // The read line names what is re-run.
+    expect(stressReadLine(test)).toMatch(/; the plan's yield on total cost re-run with one figure swapped for the evidence's, in code\.$/);
+  });
+
+  it("re-runs the renovation premium on the doors to renovate: the stabilized NOI over the total cost, one figure moved", () => {
+    const p = rowOf(test, "renovation_premium");
+    // $42M + the $1.8M budget = $43.8M; $2.65M over it is 6.05%. The gap,
+    // $60 a month on 120 doors for twelve months, is $86,400 off the NOI.
+    expect(p.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi", evidenceIndex: 0, omValue: 2_650_000, altValue: 2_650_000 - 86_400 });
+    expect(p.impact!.baseYocPct!).toBeCloseTo((2_650_000 / 43_800_000) * 100, 9);
+    expect(p.impact!.altYocPct!).toBeCloseTo((2_563_600 / 43_800_000) * 100, 9);
+    expect(p.impact!.note).toBe(
+      "If the renovation premium is the achieved premium's $190 a month, not the OM's $250 a month, the yield on cost moves from 6.05% to 5.85% (the stabilized NOI $2.65M to $2.56M over the $43.8M total cost; the gap on the 120 doors to renovate, twelve months each, the stabilized NOI read as carrying the projected premium on every one).",
+    );
+    expect(moveShort(p.impact)).toBe("Yield on cost 6.05% to 5.85%");
+    expect(rerunWords(test, p.impact)).toBe("from the plan's 6.05% yield on cost, its stabilized NOI over its total cost on the OM's own figures, one figure alone then set to the evidence's");
+  });
+
+  it("leads with the yield on cost on the OM's figures against the evidence's, the parts adding to the gap", () => {
+    const h = test.headline!;
+    expect(h.measure).toBe("yield_on_cost");
+    expect(h.omIrrPct).toBeNull();
+    expect(h.omYocPct!).toBeCloseTo((2_650_000 / 43_800_000) * 100, 9);
+    expect(h.evidenceYocPct!).toBeCloseTo((2_563_600 / 43_800_000) * 100, 9);
+    expect(h.parts.map((x) => x.key)).toEqual(["renovation_premium"]);
+    expect(h.parts.reduce((s, x) => s + x.pts, 0)).toBeCloseTo(h.evidenceYocPct! - h.omYocPct!, 9);
+    // The taxes are past their evidence and carry no re-run: left out, why said.
+    expect(h.omitted.map((o) => o.key)).toContain("taxes");
+    expect(headlineLine(test, "→")).toBe("Yield on cost on the OM's figures 6.05% → 5.85% with the evidence");
+    const sentence = headlineSentence(test)!;
+    expect(sentence).toMatch(/^Yield on cost on the OM's figures 6\.05% to 5\.85% with the evidence: the renovation premium −0\.20 pts, the one assumption past its evidence that the plan's yield is struck on\./);
+    expect(sentence).toContain("Left out: the loan rate (the yield on cost is struck before debt); rent growth (a growth rate has no yield-on-cost meaning); ");
+    expect(sentence).toContain("the taxes (the OM's tax bill is not stated as its pro forma's line");
+    expect(sentence).not.toMatch(/levered/i);
   });
 
   it("says why a row stands unchecked by what stopped it, never that the OM states nothing it prints beside the row", () => {
@@ -1000,7 +1067,159 @@ describe("a value-add plan deal", () => {
     });
     expect(p.ruleOfThumbOnly).toBeUndefined();
     expect(p.verdict).toBe("unsupported");
-    expect(p.impact).toBeNull();
+    // The premium is no model input; on a plan deal it moves the yield on cost.
+    expect(p.impact?.measure).toBe("yield_on_cost");
+  });
+});
+
+describe("a value-add's yield on cost, re-run row by row and split by Shapley values", () => {
+  // The doors × a door's cost are the budget (no total stated); the OM
+  // states its stabilized vacancy, its pro forma gross and its pro forma tax
+  // line, so each moves the stabilized NOI.
+  const metrics = [
+    row("Asking price", "$42,000,000", "p. 5"),
+    row("Units", "153", "p. 4"),
+    row("Rentable SF", "140,000", "p. 4"),
+    row("NOI (in-place)", "$2,400,000", "p. 7"),
+    row("NOI (stabilized, pro forma)", "$3,000,000", "p. 7"),
+    row("Stabilized vacancy", "5.0%", "p. 21"),
+    row("Pro forma gross potential rent", "$5,000,000", "p. 21"),
+    row("Pro forma real estate taxes", "$380,000", "p. 15"),
+    row("Assessed value", "$30,000,000", "p. 15"),
+    row("Untrended yield on cost", "7.10%", "p. 24"),
+    row("Rent growth", "4.0%", "p. 21"),
+    row("Units to renovate", "120", "p. 22"),
+    row("Renovation cost per unit", "$15,000", "p. 22"),
+    row("Renovation premium", "$250/mo", "p. 22"),
+    row("Achieved renovation premium", "$190/mo", "p. 23"),
+  ];
+  const ex: ExtractionResult = { ...APARTMENT, strategy: { kind: "value_add", summary: "Renovate 120 classic units", capitalBudget: "", timeline: "24 months" }, metrics };
+  const actualsIn = { t12: { summary: T12, periodEnd: "2026-06-30" } };
+  const derived = deriveUnderwriteInputs(ex, "x", actualsIn, { debtIndex: FIVE });
+  const actuals = readActuals({ metrics, strategy: inferStrategy(ex), rentRoll: null, t12: actualsIn.t12, assetClass: "multifamily" });
+  const test = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: readFor(derived, { plan: true }), actuals, derived, storedAssetClass: "multifamily", readOn: READ_ON });
+  const COST = 42_000_000 + 120 * 15_000;
+
+  it("strikes the plan's yield on cost on the doors × a door's cost, and moves the stabilized NOI by each row's deciding figure", () => {
+    expect(test.impactsWithheld).toBeNull();
+    // Vacancy: the T-12's 9.1% decides a plan deal's vacancy; the gap on the
+    // pro forma gross is $5M × 4.1 pts = $205k.
+    const v = rowOf(test, "vacancy");
+    expect(v.title).toBe("Stabilized vacancy");
+    const tv = v.evidence[0].value!;
+    expect(v.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi", evidenceIndex: 0, omValue: 3_000_000 });
+    expect(v.impact!.altValue).toBeCloseTo(3_000_000 - (5_000_000 * (tv - 5)) / 100, 6);
+    expect(v.impact!.baseYocPct!).toBeCloseTo((3_000_000 / COST) * 100, 9);
+    expect(v.impact!.note).toContain("the gap struck on the OM's pro forma gross potential rent of $5M");
+    // Taxes: the reset bill on the price, $380k / $30M × $42M = $532k, off
+    // the stabilized NOI the pro forma's line is in.
+    const t = rowOf(test, "taxes");
+    expect(t.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi", omValue: 3_000_000, altValue: 3_000_000 - 152_000 });
+    expect(t.noRerun).toBeUndefined();
+    // The premium on the doors to renovate.
+    expect(rowOf(test, "renovation_premium").impact!.altValue).toBe(3_000_000 - 86_400);
+    // The NOI row tests today's income against the T-12: its verdict stands,
+    // and no yield on cost is re-run on it.
+    expect(rowOf(test, "noi").verdict).not.toBe("unchecked");
+    expect(rowOf(test, "noi").noRerun).toBe(PLAN_NO_YIELD_MEANING.noi);
+  });
+
+  it("splits the gap by Shapley values, the parts adding to it and, printed, to the printed gap", () => {
+    const h = test.headline!;
+    expect(h.measure).toBe("yield_on_cost");
+    const moves = { vacancy: rowOf(test, "vacancy").impact!, taxes: rowOf(test, "taxes").impact!, renovation_premium: rowOf(test, "renovation_premium").impact! };
+    const drop = Object.values(moves).reduce((s, i) => s + (i.omValue - i.altValue), 0);
+    expect(h.omYocPct!).toBeCloseTo((3_000_000 / COST) * 100, 9);
+    expect(h.evidenceYocPct!).toBeCloseTo(((3_000_000 - drop) / COST) * 100, 9);
+    expect(h.parts.map((p) => p.key).sort()).toEqual(["renovation_premium", "taxes", "vacancy"]);
+    expect(h.parts.reduce((s, p) => s + p.pts, 0)).toBeCloseTo(h.evidenceYocPct! - h.omYocPct!, 9);
+    // The NOI moves add over one cost, so each part is its own move over it.
+    for (const p of h.parts) expect(p.pts).toBeCloseTo(-((moves[p.key as keyof typeof moves].omValue - moves[p.key as keyof typeof moves].altValue) / COST) * 100, 9);
+    const shown = shownHeadline(h);
+    expect(Math.round(shown.parts.reduce((s, p) => s + p.shown, 0) * 100)).toBe(Math.round((shown.evidence! - shown.om!) * 100));
+    // The OM's own stated yield on cost rides beside the two cases, as the OM's.
+    expect(h.statedYoc).toEqual({ pct: 7.1, label: "Untrended yield on cost", page: 24 });
+    expect(headlineSentence(test)).toContain("The OM states its own yield on cost of 7.10% (Untrended yield on cost, p. 24).");
+    expect(headlineSentence(test)).toContain("-point gap averaged over every order the swaps could be made in.");
+  });
+
+  it("re-runs the basis through the total cost, and leaves the price out of the split: both cases pay it", () => {
+    const comps: NonNullable<StressTestArgs["brokerComps"]> = {
+      saleComps: [
+        { name: "Alder", detail: "$250,000 per unit, 5.6% cap", support: "supports", note: "" },
+        { name: "Birch", detail: "$255,000 per unit, 5.5% cap", support: "supports", note: "" },
+        { name: "Cedar", detail: "$260,000 per unit, 5.4% cap", support: "supports", note: "" },
+      ],
+      leaseComps: [],
+      redFlags: [],
+      summary: "",
+    };
+    const t = buildStressTest({ extraction: ex, challenger: null, market: null, modelVsMarket: readFor(derived, { plan: true }), actuals, derived, storedAssetClass: "multifamily", brokerComps: comps, readOn: READ_ON });
+    const b = rowOf(t, "basis");
+    expect(b.verdict).not.toBe("unchecked");
+    // $43.8M over 153 units is $286k a unit all-in, against the $255k median.
+    expect(b.impact).toMatchObject({ measure: "yield_on_cost", input: "totalCost", omValue: COST });
+    expect(b.impact!.altValue).toBeCloseTo((COST * 255_000) / (COST / 153), 6);
+    expect(t.headline!.omitted).toContainEqual({ key: "basis", label: "Basis", why: PLAN_BASIS_LEFT_OUT });
+    expect(t.headline!.parts.map((p) => p.key)).not.toContain("basis");
+  });
+
+  it("re-runs nothing where the OM states no stabilized NOI, and says why", () => {
+    const bare = { ...ex, metrics: metrics.filter((m) => !/stabilized, pro forma/.test(m.label)) };
+    const d = deriveUnderwriteInputs(bare, "x", actualsIn, { debtIndex: FIVE });
+    const t = buildStressTest({ extraction: bare, challenger: null, market: null, modelVsMarket: readFor(d, { plan: true }), actuals, derived: d, storedAssetClass: "multifamily", readOn: READ_ON });
+    expect(t.impactsWithheld).toBe(`${PLAN_YIELD_LEAD}, and the OM states no stabilized NOI, so no return is re-run.`);
+    expect(t.measure).toBeUndefined();
+    expect(t.headline).toBeNull();
+    expect(t.rows.every((r) => r.impact === null)).toBe(true);
+    expect(headlineSentence(t)).toBe(`${t.impactsWithheld} The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.`);
+    // No budget beside the price: no total cost.
+    const noBudget = { ...ex, metrics: metrics.filter((m) => !/renovat/i.test(m.label)) };
+    const d2 = deriveUnderwriteInputs(noBudget, "x", actualsIn, { debtIndex: FIVE });
+    expect(buildStressTest({ extraction: noBudget, challenger: null, market: null, modelVsMarket: null, actuals, derived: d2, storedAssetClass: "multifamily", readOn: READ_ON }).impactsWithheld).toBe(
+      `${PLAN_YIELD_LEAD}, and the OM states no budget for the plan beside the price, so no total cost is read and no return is re-run.`,
+    );
+  });
+
+  it("withholds the re-runs where the yield is a misread (25% or more) or the all-in basis is outside the band, in the plan's own sentence", () => {
+    expect(planYieldBase({ ...planSummary(ex, inferStrategy(ex))! })).not.toBeNull();
+    // A stabilized NOI read off a row in thousands' place: $30M over $43.8M.
+    const hot = { ...ex, metrics: metrics.map((m) => (/stabilized, pro forma/.test(m.label) ? { ...m, value: "$30,000,000" } : m)) };
+    const hotPlan = planSummary(hot, inferStrategy(hot))!;
+    expect(hotPlan.yieldWithheld).toBeTruthy();
+    expect(IMPLIED_CAP_CEILING).toBe(0.25);
+    const dh = deriveUnderwriteInputs(hot, "x", actualsIn, { debtIndex: FIVE });
+    const th = buildStressTest({ extraction: hot, challenger: null, market: null, modelVsMarket: null, actuals, derived: dh, storedAssetClass: "multifamily", readOn: READ_ON });
+    expect(th.impactsWithheld).toBe(planNoYieldReason(hotPlan));
+    expect(th.impactsWithheld).toMatch(/^No yield on cost is struck: .*; no return is re-run\.$/);
+    expect(th.headline).toBeNull();
+    // The units read a hundredfold: $43.8M over 15,300 units is under $3k a
+    // unit all-in, outside the band any market delivers at, while the yield
+    // itself (6.85%) is no misread.
+    const many = { ...ex, metrics: metrics.map((m) => (m.label === "Units" ? { ...m, value: "15,300" } : m)) };
+    const checked = planWithBasisChecked(many, inferStrategy(many), planSummary(many, inferStrategy(many)))!;
+    expect(checked.yieldWithheld ?? null).toBeNull();
+    expect(checked.basisWithheld).toBeTruthy();
+    expect(planYieldBase(checked)).toBeNull();
+    const dm = deriveUnderwriteInputs(many, "x", actualsIn, { debtIndex: FIVE });
+    const tm = buildStressTest({ extraction: many, challenger: null, market: null, modelVsMarket: null, actuals, derived: dm, storedAssetClass: "multifamily", readOn: READ_ON });
+    expect(tm.impactsWithheld).toBe(planNoYieldReason(checked));
+    expect(tm.impactsWithheld).toMatch(/^No all-in basis is struck: .*; no return is re-run\.$/);
+    expect(tm.headline).toBeNull();
+    // The page's sentence says the threshold the code holds.
+    expect(HEADLINE_METHOD.plan.join(" ")).toContain(`${IMPLIED_CAP_CEILING * 100}% or more`);
+  });
+
+  it("draws the panel in yield-on-cost terms, its unit said", () => {
+    const html = renderToStaticMarkup(createElement(StressTestPanel, { test }));
+    expect(html).toContain('data-qa="stress-headline" data-measure="yield_on_cost"');
+    expect(html).toMatch(/Yield on cost on the OM&#x27;s figures 6\.\d\d% → \d\.\d\d% with the evidence/);
+    expect(html).toContain("The OM&#x27;s stated yield on cost");
+    expect(html).toContain('data-measure="yield_on_cost"');
+    expect(html).toMatch(/Yield on cost \d\.\d\d% → \d\.\d\d%/);
+    expect(html).not.toMatch(/Levered IRR/);
+    expect(html).not.toContain("The screening model as it runs");
+    expect(html).toContain(PLAN_NO_YIELD_MEANING.rent_growth!.replace(/'/g, "&#x27;"));
   });
 });
 
@@ -2029,7 +2248,11 @@ describe("the headline", () => {
   });
 
   it("is null wherever no return is re-run, the test's reason standing for it", () => {
-    const plan = buildStressTest({ ...apartmentArgs(), extraction: { ...APARTMENT, strategy: { kind: "value_add", summary: "", capitalBudget: "$1,800,000", timeline: "" } } });
+    // A value-add stating no stabilized NOI: no yield on cost to re-run.
+    const plan = buildStressTest({
+      ...apartmentArgs(),
+      extraction: { ...APARTMENT, strategy: { kind: "value_add", summary: "", capitalBudget: "$1,800,000", timeline: "" }, metrics: APARTMENT.metrics.filter((m) => !/stabilized/.test(m.label)) },
+    });
     expect(plan.impactsWithheld).not.toBeNull();
     expect(plan.headline).toBeNull();
     expect(headlineSentence(plan)).toBe(`${plan.impactsWithheld} The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.`);

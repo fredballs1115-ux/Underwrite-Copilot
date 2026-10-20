@@ -173,13 +173,21 @@ export function stressSection(test: StressTest): string[] {
     const move = rowMoveText(test, r);
     const ask = r.challenge?.question ? ` The challenger asks: ${r.challenge.question}` : "";
     // The OM's text may end in its own full stop ("The OM states no loan rate.").
-    lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — OM says: ${r.omSays.text.replace(/\.$/, "")}${page}. Set against: ${evidence}. Gap: ${gap} The levered IRR: ${move}${ask}`);
+    // A plan deal's rows re-run its yield on total cost, said so by name.
+    const measure = test.measure === "yield_on_cost" ? "The yield on cost" : "The levered IRR";
+    lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — OM says: ${r.omSays.text.replace(/\.$/, "")}${page}. Set against: ${evidence}. Gap: ${gap} ${measure}: ${move}${ask}`);
   }
   lines.push(
     "",
     test.impactsWithheld
       ? `${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.`
-      : `The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing. A row that holds carries no re-run: never cite a return for it.${
+      : test.measure === "yield_on_cost"
+        ? `The yield-on-cost moves above are the engine's own: the plan's stated stabilized NOI over its total cost (the price plus the plan's budget), struck again with ONE figure moved by the evidence, in code — this is a value-add, lease-up, conversion or development deal, judged on its yield on total cost, so no levered IRR is re-run. Use them as they stand — never estimate a move yourself, never restate one as a levered return, and where a row says it has no re-run, say why in its own words. A row that holds carries no re-run: never cite a yield for it.${
+            liveHeadline(test)
+              ? " The HEADLINE's two yields on cost and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself."
+              : ""
+          }`
+        : `The IRR moves above are the engine's own: the deal's derived model run again with ONE input swapped for the evidence's figure, in code. Use them as they stand — never estimate a move yourself, never restate one with other figures, and where a row says the model already runs at the evidence's figure, say that it moves nothing. A row that holds carries no re-run: never cite a return for it.${
           liveHeadline(test)
             ? " The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself — each row starts from a different return, which is what the headline's one pair of runs answers."
             : ""

@@ -239,13 +239,13 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
     heading: "Not investment advice",
     line: "A first-pass screen for an analyst to check against the documents, never a reason to buy or pass.",
   },
-  // lib/stress-test's `impactsWithheld`: a plan deal (lib/deal-strategy
-  // `isPlanDeal`) re-runs no return, and neither does a placeholder price,
-  // an assumed NOI (`modelReadsWithheld`) or a price that buys no building
-  // (`basisWithheldOf`).
+  // lib/stress-test: a plan deal (lib/deal-strategy `isPlanDeal`) re-runs
+  // its yield on total cost (`measure: "yield_on_cost"`), never the levered
+  // return; a placeholder price, an assumed NOI (`modelReadsWithheld`) or a
+  // price that buys no building (`basisWithheldOf`) re-runs nothing.
   {
-    heading: "No return is re-run on a plan",
-    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and no return is re-run.",
+    heading: "No levered return on a plan",
+    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and the plan's stabilized NOI over its total cost is re-run, never a levered return.",
   },
   {
     heading: "No return is re-run on a figure nobody stated",

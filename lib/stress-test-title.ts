@@ -14,7 +14,7 @@
 export const CHALLENGER_SCENARIO_TITLE = "The challenger's downside scenario";
 
 /** The line under the heading: whose words they are, and whose moves are
- *  computed. True on a plan deal too, where the stress test re-runs no
- *  return: any move it prints is the model's. */
+ *  computed. True on a plan deal too, whose stress test re-runs the plan's
+ *  yield on cost in code rather than the model's levered return. */
 export const CHALLENGER_SCENARIO_NOTE =
-  "In the challenger's words, not a computed result: any return it names is the challenger's estimate, and the stress test's moves are the model's.";
+  "In the challenger's words, not a computed result: any return it names is the challenger's estimate, and the stress test's moves are computed in code.";

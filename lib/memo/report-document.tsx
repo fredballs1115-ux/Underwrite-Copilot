@@ -492,7 +492,11 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
     <PageChrome title="The stress test" count={count} dealName={dealName} branding={branding}>
       <Text style={s.sub}>
         {str(
-          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; the return's move, the engine's own run of the model with that one input swapped, never an estimate; the method; and the challenger's question.${readWhen}`,
+          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; ${
+            test.measure === "yield_on_cost"
+              ? "the yield on cost's move, the plan's stabilized NOI over its total cost struck again in code with one figure moved, never an estimate"
+              : "the return's move, the engine's own run of the model with that one input swapped, never an estimate"
+          }; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
       {/* The headline (lib/stress-test-words): the OM's case against the

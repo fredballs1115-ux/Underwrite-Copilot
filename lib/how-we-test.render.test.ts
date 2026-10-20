@@ -168,7 +168,7 @@ describe("/how-we-test draws every method from the table", () => {
     expect(CANNOT.map((c) => c.heading)).toEqual([
       "Not a forecast",
       "Not investment advice",
-      "No return is re-run on a plan",
+      "No levered return on a plan",
       "No return is re-run on a figure nobody stated",
       "A metro figure is the metro's",
       "Licensed databases are not read",
@@ -178,7 +178,7 @@ describe("/how-we-test draws every method from the table", () => {
     expect(text).not.toMatch(/broker cap-rate surveys? (?:are|is) (?:licensed|never read)/i);
     // The plan's limit names every kind lib/deal-strategy's isPlanDeal
     // calls a plan, and the stress test withholds the re-run on each.
-    const plan = CANNOT.find((c) => c.heading === "No return is re-run on a plan")!.line;
+    const plan = CANNOT.find((c) => c.heading === "No levered return on a plan")!.line;
     for (const kind of ["value_add", "lease_up", "conversion", "development"] as const) {
       expect(isPlanDeal(kind), kind).toBe(true);
       expect(plan.toLowerCase(), kind).toContain(kind.replace("_", "-"));
@@ -247,7 +247,7 @@ describe("/how-we-test draws every method from the table", () => {
   it("says how the headline is struck, in HEADLINE_METHOD's own words, before the assumptions' sections", () => {
     const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
     const m = HEADLINE_METHOD;
-    for (const s of [m.title, m.claim, ...m.omCase, ...m.evidenceCase, ...m.split, ...m.overlap, ...m.limits]) expect(flat).toContain(s);
+    for (const s of [m.title, m.claim, ...m.omCase, ...m.evidenceCase, ...m.split, ...m.overlap, ...m.plan, ...m.limits]) expect(flat).toContain(s);
     // The panel's link lands here, ahead of the per-assumption sections.
     expect(html).toContain('<section id="headline"');
     expect(html.indexOf('id="headline"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));

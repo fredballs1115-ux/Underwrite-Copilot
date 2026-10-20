@@ -743,9 +743,12 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
       per: null,
       threshold: { value: 0.05, unit: "share" },
       worse: "lower",
+      rerun: null,
     });
     expect(s.rows[1].evidence).toMatchObject({ kind: "published", value: 6.2 });
     expect(s.rows[1].threshold).toEqual({ value: 0.05, unit: "pts" });
+    // What the row's re-run measured is kept: the levered IRR here.
+    expect(s.rows[1].rerun).toBe("levered_irr");
     expect(s.rows[2]).toMatchObject({ verdict: "unchecked", evidence: null, threshold: null, om: null });
     // What is written reads back as itself.
     expect(readStressSnapshot(JSON.parse(JSON.stringify(s)))).toEqual(s);
@@ -765,6 +768,40 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
       impact: { input: "vacancyPct", evidenceIndex: 0, omValue: 0.05, altValue: 0.09, baseIrrPct: 10, altIrrPct: 9, baseMultiple: 1.8, altMultiple: 1.7, note: "" },
     };
     expect(stressSnapshotOf(test(vac))!.rows[0].evidence).toMatchObject({ kind: "published", value: 6.2 });
+  });
+
+  it("keeps whether a row's re-run was a plan deal's yield on cost, and reads an older snapshot's rows as unknown", () => {
+    const vac: StressRow = {
+      ...base,
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      omSays: { text: "Stabilized vacancy 5%", value: 5, page: 9 },
+      evidence: [ev({ value: 9, label: "The deal's rent roll" })],
+      verdict: "stretched",
+      decidedBy: 0,
+      impact: {
+        measure: "yield_on_cost",
+        input: "stabilizedNoi",
+        evidenceIndex: 0,
+        omValue: 2_650_000,
+        altValue: 2_470_000,
+        baseIrrPct: null,
+        altIrrPct: null,
+        baseMultiple: null,
+        altMultiple: null,
+        baseYocPct: 6.05,
+        altYocPct: 5.64,
+        note: "",
+      },
+    };
+    const s = stressSnapshotOf(test(vac))!;
+    expect(s.rows[0].rerun).toBe("yield_on_cost");
+    expect(readStressSnapshot(JSON.parse(JSON.stringify(s)))!.rows[0].rerun).toBe("yield_on_cost");
+    // A snapshot kept before the field reads back without it: unknown, never
+    // a levered IRR.
+    const older = JSON.parse(JSON.stringify(s));
+    delete older.rows[0].rerun;
+    expect(readStressSnapshot(older)!.rows[0]).not.toHaveProperty("rerun");
   });
 
   it("a piece judged on its own yardstick is kept on it, the OM's figure with it", () => {
