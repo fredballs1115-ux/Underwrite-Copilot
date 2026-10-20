@@ -83,30 +83,54 @@ describe("modelVsMarket — the model's four assumptions against the published f
     expect(c.read).toContain("(CPI rent, BLS via FRED)");
   });
 
-  it("rent growth: the asking rents and the sitting tenants' rents, each dated and sourced, and the model placed inside the range", () => {
+  it("rent growth: the asking rents and the sitting tenants' rents, each dated and sourced, the model held to the one for its kind of rent and the rest beside it (audit H1)", () => {
     const c = check(base, "rent_growth")!;
     expect(c.model).toBe("3.0%/yr");
     expect(c.modelSource).toBe("a screening default");
     expect(c.published.map((p) => p.value)).toEqual([2.3, 1.1, 5]);
     expect(c.published.map((p) => p.publisher)).toEqual(["Zillow Research", "Zillow Research", "BLS"]);
-    expect(c.tone).toBe("inside");
-    expect(c.toneLabel).toBe("inside the published range");
+    // The apartment asking rents decide, as the stress test's rent-growth row
+    // is held to them: a 3.0% model is 1.9 points ahead of their +1.1%,
+    // never "inside" a range the CPI's sitting-tenant +5.0% stretches.
+    expect(c.tone).toBe("ahead");
+    expect(c.toneLabel).toBe("ahead of the figure it is held to");
+    expect(c.marks!.map((m) => m.role)).toEqual(["beside", "range", "beside"]);
     expect(c.read).toBe(
-      "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). The model sits inside the published range. A trailing year is what the assumption is being asked to beat, not a forecast.",
+      "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs ahead of it by 1.9 points; the other figures are shown beside it, never held to. A trailing year is what the assumption is being asked to beat, not a forecast.",
+    );
+    // At the deciding figure, it sits at it.
+    const at = check({ ...base, inputs: { ...base.inputs, rentGrowthPct: 0.011 } }, "rent_growth")!;
+    expect(at.tone).toBe("inside");
+    expect(at.toneLabel).toBe("at the figure it is held to");
+    expect(at.read).toContain("the model sits at it; the other figures are shown beside it, never held to.");
+  });
+
+  it("rent growth ahead of the deciding figure says by how much; behind says the same", () => {
+    const ahead = check({ ...base, inputs: { ...base.inputs, rentGrowthPct: 0.06 } }, "rent_growth")!;
+    expect(ahead.tone).toBe("ahead");
+    expect(ahead.read).toContain("Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs ahead of it by 4.9 points;");
+    const behind = check({ ...base, inputs: { ...base.inputs, rentGrowthPct: 0.005 } }, "rent_growth")!;
+    expect(behind.tone).toBe("behind");
+    expect(behind.read).toContain("Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs behind it by 0.6 points;");
+    // One published figure: one gap, said once, nothing beside it.
+    const one = check({ ...base, rates: [], inputs: { ...base.inputs, rentGrowthPct: 0.04 }, zori: { ...zori, mfrYoyPct: null } }, "rent_growth")!;
+    expect(one.published).toHaveLength(1);
+    expect(one.read).toContain(
+      "Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month, the model runs ahead of it by 1.7 points.",
     );
   });
 
-  it("rent growth ahead of every figure says by how much, nearest to farthest; behind says the same", () => {
-    const ahead = check({ ...base, inputs: { ...base.inputs, rentGrowthPct: 0.06 } }, "rent_growth")!;
-    expect(ahead.tone).toBe("ahead");
-    expect(ahead.read).toContain("The model runs ahead of every published figure, by 1.0 to 4.9 points.");
-    const behind = check({ ...base, inputs: { ...base.inputs, rentGrowthPct: 0.005 } }, "rent_growth")!;
-    expect(behind.tone).toBe("behind");
-    expect(behind.read).toContain("The model runs behind every published figure, by 0.6 to 4.5 points.");
-    // One published figure: one gap, said once.
-    const one = check({ ...base, rates: [], inputs: { ...base.inputs, rentGrowthPct: 0.04 }, zori: { ...zori, mfrYoyPct: null } }, "rent_growth")!;
-    expect(one.published).toHaveLength(1);
-    expect(one.read).toContain("Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). The model runs ahead of every published figure, by 1.7 points.");
+  it("holds a rented house to Zillow's all-homes rents, and a park, a student or a mixed-use building to the closest figure, named so (audit M4)", () => {
+    const sfr = check({ ...base, assetClass: "sfr_btr" }, "rent_growth")!;
+    expect(sfr.marks!.map((m) => m.role)).toEqual(["range", "beside", "beside"]);
+    expect(sfr.read).toContain("Held to Zillow's asking rents across all home types, the figure for a rented home, houses among the home types it covers,");
+    const park = check({ ...base, assetClass: "manufactured_housing" }, "rent_growth")!;
+    expect(park.read).toContain("Held to Zillow's asking rents across all home types, the closest published figure, not a park's own kind of rent:");
+    const student = check({ ...base, assetClass: "student_housing" }, "rent_growth")!;
+    expect(student.read).toContain("Held to Zillow's apartment asking rents, the closest published figure, not a student building's own kind of rent,");
+    const mixed = check({ ...base, assetClass: "mixed_use" }, "rent_growth")!;
+    expect(mixed.read).toContain("Held to Zillow's apartment asking rents, the closest published figure for the apartments, not the commercial space's rent,");
+    for (const c of [park, student, mixed]) expect(c.read).not.toContain("the figure for this kind of rent");
   });
 
   it("expense growth against consumer prices and core, BLS via FRED, with the insurance premium index beside them and never averaged in", () => {
@@ -1331,17 +1355,17 @@ describe("a rent-regulated building's allowance, shown beside the market's figur
     "2026-10-05",
   );
 
-  it("a NYC stabilized deal at a 3% model growth never reads only 'inside the published range': the allowance is named first, as a figure of its own kind", () => {
+  it("a NYC stabilized deal at a 3% model growth never reads only the market's figures: the allowance is named first, as a figure of its own kind", () => {
     const plain = check({ ...base, now: OCT_5 }, "rent_growth")!;
-    expect(plain.read).toContain("The model sits inside the published range.");
+    expect(plain.read).toContain("Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs ahead of it by 1.9 points;");
     const c = check({ ...base, now: OCT_5, regulation: stabilized }, "rent_growth")!;
-    // The chip is the market's: the allowance never joins its range.
-    expect(c.tone).toBe("inside");
-    expect(c.toneLabel).toBe("inside the published range");
+    // The chip is the market's: the allowance never decides.
+    expect(c.tone).toBe("ahead");
+    expect(c.toneLabel).toBe("ahead of the figure it is held to");
     // The sentence names the allowance first, as the regime's for the units
     // it regulates, with the model's growth against it.
     expect(c.read).toBe(
-      "Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease and 0% on a two-year lease (the Rent Guidelines Board's Apartment/Loft Order #58). That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both. For the market-rate units, over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). The model sits inside the published range. A trailing year is what the assumption is being asked to beat, not a forecast.",
+      "Under NYC rent stabilization, the allowance for leases commencing Oct 1, 2026 to Sep 30, 2027 is 0% on a one-year lease and 0% on a two-year lease (the Rent Guidelines Board's Apartment/Loft Order #58). That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both. For the market-rate units, over the past year the metro's asking rents moved +2.3% (apartments alone +1.1%) over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs ahead of it by 1.9 points; the other figures are shown beside it, never held to. A trailing year is what the assumption is being asked to beat, not a forecast.",
     );
     expect(c.read.startsWith("The model grows rents")).toBe(false);
     // The allowance's figures lead the published list; the market's follow,
@@ -1366,14 +1390,14 @@ describe("a rent-regulated building's allowance, shown beside the market's figur
     expect(gluedWords(c.read)).toEqual([]);
   });
 
-  it("keeps the tone the market's: a model behind every market figure stays behind beside a 0% allowance", () => {
-    // 0.5% against the market's 1.1–5.0% is behind; with the 0% allowance
-    // folded into the range it would have read inside.
+  it("keeps the tone the market's: a model behind the market's deciding figure stays behind beside a 0% allowance", () => {
+    // 0.5% against the apartment rents' 1.1% is behind; with the 0%
+    // allowance folded in it would have read inside.
     const behind = check({ ...base, now: OCT_5, inputs: { ...base.inputs, rentGrowthPct: 0.005 }, regulation: stabilized }, "rent_growth")!;
     expect(behind.tone).toBe("behind");
     expect(behind.read).toContain("the model's 0.5%/yr runs 0.5 points over both.");
     expect(behind.read).toContain("For the market-rate units, over the past year");
-    expect(behind.read).toContain("The model runs behind every published figure, by 0.6 to 4.5 points.");
+    expect(behind.read).toContain("Held to Zillow's apartment asking rents, the figure for this kind of rent, the model runs behind it by 0.6 points;");
   });
 
   it("names a DC rent-controlled building's two caps, a regime that only possibly applies as such, and nothing for an allowance not in force", () => {

@@ -114,7 +114,7 @@ describe("/how-we-test draws every method from the table", () => {
       // A stabilized assumption is the market's to judge first; the
       // documents' vacancy is today's.
       vacancy: ["published", "published", "document", "rule_of_thumb"],
-      rent_growth: ["published", "published", "published", "published"],
+      rent_growth: ["published", "published", "published", "published", "published"],
       expense_growth: ["published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
       insurance: ["published", "document"],
@@ -202,7 +202,9 @@ describe("/how-we-test draws every method from the table", () => {
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized assumption is held to the market/);
-    expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the deal's own kind of rent/);
+    expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
+    // A rented house, a park, a student or a mixed-use building (audit M4).
+    expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
     expect(VERDICT_RULES.rent_growth).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.expense_growth).toMatch(/^Held to the lowest price index/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);

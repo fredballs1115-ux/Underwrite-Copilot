@@ -47,7 +47,7 @@
 //                    deal's documents)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
 //                    trailing year's figure for the deal's own kind of rent
-//                    (`RENT_GROWTH_DECIDERS`)
+//                    (lib/rent-growth-decider)
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under the lowest
 //                    price index
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
@@ -109,6 +109,7 @@ import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, t
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
+import { NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
   type StressEvidence,
@@ -816,39 +817,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
 // — Rent growth —
 
 /**
- * The published figures a rent growth may be held to, in the order the
- * first present decides — the one that speaks to the deal's own kind of
- * rent (the read hands a residential class Zillow's and the CPI's figures,
- * a commercial class its lessors' index, never both):
- *   - an apartment building: Zillow's asking rents over multifamily
- *     listings alone, else over all home types (the nearest Zillow reads
- *     where its apartment index has no figure for the month), else the rent
- *     sitting tenants pay (the CPI's rent of primary residence), which
- *     averages every lease in place and lags the rents new leases sign at;
- *   - a commercial class: the national index of rents its kind of lessor
- *     charges (lib/live-market-brief `rentIndexFor`), the nation's.
- * Each figure is the trailing year's, and every other figure the read
- * carries stays shown beside the one that decides, never in its place.
+ * A rent growth is held to the published figure that speaks to the deal's
+ * own kind of rent, the first present in the class's order — ONE order,
+ * lib/rent-growth-decider's, which the model's rent-growth check reads too,
+ * so the deal page's card and this row are held to one figure. Each figure
+ * is the trailing year's, and every other figure the read carries stays
+ * shown beside the one that decides, never in its place.
  */
-const RENT_GROWTH_DECIDERS: readonly { re: RegExp; name: (label: string) => string; why: string }[] = [
-  { re: /^Asking rent, apartments$/, name: () => "Zillow's apartment asking rents", why: "the figure for this kind of rent" },
-  {
-    re: /^Asking rent, all home types$/,
-    name: () => "Zillow's asking rents across all home types",
-    why: "the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month",
-  },
-  {
-    re: /\(CPI rent\)$/,
-    name: () => "the rent sitting tenants pay (CPI rent)",
-    why: "the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at",
-  },
-  {
-    re: /^Rents charged by .+, national \(PPI\)$/,
-    name: (label) => `the national index of ${lowerFirst(label.replace(/, national \(PPI\)$/, ""))}`,
-    why: "the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's",
-  },
-];
-
 function rentGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, RENT_GROWTH_ROW, RENT_GROWTH_NOT);
   // A regulation's allowance is the regime's, for the units it regulates —
@@ -863,23 +838,24 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
     else market.push(e);
   });
   if (!om && apart.length + market.length === 0) return null;
-  // The one figure that decides, the first of RENT_GROWTH_DECIDERS present,
-  // printed first among the market's; the rest beside it.
-  const found = RENT_GROWTH_DECIDERS.flatMap((d) => {
-    const e = market.find((m) => d.re.test(m.label));
-    return e ? [{ e, d }] : [];
-  })[0];
-  const evidence = [...apart, ...(found ? [found.e] : []), ...market.filter((m) => m !== found?.e)];
-  const pick = found ? { i: apart.length, d: found.d } : null;
+  // The one figure that decides, the first of the class's order present
+  // (lib/rent-growth-decider), printed first among the market's; the rest
+  // beside it.
+  const decided = rentGrowthDecider(ctx.assetClass, market.map((m) => m.label));
+  const found = decided ? market[decided.index] : null;
+  const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found)];
+  const pick = decided && found ? { i: apart.length, d: decided } : null;
   const compared = new Set<number>(pick ? [pick.i] : []);
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
   if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
-  if (!pick) return unchecked("rent_growth", omSays, evidence, NO_EVIDENCE, compared);
+  // Lodging and licensed care read no rent index: the true reason, never
+  // that nothing could be read.
+  if (!pick) return unchecked("rent_growth", omSays, evidence, market.length === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE, compared);
   const decider = evidence[pick.i];
   const bestValue = decider.value!;
-  const name = pick.d.name(decider.label);
+  const name = pick.d.name;
   // "Held to Zillow's apartment asking rents, the figure for this kind of
   // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
   const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;

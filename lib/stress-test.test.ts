@@ -22,6 +22,7 @@ import { interestOf } from "./interest";
 import { screenYearOf } from "./criteria";
 import { basisTag } from "./pipeline-slots";
 import { compactUsd } from "./money";
+import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
 import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
@@ -679,6 +680,50 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     expect(g.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month: \+2\.3% over the year to Aug 2026 \(Zillow Research\)\. The OM's 4\.0%\/yr is 1\.7 points over it\.$/);
     expect(g.verdict).toBe("stretched");
   });
+
+  it("is held to the same figure the model's rent-growth check is held to, so the card never reads inside where the row reads unsupported (audit H1)", () => {
+    // The OM's 3.0% and the model's 3.0% against apartments' +0.8%: the
+    // CPI's +5.0% had let the card read "inside the published range".
+    const ex = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Rent growth" ? { ...m, value: "3.0%" } : m)) };
+    const args = apartmentArgs({ extraction: ex });
+    const mvm = readFor(args.derived!, { zori: { ...zori, mfrYoyPct: 0.8 } });
+    const card = mvm.checks.find((c) => c.key === "rent_growth")!;
+    const g = rowOf(buildStressTest({ ...args, modelVsMarket: mvm }), "rent_growth");
+    expect(g.verdict).toBe("unsupported");
+    expect(g.evidence[g.impact!.evidenceIndex].label).toBe("Asking rent, apartments");
+    expect(card.tone).toBe("ahead");
+    expect(card.toneLabel).not.toBe("inside the published range");
+    // The card's range is the one deciding figure; the others are beside it.
+    const ranged = card.published.filter((_, i) => card.marks![i].role === "range").map((p) => p.label);
+    expect(ranged).toEqual(["Asking rent, apartments"]);
+  });
+
+  it("holds a rented house to Zillow's all-homes rents first, and names the closest figure for a park, a student or a mixed-use building as no figure for that kind of rent (audit M4)", () => {
+    const rowFor = (cls: string) => {
+      const args = apartmentArgs({ storedAssetClass: cls });
+      return rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { assetClass: cls }) }), "rent_growth");
+    };
+    const sfr = rowFor("sfr_btr");
+    expect(sfr.evidence[sfr.impact!.evidenceIndex].label).toBe("Asking rent, all home types");
+    expect(sfr.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the figure for a rented home, houses among the home types it covers/);
+    const park = rowFor("manufactured_housing");
+    expect(park.evidence[park.impact!.evidenceIndex].label).toBe("Asking rent, all home types");
+    expect(park.gap!.text).toContain("the closest published figure, not a park's own kind of rent: its income is lot rents, which no published index tracks");
+    const student = rowFor("student_housing");
+    expect(student.gap!.text).toContain("Held to Zillow's apartment asking rents, the closest published figure, not a student building's own kind of rent");
+    const mixed = rowFor("mixed_use");
+    expect(mixed.gap!.text).toContain("Held to Zillow's apartment asking rents, the closest published figure for the apartments, not the commercial space's rent");
+    for (const r of [park, student, mixed]) expect(r.gap!.text, r.title).not.toContain("the figure for this kind of rent");
+  });
+
+  it("says lodging and licensed care read no rent index, rather than that nothing could be read (audit L4)", () => {
+    for (const cls of ["hospitality_str", "senior_housing"]) {
+      const args = apartmentArgs({ storedAssetClass: cls });
+      const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { assetClass: cls }) }), "rent_growth");
+      expect(g.verdict, cls).toBe("unchecked");
+      expect(g.unchecked, cls).toBe(NO_RENT_INDEX);
+    }
+  });
 });
 
 // ── The exit cap's threshold and its spread ──────────────────────────────
@@ -1085,7 +1130,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "a rule of thumb"],
-  rent_growth: ["Asking rent, apartments", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
+  rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
   insurance: ["Commercial property insurance premiums", "The deal's T-12 insurance line"],

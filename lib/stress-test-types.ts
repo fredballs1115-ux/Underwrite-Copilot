@@ -356,6 +356,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "Rents grow at the pro forma's rate every year.",
     against: [
       "One figure decides, the one for the deal's own kind of rent; every other is shown beside it. For an apartment building, Zillow's asking rents for the metro against a year ago: apartments alone, else all home types",
+      "For a rented house, Zillow's asking rents across all home types first, houses among them; for a park, a student building or a mixed-use building's apartments, the closest of these decides, named as the closest published figure, not that kind of rent",
       "Where no Zillow asking rent was read, the rent sitting tenants pay (the CPI's rent of primary residence), where the BLS publishes it for the metro: it averages every lease in place, so it lags the rents new leases sign at",
       "For a commercial class, the national index of rents its kind of lessor charges (the BLS producer price indexes), said as the nation's",
       "A rent regulation's published allowance for the units it reaches, shown first and never the figure that decides",
