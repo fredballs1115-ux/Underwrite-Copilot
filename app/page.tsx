@@ -660,6 +660,7 @@ export default function Home() {
           <nav className="hidden items-center gap-1 md:flex">
             {[
               ["#screen", "How it's tested"],
+              ["/how-we-test", "The method"],
               ["/demo", "Sample test"],
               ["#pricing", "Pricing"],
               ["#faq", "FAQ"],
@@ -709,6 +710,7 @@ export default function Home() {
               <nav className="shadow-float absolute right-0 top-11 z-20 w-48 rounded-xl border border-white/10 bg-sidebar p-1.5">
                 {[
                   ["#screen", "How it's tested"],
+                  ["/how-we-test", "The method"],
                   ["/demo", "Sample test"],
                   ["#pricing", "Pricing"],
                   ["#faq", "FAQ"],

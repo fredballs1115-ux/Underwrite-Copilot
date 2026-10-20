@@ -49,9 +49,12 @@ export function SampleGuide({ onNavigate }: { onNavigate?: (key: string) => void
         {/* The building is invented, so it has no photograph: the header
             leads with the one its market is known by, captioned "Market
             photo" — said here, so a first reader does not take the skyline
-            for the building or a missing photograph for a broken one. */}
+            for the building or a missing photograph for a broken one. No
+            parcel or owner is looked up for it (lib/public-record-subject),
+            so the line claims the rules and the market's figures, never
+            records. */}
         <p className="text-xs text-ink/75">
-          An invented building on real Brewerytown rules and records; the photo is its market’s.
+          An invented building with fictional comps, read against Philadelphia’s real rules and market figures; the photo is its market’s.
         </p>
       </div>
       <ol className="mt-3 grid gap-2 sm:grid-cols-3">
