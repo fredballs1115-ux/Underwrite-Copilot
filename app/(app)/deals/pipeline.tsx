@@ -2856,6 +2856,15 @@ function NewDealForm({
             persist({ name: next });
           }}
         />
+        {/* Who sees the memorandum, in /security's own terms: private
+            storage, your account and your team, Claude to screen it, no
+            training on it. */}
+        <p className="text-xs text-muted" data-qa="om-privacy">
+          {"Kept in private storage: seen by you and your team, if you're on one, and read by Claude to screen it — never used to train AI. "}
+          <Link href="/security" className="font-medium text-brand hover:underline">
+            How your documents are kept
+          </Link>
+        </p>
         <PendingButton
           pendingLabel="Uploading your OM — hang tight…"
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"

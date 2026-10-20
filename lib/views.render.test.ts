@@ -995,6 +995,39 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(atLimit).toContain("Could not read that PDF");
     expect(atLimit).toContain("Your deal was saved.");
   });
+
+  it("says under the upload who sees the memorandum, in /security's terms, and an oversized file's limit as the action enforces it (2026-10-20)", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: CARDS.slice(0, 2),
+        errorMessage: "That PDF is over the 32 MB upload limit.",
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+        billing: BILLING,
+        todayIso: TODAY,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    const at = html.indexOf('data-qa="om-privacy"');
+    expect(at).toBeGreaterThan(html.indexOf('name="om"'));
+    const line = html.slice(at, html.indexOf("</p>", at));
+    expect(visibleText(line).replace(/&#x27;/g, "'")).toContain(
+      "Kept in private storage: seen by you and your team, if you're on one, and read by Claude to screen it — never used to train AI.",
+    );
+    expect(line).toContain('href="/security"');
+    // /security states each of those: private storage, the account and its
+    // team and no other user, Anthropic's Claude to run the screen, no training.
+    const security = readFileSync("app/security/page.tsx", "utf8");
+    for (const claim of ["private storage bucket", "visible to your account (and your team", "read by Anthropic's Claude API", "nothing you upload is used to train AI models"]) {
+      expect(security).toContain(claim);
+    }
+    // The oversized-file message reads the cap the create action enforces.
+    const page = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    expect(page).toContain("${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit");
+    expect(page).not.toContain("for now");
+    expect(readFileSync("app/(app)/deals/actions.ts", "utf8")).toContain("const MAX_BYTES = UPLOAD_MAX_BYTES;");
+  });
 });
 
 describe("Pipeline — the free-deal meter counts what the create action counts (lib/deal-allowance)", () => {

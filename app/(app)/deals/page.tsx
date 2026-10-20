@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { FREE_DEAL_LIMIT, getBilling } from "@/lib/billing";
 import { MAX_OM_PAGES } from "@/lib/pdf";
+import { UPLOAD_MAX_BYTES } from "@/lib/upload-limit";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
@@ -42,7 +43,8 @@ const ERRORS: Record<string, string> = {
   // GOV.UK's own words for it: a chosen file of 0 bytes is empty.
   empty: "That file is empty (0 bytes) — download or export it again, and upload that. Nothing was saved.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
-  size: "That PDF is larger than 32 MB — please try a smaller file for now.",
+  // The cap the create action enforces (lib/upload-limit), never typed.
+  size: `That PDF is over the ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB upload limit. Compress it (Acrobat’s Reduce File Size, or any PDF compressor) and upload it again — split, it would be screened on part of the memorandum. Nothing was saved.`,
   locked: "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password (or ask the broker for one) and upload that. Nothing was saved.",
   pages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the sections that hold the deal's figures, and the screen will read those pages alone, not the whole memorandum. Nothing was saved.`,
   save: "Couldn’t save the deal. Please try again.",
