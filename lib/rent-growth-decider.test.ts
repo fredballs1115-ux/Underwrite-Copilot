@@ -45,10 +45,13 @@ describe("one rent-growth decider for the stress test and the model's check (aud
   });
 
   it("is the one order both readers use: neither keeps a copy of its own", () => {
-    for (const f of ["lib/stress-test.ts", "lib/model-vs-market.ts"]) {
+    // The stress test reads it through lib/stress-deciders, the one module
+    // of every row's deciding figure.
+    for (const f of ["lib/stress-deciders.ts", "lib/model-vs-market.ts"]) {
       const s = readFileSync(f, "utf8");
       expect(s, f).toContain("rentGrowthDecider(");
       expect(s, f).not.toContain("RENT_GROWTH_DECIDERS");
     }
+    expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("rentGrowthDeciding(");
   });
 });

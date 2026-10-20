@@ -28,7 +28,8 @@ import {
   VACANCY_UNSUPPORTED_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { RECORD_FLOOR } from "@/lib/track-record";
+import { RECORD_FLOOR, marginWords } from "@/lib/track-record";
+import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 
 export { STRESS_METHODS };
@@ -62,7 +63,7 @@ export const WHO_DOES_WHAT = {
   code: {
     heading: "Code runs",
     items: [
-      "the lookup: which published figure, document or rule of thumb speaks to it",
+      "the lookup: the one published figure, document or rule of thumb that decides it, the rest shown beside it",
       "the arithmetic: the gap in the assumption's own unit",
       "the verdict word, from the gap and the row's own threshold",
       "the re-run: the return again with the evidence's figure in the OM's place",
@@ -75,34 +76,35 @@ export const WHO_DOES_WHAT = {
 export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
   {
     word: "holds",
-    line: "The OM's figure sits inside the evidence, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
+    line: "The OM's figure sits at the one figure that decides the row, within its margin, or on its conservative side. No re-run is drawn on it. A row held only to a rule of thumb says so and is never drawn green.",
   },
   {
     word: "stretched",
-    line: `Past the evidence by less than the row's threshold; or inside it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
+    line: `Past the deciding figure by less than the row's threshold; or at it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more.`,
   },
-  { word: "unsupported", line: "Past the evidence by more than the row's threshold, below." },
+  { word: "unsupported", line: "Past the deciding figure by more than the row's threshold, below. Every other piece on the row is shown beside it and decides nothing." },
   { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
 ];
 
 const pctOf = (share: number) => `${Math.round(share * 100)}%`;
 
 /**
- * How each row picks the figure it is held to, and its threshold, one line
- * a key: what lib/stress-test does, each figure its constant.
+ * How each row picks the ONE figure it is held to, and its threshold, one
+ * line a key: what lib/stress-test does (its orders are lib/stress-deciders'),
+ * each figure its constant.
  */
 export const VERDICT_RULES: Record<StressKey, string> = {
   // lib/stress-test's price row: the first piece above that carries a
   // figure. A median needs three; under three comps graded clean none is
   // struck, and the row names what it holds the ask to by count.
   basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
-  exit_cap: `Held to the going-in cap, else the published cap range's low end. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported; where a published cap range reaches the exit, compression is stretched at worst.`,
+  exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
-  noi: `Held to the T-12, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  vacancy: `A stabilized assumption is held to the market: the metro survey inside its margin, else the tracker's band, the region, the state. The rent roll or T-12 shows today's gap; with no fresh market figure, they decide. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
+  noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
+  vacancy: `A stabilized assumption is held to the market's figure: the metro survey in its margin, else the tracker band's low read, the region, the state; else the rent roll, then the T-12, which beside it show today's gap. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
   // lib/rent-growth-decider's order, one line.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
-  expense_growth: `Held to the lowest price index; the insurance index and the breakeven are shown apart. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
+  expense_growth: `Held to all-items CPI, the broad price level the expense base moves with; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
   insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, the break-even: holds at or over it, else stretched.`,
@@ -265,16 +267,26 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 
 /** Whether the screen was right: scored, never claimed (lib/track-record's
  *  rules, its floor imported). */
+const margin = (key: StressKey) => {
+  const t = snapshotThreshold(key);
+  return t ? marginWords(t).replace("-point", " points") : "";
+};
+
 export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
-    "A screen's challenges are scored only against what arrived on the deal after its verdict: a rent roll or T-12 uploaded after it and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "Every row of the stress test is scored, holds included: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
+    "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands at or better than the OM's.",
+    "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
+    `The margin is the one the row's own verdict draws: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
     "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
     "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a figure: it is counted apart and in no share.",
-    `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record.`,
+    `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record. A share is always printed with its count beside it ("3 of 5 rows").`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
   ],
 } as const;

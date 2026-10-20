@@ -33,7 +33,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
 import type { StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, headlineSentence, liveHeadline, rowMoveText, stressReadLine, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rowMoveText, stressReadLine, whenWords } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -149,7 +149,7 @@ export function stressSection(test: StressTest): string[] {
     const page = r.omSays.page != null ? ` [p. ${r.omSays.page}]` : "";
     const evidence = r.evidence.length
       ? r.evidence
-          .map((e) => {
+          .map((e, i) => {
             // What the evidence is, after its publisher and date — left out
             // where the publisher already says it ("a rule of thumb").
             const kind =
@@ -161,7 +161,10 @@ export function stressSection(test: StressTest): string[] {
                     ? "a rule of thumb"
                     : "the memorandum's own figure";
             const when = e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : "";
-            return `${e.label}: ${e.text} (${e.publisher}${when}${kind === e.publisher ? "" : `; ${kind}`})`;
+            // ONE figure decided the row (lib/stress-deciders): it is named
+            // so, and every other piece as beside it, deciding nothing.
+            const tag = decidesTag(r, i);
+            return `${tag ? `[${tag.toUpperCase()}] ` : ""}${e.label}: ${e.text} (${e.publisher}${when}${kind === e.publisher ? "" : `; ${kind}`})`;
           })
           .join("; ")
       : "no evidence with a figure or words could be read";
@@ -181,7 +184,7 @@ export function stressSection(test: StressTest): string[] {
             ? " The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself — each row starts from a different return, which is what the headline's one pair of runs answers."
             : ""
         }`,
-    "Lead the reason with the unsupported rows, then the stretched. Wherever a figure above decides a sentence — the reason, a screen range, a deal-killer's read, a next step — cite it by figure and date and name its publisher (\"the rent roll's 9.1% vacancy, May 31, 2026\"; \"the Census Bureau's 6.2% for the metro, Q2 2026\"): an unsupported figure is the range's conservative end, and the matching next step is what the broker must show to support the OM's figure. A row the test leaves unchecked has nothing in code to cite, and you say so if you raise it.",
+    "Each tested row was decided on ONE figure, marked [DECIDES]; a piece marked [BESIDE IT, NOT DECIDING] is shown beside it and never the figure a row is held to, so never cite it as what the row was struck on. Lead the reason with the unsupported rows, then the stretched. Wherever a figure above decides a sentence — the reason, a screen range, a deal-killer's read, a next step — cite it by figure and date and name its publisher (\"the rent roll's 9.1% vacancy, May 31, 2026\"; \"the Census Bureau's 6.2% for the metro, Q2 2026\"): an unsupported figure is the range's conservative end, and the matching next step is what the broker must show to support the OM's figure. A row the test leaves unchecked has nothing in code to cite, and you say so if you raise it.",
   );
   return lines;
 }

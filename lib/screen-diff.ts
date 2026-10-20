@@ -23,6 +23,10 @@ interface VerdictLike {
   /** the verdict's own stamp — the screen the snapshot's challenges were
    *  made on, which the track record scores them from */
   generatedAt?: string | null;
+  /** the stress test as it stood at that verdict (lib/stress-snapshot,
+   *  since 2026-10-20), carried in with the verdict so the track record
+   *  scores the earlier screen's rows; absent on an older snapshot */
+  stressSnapshot?: unknown;
 }
 
 /** What the pipeline snapshots before overwriting a previous run's results. */

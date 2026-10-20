@@ -7,8 +7,12 @@ import { join } from "node:path";
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StageChange } from "@/lib/stages";
+import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
+import { STRESS_SNAPSHOT_V, WORSE_WHEN, readStressSnapshot, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import {
+  OUTCOME_WORD,
   RECORD_FLOOR,
+  dealRecordLine,
   RECORD_NONE_LINE,
   TAX_INSURANCE_NOT_SCORED,
   accountRecord,
@@ -208,7 +212,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(r.rows[1].text).toBe("Real estate taxes: a seller's T-12 cannot show a new owner's tax bill, and no document on the deal is the buyer's own, so no document scores it.");
     expect(r.rows[2].text).toContain("the T-12 to Oct 31, 2026 earned $3.71M");
     expect(accountRecord([r]).byKey.map((k) => k.key)).toEqual(["noi"]);
-    expect(TAX_INSURANCE_NOT_SCORED).toBe("A seller's T-12 cannot show a new owner's tax bill or premium, so taxes and insurance challenges are not scored by documents.");
+    expect(TAX_INSURANCE_NOT_SCORED).toBe("A seller's T-12 cannot show a new owner's tax bill or premium, so taxes and insurance rows are not scored by documents.");
     // Nothing reads a T-12's tax or insurance line to score a row.
     const src = readFileSync(join(process.cwd(), "lib/track-record.ts"), "utf8");
     expect(src).not.toMatch(/case "(?:taxes|insurance)":/);
@@ -438,7 +442,7 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
 
   it("the account's record counts a prior screen's scored row as the deal's", () => {
     const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } })]);
-    expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 1, scored: 1, screenSide: 1 });
+    expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 1, scored: 0, challenges: { scored: 1, screenSide: 1 } });
   });
 });
 
@@ -455,40 +459,46 @@ describe("accountRecord — counts, by key, and the floor", () => {
     expect(recordCountsLine(r)).toBe("1 deal tested · 0 with later evidence · 0 rows scored");
   });
 
-  it("under the floor the rows are a start, not a record, and no share is printed", () => {
-    expect(RECORD_FLOOR).toBe(3);
+  it("under the floor the challenges are a start, not a record, and no share is printed", () => {
+    expect(RECORD_FLOOR).toBe(5);
     const r = accountRecord([scoredDeal(), scoredDeal()]);
-    expect(r).toMatchObject({ dealsTested: 2, dealsWithLater: 2, scored: 2, screenSide: 2, omSide: 0, between: 0, shares: null });
+    expect(r).toMatchObject({ dealsTested: 2, dealsWithLater: 2, scored: 0, challenges: { scored: 2, screenSide: 2, omSide: 0, between: 0, shares: null }, shares: null });
     expect(recordState(r)).toBe("start");
-    expect(recordLine(r)).toBe("2 scored rows are a start, not a record.");
-    expect(recordLine(accountRecord([scoredDeal()]))).toBe("1 scored row is a start, not a record.");
+    expect(recordLine(r)).toBe("2 challenges scored from screens whose stress test was not kept are a start, not a record: no share is printed under 5.");
+    expect(recordLine(accountRecord([scoredDeal()]))).toBe("1 challenge scored from screens whose stress test was not kept is a start, not a record: no share is printed under 5.");
     expect(recordLine(accountRecord([scoredDeal()]))).not.toMatch(/%/);
+    // Four is still under the floor.
+    const four = accountRecord([scoredDeal(noi), scoredDeal(), scoredDeal()]);
+    expect(four.challenges.scored).toBe(4);
+    expect(recordState(four)).toBe("start");
+    expect(recordLine(four)).not.toMatch(/%/);
   });
 
-  it("at the floor the shares are said, and the keys ranked by rows scored", () => {
-    const r = accountRecord([scoredDeal(noi), scoredDeal(), scoredDeal()]);
-    expect(r.scored).toBe(4);
+  it("at the floor the shares are said, each with its count, and the keys ranked by rows scored", () => {
+    const r = accountRecord([scoredDeal(noi), scoredDeal(), scoredDeal(), scoredDeal()]);
+    expect(r.challenges.scored).toBe(5);
     expect(r.byKey.map((k) => [k.key, k.screenSide, k.omSide, k.between])).toEqual([
-      ["vacancy", 3, 0, 0],
+      ["vacancy", 4, 0, 0],
       ["noi", 0, 0, 1],
     ]);
-    expect(r.shares).toEqual({ screenSidePct: 75, omSidePct: 0, betweenPct: 25 });
+    expect(r.challenges.shares).toEqual({ screenSidePct: 80, omSidePct: 0, betweenPct: 20 });
     expect(recordState(r)).toBe("record");
-    expect(recordLine(r)).toBe("Of 4 scored rows, 3 landed on the screen's side (75%), 0 on the OM's (0%) and 1 between (25%).");
-    expect(recordCountsLine(r)).toBe("3 deals tested · 3 with later evidence · 4 rows scored");
+    expect(recordLine(r)).toBe(
+      "5 challenges scored from screens whose stress test was not kept: 4 of 5 challenges on the screen's side (80%), 0 of 5 challenges on the OM's (0%), 1 of 5 challenges between (20%).",
+    );
+    expect(recordCountsLine(r)).toBe("4 deals tested · 4 with later evidence · 5 rows scored");
   });
 
   it("a decision is counted apart: never a scored row, never in a share or a key's bar", () => {
     const decided = scoreDeal({ screenedAt: T, challenges: [basis], ...dead("price") });
     expect(decided.rows[0]).toMatchObject({ landing: "screen_side", decision: true });
-    const r = accountRecord([scoredDeal(noi), scoredDeal(), decided]);
-    expect(r).toMatchObject({ scored: 3, decisions: 1, screenSide: 2, between: 1 });
+    const r = accountRecord([scoredDeal(noi), scoredDeal(), scoredDeal(), scoredDeal(), decided]);
+    expect(r).toMatchObject({ scored: 0, decisions: 1, challenges: { scored: 5, screenSide: 4, between: 1 } });
     expect(r.byKey.map((k) => k.key)).toEqual(["vacancy", "noi"]);
-    expect(r.shares).toEqual({ screenSidePct: 67, omSidePct: 0, betweenPct: 33 });
     expect(recordLine(r)).toBe(
-      "Of 3 scored rows, 2 landed on the screen's side (67%), 0 on the OM's (0%) and 1 between (33%). 1 more row was a decision (Dead, and why), counted apart and in no share.",
+      "5 challenges scored from screens whose stress test was not kept: 4 of 5 challenges on the screen's side (80%), 0 of 5 challenges on the OM's (0%), 1 of 5 challenges between (20%). 1 more row was a decision (Dead, and why), counted apart and in no share.",
     );
-    expect(recordCountsLine(r)).toBe("3 deals tested · 3 with later evidence · 4 rows answered, 1 of them a decision · 3 scored");
+    expect(recordCountsLine(r)).toBe("5 deals tested · 5 with later evidence · 6 rows answered, 1 of them a decision · 5 scored");
     // A decision alone is no record: nothing is scored on a figure.
     const alone = accountRecord([decided]);
     expect(recordState(alone)).toBe("none");
@@ -505,5 +515,269 @@ describe("accountRecord — counts, by key, and the floor", () => {
     });
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.rows[0].text).toBe("Basis: the building traded at $60.00M, but it carries no figure on the OM figure's basis, so it is not scored.");
+  });
+});
+
+// ── The stress test's rows, as they stood at the verdict ───────────────────
+
+describe("scoreDeal — every row of the stress test kept with the verdict, holds included (the owner's decision of 2026-10-20)", () => {
+  const row = (over: Partial<StressSnapshotRow> & Pick<StressSnapshotRow, "key">): StressSnapshotRow => ({
+    title: over.key === "vacancy" ? "Stabilized vacancy" : over.key === "noi" ? "NOI" : over.key === "basis" ? "Basis per unit" : "Row",
+    verdict: "stretched",
+    om: 6,
+    page: 12,
+    evidence: { value: 9, label: "Apartment occupancy, a rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
+    per: null,
+    threshold: snapshotThreshold(over.key),
+    worse: WORSE_WHEN[over.key],
+    ...over,
+  });
+  const snap = (...rows: StressSnapshotRow[]): StressSnapshot => ({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows });
+  const laterT12 = (over: Partial<T12Summary> = {}) => ({ t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: { ...t12, ...over } } });
+  // The T-12's economic vacancy: 650,500 over 7,150,000 is 9.1%.
+
+  it("a stretched row is right where the later figure lands past the OM's on the buyer's bad side, by more than the row's margin", () => {
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [vacancy], ...laterT12() });
+    expect(r.snapshotted).toBe(true);
+    expect(r.snapshotNotes).toEqual([]);
+    const x = r.rows[0];
+    expect(x).toMatchObject({ key: "vacancy", fromTest: true, verdict: "stretched", landing: "right", outcome: "flag_right", omFigure: 6, altFigure: 9 });
+    expect(x.figures).toEqual({ om: "6.0%", alt: "9.0%", later: "9.1%" });
+    expect(x.text).toBe(
+      "Stabilized vacancy: the test read the OM's 6.0% as stretched, set against apartment occupancy, a rule of thumb at 9.0%; the T-12 to Oct 31, 2026 ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — past the OM's figure, worse for the buyer by more than the row's 0.05-point margin: the test was right.",
+    );
+  });
+
+  it("a stretched row is wrong where the later figure lands at or better than the OM's", () => {
+    // A rent roll 4.2% vacant against the OM's 6.0%, read stretched: better for the buyer.
+    const rr = { ...roll, occupiedUnits: 230, unitCount: 240, sfWeightedOccupancy: 0.96 };
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: rr } });
+    expect(r.rows[0]).toMatchObject({ landing: "wrong", outcome: "flag_wrong" });
+    expect(r.rows[0].text).toContain("at or better than the OM's figure for the buyer: the test was wrong.");
+    // At the OM's own figure exactly: still wrong — the flag said it was worse.
+    const at = { ...roll, occupiedUnits: 0, unitCount: 0, sfWeightedOccupancy: 0.94 };
+    const atOm = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: at } });
+    expect(atOm.rows[0].later?.value).toBe(6);
+    expect(atOm.rows[0].outcome).toBe("flag_wrong");
+  });
+
+  it("a hold is right where the later figure lands within the row's margin of the OM's, or better for the buyer", () => {
+    const held = row({ key: "noi", verdict: "holds", om: 3_800_000, evidence: { value: 3_900_000, label: "The OM's own in-place NOI", asOf: null, kind: "om_internal", publisher: "the memorandum" } });
+    // The T-12's $3.71M is 2.5% under the OM's $3.8M: inside the 5% band.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(held), challenges: [], ...laterT12() });
+    expect(r.rows[0]).toMatchObject({ landing: "right", outcome: "hold_right" });
+    expect(r.rows[0].text).toContain("within the row's 5% margin of the OM's figure, or better for the buyer: the hold was right.");
+    // Better for the buyer by far is a hold borne out too.
+    const better = scoreDeal({ screenedAt: T, stressSnapshot: snap(held), challenges: [], ...laterT12({ noi: 4_500_000 }) });
+    expect(better.rows[0].outcome).toBe("hold_right");
+  });
+
+  it("a hold is wrong — a false hold — where the later figure lands past the OM's on the buyer's bad side", () => {
+    const held = row({ key: "noi", verdict: "holds", om: 4_000_000, evidence: { value: 3_950_000, label: "The OM's own in-place NOI", asOf: null, kind: "om_internal", publisher: "the memorandum" } });
+    // $3.71M is 7.3% under $4.0M: past the 5% band.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(held), challenges: [], ...laterT12() });
+    expect(r.rows[0]).toMatchObject({ landing: "wrong", outcome: "false_hold", verdict: "holds" });
+    expect(r.rows[0].figures).toEqual({ om: "$4.00M", alt: "$3.95M", later: "$3.71M" });
+    expect(r.rows[0].text).toBe(
+      "NOI: the test read the OM's $4.00M as holding, set against the OM's own in-place NOI at $3.95M; the T-12 to Oct 31, 2026 earned $3.71M — past the OM's figure, worse for the buyer by more than the row's 5% margin: a false hold.",
+    );
+    expect(OUTCOME_WORD.false_hold).toBe("Wrong: a false hold");
+    expect(dealRecordLine(r)).toBe("1 stress-test row scored on this deal: 0 right, 1 wrong, 1 of them a false hold. No share is printed under 5 scored rows.");
+  });
+
+  it("an unchecked row is not scored, and says why; taxes and insurance are never scored by a document", () => {
+    const r = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(
+        row({ key: "vacancy", verdict: "unchecked", evidence: null }),
+        row({ key: "taxes", verdict: "stretched", om: 1_000_000, evidence: { value: 1_400_000, label: "The reset bill", asOf: null, kind: "om_internal", publisher: "the memorandum" } }),
+      ),
+      challenges: [],
+      ...laterT12(),
+    });
+    expect(r.rows.map((x) => x.landing)).toEqual(["unscored", "unscored"]);
+    expect(r.rows[0].why).toBe("the stress test left it unchecked — no evidence with a figure decided it — so there is no verdict to score.");
+    expect(r.rows[1].why).toContain("a seller's T-12 cannot show a new owner's tax bill");
+    expect(dealRecordLine(r)).toBeNull();
+  });
+
+  it("a stabilized vacancy the market's published figure decided is not scored by a later document; one a rule of thumb decided is", () => {
+    const published = row({ key: "vacancy", verdict: "holds", om: 6, evidence: { value: 6.2, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" } });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(published), challenges: [], ...laterT12() });
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.rows[0].text).toContain("which the stress test holds to the market's published figures");
+    // The caller's flag is for an older screen's challenge; the row reads its own decider.
+    const ruled = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], vacancyHeldToMarket: true, ...laterT12() });
+    expect(ruled.rows[0].landing).toBe("right");
+    // A plan deal's NOI is the finished project's, whatever the row read.
+    const plan = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "noi", om: 4_000_000, evidence: null, verdict: "holds" })), challenges: [], plan: true, ...laterT12() });
+    expect(plan.rows[0].landing).toBe("unscored");
+  });
+
+  it("a decision is a direction: on a flagged row it agrees, against a hold it does not, and either is counted apart", () => {
+    const flagged = row({ key: "basis", om: 274_000, evidence: { value: 240_000, label: "The OM's sale comps", asOf: null, kind: "om_internal", publisher: "the memorandum" } });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(flagged), challenges: [], ...dead("price") });
+    expect(r.rows[0]).toMatchObject({ landing: "right", decision: true, outcome: null });
+    expect(r.rows[0].text).toContain("and you walked away on price — a decision on the test's side, not a figure.");
+    const held = scoreDeal({ screenedAt: T, stressSnapshot: snap({ ...flagged, verdict: "holds" }), challenges: [], ...dead("price") });
+    expect(held.rows[0]).toMatchObject({ landing: "wrong", decision: true });
+    expect(held.rows[0].text).toContain("a decision against the hold, not a figure.");
+    const acct = accountRecord([r, held]);
+    expect(acct).toMatchObject({ scored: 0, decisions: 2, shares: null });
+  });
+
+  it("a trade is put on a per-SF row's own yardstick, and the row's 5% stretch line decides", () => {
+    const perSf = row({ key: "basis", om: 300, per: "/SF", evidence: { value: 260, label: "Recorded sales, median a foot", asOf: "2026-09-01", kind: "published", publisher: "public records" } });
+    const trade = (price: number) => ({
+      askingPrice: 66_000_000,
+      stage: "closed",
+      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }] as StageChange[],
+    });
+    // $60.0M over the $66.0M ask is $272.73 a foot: 9.1% under $300.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(perSf), challenges: [], ...trade(60_000_000) });
+    expect(r.rows[0]).toMatchObject({ landing: "right", outcome: "flag_right" });
+    expect(r.rows[0].figures?.om).toBe("$300/SF");
+    // $64.0M is 3.0% under: inside the 5% line, so the flag did not stand.
+    const near = scoreDeal({ screenedAt: T, stressSnapshot: snap(perSf), challenges: [], ...trade(64_000_000) });
+    expect(near.rows[0].outcome).toBe("flag_wrong");
+  });
+
+  it("the floor: four scored rows are a start with no share; five print each share with its count", () => {
+    const deal = (n: number) => scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om: n })), challenges: [], ...laterT12() });
+    const four = accountRecord([deal(6), deal(6), deal(6), deal(9.1)]);
+    expect(four).toMatchObject({ scored: 4, right: 3, wrong: 1, falseHolds: 0, shares: null });
+    expect(recordState(four)).toBe("start");
+    expect(recordLine(four)).toBe("4 scored stress-test rows are a start, not a record: no share is printed under 5.");
+    const five = accountRecord([deal(6), deal(6), deal(6), deal(9.1), deal(9.1)]);
+    expect(five.shares).toEqual({ rightPct: 60, wrongPct: 40 });
+    expect(recordState(five)).toBe("record");
+    expect(recordLine(five)).toBe("5 stress-test rows scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%).");
+    expect(five.byKey).toEqual([{ key: "vacancy", title: "Stabilized vacancy", right: 3, wrong: 2, screenSide: 0, omSide: 0, between: 0 }]);
+    expect(recordCountsLine(five)).toBe("5 deals tested · 5 with later evidence · 5 rows scored");
+    // The deal page's own line takes the same floor.
+    const many = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy", om: 9.1 }), row({ key: "vacancy", om: 9.1 })),
+      challenges: [],
+      ...laterT12(),
+    });
+    expect(dealRecordLine(many)).toBe("5 stress-test rows scored on this deal: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%).");
+  });
+
+  it("a verdict with no snapshot scores its challenges and says its rows were not snapshotted; one that built no test says so", () => {
+    const older = scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterT12() });
+    expect(older.snapshotted).toBe(false);
+    expect(older.rows[0]).toMatchObject({ landing: "screen_side" });
+    expect(older.rows[0].fromTest).toBeUndefined();
+    expect(older.snapshotNotes).toEqual([
+      "This screen (Oct 1, 2026) was made before the stress test was kept with its verdict, so its rows were not snapshotted: its challenges are scored on the challenger's own figures instead.",
+    ]);
+    const none = scoreDeal({ screenedAt: T, stressSnapshot: null, challenges: [vacancy], ...laterT12() });
+    expect(none.snapshotNotes).toEqual(["This screen (Oct 1, 2026) built no stress test, so its rows were not snapshotted: its challenges are scored on the challenger's own figures instead."]);
+    // Anything stored that is not a snapshot is none, never a hold.
+    expect(readStressSnapshot({ v: 99, rows: [] })).toBeNull();
+    expect(readStressSnapshot({ v: STRESS_SNAPSHOT_V, rows: [{ key: "nope", verdict: "holds", title: "x" }] })).toBeNull();
+    expect(readStressSnapshot("junk")).toBeNull();
+  });
+
+  it("the prior screen's snapshot rides in its verdict into prior_screen, and scores what arrived between the two screens", () => {
+    const PRIOR_T = "2026-09-10T12:00:00Z";
+    const BETWEEN = "2026-09-25T09:00:00Z";
+    const priorScreen = { verdict: { generatedAt: PRIOR_T, stressSnapshot: snap(row({ key: "vacancy", verdict: "holds", om: 5 })) }, challenges: { challenges: [vacancy] } };
+    // The T-12 arrived between the two screens, dated Sep 20: the current
+    // screen read it; the prior's hold of 5.0% is scored on it — a false hold.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], priorScreen, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } });
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ priorScreenedOn: "Sep 10, 2026", outcome: "false_hold", fromTest: true });
+    expect(r.rows[0].text.startsWith("Stabilized vacancy (the screen of Sep 10, 2026): the test read the OM's 5.0% as holding")).toBe(true);
+    expect(r.snapshotNotes).toEqual([]);
+    // A prior verdict with no snapshot scores its challenges, said as the earlier screen's.
+    const older = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(row({ key: "vacancy" })),
+      challenges: [],
+      priorScreen: { verdict: { generatedAt: PRIOR_T }, challenges: { challenges: [vacancy] } },
+      t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 },
+    });
+    expect(older.rows[0]).toMatchObject({ landing: "screen_side", priorScreenedOn: "Sep 10, 2026" });
+    expect(older.snapshotNotes).toEqual([
+      "The screen of Sep 10, 2026 was made before the stress test was kept with its verdict, so its rows were not snapshotted: its challenges are scored on the challenger's own figures instead.",
+    ]);
+  });
+});
+
+describe("stressSnapshotOf — the stress test as it stood at the verdict", () => {
+  const ev = (over: Partial<StressEvidence>): StressEvidence => ({ kind: "document", label: "The deal's T-12", text: "", value: 1_000_000, asOf: "2026-06-30", publisher: "the deal's T-12", scope: "deal", ...over });
+  const base: StressRow = {
+    key: "noi",
+    title: "NOI",
+    omSays: { text: "NOI: $1,200,000", value: 1_200_000, page: 5 },
+    evidence: [ev({})],
+    gap: { value: 200_000, unit: "usd", text: "" },
+    verdict: "unsupported",
+    impact: null,
+    challenge: null,
+    method: "",
+  };
+  const test = (...rows: StressRow[]): StressTest => ({ rows, readOn: "2026-10-01", publishedRead: true, impactsWithheld: null });
+
+  it("keeps each row's verdict, the OM's figure and page, and the evidence that decided it — the re-run's, else the first with a figure", () => {
+    const vac: StressRow = {
+      ...base,
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      omSays: { text: "Vacancy 5%", value: 5, page: 9 },
+      evidence: [ev({ value: 9, label: "The deal's rent roll" }), ev({ kind: "published", label: "Rental vacancy, metro area", value: 6.2, asOf: "2026-04-01", publisher: "Census Bureau" })],
+      verdict: "stretched",
+      impact: { input: "vacancyPct", evidenceIndex: 1, omValue: 0.05, altValue: 0.062, baseIrrPct: 10, altIrrPct: 9, baseMultiple: 1.8, altMultiple: 1.7, note: "" },
+    };
+    const s = stressSnapshotOf(test(base, vac, { ...base, key: "other", title: "Other", verdict: "unchecked", evidence: [], omSays: { text: "", value: null, page: null } }))!;
+    expect(s).toMatchObject({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01" });
+    expect(s.rows[0]).toEqual({
+      key: "noi",
+      title: "NOI",
+      verdict: "unsupported",
+      om: 1_200_000,
+      page: 5,
+      evidence: { value: 1_000_000, label: "The deal's T-12", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12" },
+      per: null,
+      threshold: { value: 0.05, unit: "share" },
+      worse: "lower",
+    });
+    expect(s.rows[1].evidence).toMatchObject({ kind: "published", value: 6.2 });
+    expect(s.rows[1].threshold).toEqual({ value: 0.05, unit: "pts" });
+    expect(s.rows[2]).toMatchObject({ verdict: "unchecked", evidence: null, threshold: null, om: null });
+    // What is written reads back as itself.
+    expect(readStressSnapshot(JSON.parse(JSON.stringify(s)))).toEqual(s);
+    expect(stressSnapshotOf(null)).toBeNull();
+    expect(stressSnapshotOf(test())).toBeNull();
+  });
+
+  it("keeps the row's own deciding figure (decidedBy) ahead of the re-run's", () => {
+    const vac: StressRow = {
+      ...base,
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      omSays: { text: "Vacancy 5%", value: 5, page: 9 },
+      evidence: [ev({ value: 9, label: "The deal's rent roll" }), ev({ kind: "published", label: "Rental vacancy, metro area", value: 6.2, asOf: "2026-04-01", publisher: "Census Bureau" })],
+      verdict: "stretched",
+      decidedBy: 1,
+      impact: { input: "vacancyPct", evidenceIndex: 0, omValue: 0.05, altValue: 0.09, baseIrrPct: 10, altIrrPct: 9, baseMultiple: 1.8, altMultiple: 1.7, note: "" },
+    };
+    expect(stressSnapshotOf(test(vac))!.rows[0].evidence).toMatchObject({ kind: "published", value: 6.2 });
+  });
+
+  it("a piece judged on its own yardstick is kept on it, the OM's figure with it", () => {
+    const basisRow: StressRow = {
+      ...base,
+      key: "basis",
+      title: "Basis per unit",
+      omSays: { text: "$274,000 a unit", value: 274_000, page: 3 },
+      evidence: [ev({ kind: "published", label: "Recorded sales", value: 260, ownYardstick: { om: 300, per: "/SF" } })],
+      verdict: "stretched",
+    };
+    const row0 = stressSnapshotOf(test(basisRow))!.rows[0];
+    expect(row0).toMatchObject({ om: 300, per: "/SF", threshold: { value: 0.05, unit: "share" }, worse: "lower" });
+    expect(row0.evidence?.value).toBe(260);
   });
 });

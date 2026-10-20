@@ -21,7 +21,7 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * The T-12's tax line is shown beside the taxes row and judges nothing, so
  * taxes are not named. And a document dated after the screen's verdict (and
  * uploaded after it) is what the track record scores the screen's
- * challenges against (lib/track-record) — never its taxes or insurance,
+ * stress-test rows against (lib/track-record) — never its taxes or insurance,
  * which a seller's T-12 cannot show for a new owner.
  */
 export function ActualsPrompt({
@@ -50,7 +50,7 @@ export function ActualsPrompt({
         building&apos;s own year; a rent roll tests its vacancy against the
         occupancy it runs at. Dated after this screen (the roll&apos;s as-of,
         the T-12&apos;s period end), either one lets the track record score
-        its challenges.
+        the stress test&apos;s rows.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -32,6 +32,7 @@ import {
   engineReruns,
   evidenceKindOf,
 } from "./how-we-test";
+import { snapshotThreshold } from "./stress-snapshot";
 import {
   BASIS_STRETCH_PCT,
   BASIS_UNSUPPORTED_PCT,
@@ -115,7 +116,7 @@ describe("/how-we-test draws every method from the table", () => {
       // documents' vacancy is today's.
       vacancy: ["published", "published", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
-      expense_growth: ["published", "published", "published"],
+      expense_growth: ["published", "published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
       insurance: ["published", "document"],
       // The break-even is said beside the row, never set against it.
@@ -206,16 +207,33 @@ describe("/how-we-test draws every method from the table", () => {
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
     expect(VERDICT_RULES.rent_growth).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} points`);
-    expect(VERDICT_RULES.expense_growth).toMatch(/^Held to the lowest price index/);
+    // ONE figure decides each row (lib/stress-deciders), never the lowest
+    // of several: all-items CPI for an expense growth, core only in its place.
+    expect(VERDICT_RULES.expense_growth).toMatch(/^Held to all-items CPI/);
+    expect(VERDICT_RULES.expense_growth).not.toMatch(/lowest/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
-    expect(VERDICT_RULES.exit_cap).toMatch(/compression is stretched at worst/);
+    expect(VERDICT_RULES.exit_cap).toMatch(/a cap range beside a going-in cap decides nothing/);
+    expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
     // The record: its heading, its lines, and its floor the reader's own.
     expect(text).toContain(TRACK_RECORD.heading);
     for (const line of TRACK_RECORD.lines) expect(text).toContain(line);
     expect(TRACK_RECORD.lines.join(" ")).toContain(`under ${RECORD_FLOOR} scored rows`);
+    expect(RECORD_FLOOR).toBe(5);
+    // Every row scored, holds included, each outcome said, and the margins
+    // the snapshot keeps (lib/stress-snapshot) printed as the reader's own.
+    const record = TRACK_RECORD.lines.join(" ");
+    expect(record).toContain("Every row of the stress test is scored, holds included");
+    expect(record).toContain("a false hold");
+    expect(record).toContain("An unchecked row is not scored.");
+    expect(record).toContain('"3 of 5 rows"');
+    expect(record).toContain("0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });
+    expect(snapshotThreshold("noi")).toEqual({ value: 0.05, unit: "share" });
+    expect(snapshotThreshold("basis")).toEqual({ value: 0.05, unit: "share" });
+    for (const line of TRACK_RECORD.lines) expect(line.length, line).toBeLessThanOrEqual(260);
     // A stabilized vacancy the market decided is not scored by a later document (audit L5).
     expect(TRACK_RECORD.lines).toContain("A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.");
     // The marker keeps the sentence live-verify greps, whole.

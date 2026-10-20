@@ -22,11 +22,15 @@
 //     named as one, then the memorandum contradicting itself;
 //   - the gap is signed from the buyer's side: positive means the OM is
 //     the more optimistic of the two;
-//   - the verdict is code's, from the gap and the thresholds below: `holds`
-//     inside the evidence's range or on its conservative side (within a
-//     survey's margin), `stretched` past it, `unsupported` past it by more
-//     than the key's own threshold, `unchecked` where nothing carries a
-//     figure;
+//   - the verdict is code's, from the gap and the thresholds below, and it
+//     is struck on ONE figure (the owner's rule of 2026-10-20): the first
+//     piece in the row's own order (lib/stress-deciders) that is fresh and
+//     may be held to decides, and every other piece is shown beside it,
+//     deciding nothing — never the nearest edge of a range the pieces make
+//     together, which let the most lenient piece win. `holds` at the
+//     deciding figure or on its conservative side (within a survey's
+//     margin), `stretched` past it, `unsupported` past it by more than the
+//     key's own threshold, `unchecked` where nothing carries a figure;
 //   - the impact swaps ONE input of the model, twice: the OM's figure in for
 //     the base run and the best evidence's for the alternative, so the move
 //     is the gap's own and never the model's default's (which reads no
@@ -48,10 +52,10 @@
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
 //                    trailing year's figure for the deal's own kind of rent
 //                    (lib/rent-growth-decider)
-//   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under the lowest
-//                    price index
+//   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under all-items
+//                    CPI (core CPI only where all-items is not fresh)
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
-//                    going-in cap with no published cap range supporting it
+//                    going-in cap (else the tracker cap range's low end)
 //   debt             DEBT_UNSUPPORTED_BPS      50 bps under the seeded rate
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
@@ -110,7 +114,7 @@ import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { readValueAdd } from "@/lib/value-add";
 import { readRoster } from "@/lib/tenant-roster";
-import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex, rentGrowthDecider } from "@/lib/rent-growth-decider";
+import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex } from "@/lib/rent-growth-decider";
 import {
   STRESS_KEYS,
   type StressEvidence,
@@ -127,6 +131,31 @@ import {
   type StressKept,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
+import {
+  ABATEMENT_LABEL,
+  ACHIEVED_PREMIUM_LABEL,
+  GOING_IN_CAP_LABEL,
+  OM_IN_PLACE_NOI_LABEL,
+  PAST_SCREENS_PUBLISHER,
+  RENT_ROLL_VACANCY_LABEL,
+  RESET_BILL_LABEL,
+  SALE_COMPS_LABEL,
+  SALE_COMPS_SF_LABEL,
+  SEEDED_RATE_LABEL,
+  SEEDED_RATE_ONLY_LABEL,
+  T12_NOI_LABEL,
+  T12_VACANCY_LABEL,
+  basisDecider,
+  debtDecider,
+  exitCapDecider,
+  expenseGrowthDecider,
+  noiDecider,
+  renovationPremiumDecider,
+  rentGrowthDeciding,
+  taxesDecider,
+  vacancyDecider,
+  type DeciderCandidate,
+} from "@/lib/stress-deciders";
 
 export const VACANCY_UNSUPPORTED_PTS = 3;
 export const RENT_GROWTH_UNSUPPORTED_PTS = 2;
@@ -283,36 +312,30 @@ function moeOf(fig: PublishedFigure): number | null {
 type Judged = { gap: NonNullable<StressRow["gap"]>; verdict: StressVerdict };
 
 /**
- * The verdict and the gap for a row whose evidence is a set of comparable
- * figures. `optimistic` says which way the OM flatters the buyer: "low" (a
- * vacancy, an expense growth, a tax bill, an exit cap — the OM's figure
- * under the evidence is optimistic) or "high" (a rent growth, an NOI, a
- * basis, a premium). The gap is struck against the BEST figure (the first,
- * in the row's priority); the verdict against the range the comparables
- * make: inside it, or on its conservative side, holds; past its nearer end
- * by less than `unsupportedPast` is stretched, by more is unsupported.
- * `tolerance` is the margin inside which the OM is at the evidence (a
- * survey's margin of error, else a hair) — a comparable may carry its own,
- * and a survey's margin then reaches the survey's figure and no other's.
+ * The verdict and the gap for a row, struck on its ONE deciding figure
+ * (lib/stress-deciders): never on a range the row's pieces make together,
+ * whose nearest edge let the most lenient piece decide. `optimistic` says
+ * which way the OM flatters the buyer: "low" (a vacancy, an expense growth,
+ * a tax bill, an exit cap — the OM's figure under the evidence is
+ * optimistic) or "high" (a rent growth, an NOI, a basis, a premium). At the
+ * figure, or on its conservative side, holds; past it by less than
+ * `unsupportedPast` is stretched, by more is unsupported. `tolerance` is the
+ * margin inside which the OM is at the figure (a survey's margin of error
+ * where the deciding figure is the survey's, else a hair).
  */
 function judge(
   om: number,
-  comparables: readonly (number | { value: number; tolerance: number })[],
+  decider: number,
   optimistic: "low" | "high",
   unit: NonNullable<StressRow["gap"]>["unit"],
   unsupportedPast: number,
   tolerance: number,
   text: (gap: number, best: number) => string,
 ): Judged {
-  const items = comparables.map((c) => (typeof c === "number" ? { value: c, tolerance } : c));
-  const best = items[0].value;
-  const gap = optimistic === "low" ? best - om : om - best;
-  // How far past the evidence's nearer edge, each figure's edge its own
-  // value less (or plus) its own tolerance: "past" is measured from the
-  // edge of whichever figure reaches nearest the OM.
-  const beyond = optimistic === "low" ? Math.min(...items.map((c) => c.value - c.tolerance)) - om : om - Math.max(...items.map((c) => c.value + c.tolerance));
+  const gap = optimistic === "low" ? decider - om : om - decider;
+  const beyond = gap - tolerance;
   const verdict: StressVerdict = beyond <= 0 ? "holds" : beyond > unsupportedPast ? "unsupported" : "stretched";
-  return { gap: { value: round(gap, unit), unit, text: text(gap, best) }, verdict };
+  return { gap: { value: round(gap, unit), unit, text: text(gap, decider) }, verdict };
 }
 
 function round(n: number, unit: NonNullable<StressRow["gap"]>["unit"]): number {
@@ -575,33 +598,32 @@ const TITLES: Record<StressKey, string> = {
 };
 
 /**
- * "The OM's stabilized vacancy against the deal's T-12, then rental vacancy,
- * metro area (Census Bureau); beside the class's norm." — the sources
- * actually attached, in their order: "against" the ones the row's verdict
- * is struck on (`compared`, the row's own set; where a row hands none,
- * every item with a figure), "beside" the rest — a figure shown apart, one
- * held to nothing, words alone. A publisher the label already names is not
- * said twice. None, said so.
+ * "The OM's stabilized vacancy against rental vacancy, metro area (Census
+ * Bureau), the one figure that decides; beside it, not deciding: the deal's
+ * T-12 and the class's norm." — the sources actually attached: the ONE
+ * piece the verdict was decided on (`decidedBy`), and every other piece
+ * beside it — a figure that did not decide, one held to nothing, words
+ * alone. With nothing decided (an unchecked row), every piece is beside. A
+ * publisher the label already names is not said twice. None, said so.
  */
-function methodSentence(key: StressKey, evidence: StressEvidence[], compared?: ReadonlySet<number>, title?: string): string {
+function methodSentence(key: StressKey, evidence: StressEvidence[], decidedBy: number | null, title?: string): string {
   const what = `The OM's ${lowerFirst(title ?? TITLES[key])}`;
   if (evidence.length === 0) return `${what}: no evidence with a figure or words could be read for this deal, so it stands unchecked.`;
-  const isCompared = (i: number) => (compared ? compared.has(i) : evidence[i].value != null);
   const name = (e: StressEvidence) => (e.label.toLowerCase().includes(e.publisher.toLowerCase()) ? lowerFirst(e.label) : `${lowerFirst(e.label)} (${e.publisher})`);
-  const against = evidence.filter((_, i) => isCompared(i)).map(name);
-  const beside = evidence.filter((_, i) => !isCompared(i)).map(name);
-  if (against.length === 0) return `${what} beside ${joinWords(beside)}: none carries a figure it is held to.`;
-  const [first, ...rest] = against;
-  return `${what} against ${first}${rest.length ? `, then ${joinWords(rest)}` : ""}${beside.length ? `; beside ${joinWords(beside)}` : ""}.`;
+  const decider = decidedBy != null ? evidence[decidedBy] : null;
+  const beside = evidence.filter((_, i) => i !== decidedBy).map(name);
+  if (!decider) return `${what} beside ${joinWords(beside)}: no figure decides it.`;
+  return `${what} against ${name(decider)}, the one figure that decides${beside.length ? `; beside it, not deciding: ${joinWords(beside)}` : ""}.`;
 }
 
-function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, compared?: ReadonlySet<number>, title?: string): StressRow {
-  return { key, title: title ?? TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", impact: null, challenge: null, method: methodSentence(key, evidence, compared, title), unchecked: why };
+function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, title?: string): StressRow {
+  return { key, title: title ?? TITLES[key], omSays, evidence, gap: null, verdict: "unchecked", decidedBy: null, impact: null, challenge: null, method: methodSentence(key, evidence, null, title), unchecked: why };
 }
 
-/** The indexes of the evidence a row's verdict is struck on. */
-const indexesOf = (evidence: StressEvidence[], pick: (e: StressEvidence, i: number) => boolean): Set<number> =>
-  new Set(evidence.map((e, i) => (pick(e, i) ? i : -1)).filter((i) => i >= 0));
+/** The row's pieces as the deciders read them: `held` where the piece may
+ *  decide (it carries a figure and the row may hold the OM's figure to it). */
+const candidatesOf = (evidence: StressEvidence[], held: (e: StressEvidence, i: number) => boolean = () => true): DeciderCandidate[] =>
+  evidence.map((e, i) => ({ evidence: e, held: e.value != null && held(e, i) }));
 
 /** The vacancy row's title where the OM's figure is today's occupancy. */
 const OCCUPANCY_TITLE = "Occupancy today";
@@ -641,35 +663,21 @@ export function planVacancyStated(extraction: ExtractionResult | null, firstSign
 }
 
 /**
- * The kind of evidence that decided a built test's vacancy row: the figure
- * its re-run swapped in, else the first piece with a figure (the row prints
- * the kind that decides first) — "published" where the market's figure held
- * a stabilized assumption, "document" where the deal's rent roll or T-12
- * decided it. Null with no vacancy row, or one left unchecked. The track
- * record reads it (audit M5): a later document scores no vacancy challenge
- * only where the market decided it, never where the documents did.
+ * The kind of evidence that decided a built test's vacancy row: the one
+ * piece its verdict was struck on (`decidedBy`; on a row built before it,
+ * the figure its re-run swapped in, else the first piece with a figure) —
+ * "published" where the market's figure held a stabilized assumption,
+ * "document" where the deal's rent roll or T-12 decided it. Null with no
+ * vacancy row, or one left unchecked. The track record reads it (audit M5):
+ * a later document scores no vacancy challenge only where the market
+ * decided it, never where the documents did.
  */
 export function vacancyDecidedBy(test: StressTest | null | undefined): StressEvidence["kind"] | null {
   const row = test?.rows.find((r) => r.key === "vacancy");
   if (!row || row.verdict === "unchecked") return null;
-  const e = row.impact ? row.evidence[row.impact.evidenceIndex] : row.evidence.find((x) => x.value != null);
+  const e =
+    row.decidedBy != null ? row.evidence[row.decidedBy] : row.impact ? row.evidence[row.impact.evidenceIndex] : row.evidence.find((x) => x.value != null);
   return e?.kind ?? null;
-}
-
-/**
- * Where a published vacancy figure stands in the order a stabilized
- * assumption is held to them — the order lib/model-vs-market's vacancy check
- * anchors in: the metro area's survey, inside its own margin; for a
- * commercial class, the research tracker's band (where the read holds the
- * model to it); the Census region's; the state's annual figure. The first
- * present decides and the rest are shown beside it. Read off the figure's
- * label, never its picture's marks, which a withheld read drops.
- */
-function marketVacancyRank(label: string): number {
-  if (/research tracker/i.test(label)) return 1;
-  if (/metro area/i.test(label)) return 0;
-  if (/census region/i.test(label)) return 2;
-  return 3;
 }
 
 /** "The lease-up from today's 9.3% to the stabilized 6.0% is not modelled in
@@ -686,11 +694,11 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // kind decides: the deal's documents, the published figures (each with its
   // own tolerance — the survey's margin reaches the survey's figure, never
   // the region's or the state's beside it), the class's rule of thumb.
-  type Piece = { e: StressEvidence; tolerance: number; compare: boolean; rank: number };
+  type Piece = { e: StressEvidence; tolerance: number; compare: boolean };
   const docs: Piece[] = [];
   const market: Piece[] = [];
   let rot: Piece | null = null;
-  const piece = (e: StressEvidence, tolerance = SAME, compare = true, rank = 0): Piece => ({ e, tolerance, compare: compare && e.value != null, rank });
+  const piece = (e: StressEvidence, tolerance = SAME, compare = true): Piece => ({ e, tolerance, compare: compare && e.value != null });
   // The deal's own documents: the rent roll's occupancy, the T-12's
   // vacancy loss over gross potential rent — whether its rent line already
   // nets the vacancy is the statement's own EGI to say (lib/actuals/analyze
@@ -713,7 +721,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const noun = assetWords(ctx.assetClass).noun?.many ?? "units";
       docs.push(piece({
         kind: "document",
-        label: "The deal's rent roll: the occupancy it runs at",
+        label: RENT_ROLL_VACANCY_LABEL,
         text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${proseDay(asOf)}` : ", no stated as-of"})`,
         value: v,
         asOf,
@@ -727,7 +735,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   if (t12 && tv) {
     docs.push(piece({
       kind: "document",
-      label: "The deal's T-12: vacancy loss over gross potential rent",
+      label: T12_VACANCY_LABEL,
       text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${proseDay(t12.periodEnd)}` : "; period not stated"})`,
       value: tv.pct,
       asOf: t12.periodEnd,
@@ -746,7 +754,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const tracker = /research tracker/i.test(f.label);
       const e = published(check, f, ctx.mvm?.grain ?? null);
       const compare = tracker ? held && !assetWords(ctx.assetClass).residential : !(check.marks?.[i]?.role === "apart");
-      market.push(piece(e, moeOf(f) ?? SAME, compare, marketVacancyRank(f.label)));
+      market.push(piece(e, moeOf(f) ?? SAME, compare));
     });
   }
   // The class's norm, a rule of thumb named as one.
@@ -763,18 +771,27 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     });
   }
   if (!om && docs.length + market.length === 0 && !rot) return null;
-  // A stabilized assumption on a deal read as stabilized is the market's to
-  // judge (`stabilizedVacancyStated`): the published figure first in
-  // `marketVacancyRank`'s order decides, inside its own margin, and the
-  // documents' vacancy is today's — shown beside it as the gap a lease-up
-  // has to close, or as support where the building already runs at or under
-  // the assumption. Where no published figure is fresh, the documents decide
-  // as on every other deal, and the row says so.
+  // ONE figure decides (lib/stress-deciders `vacancyDecider`). A stabilized
+  // assumption on a deal read as stabilized is the market's to judge
+  // (`stabilizedVacancyStated`): the metro survey inside its margin, else a
+  // commercial class's tracker band at its low read, the Census region, the
+  // state; and the documents' vacancy is today's — shown beside it as the
+  // gap a lease-up has to close, or as support where the building already
+  // runs at or under the assumption. Where no published figure is fresh, the
+  // rent roll, then the T-12, decide, and the row says so. Any other
+  // vacancy (today's occupancy, a plan deal's figure) is the rent roll's,
+  // then the T-12's, then the published figures', then the class's norm's.
+  // Every other piece is shown beside the one that decides, never in its
+  // place: a region's or a state's figure beside the metro's, a T-12 beside
+  // the rent roll, a rule of thumb beside a document.
   const stabilized = om?.from === "vacancy" && !ctx.plan;
-  const heldTo = stabilized ? market.filter((m) => m.compare) : [];
-  const topRank = heldTo.length > 0 ? Math.min(...heldTo.map((m) => m.rank)) : null;
-  const deciding = topRank == null ? [] : heldTo.filter((m) => m.rank === topRank);
-  const marketDecides = deciding.length > 0;
+  const pool: Piece[] = [...docs, ...market, ...(rot ? [rot] : [])];
+  const decided = vacancyDecider(
+    pool.map((p) => ({ evidence: p.e, held: p.compare })),
+    { stabilized },
+  );
+  const best = decided ? pool[decided.index] : null;
+  const marketDecides = stabilized && best != null && best.e.kind === "published";
   // The documents' vacancy against the stabilized assumption, said as
   // today's: the gap a lease-up has to close, or support for the figure.
   const todayWords = (docPct: number, omPct: number, what: string): string => {
@@ -784,19 +801,14 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       : `${diff < -SAME ? `${pts(diff)} under` : "at"} ${what} — support for it`;
   };
   if (marketDecides && om) {
-    for (const d of docs) {
-      d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
-      d.compare = false;
-    }
-    for (const m of market) if (!deciding.includes(m)) m.compare = false;
-    if (rot) rot.compare = false;
+    for (const d of docs) d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
   }
-  // The row prints the kind that decides first.
-  const ordered: Piece[] = marketDecides
-    ? [...deciding, ...market.filter((m) => !deciding.includes(m)), ...docs, ...(rot ? [rot] : [])]
-    : [...docs, ...market, ...(rot ? [rot] : [])];
+  // The figure that decides first, then the rest in the order of the kind
+  // that decides: the market's, then the documents', where the market
+  // decides; else the documents', then the market's.
+  const rest: Piece[] = marketDecides ? [...market, ...docs, ...(rot ? [rot] : [])] : pool;
+  const ordered: Piece[] = best ? [best, ...rest.filter((p) => p !== best)] : pool;
   const evidence = ordered.map((p) => p.e);
-  const compared = indexesOf(evidence, (_, i) => ordered[i].compare);
   // Where the OM states no vacancy allowance, the figure is its occupancy
   // TODAY, not a pro forma assumption: the row is titled and worded so, and
   // the documents — today's figures too — decide it.
@@ -813,39 +825,33 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         page: pageOf(om.row, ctx.ex),
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
-  if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"), compared);
-  const comparables = ordered.filter((p) => p.compare);
-  if (comparables.length === 0) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, compared, title);
-  // The verdict is the best kind's: the published figure that decides a
-  // stabilized assumption; else the deal's own document where one states
-  // the figure, else the published figures, else the rule of thumb. A rule
-  // of thumb never widens the range a document decides (a 5% class default
-  // beside a T-12's 9.1% had read the OM's 6% as "inside").
-  const best = comparables[0];
+  if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"));
+  if (!best) return unchecked("vacancy", omSays, evidence, NO_EVIDENCE, title);
   const bestValue = best.e.value!;
-  const decisive = marketDecides ? deciding : comparables.filter((c) => c.e.kind === best.e.kind);
-  // Each figure carries its own tolerance: the survey's margin reaches the
-  // survey's figure, never the region's or the state's beside it.
-  const figures = decisive.map((c) => ({ value: c.e.value!, tolerance: c.tolerance }));
   let judged: Judged;
   if (marketDecides) {
-    // Said by the figure that decided — its margin, or its band — and why
-    // it decides: the assumption is the building stabilized, which the
-    // market's own vacancy speaks to and today's documents do not.
-    const band = figures.length > 1 ? { lo: Math.min(...figures.map((f) => f.value)), hi: Math.max(...figures.map((f) => f.value)) } : null;
+    // Said by the figure that decided — its margin, or, for a band, its low
+    // read with the band's other end named — and why it decides: the
+    // assumption is the building stabilized, which the market's own vacancy
+    // speaks to and today's documents do not.
+    const stem = (label: string) => label.replace(/, (?:low|high) read$/, "");
+    const high = /, low read$/.test(best.e.label)
+      ? market.find((m) => m !== best && m.e.value != null && /, high read$/.test(m.e.label) && stem(m.e.label) === stem(best.e.label))
+      : undefined;
+    const band = high ? { lo: bestValue, hi: high.e.value! } : null;
     const moe = band || best.tolerance === SAME ? null : best.tolerance;
-    const said = `${lowerFirst(best.e.label.replace(/, low read$/, ""))} (${best.e.publisher}), ${band ? `${pct1(band.lo)}–${pct1(band.hi)}` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
-    const edge = band ? band.lo - SAME : bestValue - (moe ?? SAME);
+    const said = `${lowerFirst(stem(best.e.label))} (${best.e.publisher}), ${band ? `its low read ${pct1(band.lo)} (the band runs to ${pct1(band.hi)})` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
+    const edge = bestValue - (moe ?? SAME);
     const doc = docs[0];
     const docLine = doc
-      ? ` ${doc === docs.find((d) => d.e.publisher === "the deal's rent roll") ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+      ? ` ${doc.e.label === RENT_ROLL_VACANCY_LABEL ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
           // Past the row's own threshold, the building today is materially
           // emptier than the stabilized figure the market holds: whatever
           // the verdict, neither run models getting from one to the other.
           doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
         }`
       : "";
-    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) => {
+    judged = judge(om.pct, bestValue, "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) => {
       const where =
         om.pct < edge
           ? `${pts(gap)} under it${moe != null ? `, ${pts(edge - om.pct)} past its margin` : ""}`
@@ -862,7 +868,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     // A stabilized assumption with no fresh published figure to hold it to:
     // the documents decide, said so.
     const noMarket = stabilized && best.e.kind === "document" ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide." : "";
-    judged = judge(om.pct, figures, "low", "pts", VACANCY_UNSUPPORTED_PTS, SAME, (gap) =>
+    judged = judge(om.pct, bestValue, "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) =>
       Math.abs(gap) < SAME
         ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}`
         : gap > 0
@@ -870,11 +876,10 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(bestValue)} — the conservative side.${noMarket}`,
     );
   }
-  // The engine is re-run at the figure that decided.
-  const evidenceIndex = ordered.indexOf(best);
+  // The engine is re-run at the figure that decided, printed first.
   const impact =
     ctx.derived && ctx.impactsWithheld == null
-      ? pctImpact(ctx.derived, "vacancyPct", evidenceIndex, om.pct, bestValue, {
+      ? pctImpact(ctx.derived, "vacancyPct", 0, om.pct, bestValue, {
           what: "vacancy",
           om: pct1(om.pct),
           alt: pct1(bestValue),
@@ -882,7 +887,19 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           model: pct1(ctx.derived.inputs.vacancyPct * 100),
         })
       : null;
-  return { key: "vacancy", title: title ?? TITLES.vacancy, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("vacancy", evidence, compared, title), ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
+  return {
+    key: "vacancy",
+    title: title ?? TITLES.vacancy,
+    omSays,
+    evidence,
+    gap: judged.gap,
+    verdict: judged.verdict,
+    decidedBy: 0,
+    impact,
+    challenge: null,
+    method: methodSentence("vacancy", evidence, 0, title),
+    ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
+  };
 }
 
 // — Rent growth —
@@ -912,25 +929,24 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   // The one figure that decides, the first of the class's order present
   // (lib/rent-growth-decider), printed first among the market's; the rest
   // beside it.
-  const decided = rentGrowthDecider(ctx.assetClass, market.map((m) => m.label));
+  const decided = rentGrowthDeciding(ctx.assetClass, candidatesOf(market));
   const found = decided ? market[decided.index] : null;
   const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found)];
   const pick = decided && found ? { i: apart.length, d: decided } : null;
-  const compared = new Set<number>(pick ? [pick.i] : []);
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("rent growth rate"), value: null, page: null };
-  if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"), compared);
+  if (!om) return unchecked("rent_growth", omSays, evidence, NO_FIGURE("rent growth rate"));
   // Lodging and licensed care read no rent index: the true reason, never
   // that nothing could be read.
-  if (!pick) return unchecked("rent_growth", omSays, evidence, market.length === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE, compared);
+  if (!pick) return unchecked("rent_growth", omSays, evidence, market.length === 0 && readsNoRentIndex(ctx.assetClass) ? NO_RENT_INDEX : NO_EVIDENCE);
   const decider = evidence[pick.i];
   const bestValue = decider.value!;
-  const name = pick.d.name;
+  const name = pick.d.name!;
   // "Held to Zillow's apartment asking rents, the figure for this kind of
   // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
   const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
-  const judged = judge(om.pct, [bestValue], "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
+  const judged = judge(om.pct, bestValue, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
       ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
       : gap > 0
@@ -947,46 +963,44 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
           model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
         })
       : null;
-  return { key: "rent_growth", title: TITLES.rent_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("rent_growth", evidence, compared) };
+  return { key: "rent_growth", title: TITLES.rent_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: pick.i, impact, challenge: null, method: methodSentence("rent_growth", evidence, pick.i) };
 }
 
 // — Expense growth —
 
+/**
+ * An expense growth is held to ONE figure (lib/stress-deciders
+ * `expenseGrowthDecider`): consumer prices, all items — the broad price
+ * level the expense base moves with — and core CPI only where the all-items
+ * figure is not fresh. Core, the insurance premium index and the breakeven
+ * are shown beside it, never held to: the lower of two price indexes had
+ * decided, so a 2.5% expense growth held against core's 2.4% while the CPI
+ * read 3.4%.
+ */
 function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, EXPENSE_GROWTH_ROW);
   const evidence: StressEvidence[] = [];
-  const comparables: number[] = [];
-  const compared = new Set<number>();
   const check = checkOf(ctx.mvm, "expense_growth");
-  if (check) {
-    check.published.forEach((f, i) => {
-      const e = published(check, f, ctx.mvm?.grain ?? null);
-      evidence.push(e);
-      // The price indexes are the range; the insurance index and the
-      // breakeven are shown apart, never averaged in (the read's own rule).
-      if (check.marks?.[i]?.role !== "apart") {
-        comparables.push(f.value);
-        compared.add(evidence.length - 1);
-      }
-    });
-  }
+  if (check) for (const f of check.published) evidence.push(published(check, f, ctx.mvm?.grain ?? null));
   if (!om && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("expense growth rate"), value: null, page: null };
-  if (!om) return unchecked("expense_growth", omSays, evidence, NO_FIGURE("expense growth rate"), compared);
-  if (comparables.length === 0) return unchecked("expense_growth", omSays, evidence, NO_EVIDENCE, compared);
-  // Under the lowest price index is the optimistic side for an expense.
-  const bestValue = Math.min(...comparables);
-  const ordered = [bestValue, ...comparables.filter((v) => v !== bestValue)];
-  const judged = judge(om.pct, ordered, "low", "pts", EXPENSE_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
+  if (!om) return unchecked("expense_growth", omSays, evidence, NO_FIGURE("expense growth rate"));
+  const decided = expenseGrowthDecider(candidatesOf(evidence));
+  if (!decided) return unchecked("expense_growth", omSays, evidence, NO_EVIDENCE);
+  const evidenceIndex = decided.index;
+  const bestValue = decided.figure;
+  // "Held to consumer prices, all items (the CPI), the broad price level the
+  // expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED)."
+  const held = `Held to ${decided.name}, ${decided.why}: ${evidence[evidenceIndex].text} (${evidence[evidenceIndex].publisher}).`;
+  const judged = judge(om.pct, bestValue, "low", "pts", EXPENSE_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `The OM's ${pct1(om.pct)}/yr is at the price index's ${pct1(bestValue)}.`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
       : gap > 0
-        ? `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under the lowest price index, ${pct1(bestValue)}.`
-        : `The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over the price index's ${pct1(bestValue)} — the conservative side.`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it.`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side.`,
   );
-  const evidenceIndex = evidence.findIndex((e) => e.value === bestValue);
   const impact =
     ctx.derived && ctx.impactsWithheld == null
       ? pctImpact(ctx.derived, "expenseGrowthPct", evidenceIndex, om.pct, bestValue, {
@@ -997,7 +1011,7 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
           model: `${pct1(ctx.derived.inputs.expenseGrowthPct * 100)}/yr`,
         })
       : null;
-  return { key: "expense_growth", title: TITLES.expense_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("expense_growth", evidence, compared) };
+  return { key: "expense_growth", title: TITLES.expense_growth, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: evidenceIndex, impact, challenge: null, method: methodSentence("expense_growth", evidence, evidenceIndex) };
 }
 
 // — Exit cap —
@@ -1012,7 +1026,7 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   if (goingInOk) {
     evidence.push({
       kind: "om_internal",
-      label: "The OM's going-in cap",
+      label: GOING_IN_CAP_LABEL,
       text: `${pct2(goingIn!)} (${goingRow!.label}): an exit tighter than it is cap compression`,
       value: goingIn!,
       asOf: null,
@@ -1022,22 +1036,17 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   }
   // The published figures the read carries: the 10-year, dated (a yield,
   // not a cap — the exit's spread over it is the read, never a comparable),
-  // and the tracker's cap range where one is on file and held to.
+  // and the tracker's cap range where one is on file — held to only where
+  // the read holds the model to it (fresh, dated, the whole stock).
   const check = checkOf(ctx.mvm, "exit_cap");
-  const trackerComparables: number[] = [];
-  // The going-in cap and a tracker range held to are compared; the 10-year
-  // (a yield, not a cap) and a tracker range held to nothing are beside.
-  const compared = new Set<number>(goingInOk ? [0] : []);
+  const trackerHeld = new Set<StressEvidence>();
   if (check) {
     const held = !/not held to it/.test(check.read);
     for (const f of check.published) {
       const e = published(check, f, ctx.mvm?.grain ?? null);
       if (/research tracker/i.test(f.label)) {
         evidence.push(e);
-        if (held) {
-          trackerComparables.push(f.value);
-          compared.add(evidence.length - 1);
-        }
+        if (held) trackerHeld.add(e);
       } else {
         const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
         const spread = exit != null ? Math.round((exit - f.value) * 100) : null;
@@ -1065,8 +1074,14 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("exit cap"), value: null, page: null };
-  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"), compared);
-  if (!goingInOk && trackerComparables.length === 0) {
+  if (!om) return unchecked("exit_cap", omSays, evidence, NO_FIGURE("exit cap"));
+  // ONE figure decides (lib/stress-deciders `exitCapDecider`): the OM's own
+  // going-in cap — the cap the deal is bought at, and the model's own exit —
+  // else the tracker's cap range at its low end. A tracker range beside a
+  // going-in cap is shown and decides nothing: it had turned an unsupported
+  // compression into a stretched one wherever its low end reached the exit.
+  const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || trackerHeld.has(e)));
+  if (!decided) {
     // Said by what stopped the test, never "no going-in cap" beside one the
     // OM states: on a value-add, lease-up, conversion or development deal
     // the going-in cap is struck on today's income, not the stabilized one
@@ -1078,58 +1093,47 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       : ctx.plan
         ? `On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and ${range}.`
         : `The price buys no building, so its going-in cap is no building's to hold the exit to; and ${range}.`;
-    return unchecked("exit_cap", omSays, evidence, why, compared);
+    return unchecked("exit_cap", omSays, evidence, why);
   }
-  // Against the going-in cap where one stands: holds at or over it; tighter
-  // is stretched, and by 25 bps or more with no published range reaching
-  // the exit, unsupported. Where a published range supports the exit (its
-  // low end at or under it), a compression is stretched, never unsupported.
-  const supported = trackerComparables.length > 0 && Math.min(...trackerComparables) <= om.pct + SAME;
-  let judged: Judged;
-  if (goingInOk) {
-    const g = goingIn!;
-    const diffBps = (g - om.pct) * 100;
-    // The figures are percent points here; the threshold is in bps.
-    judged = judge(om.pct, [g], "low", "bps", supported ? Infinity : EXIT_CAP_UNSUPPORTED_BPS / 100 - SAME, SAME, () =>
-      // Flat to the entry holds: the code carries no expansion default (the
-      // model itself exits at the going-in cap), so none is invented here;
-      // the sentence says what most underwriting does.
-      Math.abs(diffBps) < SAME * 100
-        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(g)} going-in cap; most underwriting adds expansion over a hold.`
+  const alt = decided.figure;
+  const onGoingIn = decided.label === GOING_IN_CAP_LABEL;
+  // The figures are percent points here; the threshold is in bps. At or over
+  // the figure holds; tighter is stretched, and by 25 bps or more
+  // unsupported (the threshold inclusive, below).
+  const diffBps = (alt - om.pct) * 100;
+  const judged = judge(om.pct, alt, "low", "bps", EXIT_CAP_UNSUPPORTED_BPS / 100 - SAME, SAME, (gap) =>
+    onGoingIn
+      ? // Flat to the entry holds: the code carries no expansion default (the
+        // model itself exits at the going-in cap), so none is invented here;
+        // the sentence says what most underwriting does.
+        Math.abs(diffBps) < SAME * 100
+        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; most underwriting adds expansion over a hold.`
         : diffBps > 0
-          ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(g)} going-in cap — cap compression${supported ? ", inside the published cap range" : ""}.`
-          : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(g)} going-in cap — the conservative side.`,
-    );
-  } else {
-    const lo = Math.min(...trackerComparables);
-    judged = judge(om.pct, [lo, ...trackerComparables.filter((v) => v !== lo)], "low", "bps", EXIT_CAP_UNSUPPORTED_BPS / 100 - SAME, SAME, (gap) =>
-      Math.abs(gap) < SAME
-        ? `The OM's ${pct2(om.pct)} exit sits at the published cap range's low end, ${pct2(lo)}.`
+          ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} going-in cap — cap compression.`
+          : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} going-in cap — the conservative side.`
+      : Math.abs(gap) < SAME
+        ? `The OM's ${pct2(om.pct)} exit sits at the published cap range's low end, ${pct2(alt)}.`
         : gap > 0
-          ? `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} under the published cap range's low end, ${pct2(lo)}.`
-          : `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} over the published cap range's low end, ${pct2(lo)} — the conservative side.`,
-    );
-    judged.gap = { ...judged.gap, value: Math.round(judged.gap.value * 100), unit: "bps" };
-  }
-  if (goingInOk) judged.gap = { ...judged.gap, value: Math.round((goingIn! - om.pct) * 100), unit: "bps" };
-  // 25 bps or more of compression with no published range reaching the
-  // exit is unsupported: the threshold is inclusive, as the rule says.
-  if (judged.verdict === "stretched" && !supported && judged.gap.value >= EXIT_CAP_UNSUPPORTED_BPS) judged.verdict = "unsupported";
-  // The engine is re-run at the going-in cap (the entry), else at the
-  // published range's low end.
-  const alt = goingInOk ? goingIn! : Math.min(...trackerComparables);
-  const evidenceIndex = evidence.findIndex((e) => e.value === alt);
+          ? `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} under the published cap range's low end, ${pct2(alt)}.`
+          : `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} over the published cap range's low end, ${pct2(alt)} — the conservative side.`,
+  );
+  judged.gap = { ...judged.gap, value: Math.round(diffBps), unit: "bps" };
+  // 25 bps or more of compression is unsupported: the threshold is
+  // inclusive, as the rule says.
+  if (judged.verdict === "stretched" && judged.gap.value >= EXIT_CAP_UNSUPPORTED_BPS) judged.verdict = "unsupported";
+  // The engine is re-run at the figure that decided.
+  const evidenceIndex = decided.index;
   const impact =
     ctx.derived && ctx.impactsWithheld == null
       ? pctImpact(ctx.derived, "exitCapPct", evidenceIndex, om.pct, alt, {
           what: "the exit cap",
           om: pct2(om.pct),
           alt: pct2(alt),
-          evidence: goingInOk ? "the going-in cap" : evidence[evidenceIndex].publisher,
+          evidence: onGoingIn ? "the going-in cap" : evidence[evidenceIndex].publisher,
           model: pct2(ctx.derived.inputs.exitCapPct * 100),
         })
       : null;
-  return { key: "exit_cap", title: TITLES.exit_cap, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("exit_cap", evidence, compared) };
+  return { key: "exit_cap", title: TITLES.exit_cap, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: evidenceIndex, impact, challenge: null, method: methodSentence("exit_cap", evidence, evidenceIndex) };
 }
 
 // — Debt —
@@ -1185,7 +1189,7 @@ function debtRow(ctx: Ctx): StressRow | null {
     });
     evidence.push({
       kind: "rule_of_thumb",
-      label: "The class's screening spread over it, a rule of thumb",
+      label: SEEDED_RATE_LABEL,
       text: `+${index.spreadBps} bps over the index, the class's screening default, not a quote: ${pct2(seed.pct)} all in — ${seed.note}`,
       value: seed.pct,
       asOf: null,
@@ -1195,7 +1199,7 @@ function debtRow(ctx: Ctx): StressRow | null {
   } else if (seed) {
     evidence.push({
       kind: "rule_of_thumb",
-      label: "The index the model prices off, plus the class's screening spread",
+      label: SEEDED_RATE_ONLY_LABEL,
       text: `${pct2(seed.pct)} — ${seed.note}`,
       value: seed.pct,
       asOf: null,
@@ -1283,9 +1287,14 @@ function debtRow(ctx: Ctx): StressRow | null {
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
     : { text: NO_FIGURE("loan rate"), value: null, page: null };
   if (!om) return unchecked("debt", omSays, evidence, NO_FIGURE("loan rate"));
-  if (!seed) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
+  // ONE figure decides (lib/stress-deciders `debtDecider`): today's index
+  // plus the class's screening spread. The bare index, the 10-year, the
+  // lender tests and the leverage read are shown beside it; the bare index
+  // sets only how far under the decider a rate may read unsupported (below).
+  const decided = seed ? debtDecider(candidatesOf(evidence)) : null;
+  if (!seed || !decided) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
   // The figures are percent points here; the threshold is in bps.
-  const judged = judge(om.pct, [seed.pct], "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
+  const judged = judge(om.pct, decided.figure, "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
     const d = (seed.pct - om.pct) * 100;
     return Math.abs(d) < SAME * 100
       ? `The OM's ${pct2(om.pct)} is at the seeded ${pct2(seed.pct)}.`
@@ -1298,7 +1307,7 @@ function debtRow(ctx: Ctx): StressRow | null {
   // spread is stretched at most; only a rate under the bare index — under
   // the fact — reads unsupported.
   if (judged.verdict === "unsupported" && index && om.pct >= index.pct - SAME) judged.verdict = "stretched";
-  const seedIndexAt = evidence.findIndex((e) => e.value === seed.pct);
+  const seedIndexAt = decided.index;
   const impact =
     ctx.derived && ctx.impactsWithheld == null
       ? pctImpact(ctx.derived, "allInRatePct", seedIndexAt, om.pct, seed.pct, {
@@ -1311,7 +1320,7 @@ function debtRow(ctx: Ctx): StressRow | null {
       : null;
   // The rate is held to the index plus the class's screening spread: the
   // spread is the site's own default, so the verdict is a rule of thumb's.
-  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, impact, challenge: null, method: methodSentence("debt", evidence), ruleOfThumbOnly: true };
+  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: seedIndexAt, impact, challenge: null, method: methodSentence("debt", evidence, seedIndexAt), ruleOfThumbOnly: true };
 }
 
 // — NOI —
@@ -1337,7 +1346,7 @@ function noiRow(ctx: Ctx): StressRow | null {
   if (t12 && t12.summary.noi != null && Number.isFinite(t12.summary.noi) && t12.summary.noi !== 0) {
     evidence.push({
       kind: "document",
-      label: "The deal's T-12 NOI",
+      label: T12_NOI_LABEL,
       text: `${money(t12.summary.noi)}${t12.summary.noiDerived ? " (derived: EGI less expenses)" : ""} (${t12.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated"})`,
       value: t12.summary.noi,
       asOf: t12.periodEnd,
@@ -1368,7 +1377,7 @@ function noiRow(ctx: Ctx): StressRow | null {
   if (inPlace && stabilized && inPlace.label !== stabilized.label) {
     evidence.push({
       kind: "om_internal",
-      label: "The OM's in-place NOI against its pro forma",
+      label: OM_IN_PLACE_NOI_LABEL,
       text: `${inPlace.label} ${money(inPlace.value)} against ${stabilized.label} ${money(stabilized.value)} (${((stabilized.value / inPlace.value - 1) * 100).toFixed(1)}% over it)`,
       value: inPlace.value,
       asOf: null,
@@ -1382,11 +1391,11 @@ function noiRow(ctx: Ctx): StressRow | null {
       ? { text: `${omLabel}: ${omRow?.value ?? money(omValue)}`, value: omValue, page: pageOf(omRow, ctx.ex) }
       : { text: NO_FIGURE("NOI"), value: null, page: null };
   if (omValue == null) return unchecked("noi", omSays, evidence, NO_FIGURE("NOI"));
-  // The T-12 is the comparable; the OM's own in-place figure stands in only
-  // where the figure under test is the pro forma and no T-12 is on file.
-  const comparables = evidence.filter((e) => e.value != null && (e.kind === "document" || (e.kind === "om_internal" && omLabel !== e.label && omValue !== e.value)));
-  const compared = indexesOf(evidence, (e) => comparables.includes(e));
-  if (comparables.length === 0) {
+  // ONE figure decides (lib/stress-deciders `noiDecider`): the T-12; the
+  // OM's own in-place figure stands in only where the figure under test is
+  // the pro forma and no T-12 is on file. The rest are shown beside it.
+  const decided = noiDecider(candidatesOf(evidence, (e) => e.kind === "document" || (e.kind === "om_internal" && omLabel !== e.label && omValue !== e.value)));
+  if (!decided) {
     // Said by what stopped the test: a second NOI printed beside the row is
     // never called absent. On a value-add, lease-up, conversion or
     // development deal the OM's pro forma is the business plan, not a second
@@ -1397,9 +1406,9 @@ function noiRow(ctx: Ctx): StressRow | null {
       : second
         ? "No T-12 is on file, and the OM's other NOI is the figure under test itself."
         : "No T-12 is on file, and the OM states no second NOI to hold its figure to.";
-    return unchecked("noi", omSays, evidence, why, compared);
+    return unchecked("noi", omSays, evidence, why);
   }
-  const best = comparables[0];
+  const best = evidence[decided.index];
   const share = (omValue - best.value!) / Math.abs(best.value!);
   // The memorandum's own in-place figure is the memorandum against itself,
   // not a document of the building's: a pro forma over it reads stretched
@@ -1435,7 +1444,7 @@ function noiRow(ctx: Ctx): StressRow | null {
       });
     }
   }
-  return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("noi", evidence, compared) };
+  return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, decidedBy: decided.index, impact, challenge: null, method: methodSentence("noi", evidence, decided.index) };
 }
 
 // — Taxes —
@@ -1457,7 +1466,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
     const reset = rate * price;
     evidence.push({
       kind: "om_internal",
-      label: "The bill the OM's own figures imply on the price",
+      label: RESET_BILL_LABEL,
       text: `${money(bill)} over ${money(assessed)} assessed is ${(rate * 100).toFixed(2)}%, which on the ${money(price)} price is ${money(reset)} a year if the sale resets the assessment to the price`,
       value: Math.round(reset),
       asOf: null,
@@ -1486,7 +1495,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
           : `; it ends after the model's ${Math.round(holdMonths / 12)}-year hold, so the step-up is the next buyer's to price`;
     evidence.push({
       kind: "om_internal",
-      label: "The stated tax abatement and when it ends",
+      label: ABATEMENT_LABEL,
       text: `${abatement.headline}${placed}`,
       value: full != null && abatementInHold ? Math.round(full) : null,
       asOf: end?.ends ?? null,
@@ -1512,23 +1521,24 @@ function taxesRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = billRow && bill != null
     ? { text: `${billRow.label}: ${billRow.value}`, value: bill, page: pageOf(billRow, ctx.ex) }
     : { text: NO_FIGURE("tax bill"), value: null, page: null };
-  const comparables = evidence.filter((e) => e.value != null && e.kind === "om_internal");
-  const compared = indexesOf(evidence, (e) => comparables.includes(e));
-  if (bill == null) return unchecked("taxes", omSays, evidence, NO_FIGURE("tax bill"), compared);
-  if (comparables.length === 0) {
+  if (bill == null) return unchecked("taxes", omSays, evidence, NO_FIGURE("tax bill"));
+  // ONE figure decides (lib/stress-deciders `taxesDecider`): the reset bill
+  // the OM's own figures imply, else the unabated bill an abatement ends into
+  // inside the hold; the T-12's tax line (the seller's bill) is beside it.
+  const decided = taxesDecider(candidatesOf(evidence, (e) => e.kind === "om_internal"));
+  if (!decided) {
     return unchecked(
       "taxes",
       omSays,
       evidence,
       assessed == null ? "The OM states no assessed value to work the reset bill from; the rate is the assessor's to give." : NO_EVIDENCE,
-      compared,
     );
   }
-  const best = comparables[0];
+  const best = evidence[decided.index];
   const share = (best.value! - bill) / Math.abs(best.value!);
   // Both figures are the OM's: the bill against the reset its own figures
   // imply, or the abated bill against the unabated one it states.
-  const abated = best.label.startsWith("The stated tax abatement");
+  const abated = best.label === ABATEMENT_LABEL;
   // Whether a sale resets the assessment is the jurisdiction's to say, and
   // the code asserts none: the reset bill is a CONDITIONAL re-strike of the
   // OM's own figures, never an observed bill, so it reads stretched at most
@@ -1568,7 +1578,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
             : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} bill ${ifReset}`, evidence: "" },
         )
       : null;
-  return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("taxes", evidence, compared) };
+  return { key: "taxes", title: TITLES.taxes, omSays, evidence, gap, verdict, decidedBy: decided.index, impact, challenge: null, method: methodSentence("taxes", evidence, decided.index) };
 }
 
 /**
@@ -1721,11 +1731,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = premiumRow && premium != null
     ? { text: `${premiumRow.label}: ${premiumRow.value}`, value: premium, page: pageOf(premiumRow, ctx.ex) }
     : { text: NO_FIGURE("insurance premium"), value: null, page: null };
-  // Nothing on file is held against the OM's premium: every piece is shown
-  // beside it.
-  const none = new Set<number>();
-  if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"), none);
-  const row = unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE, none);
+  // Nothing on file is held against the OM's premium (lib/stress-deciders
+  // `insuranceDecider`): every piece is shown beside it.
+  if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"));
+  const row = unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE);
   // The re-run at the seller's own premium, where the T-12 states one.
   const t12At = t12Ins && t12Ins.amount > 0 ? evidence.findIndex((e) => e.label === "The deal's T-12 insurance line") : -1;
   if (t12At >= 0 && ctx.derived && ctx.impactsWithheld == null) {
@@ -1872,7 +1881,7 @@ function basisRow(ctx: Ctx): StressRow | null {
     pushComparable(
       {
         kind: "om_internal",
-        label: on === per || !stating.some((c) => c.on === per) ? "The memorandum's sale comps" : "The memorandum's sale comps stating a price per SF alone",
+        label: on === per || !stating.some((c) => c.on === per) ? SALE_COMPS_LABEL : SALE_COMPS_SF_LABEL,
         text: `${head}${graded}${struck}${leftOut}`,
         value: figure != null ? Math.round(figure) : null,
         asOf: null,
@@ -1944,7 +1953,7 @@ function basisRow(ctx: Ctx): StressRow | null {
               : `${ps.count} screens, none with a basis ${perWord}`,
         value: v != null ? Math.round(v) : null,
         asOf: null,
-        publisher: "your past screens",
+        publisher: PAST_SCREENS_PUBLISHER,
         scope: "metro",
       },
       per,
@@ -1990,7 +1999,7 @@ function basisRow(ctx: Ctx): StressRow | null {
   // The yardstick the verdict is struck on: the first comparable's, the
   // best kind present (below); the OM's figure on the other yardstick rides
   // beside it where a piece is judged on that one.
-  const asks = comparables.filter((c) => c.e.publisher === "your past screens");
+  const asks = comparables.filter((c) => c.e.publisher === PAST_SCREENS_PUBLISHER);
   const judgedOn = comparables.length > asks.length ? comparables.filter((c) => !asks.includes(c)) : asks;
   const lead: Per = judgedOn[0]?.on ?? per;
   const other: Per | null = judgedOn.some((c) => c.on !== lead) ? (lead === "unit" ? "sf" : "unit") : null;
@@ -2032,8 +2041,13 @@ function basisRow(ctx: Ctx): StressRow | null {
       evidence.some((e) => e.publisher !== "past screens") ? "No evidence above carries a figure the ask can be set against." : "No comp with a figure could be read for this deal.",
     );
   }
-  const compared = indexesOf(evidence, (e) => judgedOn.some((c) => c.e === e));
-  const best = judgedOn[0];
+  // ONE figure decides (lib/stress-deciders `basisDecider`, the order
+  // lib/stress-basis-evidence builds the pieces in): the memorandum's comps
+  // graded clean, else the recorded sales, else the reader's own past asks;
+  // every other piece is shown beside it.
+  const decided = basisDecider(candidatesOf(evidence));
+  const best = (decided && comparables.find((c) => c.e === evidence[decided.index])) || judgedOn[0];
+  const decidedBy = evidence.indexOf(best.e);
   const bestOm = omOn(best.on)!;
   const pw = perWordOf(best.on);
   // "the median of …": every basis comparable with three figures behind it
@@ -2101,7 +2115,7 @@ function basisRow(ctx: Ctx): StressRow | null {
   for (const c of comparables) {
     if (c.on !== best.on && omOn(c.on) != null) c.e.ownYardstick = { om: omOn(c.on)!, per: perWordOf(c.on) };
   }
-  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, impact, challenge: null, method: methodSentence("basis", evidence, compared), ...(judgedOn === asks ? { ruleOfThumbOnly: true } : {}) };
+  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, decidedBy, impact, challenge: null, method: methodSentence("basis", evidence, decidedBy), ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
 }
 
 /** Why a plan deal's all-in basis cannot be struck, in one sentence: the
@@ -2139,7 +2153,7 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
   if (r.achievedPremium != null) {
     evidence.push({
       kind: "om_internal",
-      label: "Achieved premium on the doors already renovated",
+      label: ACHIEVED_PREMIUM_LABEL,
       text: `${dollars(r.achievedPremium)} a month, as stated${r.renovated != null ? ` on ${r.renovated.toLocaleString("en-US")} doors` : ""}`,
       value: r.achievedPremium,
       asOf: null,
@@ -2182,10 +2196,11 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     r.premium != null
       ? { text: `${dollars(r.premium)} a month a renovated door${r.premiumFrom === "rents" ? " (the renovated rent less the classic rent)" : ", as stated"}`, value: r.premium, page: locatedPage(r.page, ctx.ex?.totalPages) }
       : { text: NO_FIGURE("renovation premium"), value: null, page: locatedPage(r.page, ctx.ex?.totalPages) };
-  const achieved = evidence.find((e) => e.label.startsWith("Achieved"));
-  // The achieved premium decides; the rents are words beside it.
-  const compared = indexesOf(evidence, (e) => e.value != null && e === achieved);
-  if (r.premium == null) return unchecked("renovation_premium", omSays, evidence, NO_FIGURE("renovation premium"), compared);
+  // ONE figure decides (lib/stress-deciders `renovationPremiumDecider`): the
+  // achieved premium; the rents are beside it.
+  const decided = renovationPremiumDecider(candidatesOf(evidence));
+  const achieved = decided ? evidence[decided.index] : undefined;
+  if (r.premium == null) return unchecked("renovation_premium", omSays, evidence, NO_FIGURE("renovation premium"));
   let gap: StressRow["gap"] = null;
   let verdict: StressVerdict = "unchecked";
   let why: string | null = null;
@@ -2213,7 +2228,8 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     why = "No achieved premium is stated, so no door has proven the projected premium.";
   }
   // The premium is no model input: the model grows today's rent at one rate.
-  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, compared), ...(why ? { unchecked: why } : {}) };
+  const decidedBy = achieved && verdict !== "unchecked" ? decided!.index : null;
+  return { key: "renovation_premium", title: TITLES.renovation_premium, omSays, evidence, gap, verdict, decidedBy, impact: null, challenge: null, method: methodSentence("renovation_premium", evidence, decidedBy), ...(why ? { unchecked: why } : {}) };
 }
 
 // ── The test ─────────────────────────────────────────────────────────────

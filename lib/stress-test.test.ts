@@ -211,19 +211,25 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
     // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, then rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (Census Bureau via FRED) and multifamily vacancy, a rule of thumb.",
+      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, the one figure that decides; beside it, not deciding: rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (Census Bureau via FRED) and multifamily vacancy, a rule of thumb.",
     );
   });
 
-  it("says 'against' for the evidence the verdict is struck on and 'beside' for the rest", () => {
+  it("says 'against' for the one figure the verdict is struck on and 'beside it, not deciding' for the rest", () => {
     // The 10-year is a yield, never compared; the lender tests and the
     // negative-leverage read carry no figure.
-    expect(rowOf(test, "exit_cap").method).toBe("The OM's exit cap against the OM's going-in cap (the offering memorandum); beside 10-year Treasury (FRED).");
+    expect(rowOf(test, "exit_cap").method).toBe("The OM's exit cap against the OM's going-in cap (the offering memorandum), the one figure that decides; beside it, not deciding: 10-year Treasury (FRED).");
+    // The index plus the spread decides; the bare index beside it.
     expect(rowOf(test, "debt").method).toBe(
-      "The OM's debt against the index the model prices off: 5-yr Treasury (FRED), then the class's screening spread over it, a rule of thumb (a screening default); beside 10-year Treasury, as the market check read it (FRED), lender tests at screening defaults, the binding one named (a rule of thumb) and negative leverage: the model's going-in cap against the loan's rate (the model's own figures).",
+      "The OM's debt against the class's screening spread over it, a rule of thumb (a screening default), the one figure that decides; beside it, not deciding: the index the model prices off: 5-yr Treasury (FRED), 10-year Treasury, as the market check read it (FRED), lender tests at screening defaults, the binding one named (a rule of thumb) and negative leverage: the model's going-in cap against the loan's rate (the model's own figures).",
     );
-    // The T-12 first, then the OM's own in-place figure; "NOI" keeps its letters.
-    expect(rowOf(test, "noi").method).toBe("The OM's NOI against the deal's T-12 NOI, then the OM's in-place NOI against its pro forma (the offering memorandum).");
+    // The T-12 decides, the OM's own in-place figure beside it; "NOI" keeps its letters.
+    expect(rowOf(test, "noi").method).toBe("The OM's NOI against the deal's T-12 NOI, the one figure that decides; beside it, not deciding: the OM's in-place NOI against its pro forma (the offering memorandum).");
+    // Every row a figure decided names it on the row; an unchecked row none.
+    for (const r of test.rows) {
+      if (r.verdict === "unchecked") expect(r.decidedBy ?? null, r.key).toBeNull();
+      else expect(r.evidence[r.decidedBy!]?.value, r.key).not.toBeNull();
+    }
   });
 
   it("holds the OM's pro forma NOI to the T-12's, in dollars, by the actuals card's own bands", () => {
@@ -323,7 +329,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.gap).toBeNull();
     expect(i.unchecked).toBe(INSURANCE_NO_QUOTE);
     expect(i.method).toBe(
-      "The OM's insurance beside the deal's T-12 insurance line and the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED): none carries a figure it is held to.",
+      "The OM's insurance beside the deal's T-12 insurance line and the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED): no figure decides it.",
     );
     // The return is re-run at the seller's own premium, said as no test.
     expect(i.impact!.input).toBe("expenseLines");
@@ -405,7 +411,7 @@ describe("a stabilized apartment deal with a T-12", () => {
       text: "Held to Zillow's apartment asking rents, the figure for this kind of rent: +1.1% over the year to Aug 2026 (Zillow Research). The OM's 4.0%/yr is 2.9 points over it.",
     });
     expect(g.verdict).toBe("unsupported");
-    expect(g.method).toBe("The OM's rent growth against asking rent, apartments (Zillow Research); beside asking rent, all home types (Zillow Research) and rent paid by sitting tenants (CPI rent) (BLS).");
+    expect(g.method).toBe("The OM's rent growth against asking rent, apartments (Zillow Research), the one figure that decides; beside it, not deciding: asking rent, all home types (Zillow Research) and rent paid by sitting tenants (CPI rent) (BLS).");
     expect(g.impact!.input).toBe("rentGrowthPct");
     expect(g.impact!.evidenceIndex).toBe(0);
     expect(g.impact!.altIrrPct!).toBeLessThan(g.impact!.baseIrrPct!);
@@ -414,9 +420,21 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(e.omSays.value).toBe(2.5);
     expect(e.evidence[0].label).toBe("Consumer prices (CPI, all items)");
     expect(e.evidence.every((x) => x.scope === "nation")).toBe(true);
-    // Under core's 2.4%? No — 2.5 is over the lowest index, the conservative side.
-    expect(e.verdict).toBe("holds");
+    // All-items CPI decides (the broad price level the expense base moves
+    // with): 2.5% is 0.9 points under its +3.4%, stretched — core's +2.4%,
+    // which the lower index had let it hold against, is beside it, deciding
+    // nothing (the owner's rule of 2026-10-20).
+    expect(e.decidedBy).toBe(0);
+    expect(e.evidence[1].label).toBe("Core CPI");
+    expect(e.gap).toEqual({
+      value: 0.9,
+      unit: "pts",
+      text: "Held to consumer prices, all items (the CPI), the broad price level the expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED). The OM's 2.5%/yr is 0.9 points under it.",
+    });
+    expect(e.verdict).toBe("stretched");
+    expect(e.method).toMatch(/^The OM's expense growth against consumer prices \(CPI, all items\) \(BLS via FRED\), the one figure that decides; beside it, not deciding: core CPI \(BLS via FRED\)/);
     expect(e.impact!.input).toBe("expenseGrowthPct");
+    expect(e.impact!.altValue).toBeCloseTo(e.evidence[0].value! / 100, 9);
 
     const d = rowOf(test, "debt");
     expect(d.omSays).toEqual({ text: "Interest rate: 5.25%", value: 5.25, page: 30 });
@@ -655,7 +673,7 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(STRESS_METHODS.find((m) => m.key === "vacancy")!.limits.join(" ")).toContain(`more than ${VACANCY_UNSUPPORTED_PTS} points over the assumption`);
     expect(v.verdict).toBe("holds");
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau); beside rental vacancy, South Census region (Census Bureau via FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",
+      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau), the one figure that decides; beside it, not deciding: rental vacancy, South Census region (Census Bureau via FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",
     );
     // The engine is re-run at the figure that decided.
     expect(v.impact!.evidenceIndex).toBe(0);
@@ -1227,7 +1245,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
-  expense_growth: ["Consumer prices", "insurance premiums", "breakeven"],
+  expense_growth: ["Consumer prices", "Core CPI", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
   insurance: ["moved by the national premium index", "The deal's T-12 insurance line"],
   renovation_premium: ["Achieved premium", "classic and renovated rents"],
@@ -1344,7 +1362,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // is the going-in cap's 21 bps of compression, as in Washington.
     expect(x.gap).toMatchObject({ value: 21, unit: "bps" });
     expect(x.verdict).toBe("stretched");
-    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\); beside .*cap \(research tracker\)/);
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: .*cap \(research tracker\)/);
   });
 
   it("holds a commercial rent growth to its lessors' national index, and never to a regulation's allowance", () => {
@@ -1357,7 +1375,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const g = rowOf(apartmentTest, "rent_growth");
     expect(g.evidence[0].label).toMatch(/allowance on the regulated units/);
     expect(g.impact!.evidenceIndex).toBe(g.evidence.findIndex((e) => e.label === "Asking rent, apartments"));
-    expect(g.method).toMatch(/^The OM's rent growth against asking rent, apartments \(Zillow Research\); beside .*allowance on the regulated units/i);
+    expect(g.method).toMatch(/^The OM's rent growth against asking rent, apartments \(Zillow Research\), the one figure that decides; beside it, not deciding: .*allowance on the regulated units/i);
   });
 
   it("the map covers every key, one entry a sentence", () => {
@@ -1491,7 +1509,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // 7.0% over the comps; the asks at $300k would have read it under one.
     expect(b.verdict).toBe("stretched");
     expect(b.ruleOfThumbOnly).toBeUndefined();
-    expect(b.method).toMatch(/against the memorandum's sale comps \(the offering memorandum\); beside other memoranda's asking prices/);
+    expect(b.method).toMatch(/against the memorandum's sale comps \(the offering memorandum\), the one figure that decides; beside it, not deciding: other memoranda's asking prices/);
     // The asks alone decide only where nothing else carries a figure — and
     // the row says it was held to a rule of thumb only.
     const asksOnly = rowOf(buildStressTest(apartmentArgs({ pastScreens })), "basis");

@@ -84,7 +84,8 @@ export interface StressImpact {
  *  decides it from the gap and the evidence's kind; the challenger's words
  *  ride beside it, never in its place. */
 export type StressVerdict =
-  /** the OM's figure sits inside the evidence, or on its conservative side */
+  /** the OM's figure sits at the one figure that decides (within its
+   *  margin), or on its conservative side */
   | "holds"
   /** past the evidence by a margin a buyer should price */
   | "stretched"
@@ -110,11 +111,17 @@ export interface StressRow {
    *  sentence; null where nothing carries a figure */
   gap: { value: number; unit: "pts" | "pct" | "bps" | "usd"; text: string } | null;
   verdict: StressVerdict;
+  /** the ONE piece of `evidence` the verdict was decided on (its index),
+   *  picked by lib/stress-deciders' order for the row: every other piece is
+   *  shown beside it and decides nothing. Null on a row nothing decided
+   *  (unchecked); absent on a row built before the rule */
+  decidedBy?: number | null;
   impact: StressImpact | null;
   /** the challenger's own words for this assumption, where it made one */
   challenge: { severity: "high" | "medium" | "low"; challenge: string; question: string } | null;
   /** one sentence, what was compared to what: "The OM's stabilized vacancy
-   *  against the deal's rent roll, then the Census survey for the metro." */
+   *  against the deal's rent roll, the one figure that decides; beside it,
+   *  not deciding: the Census survey for the metro." */
   method: string;
   /** why the row is unchecked, where it is */
   unchecked?: string | null;
@@ -354,7 +361,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, graded by the comps step: a median only over three or more graded as supporting the ask, one or two named, never a median, and those graded favorable (leaning the seller's way) or stretched named and left out",
+      "The memorandum's own sale comps, graded by the comps step, the first of these that carries a figure deciding and the rest shown beside it: a median only over three or more graded as supporting the ask, one or two named, never a median, and those graded favorable (leaning the seller's way) or stretched named and left out",
       "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
       "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb that decides only where nothing above carries a figure, and never on a shared screen or in the verdict's brief",
     ],
@@ -372,9 +379,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The exit cap",
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
-      "The going-in cap: an exit tighter than the entry is cap compression, said as such",
-      "The exit's spread over the latest 10-year Treasury, dated, beside the going-in cap's spread where the exit is held to it",
-      "The research tracker's cap range for the class and market, with its period, where one is on file",
+      "The going-in cap, the one figure that decides: an exit tighter than the entry is cap compression, said as such",
+      "The exit's spread over the latest 10-year Treasury, dated, shown beside it and deciding nothing (a yield, not a cap), with the going-in cap's spread where the exit is held to it",
+      "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where no going-in cap stands, and beside a going-in cap it is shown, deciding nothing",
     ],
     engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
     limits: [
@@ -387,9 +394,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The debt",
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
-      "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default",
-      "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named",
-      "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield",
+      "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default: the one figure that decides, the bare index beside it setting only where a rate reads unsupported",
+      "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
+      "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],
     // lib/stress-test's debtRow sizes the tests at the OM's stated rate
     // where one is read, else the derived model's `allInRatePct` (the seed,
@@ -405,9 +412,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The NOI",
     claim: "The pro forma's net operating income is what the building earns.",
     against: [
-      "The deal's own T-12 NOI, with its period printed beside it and the sign of every deduction read once",
-      "The rent roll's in-place rent against the pro forma's",
-      "The memorandum's own in-place figures against its stabilized ones",
+      "The deal's own T-12 NOI, the one figure that decides where one is on file, with its period printed beside it and the sign of every deduction read once",
+      "The rent roll's in-place rent against the pro forma's, in words beside it",
+      "The memorandum's own in-place figures against its stabilized ones, deciding only where no T-12 is on file",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
     limits: [
@@ -422,7 +429,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "A stabilized vacancy on a deal read as stabilized is held to the market's published figure, the first present deciding and the rest shown beside it: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
       "For a commercial class, the research tracker's vacancy band, with its period, where the market check holds the model to it",
-      "The deal's own rent roll or T-12, the occupancy the building runs at today: beside a stabilized assumption it is the gap a lease-up has to close (or support, where the building already runs at or under it); it decides an occupancy the OM states for today, a value-add, lease-up, conversion or development deal, and a stabilized assumption no fresh published figure speaks to, said so",
+      "The deal's own rent roll, else its T-12, the occupancy the building runs at today: beside a stabilized assumption it is the gap a lease-up has to close (or support, where the building already runs at or under it); it decides an occupancy the OM states for today, a value-add, lease-up, conversion or development deal, and a stabilized assumption no fresh published figure speaks to, said so",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above carries a figure",
     ],
     engine: "Vacancy is a direct input: the return is re-run at the figure that decided — the market's for a stabilized assumption, else the documents'.",
@@ -455,11 +462,12 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Expense growth",
     claim: "Expenses grow at the pro forma's rate.",
     against: [
-      "Consumer prices, all items and core, against a year ago (BLS via FRED)",
+      "Consumer prices, all items, against a year ago (BLS via FRED): the one figure that decides, the broad price level the expense base moves with",
+      "Core CPI against a year ago, deciding only where the all-items figure is not fresh, else shown beside it and never the lower figure held to",
       "The producer price index for commercial property insurance premiums, shown beside the price indexes and never averaged into them",
       "The bond market's ten-year expected inflation (the breakeven), shown apart",
     ],
-    engine: "Expense growth is a direct input: the return is re-run at the evidence's rate.",
+    engine: "Expense growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
     limits: ["The insurance line's own repricing is read apart (below), not through the growth rate."],
   },
   {
@@ -467,8 +475,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Real estate taxes",
     claim: "The tax line stays at the seller's bill.",
     against: [
-      "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment",
-      "A stated tax abatement and when it ends, read against the model's sale",
+      "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment, the one figure that decides where both are stated",
+      "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck, and the T-12's tax line is shown beside it",
     ],
     engine: "The tax line is an expense input: the return is re-run at the reset bill where the memorandum states both figures.",
     limits: [
@@ -494,8 +502,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The renovation premium",
     claim: "Each renovated unit rents for the stated premium.",
     against: [
-      "An achieved premium the memorandum states, against the projected one",
-      "The memorandum's own classic and renovated rents against its comps' rents",
+      "An achieved premium the memorandum states, against the projected one: the one figure that decides",
+      "The memorandum's own classic and renovated rents against its comps' rents, shown beside it",
     ],
     engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, said beside the row as the break-even the program needs, never as evidence of what a door earns.",
     limits: [

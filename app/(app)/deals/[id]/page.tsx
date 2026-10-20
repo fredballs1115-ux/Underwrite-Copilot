@@ -985,6 +985,10 @@ export default async function DealPage({
   // market or the documents decided the vacancy row.
   const scoreTrackRecord = (vacancyHeldToMarket: boolean) => scoreDeal({
     screenedAt: verdict?.generatedAt ?? null,
+    // The stress test as it stood at the verdict (lib/stress-snapshot): its
+    // rows, holds included, are what is scored; a verdict that kept none has
+    // its challenges scored instead, and the card says so.
+    stressSnapshot: verdict ? verdict.stressSnapshot : undefined,
     challenges: challenges?.challenges,
     priorScreen,
     rentRoll: rrRes.data?.summary

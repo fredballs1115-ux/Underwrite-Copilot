@@ -233,7 +233,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(words).toContain("A T-12 tests the OM's NOI, vacancy and insurance against the building's own year");
     expect(words).toContain("a rent roll tests its vacancy against the occupancy it runs at");
-    expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score its challenges.");
+    expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows.");
     // The T-12's tax line judges no row, so taxes are never promised.
     expect(words).not.toMatch(/\btax/i);
     expect(html).toContain('href="/deals/sample?tab=analyses&amp;a=reconciler"');

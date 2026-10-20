@@ -82,6 +82,7 @@ import { modelMarketFor } from "@/lib/model-market";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { buildStressTest } from "@/lib/stress-test";
+import { stressSnapshotOf } from "@/lib/stress-snapshot";
 import { PAST_SCREENS_IN_BRIEF, compsCallSubjectOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import type { StressTest } from "@/lib/stress-test-types";
@@ -1022,8 +1023,11 @@ async function regenerateVerdict(
 
   // The OM's assumptions tested in code, built here from the stored results
   // and the model the screen derives, so the verdict leads with the engine's
-  // own moves. Nothing new is stored on the verdict: every surface rebuilds
-  // the test on read.
+  // own moves. Every surface rebuilds the test on read for today's figures;
+  // the verdict keeps only its snapshot (lib/stress-snapshot) — each row's
+  // verdict, the OM's figure and the evidence that decided it — so the track
+  // record (lib/track-record) scores the test the call was reached on, and a
+  // re-screen carries it into prior_screen with the verdict.
   const stressTest = await screenStressTest(admin, dealId, data, reads);
 
   const verdict = await synthesizeVerdict({
@@ -1051,7 +1055,7 @@ async function regenerateVerdict(
 
   // generatedAt lets consumers (the weekly digest) know when THIS verdict
   // landed — deals.updated_at bumps on any edit and can't be trusted.
-  await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString() });
+  await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString(), stressSnapshot: stressSnapshotOf(stressTest) });
   // The test the call was reached on, for the screen-complete email's
   // counts: nothing is stored on the verdict, so the run hands it over.
   return stressTest;
@@ -1298,6 +1302,9 @@ async function runAnalysisSteps(
     // (`runActualsIngestion`, below) while replacing the challenges it would
     // be scored against — so the snapshot keeps them, beside the verdict
     // whose `generatedAt` says which screen they were made on.
+    // The verdict carries its stress test's snapshot (`stressSnapshot`,
+    // 2026-10-20), so the snapshot keeps the rows that screen's call was
+    // reached on too, and the track record scores them, holds included.
     if (snapshotPrior && completed.size === 0 && !manual) try {
       const { data: prev } = await admin
         .from("deals")
