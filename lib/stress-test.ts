@@ -44,12 +44,17 @@
 //     stabilized NOI over its total cost (lib/deal-strategy `planSummary`,
 //     the one division lib/plan-sensitivity `yieldOnCost`), ONE of the two
 //     figures moved by the row's deciding evidence — vacancy through the
-//     stabilized gross the OM states, a tax bill only where the OM states it
-//     as its pro forma's line, a renovation premium on the doors to
-//     renovate, the basis through the total cost — and a row with no
-//     yield-on-cost meaning says so (`noRerun`), its verdict unchanged. A
-//     figure the plan does not state is never inferred: the row says why it
-//     has no re-run;
+//     stabilized gross the OM states where the market's figure or a rule of
+//     thumb decides it (a rent roll or T-12 is the building before the plan
+//     is done), a tax bill only where the OM states it as its pro forma's
+//     line (the reset struck at today's bill over today's assessed value,
+//     none on a development, a conversion or a forward purchase), a
+//     renovation premium on the doors to renovate, the basis through the
+//     total cost — and a row with no yield-on-cost meaning says so
+//     (`noRerun`), its verdict unchanged. A figure the plan does not state
+//     is never inferred, and a moved figure no plan earns (a stabilized NOI
+//     at or under zero, a yield at or past IMPLIED_CAP_CEILING) is struck
+//     nowhere: the row says why it has no re-run;
 //   - the challenger's words ride beside a row, never in its place: a
 //     challenge keyed by the challenger (`Challenge.key`) lands on its row;
 //     one stored before the key was asked is matched on its `assumption`
@@ -77,7 +82,12 @@
 //                    the comps' median
 //   premium          PREMIUM_UNSUPPORTED_SHARE 15% over the achieved premium
 //   any row          IRR_MOVE_STRETCH_BPS      a re-run that lowers the levered
-//                    IRR 100 bps or more never holds (`finishRow`)
+//                    IRR 100 bps or more never holds (`finishRow`); on a
+//                    plan deal YOC_MOVE_STRETCH_PTS, a re-run that lowers
+//                    the yield on cost 0.5 points or more
+//   tax reset        TAX_RATE_CEILING          a bill over its assessed value
+//                    past 5% is a misread or a fractional assessment, and
+//                    strikes no reset bill
 
 import type {
   BrokerCompsResult,
@@ -109,6 +119,8 @@ import {
   notYetDelivered,
   planSummary,
   planWithBasisChecked,
+  RENOVATION_COST_PER_DOOR_ROW,
+  RENOVATION_DOORS_ROW,
   type DealStrategy,
   type PlanSummary,
 } from "@/lib/deal-strategy";
@@ -185,6 +197,15 @@ export const BASIS_UNSUPPORTED_PCT = 15;
 export const PREMIUM_UNSUPPORTED_SHARE = 0.15;
 /** A re-run that moves the levered IRR down this far never reads "holds". */
 export const IRR_MOVE_STRETCH_BPS = 100;
+/** A plan deal's equivalent: a re-run that moves the yield on cost down this
+ *  many points never reads "holds" — half a point, about a twelfth of a 6%
+ *  yield's NOI and a third or more of the spread a plan is built for. */
+export const YOC_MOVE_STRETCH_PTS = 0.5;
+/** A tax bill over the assessed value it is struck on past this share is
+ *  read as no effective rate on market value (a screening ceiling, not a
+ *  published figure): the assessment is a fraction of value, or a
+ *  figure was misread, so no reset bill is struck on it. */
+export const TAX_RATE_CEILING = 0.05;
 
 /** Two percent figures within this are one figure (lib/model-vs-market's own). */
 export const SAME = 0.05;
@@ -268,7 +289,13 @@ const isRow = (m: unknown): m is Row =>
   !!m && typeof m === "object" && typeof (m as Row).label === "string" && typeof (m as Row).value === "string";
 
 const pct1 = (n: number) => `${n.toFixed(1)}%`;
-const pct2 = (n: number) => `${n.toFixed(2)}%`;
+// A negative to two places carries the true minus (U+2212), as
+// lib/stress-test-words' own `signedPct` writes it; one that rounds to
+// nothing carries none.
+const pct2 = (n: number) => {
+  const t = n.toFixed(2);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 const bps = (n: number) => `${Math.round(Math.abs(n))} bps`;
 const pts = (n: number) => `${Math.abs(n).toFixed(1)} point${Math.abs(Math.abs(n) - 1) < 0.05 ? "" : "s"}`;
@@ -629,6 +656,13 @@ const PLAN_FIGURE = /stabili[sz]ed|pro ?forma/i;
  * figure in dollars at each side; `words.what` names the row's figure, `om`
  * and `alt` say it, `evidence` whose the alternative is ("" where `alt` is a
  * whole phrase), and `moved` names the plan's figure the swap moves.
+ *
+ * Bounded as the plan's own yield is (lib/deal-strategy `yieldWithheld`): a
+ * moved stabilized NOI at or under zero, or a moved yield at or past
+ * IMPLIED_CAP_CEILING, is no yield any plan earns — the figures do not tie —
+ * so no impact is struck and the row's `noRerun` sentence is returned in its
+ * place (a string). Two yields that print the same at two places are said
+ * to stand.
  */
 function yocImpact(
   py: PlanYield,
@@ -637,15 +671,22 @@ function yocImpact(
   om: number,
   alt: number,
   words: { what: string; om: string; alt: string; evidence: string; how?: string },
-): StressImpact | null {
-  const at =(v: number) => (input === "stabilizedNoi" ? yieldOnCost(v, py.totalCost) : yieldOnCost(py.noi, v));
+): StressImpact | string | null {
+  const at = (v: number) => (input === "stabilizedNoi" ? yieldOnCost(v, py.totalCost) : yieldOnCost(py.noi, v));
+  const altSaid = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
+  if (!Number.isFinite(alt)) return null;
+  if (input === "stabilizedNoi" && alt <= 0) {
+    return `If ${words.what} is ${altSaid}, the stabilized NOI falls to ${money(alt)}, at or under zero, which is no stabilized plan: the figures do not tie, so no yield on cost is re-run on it.`;
+  }
   const base = at(om);
   const moved = at(alt);
-  if (base == null || moved == null || !Number.isFinite(alt)) return null;
+  if (base == null || moved == null) return null;
   const basePct = base * 100;
   const altPct = moved * 100;
+  if (moved >= IMPLIED_CAP_CEILING) {
+    return `If ${words.what} is ${altSaid}, the yield on cost would be ${pct2(altPct)}, at or past the ${Math.round(IMPLIED_CAP_CEILING * 100)}% the screen holds as a misread: the figures do not tie, so no yield on cost is re-run on it.`;
+  }
   const same = Math.abs(alt - om) < 0.5;
-  const altSaid = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
   const over =
     input === "stabilizedNoi"
       ? `the stabilized NOI ${money(om)} to ${money(alt)} over the ${money(py.totalCost)} total cost`
@@ -653,7 +694,9 @@ function yocImpact(
   const how = words.how ? `; ${words.how}` : "";
   const note = same
     ? `The OM's ${words.what}, ${words.om}, is ${altSaid}, so the yield on cost of ${pct2(basePct)} stands on it.`
-    : `If ${words.what} is ${altSaid}, not the OM's ${words.om}, the yield on cost moves from ${pct2(basePct)} to ${pct2(altPct)} (${over}${how}).`;
+    : pct2(basePct) === pct2(altPct)
+      ? `If ${words.what} is ${altSaid}, not the OM's ${words.om}, the yield on cost stands at ${pct2(basePct)} to two places (${over}${how}).`
+      : `If ${words.what} is ${altSaid}, not the OM's ${words.om}, the yield on cost moves from ${pct2(basePct)} to ${pct2(altPct)} (${over}${how}).`;
   return {
     measure: "yield_on_cost",
     input,
@@ -668,6 +711,11 @@ function yocImpact(
     altYocPct: altPct,
     note,
   };
+}
+
+/** A plan re-run's result split: the impact, or the sentence why none. */
+function yocSplit(run: StressImpact | string | null): { impact: StressImpact | null; noRerun: string | null } {
+  return typeof run === "string" ? { impact: null, noRerun: run } : { impact: run, noRerun: null };
 }
 
 /** Why a plan deal's row with no yield-on-cost meaning carries no re-run,
@@ -696,13 +744,36 @@ export const PLAN_LEFT_OUT_WHY: Partial<Record<StressKey, string>> = {
 export const PLAN_VACANCY_TODAY =
   "The OM's figure is today's occupancy, not the stabilized vacancy the plan's NOI runs at, so no yield on cost is re-run on it.";
 
+/** The vacancy row's no-re-run on a plan deal whose stated stabilized
+ *  vacancy the deal's own rent roll or T-12 decided: a document is the
+ *  building before the plan is done (`planVacancyStated`), so its vacancy is
+ *  the gap the plan closes, never the figure the stabilized NOI runs at. */
+export const PLAN_VACANCY_DOCUMENT =
+  "Today's vacancy is the gap the plan closes, not evidence of the stabilized figure, so no yield on cost is re-run on it.";
+
 /** The vacancy row's no-re-run where the OM states no stabilized gross. */
 export const PLAN_NO_GROSS =
   "The OM states no stabilized gross potential rent or effective gross income, so the vacancy gap cannot be carried to the stabilized NOI and no yield on cost is re-run on it.";
 
-/** The tax row's no-re-run where the OM's bill is not its pro forma's. */
+/** The tax row's no-re-run where no tax row the OM states is its pro
+ *  forma's (every row searched). */
 export const PLAN_TAX_NOT_PRO_FORMA =
-  "The OM's tax bill is not stated as its pro forma's line, so which bill the stabilized NOI carries is not stated, and no yield on cost is re-run on it.";
+  "The OM states no tax bill as its pro forma's line, so which bill the stabilized NOI carries is not stated, and no yield on cost is re-run on it.";
+
+/** The tax row's no-re-run on a development, a conversion or a forward
+ *  purchase: the reset is struck on today's assessment and the price paid
+ *  today, and the building the plan delivers is assessed when finished. */
+export const PLAN_TAX_NOT_ASSESSED =
+  "The finished building is not assessed at the price, so the reset bill struck on it is a floor, not the bill the stabilized NOI carries, and no yield on cost is re-run on it.";
+
+/** Why the tax row stands unchecked where the OM's only bill is its pro
+ *  forma's line: a pro forma bill over today's assessment is no rate. */
+export const PLAN_TAX_NO_TODAY =
+  "The OM's only tax bill is its pro forma's line, not today's bill on today's assessment, so no rate is read to work the reset bill from; the rate is the assessor's to give.";
+
+/** Why the tax row stands unchecked where the bill over the assessed value
+ *  is past `TAX_RATE_CEILING`. */
+export const TAX_RATE_MISREAD = `The OM's tax bill over its assessed value is past the ${Math.round(TAX_RATE_CEILING * 100)}% ceiling the screen holds for an effective rate on market value, so the assessment is a fraction of value or a figure was misread, and no reset bill is struck.`;
 
 const GROSS_ROW = /\bgross\s+potential\s+(?:rent|income|revenue)\b|\bpotential\s+gross\s+(?:rent|income|revenue)\b|\bgpr\b|\bgpi\b/i;
 const EGI_ROW = /\beffective\s+gross\s+(?:income|revenue)\b|\begi\b/i;
@@ -729,14 +800,20 @@ export function stabilizedGrossOf(rows: readonly { label: string; value: string;
   return null;
 }
 
-const STATED_YOC_ROW = /\byield\s+on\s+(?:total\s+)?cost\b|\breturn\s+on\s+(?:total\s+)?cost\b|\byoc\b|\bdevelopment\s+yield\b/i;
+const STATED_YOC_ROW = /\byield\s+on\s+(?:total\s+)?cost\b|\breturn\s+on\s+total\s+cost\b|\byoc\b|\bdevelopment\s+yield\b/i;
+/** A bare "return on cost" is most often the renovation's (a door's premium
+ *  over its cost) on a value-add: read as the plan's only on a development
+ *  or a conversion whose memorandum states no renovation program. */
+const RETURN_ON_COST_ROW = /\breturn\s+on\s+cost\b/i;
 const STATED_YOC_NOT = /renovat|premium|door|\bunits?\b|interior|upgrade|\btrended\b|spread|levered|\birr\b|\bper\b/i;
 
 /** A yield on cost the memorandum states in a row of its own (the whole
  *  plan's, never a renovation's return on a door), with its page; null where
  *  it states none or a figure no project earns. */
-function statedYocOf(rows: Row[], ex: ExtractionResult | null): NonNullable<StressHeadline["statedYoc"]> | null {
-  const row = findMetric(rows, STATED_YOC_ROW, STATED_YOC_NOT);
+function statedYocOf(rows: Row[], ex: ExtractionResult | null, kind: Ctx["kind"]): NonNullable<StressHeadline["statedYoc"]> | null {
+  const builds = kind === "development" || kind === "conversion";
+  const renovates = readValueAdd(ex) != null || rows.some((m) => RENOVATION_DOORS_ROW.test(m.label) || RENOVATION_COST_PER_DOOR_ROW.test(m.label));
+  const row = findMetric(rows, STATED_YOC_ROW, STATED_YOC_NOT) ?? (builds && !renovates ? findMetric(rows, RETURN_ON_COST_ROW, STATED_YOC_NOT) : null);
   const pct = row ? parsePct(row.value) : null;
   if (!row || pct == null || !(pct > 0) || pct >= IMPLIED_CAP_CEILING * 100 || statesRange(row.value)) return null;
   return { pct, label: row.label, page: pageOf(row, ex) };
@@ -1049,22 +1126,33 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // A plan deal re-runs its yield on cost: the stabilized NOI moved by the
   // vacancy gap on the stabilized gross the OM states — only where the OM's
   // figure is the stabilized allowance the plan's NOI runs at, never today's
-  // occupancy, and never on a gross the OM does not state.
+  // occupancy, never on a gross the OM does not state, and only where the
+  // figure that decided speaks to a stabilized building — the market's
+  // published vacancy or the class's rule of thumb. The deal's rent roll or
+  // T-12 is the building before the plan is done (`planVacancyStated`): its
+  // vacancy decides the verdict as the gap the plan has to close, and a
+  // stabilized NOI struck at it would run a lease-up's empty building as
+  // the finished one.
   let noRerun: string | null = null;
   if (ctx.planYield) {
     const py = ctx.planYield;
     const gross = om.from === "vacancy" ? stabilizedGrossOf(ctx.rows, om.pct) : null;
     if (om.from !== "vacancy") noRerun = PLAN_VACANCY_TODAY;
+    else if (best.e.kind !== "published" && best.e.kind !== "rule_of_thumb") noRerun = PLAN_VACANCY_DOCUMENT;
     else if (!gross) noRerun = PLAN_NO_GROSS;
     else {
       const altNoi = py.noi - (gross.gross * (bestValue - om.pct)) / 100;
-      impact = yocImpact(py, "stabilizedNoi", 0, py.noi, altNoi, {
-        what: "stabilized vacancy",
-        om: pct1(om.pct),
-        alt: pct1(bestValue),
-        evidence: best.e.publisher,
-        how: `the gap struck on ${gross.words}`,
-      });
+      const run = yocSplit(
+        yocImpact(py, "stabilizedNoi", 0, py.noi, altNoi, {
+          what: "stabilized vacancy",
+          om: pct1(om.pct),
+          alt: pct1(bestValue),
+          evidence: best.e.publisher,
+          how: `the gap struck on ${gross.words}`,
+        }),
+      );
+      impact = run.impact;
+      noRerun = run.noRerun;
     }
   }
   return {
@@ -1688,8 +1776,19 @@ function noiRow(ctx: Ctx): StressRow | null {
 // — Taxes —
 
 function taxesRow(ctx: Ctx): StressRow | null {
-  const billRow = ctx.rows.find((m) => TAX_BILL_ROW.test(m.label) && !TAX_BILL_NOT.test(m.label) && taxBillOf(m.value) != null) ?? null;
+  const taxRows = ctx.rows.filter((m) => TAX_BILL_ROW.test(m.label) && !TAX_BILL_NOT.test(m.label) && taxBillOf(m.value) != null);
+  // On a plan deal the memorandum may state two bills: today's, on today's
+  // assessment, and its pro forma's line, the one the stabilized NOI
+  // carries. Every row is searched for each, never the first alone. The
+  // OM's figure tested is the pro forma's line where stated (else today's
+  // bill), and the rate the reset is struck at is today's bill over today's
+  // assessed value — never a pro forma bill over an assessment it was not
+  // levied on. A deal read as stabilized reads its first bill for both.
+  const proFormaRow = ctx.plan ? (taxRows.find((m) => PLAN_FIGURE.test(m.label)) ?? null) : null;
+  const todayRow = ctx.plan ? (taxRows.find((m) => !PLAN_FIGURE.test(m.label)) ?? null) : (taxRows[0] ?? null);
+  const billRow = proFormaRow ?? todayRow;
   const bill = billRow ? taxBillOf(billRow.value) : null;
+  const todayBill = todayRow ? taxBillOf(todayRow.value) : null;
   const assessedRow = findMetric(ctx.rows, ASSESSED_ROW, ASSESSED_NOT);
   const assessed = assessedRow ? parseUsd(assessedRow.value, 10_000) : null;
   // The building's price off the stated ask (a share's grossed up ONCE to
@@ -1698,15 +1797,23 @@ function taxesRow(ctx: Ctx): StressRow | null {
   // a 49% share's $20M as $83M.
   const price = buildingPriceOf(ctx.ex, askingPriceOf(ctx.ex));
   const evidence: StressEvidence[] = [];
-  // The reset bill the memorandum's own figures imply on the price.
-  if (bill != null && assessed != null && assessed > 0 && price != null && ctx.derived?.sources.purchasePrice?.provenance !== "assumption") {
-    const rate = bill / assessed;
+  // The reset bill the memorandum's own figures imply on the price — struck
+  // only on an effective rate a jurisdiction levies on market value: past
+  // TAX_RATE_CEILING the assessment is a fraction of value or a figure was
+  // misread, and the piece is shown with no figure, deciding nothing.
+  let rateMisread = false;
+  if (todayBill != null && assessed != null && assessed > 0 && price != null && ctx.derived?.sources.purchasePrice?.provenance !== "assumption") {
+    const rate = todayBill / assessed;
     const reset = rate * price;
+    rateMisread = rate > TAX_RATE_CEILING;
+    const billWords = proFormaRow ? `today's ${money(todayBill)} bill` : money(todayBill);
     evidence.push({
       kind: "om_internal",
       label: RESET_BILL_LABEL,
-      text: `${money(bill)} over ${money(assessed)} assessed is ${(rate * 100).toFixed(2)}%, which on the ${money(price)} price is ${money(reset)} a year if the sale resets the assessment to the price`,
-      value: Math.round(reset),
+      text: rateMisread
+        ? `${billWords} over ${money(assessed)} assessed is ${(rate * 100).toFixed(2)}%, past the ${Math.round(TAX_RATE_CEILING * 100)}% ceiling the screen holds for an effective rate on market value, so no reset bill is struck on it`
+        : `${billWords} over ${money(assessed)} assessed is ${(rate * 100).toFixed(2)}%, which on the ${money(price)} price is ${money(reset)} a year if the sale resets the assessment to the price`,
+      value: rateMisread ? null : Math.round(reset),
       asOf: null,
       publisher: "the memorandum's own figures",
       scope: "deal",
@@ -1769,7 +1876,13 @@ function taxesRow(ctx: Ctx): StressRow | null {
       "taxes",
       omSays,
       evidence,
-      assessed == null ? "The OM states no assessed value to work the reset bill from; the rate is the assessor's to give." : NO_EVIDENCE,
+      rateMisread
+        ? TAX_RATE_MISREAD
+        : assessed == null
+          ? "The OM states no assessed value to work the reset bill from; the rate is the assessor's to give."
+          : todayBill == null && proFormaRow
+            ? PLAN_TAX_NO_TODAY
+            : NO_EVIDENCE,
     );
   }
   const best = evidence[decided.index];
@@ -1819,22 +1932,32 @@ function taxesRow(ctx: Ctx): StressRow | null {
   // A plan deal re-runs its yield on cost on the tax line only where the OM
   // states the bill as its pro forma's line, the one its stabilized NOI
   // carries; the swap is the bill less the evidence's, never a line inferred.
+  // A reset on a development, a conversion or a forward purchase is no
+  // figure for that line: the building the plan delivers is assessed when
+  // it is finished, not at the price paid today, so its verdict stands as a
+  // floor and nothing is re-run.
   let planImpact: StressImpact | null = null;
   let noRerun: string | null = null;
   if (ctx.planYield) {
     const py = ctx.planYield;
-    if (!PLAN_FIGURE.test(billRow!.label)) noRerun = PLAN_TAX_NOT_PRO_FORMA;
-    else
-      planImpact = yocImpact(
-        py,
-        "stabilizedNoi",
-        evidenceIndex,
-        py.noi,
-        py.noi - (best.value! - bill),
-        abated
-          ? { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: "the unabated bill" }
-          : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} bill ${ifReset}`, evidence: "" },
+    if (!abated && (ctx.kind === "development" || ctx.kind === "conversion" || py.plan.forward)) noRerun = PLAN_TAX_NOT_ASSESSED;
+    else if (!PLAN_FIGURE.test(billRow!.label)) noRerun = PLAN_TAX_NOT_PRO_FORMA;
+    else {
+      const run = yocSplit(
+        yocImpact(
+          py,
+          "stabilizedNoi",
+          evidenceIndex,
+          py.noi,
+          py.noi - (best.value! - bill),
+          abated
+            ? { what: "the tax line", om: money(bill), alt: money(best.value!), evidence: "the unabated bill" }
+            : { what: "the tax line", om: money(bill), alt: `the ${money(best.value!)} bill ${ifReset}`, evidence: "" },
+        ),
       );
+      planImpact = run.impact;
+      noRerun = run.noRerun;
+    }
   }
   return {
     key: "taxes",
@@ -2382,22 +2505,40 @@ function basisRow(ctx: Ctx): StressRow | null {
   }
   // A plan deal re-runs its yield on cost at the evidence's all-in basis:
   // the total cost moved by the same ratio, the stabilized NOI as stated.
+  let noRerun: string | null = null;
   if (plan && ctx.planYield) {
     const py = ctx.planYield;
     const altCost = (py.totalCost * best.value) / bestOm;
-    impact = yocImpact(py, "totalCost", evidenceIndex, py.totalCost, altCost, {
-      what: plan.forward ? "the price" : "the all-in cost",
-      om: `${money(py.totalCost)} (${money(bestOm)}${pw})`,
-      alt: `${whose}, ${money(altCost)} (${money(best.value)}${pw})`,
-      evidence: "",
-    });
+    const run = yocSplit(
+      yocImpact(py, "totalCost", evidenceIndex, py.totalCost, altCost, {
+        what: plan.forward ? "the price" : "the all-in cost",
+        om: `${money(py.totalCost)} (${money(bestOm)}${pw})`,
+        alt: `${whose}, ${money(altCost)} (${money(best.value)}${pw})`,
+        evidence: "",
+      }),
+    );
+    impact = run.impact;
+    noRerun = run.noRerun;
   }
   // A piece on the other yardstick carries the OM's own figure on it, and is
   // drawn on no track shared with the OM's figure.
   for (const c of comparables) {
     if (c.on !== best.on && omOn(c.on) != null) c.e.ownYardstick = { om: omOn(c.on)!, per: perWordOf(c.on) };
   }
-  return { key: "basis", title: TITLES.basis, omSays, evidence, gap, verdict, decidedBy, impact, challenge: null, method: methodSentence("basis", evidence, decidedBy), ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}) };
+  return {
+    key: "basis",
+    title: TITLES.basis,
+    omSays,
+    evidence,
+    gap,
+    verdict,
+    decidedBy,
+    impact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("basis", evidence, decidedBy),
+    ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
+  };
 }
 
 /** Why a plan deal's all-in basis cannot be struck, in one sentence: the
@@ -2522,13 +2663,17 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
     else if (r.doors == null || !(r.doors > 0)) noRerun = "The OM states no count of doors to renovate, so the premium's gap cannot be carried to the stabilized NOI and no yield on cost is re-run on it.";
     else {
       const doors = r.doors;
-      impact = yocImpact(py, "stabilizedNoi", decidedBy, py.noi, py.noi - (r.premium - achieved.value) * doors * 12, {
-        what: "the renovation premium",
-        om: `${dollars(r.premium)} a month`,
-        alt: `${dollars(achieved.value)} a month`,
-        evidence: "the achieved premium",
-        how: `the gap on the ${doors.toLocaleString("en-US")} ${doors === 1 ? "door" : "doors"} to renovate, twelve months each, the stabilized NOI read as carrying the projected premium on every one`,
-      });
+      const run = yocSplit(
+        yocImpact(py, "stabilizedNoi", decidedBy, py.noi, py.noi - (r.premium - achieved.value) * doors * 12, {
+          what: "the renovation premium",
+          om: `${dollars(r.premium)} a month`,
+          alt: `${dollars(achieved.value)} a month`,
+          evidence: "the achieved premium",
+          how: `the gap on the ${doors.toLocaleString("en-US")} ${doors === 1 ? "door" : "doors"} to renovate, twelve months each, the stabilized NOI read as carrying the projected premium on every one`,
+        }),
+      );
+      impact = run.impact;
+      noRerun = run.noRerun;
     }
   }
   return {
@@ -2557,7 +2702,8 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
  *     the levered IRR down by `IRR_MOVE_STRETCH_BPS` or more never reads
  *     "holds" — inside the evidence's band or not, a move that size is to be
  *     priced, so it reads "stretched" and the gap says both — where the OM
- *     is the more optimistic side.
+ *     is the more optimistic side; on a plan deal, a re-run that moves the
+ *     yield on cost down by `YOC_MOVE_STRETCH_PTS` or more, the same way.
  */
 function finishRow(row: StressRow): void {
   if (row.ruleOfThumbOnly && row.gap) row.gap = { ...row.gap, text: `${row.gap.text} Against a rule of thumb only.` };
@@ -2572,6 +2718,18 @@ function finishRow(row: StressRow): void {
       row.gap = {
         ...row.gap,
         text: `${row.gap.text} The gap is inside the evidence's band, but the return moves ${moveBps} bps on it (levered IRR ${pct1(i.baseIrrPct)} to ${pct1(i.altIrrPct)}).`,
+      };
+    }
+  }
+  // A plan deal's equivalent, in points of yield on cost (YOC_MOVE_STRETCH_PTS),
+  // compared at the two places every surface prints.
+  if (row.verdict === "holds" && row.gap && row.gap.value > 0 && i && i.measure === "yield_on_cost" && i.baseYocPct != null && i.altYocPct != null) {
+    const movePts = Math.round((i.baseYocPct - i.altYocPct) * 100) / 100;
+    if (movePts >= YOC_MOVE_STRETCH_PTS) {
+      row.verdict = "stretched";
+      row.gap = {
+        ...row.gap,
+        text: `${row.gap.text} The gap is inside the evidence's band, but the yield on cost moves ${movePts.toFixed(2)} points on it (${pct2(i.baseYocPct)} to ${pct2(i.altYocPct)}).`,
       };
     }
   }
@@ -2602,7 +2760,7 @@ export const SHARE_NO_MODEL = "The shared screen carries no model, so no return 
 // re-run the plan's yield on total cost instead — where the plan states the
 // figures to strike it on. Where it does not, said why, in one sentence.
 export const PLAN_YIELD_LEAD =
-  "On a value-add, lease-up, conversion or development deal the model runs today's income, not the business plan, so the re-run is the plan's yield on total cost, its stabilized NOI over the price plus its budget";
+  "On a value-add, lease-up, conversion or development deal the model runs today's income, not the business plan, so the re-run is the plan's yield on total cost, its stabilized NOI over the price plus its budget (on a forward purchase, the price alone)";
 
 /** Why a plan deal re-runs no yield on cost: the plan's own sentence where
  *  it withholds the yield or the basis as a misread, else what the OM does
@@ -2623,6 +2781,13 @@ export function planNoYieldReason(plan: PlanSummary | null): string {
           ? "states no budget for the plan beside the price, so no total cost is read and"
           : "states no price, so no total cost is read and";
   return `${PLAN_YIELD_LEAD}, and the OM ${missing} no return is re-run.`;
+}
+
+/** Why a plan deal whose price buys a master lease re-runs no yield on cost:
+ *  the plan's yield is the building's stabilized NOI over its total cost,
+ *  and the price buys the position between two rents. One whole sentence. */
+export function planMasterLeaseReason(why: string): string {
+  return `No yield on cost is struck: ${why}, so the building's stabilized NOI over that price is no yield on cost; no return is re-run.`;
 }
 
 /**
@@ -2664,12 +2829,16 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   // A master lease's basis is withheld, but its model is the position's own,
   // run as a leasehold's is: its other rows re-run.
   const priceWithheld = withheld && withheld.word !== MASTER_LEASE_WORD ? `No return is re-run: ${withheld.why}.` : null;
+  // On a plan deal, though, the re-run is the building's stabilized NOI over
+  // the price, and a master lease's price buys the position, not the
+  // building: no yield on cost is struck on it.
+  const masterLeasePlan = plan && withheld?.word === MASTER_LEASE_WORD ? planMasterLeaseReason(withheld.why) : null;
   const impactsWithheld =
     derived == null
       ? (args.withheldReason?.trim() || "No model was derived for this deal, so no return is re-run.")
       : readsWithheld
         ? `No return is re-run: ${lowerFirst(readsWithheld.trim())}${/[.!?]$/.test(readsWithheld.trim()) ? "" : "."}`
-        : (priceWithheld ?? (plan && !yieldBase ? planNoYieldReason(planChecked) : null));
+        : (priceWithheld ?? masterLeasePlan ?? (plan && !yieldBase ? planNoYieldReason(planChecked) : null));
   const planYield: PlanYield | null = plan && impactsWithheld == null && planChecked && yieldBase ? { plan: planChecked, ...yieldBase } : null;
   const ctx: Ctx = {
     ex,
@@ -2754,7 +2923,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   // A plan deal's headline is its yield on total cost (`planStressHeadline`).
   const struck =
     derived && planYield
-      ? planStressHeadline(rows, planYield, derived.inputs, statedYocOf(ctx.rows, ex))
+      ? planStressHeadline(rows, planYield, derived.inputs, statedYocOf(ctx.rows, ex, ctx.kind))
       : derived && impactsWithheld == null
         ? stressHeadline(rows, derived.inputs, headlinePrice(derived))
         : null;
@@ -2765,6 +2934,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     publishedRead: args.modelVsMarket != null,
     impactsWithheld,
     ...(planYield ? { measure: "yield_on_cost" as const } : {}),
+    ...(planYield?.plan.forward ? { forward: true as const } : {}),
     headline,
   };
 }
@@ -3056,6 +3226,11 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
 export const PLAN_BASIS_LEFT_OUT =
   "both cases pay the total cost, the price plus the plan's budget, so the headline says what that cost yields on each set of figures; the price row says how far the all-in cost sits from the comps and what the yield is at their figure";
 
+/** A forward purchase's: its total cost is the price alone, the buyer's
+ *  whole cost at delivery (lib/deal-strategy `planSummary`'s `forward`). */
+export const PLAN_BASIS_LEFT_OUT_FORWARD =
+  "both cases pay the price, the buyer's whole cost at delivery, so the headline says what that price yields on each set of figures; the price row says how far it sits from the comps and what the yield is at their figure";
+
 /**
  * A plan deal's headline (lib/stress-test-types `StressHeadline` with
  * `measure: "yield_on_cost"`): the plan's yield on total cost on the OM's
@@ -3077,7 +3252,7 @@ export const PLAN_BASIS_LEFT_OUT =
  */
 export function planStressHeadline(
   rows: readonly StressRow[],
-  base: { noi: number; totalCost: number },
+  base: { noi: number; totalCost: number; plan?: Pick<PlanSummary, "forward"> },
   carrier: UnderwriteInputs,
   statedYoc: StressHeadline["statedYoc"] = null,
 ): StressHeadline | null {
@@ -3100,7 +3275,7 @@ export function planStressHeadline(
   const basis = players.find((s) => s.row.key === "basis");
   if (basis) {
     players = players.filter((s) => s !== basis);
-    omitted.push({ key: basis.row.key, label: basis.row.title, why: PLAN_BASIS_LEFT_OUT });
+    omitted.push({ key: basis.row.key, label: basis.row.title, why: base.plan?.forward ? PLAN_BASIS_LEFT_OUT_FORWARD : PLAN_BASIS_LEFT_OUT });
   }
   /** The plan's two figures with the swaps `alt` answers true for moved. */
   const figures = (alt: (s: Swap) => boolean) => {

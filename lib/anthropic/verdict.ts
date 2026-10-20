@@ -182,7 +182,7 @@ export function stressSection(test: StressTest): string[] {
     test.impactsWithheld
       ? `${test.impactsWithheld} The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.`
       : test.measure === "yield_on_cost"
-        ? `The yield-on-cost moves above are the engine's own: the plan's stated stabilized NOI over its total cost (the price plus the plan's budget), struck again with ONE figure moved by the evidence, in code — this is a value-add, lease-up, conversion or development deal, judged on its yield on total cost, so no levered IRR is re-run. Use them as they stand — never estimate a move yourself, never restate one as a levered return, and where a row says it has no re-run, say why in its own words. A row that holds carries no re-run: never cite a yield for it.${
+        ? `The yield-on-cost moves above are the engine's own: the plan's stated stabilized NOI over its total cost (${test.forward ? "the price, the buyer's whole cost at delivery" : "the price plus the plan's budget"}), struck again with ONE figure moved by the evidence, in code — this is a value-add, lease-up, conversion or development deal, judged on its yield on total cost, so no levered IRR is re-run. Use them as they stand — never estimate a move yourself, never restate one as a levered return, and where a row says it has no re-run, say why in its own words. A row that holds carries no re-run: never cite a yield for it.${
             liveHeadline(test)
               ? " The HEADLINE's two yields on cost and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself."
               : ""

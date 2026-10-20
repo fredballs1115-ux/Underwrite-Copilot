@@ -650,7 +650,7 @@ export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evi
  *  the plan rule's own words (lib/stress-test `PLAN_YIELD_LEAD`;
  *  lib/sample-stress.test.ts holds the two to one another). */
 export const SAMPLE_PLAN_NOTE =
-  "Read as stabilized, the sample re-runs each row's levered return. A value-add, lease-up, conversion or development OM is set against the same evidence and re-run on its yield on total cost instead: the model runs today's income, not the business plan.";
+  "Read as stabilized, the sample re-runs each row's levered return. A value-add, lease-up, conversion or development OM is re-run on its yield on total cost instead, where it states its stabilized NOI and total cost: the model runs today's income, not the business plan.";
 
 /**
  * The headline in whole sentences, for the memo, the report and the

@@ -85,15 +85,21 @@ export function valueAddTermRows<M extends { label: string; value: string }>(met
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 
+/** A figure stated a square foot: "/SF", "per SF", "PSF", "per square foot". */
+const PER_FOOT = /\bp\.?s\.?f\b|(?:\/|\bper\b|\ba\b)\s*(?:r?sf|sq\.?\s*f(?:oo)?t|square\s+f(?:oo|ee)t|foot)\b/i;
+
 /** A monthly rent or premium to the cent: "$250", "$250/mo", "$3,000/yr"
  *  read as a month's. A range is two figures and reads as none (lib/money
- *  `statesRange`, so "$250/mo – 20% on cost" is the premium it states). */
+ *  `statesRange`, so "$250/mo – 20% on cost" is the premium it states). A
+ *  figure a square foot ("$0.30/SF/mo", "$3.60 PSF") or a percent ("8%",
+ *  "8 percent") is no dollar figure a door and reads as none. */
 export function monthlyOf(value: string | null | undefined): number | null {
   if (statesRange(clean(value))) return null;
   const v = clean(value).replace(/,/g, "");
   if (!v) return null;
-  const m = v.match(/\$?\s*(\d+(?:\.\d+)?)/);
-  if (!m) return null;
+  if (PER_FOOT.test(v)) return null;
+  const m = v.match(/\$?\s*(\d+(?:\.\d+)?)(\s*(?:%|percent\b))?/i);
+  if (!m || m[2]) return null;
   const n = Number(m[1]);
   if (!(n > 0)) return null;
   const yearly = /\/\s*(?:yr|year)\b|per\s+year|annual(?:ly)?\b/i.test(v);
