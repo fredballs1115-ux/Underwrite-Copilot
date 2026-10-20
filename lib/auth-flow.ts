@@ -367,7 +367,23 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
     const tail = onward ? `&next=${encodeURIComponent(onward)}` : "";
     return hadCode ? `/login?confirmed=1${tail}` : `/login?confirmed=1&link=expired${tail}`;
   }
+  // A code whose link says neither that it confirmed an address nor that it
+  // was a reset — a confirmation that fell back to the Site URL and was
+  // opened on another device, say. The address may well be confirmed, so the
+  // page says both possibilities and opens on Sign in, never on the reset
+  // form (the first-run audit of 2026-10-20).
+  if (hadCode && !isResetLanding(safe)) return `/login?link=${LINK_UNSURE}`;
   return "/login?link=expired";
+}
+
+/** The `link` marker for a code the callback could not exchange and whose
+ *  kind it cannot tell. */
+export const LINK_UNSURE = "unsure";
+
+/** The page a reset link is sent to (`resetPasswordForEmail`'s redirect,
+ *  `/account?reset=1`). */
+function isResetLanding(path: string): boolean {
+  return /^\/account(?:\?|$)/.test(path) && /[?&]reset=1(?:&|$)/.test(path);
 }
 
 /**
@@ -483,6 +499,8 @@ export const CONFIRM_LINK_FAILED =
 export const RESET_LINK_FAILED =
   "That reset link has expired, was already used, or was opened in a different browser than the one you asked from. Request a fresh one below and open it in this browser.";
 export const EMAIL_CONFIRMED = "Email confirmed — sign in below and your pipeline is ready.";
+export const LINK_UNSURE_TEXT =
+  "That link couldn't sign you in on this device. If it confirmed your email, sign in below; if it was a password reset, request a new one.";
 
 /**
  * The banner the sign-in page shows for the link that brought someone here.
@@ -502,6 +520,11 @@ export function authLinkBanner(params: {
     !!params.error_code ||
     !!params.error_description ||
     params.error === "access_denied";
+  // A code the callback could not exchange and whose kind it cannot tell
+  // (`landingAfterFailedExchange`): neither "expired" nor "confirmed".
+  if (params.link === LINK_UNSURE && !params.confirmed && !params.error_code && !params.error_description) {
+    return { tone: "warn", text: LINK_UNSURE_TEXT };
+  }
   if (refused) {
     return { tone: "warn", text: params.confirmed ? CONFIRM_LINK_FAILED : RESET_LINK_FAILED };
   }
