@@ -90,8 +90,14 @@ export function bestEvidence(row: StressRow): StressEvidence | null {
   return row.evidence.find((e) => e.value != null) ?? row.evidence[0] ?? null;
 }
 
-const pct1 = (n: number) => `${n.toFixed(1)}%`;
-const pct2 = (n: number) => `${n.toFixed(2)}%`;
+/** A percent at one or two places, a negative with the minus sign (U+2212),
+ *  and none on a figure that rounds to nothing. */
+const signedPct = (n: number, places: number): string => {
+  const t = n.toFixed(places);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
+const pct1 = (n: number) => signedPct(n, 1);
+const pct2 = (n: number) => signedPct(n, 2);
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
 
 /**

@@ -189,6 +189,11 @@ export interface StressHeadline {
 export const HEADLINE_NOI_LEFT_OUT =
   "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
 
+/** Why the price is in neither side of the headline's split: both cases pay
+ *  the ask, so the headline is what the ask earns on each set of figures. */
+export const HEADLINE_BASIS_LEFT_OUT =
+  "both cases pay the asking price, so the headline says what the ask earns on each set of figures; the price row says how far the ask sits from the comps and what the return is at their figure";
+
 /** The headline's method, as /how-we-test prints it and
  *  lib/stress-test.test.ts holds it to `stressHeadline`. */
 export const HEADLINE_METHOD = {
@@ -203,6 +208,7 @@ export const HEADLINE_METHOD = {
   evidenceCase: [
     "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
     "One that holds or is unchecked stays at the OM's figure.",
+    "The price stays at the ask in both cases: the headline asks what the ask earns, and the price row says how far the ask sits from the comps.",
   ],
   split: [
     "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic.",
@@ -212,7 +218,7 @@ export const HEADLINE_METHOD = {
   overlap: [
     `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
     "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
-    "A reset tax bill is struck on the price: where the price is swapped too, the bill is struck on the evidence's price.",
+    "A reset tax bill is struck on the asking price, which both cases pay.",
   ],
   limits: [
     "An assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",

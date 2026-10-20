@@ -171,28 +171,26 @@ describe("the sample's stress test, one build on every surface", () => {
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
     // vacancy, its 4.0% rent growth, its tax bill and premium.
     expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
-    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 12.3]);
-    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.76"]);
-    // The split, largest first: the comps' price raises the return (the ask
-    // is over them), the rent roll's vacancy, the reset tax bill, the exit
-    // at the going-in cap and the T-12's premium lower it; rent growth holds
-    // and carries no part.
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.6]);
+    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.70"]);
+    // The split, largest first: the reset tax bill, the exit at the
+    // going-in cap and the T-12's premium lower it; the vacancy holds to the
+    // metro's survey and rent growth to CPI rent, so neither carries a part.
     expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
-      ["basis", 3.7],
-      ["vacancy", -3.2],
-      ["taxes", -2.5],
+      ["taxes", -2.8],
       ["exit_cap", -1.4],
-      ["insurance", -1],
+      ["insurance", -0.9],
     ]);
     expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
-    // The NOI's T-12 figure holds the vacancy, taxes and insurance the rows
-    // move on their own; the premium is no model input.
-    expect(h.omitted.map((o) => o.key)).toEqual(["noi", "renovation_premium"]);
-    // With the read failed, the published rows unchecked and rent growth
-    // out of both cases.
+    // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
+    // and insurance the rows move on their own; the premium is no model input.
+    expect(h.omitted.map((o) => o.key)).toEqual(["basis", "noi", "renovation_premium"]);
+    // With the read failed: the published rows unchecked, rent growth out of
+    // both cases, and the vacancy held to the deal's own rent roll.
     const bare = signedInSample(null).headline!;
     expect(bare.omKeys).not.toContain("rent_growth");
-    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 8.2]);
+    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
+    expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
   });
 
   it("places the sample where the deal page places it", () => {

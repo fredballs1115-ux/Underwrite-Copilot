@@ -117,6 +117,7 @@ import {
   type StressRow,
   type StressTest,
   type StressVerdict,
+  HEADLINE_BASIS_LEFT_OUT,
   HEADLINE_NOI_LEFT_OUT,
   type StressHeadline,
 } from "@/lib/stress-test-types";
@@ -2323,6 +2324,14 @@ export function stressHeadline(rows: readonly StressRow[], model: UnderwriteInpu
   if (noi && players.some((s) => HEADLINE_NOI_COMPONENTS.includes(s.row.key))) {
     players = players.filter((s) => s !== noi);
     omitted.push({ key: noi.row.key, label: noi.row.title, why: HEADLINE_NOI_LEFT_OUT });
+  }
+
+  // The price is no player: both cases pay the ask, so the headline is what
+  // the ask earns on each set of figures (the price row says the rest).
+  const price = players.find((s) => s.row.key === "basis");
+  if (price) {
+    players = players.filter((s) => s !== price);
+    omitted.push({ key: price.row.key, label: price.row.title, why: HEADLINE_BASIS_LEFT_OUT });
   }
 
   // The OM's case before its NOI: every swap at the OM's side.

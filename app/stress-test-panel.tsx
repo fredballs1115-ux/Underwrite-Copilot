@@ -124,7 +124,12 @@ function figureText(key: StressKey, v: number): string {
   }
 }
 
-const pctText = (n: number | null): string => (n == null ? "does not solve" : `${n.toFixed(1)}%`);
+const pctText = (n: number | null): string => {
+  if (n == null) return "does not solve";
+  // A negative return with the minus sign (U+2212), none on one that rounds to nothing.
+  const t = n.toFixed(1);
+  return Number(t) < 0 ? `\u2212${t.slice(1)}%` : `${t.replace(/^-/, "")}%`;
+};
 
 /** Most severe first, the reader's order inside a verdict. */
 export function sortStressRows(rows: readonly StressRow[]): StressRow[] {

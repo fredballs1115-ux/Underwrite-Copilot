@@ -35,7 +35,7 @@ import {
   stressHeadline,
   type StressTestArgs,
 } from "./stress-test";
-import { HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT } from "./stress-test-types";
+import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT } from "./stress-test-types";
 import { headlineName, headlineSentence } from "./stress-test-words";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
@@ -1542,7 +1542,7 @@ describe("the headline", () => {
     expect(HEADLINE_METHOD.overlap[0]).toContain(HEADLINE_NOI_LEFT_OUT);
   });
 
-  it("strikes a reset tax bill on the price the case pays, where the price is swapped too", () => {
+  it("keeps the price at the ask in both cases, a reset tax bill struck on the ask, and names the price as left out", () => {
     const taxes = rowOf(test, "taxes");
     const reset = taxes.evidence[taxes.impact!.evidenceIndex];
     expect(reset.label).toMatch(/^The bill the OM's own figures imply/);
@@ -1559,16 +1559,17 @@ describe("the headline", () => {
       method: "",
     };
     const both = stressHeadline([basis, ...only(["taxes"]).filter((r) => r.key !== "basis")], model)!;
-    // By hand: the price 10% under, the tax line moved by the reset struck
-    // on that price less the OM's bill.
-    const delta = reset.value! * 0.9 - taxes.omSays.value!;
+    // By hand: the ask, the tax line moved by the reset struck on the ask
+    // less the OM's bill. The price is in neither side of the split.
+    const delta = reset.value! - taxes.omSays.value!;
     const byHand = computeUnderwrite({
       ...model,
-      purchasePrice: price * 0.9,
+      purchasePrice: price,
       expenseLines: model.expenseLines.map((l, i) => (i === 0 ? { ...l, annual: l.annual + delta } : l)),
     }).returns.leveredIrrPct!;
     expect(both.evidenceIrrPct!).toBeCloseTo(byHand * 100, 9);
-    expect(both.parts.map((p) => p.key).sort()).toEqual(["basis", "taxes"]);
+    expect(both.parts.map((p) => p.key)).toEqual(["taxes"]);
+    expect(both.omitted).toContainEqual({ key: "basis", label: "Basis", why: HEADLINE_BASIS_LEFT_OUT });
   });
 
   it("names a row past its evidence with no model input as left out, and says the headline in the documents' words", () => {
