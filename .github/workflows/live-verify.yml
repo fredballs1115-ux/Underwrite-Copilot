@@ -101,7 +101,7 @@ jobs:
           for path in demo why whats-new market how-we-test; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
-          grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
+          grep -q "Behind this test" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
           # The sample's stress test as the live site prints it (2026-10-20):
           # the headline and each row's verdict, on /demo and the homepage,
           # so the figures the tests quote can be read against today's feeds.
