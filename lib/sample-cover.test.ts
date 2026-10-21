@@ -290,14 +290,15 @@ describe("the sample's public workbook is the signed-in sample's", () => {
     const res = await route.GET();
     expect(res.status).toBe(200);
     const args = workbookArgs.value!;
-    expect(args).toHaveLength(9);
-    const [model, branding, marketRead, , asOf, findings, interest, , omFacts] = args as [
+    expect(args).toHaveLength(10);
+    const [model, branding, marketRead, , asOf, findings, interest, , omFacts, stressTest] = args as [
       { inputs: unknown },
       unknown,
       unknown,
       unknown,
       Date,
       unknown[],
+      unknown,
       unknown,
       unknown,
       unknown,
@@ -312,5 +313,10 @@ describe("the sample's public workbook is the signed-in sample's", () => {
     expect(asOf.toISOString()).toMatch(/T12:00:00\.000Z$/);
     expect(Array.isArray(findings)).toBe(true);
     expect(interest).toBeTruthy();
+    // The Stress Test tab prints the sample's one build (lib/sample-stress,
+    // the one /demo, the homepage and the signed-in sample print), on the
+    // day the workbook is read and the reads it made (none, in a test).
+    const { sampleStressTest } = await import("@/lib/sample-stress");
+    expect(stressTest).toEqual(sampleStressTest({ today: asOf.toISOString().slice(0, 10), reads: null }));
   });
 });

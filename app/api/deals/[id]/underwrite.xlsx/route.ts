@@ -11,7 +11,7 @@ import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { BrokerCompsResult, ChallengerResult, ExtractionResult, FirstSignal, MarketResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -28,6 +28,11 @@ import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { readOmFacts } from "@/lib/underwrite/om-facts";
+import { actualsFromRows } from "@/lib/actuals/actuals-read";
+import { shownAssetClass } from "@/lib/asset-class";
+import { buildStressTest } from "@/lib/stress-test";
+import type { StressTest } from "@/lib/stress-test-types";
+import { readStressBasisEvidence } from "@/lib/stress-basis-read";
 
 export const runtime = "nodejs";
 
@@ -217,6 +222,44 @@ export async function GET(
     } catch (err) {
       console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);
     }
+    // The OM's assumptions tested in code (lib/stress-test), built the way
+    // the deal page and the report build it — the stored challenger, market
+    // check and memorandum comps, the model's read against the published
+    // figures above (its dated figures are the test's published evidence),
+    // the deal's rent roll and T-12 as the page reads them, this very
+    // derived model, the recorded sales and the reader's own past screens
+    // (lib/stress-basis-read, the one builder) — on the reader's day, so the
+    // Stress Test tab prints the StressTest the page prints. Its own try: a
+    // failed build leaves the tab out, never the workbook.
+    let stressTest: StressTest | null = null;
+    try {
+      const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
+      const stressActuals = actualsFromRows(
+        extraction,
+        inferStrategy(extraction, firstSignal),
+        shownAssetClass(deal.asset_class as string | null, extraction) || null,
+        rrRes.data,
+        t12Res.data,
+      );
+      const { recordedSales, pastScreens } = await readStressBasisEvidence(supabase, deal, { readerId: user.id, pastScreens: true });
+      stressTest = buildStressTest({
+        extraction,
+        firstSignal,
+        challenger: (deal.challenges as ChallengerResult | null) ?? null,
+        market: (deal.market as MarketResult | null) ?? null,
+        modelVsMarket: marketRead,
+        actuals: stressActuals,
+        derived: model,
+        storedAssetClass: deal.asset_class as string | null,
+        brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
+        recordedSales,
+        pastScreens,
+        sample: !!(deal as { is_sample?: boolean }).is_sample,
+        readOn: readerDay,
+      });
+    } catch (err) {
+      console.warn(`workbook stress test failed for ${id}:`, err instanceof Error ? err.message : err);
+    }
     // A portfolio memorandum's properties (#411), the same reader as the
     // deal page's card and the report's portfolio page. And the plausibility
     // check's findings on the deal page's own read (its kind with the first
@@ -236,7 +279,7 @@ export async function GET(
     // Every figure the screen read out of the memorandum, with its page
     // held to the memorandum's length (lib/facts' rule) — the OM Facts tab;
     // none read, no tab.
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date(), readOmFacts(extraction));
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date(), readOmFacts(extraction), stressTest);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";
