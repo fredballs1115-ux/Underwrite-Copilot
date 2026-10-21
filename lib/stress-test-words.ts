@@ -219,6 +219,12 @@ export function figureText(key: StressKey, value: number | null, rowText?: strin
     }
     case "renovation_premium":
       return `$${Math.round(value).toLocaleString("en-US")}/mo`;
+    case "market_rent": {
+      // The reader writes the OM's rent first on its own yardstick ("$2,600/mo
+      // …", "$38.00/SF …"); without it, a figure a foot is under $200.
+      const perSf = rowText ? /^\$[\d.,]+\/SF/.test(rowText) : value < 200;
+      return perSf ? `$${value.toFixed(2)}/SF` : `$${Math.round(value).toLocaleString("en-US")}/mo`;
+    }
     default:
       return String(value);
   }
@@ -572,6 +578,7 @@ const HEADLINE_NAME: Record<StressKey, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
+  market_rent: "the market rent",
   expense_growth: "expense growth",
   taxes: "the taxes",
   insurance: "insurance",

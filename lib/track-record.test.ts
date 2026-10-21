@@ -1004,6 +1004,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
     noi: 4_000_000,
     vacancy: 6,
     rent_growth: 3,
+    market_rent: 38,
     expense_growth: 3,
     taxes: 1_000_000,
     insurance: 300_000,
@@ -1018,7 +1019,8 @@ describe("what can score a row — the words held to the scorer, key by key (the
     om: OM[key],
     page: 3,
     evidence: { value: OM[key] * 1.2, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
-    per: null,
+    // A market rent carries its yardstick: a foot a year here.
+    per: key === "market_rent" ? "/SF" : null,
     threshold: snapshotThreshold(key),
     worse: WORSE_WHEN[key],
   });
@@ -1039,7 +1041,12 @@ describe("what can score a row — the words held to the scorer, key by key (the
       stage: "dead",
       history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
-    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
+    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "opex", "market_rent", "basis"]));
+    // The market rent by the later rent roll's in-place rent, said as in-place.
+    const rent = r.rows.find((x) => x.key === "market_rent")!;
+    expect(rent.later?.source).toBe("rent_roll");
+    expect(rent.later?.text).toContain("ran $30.00 a square foot a year in place — an in-place rent, not a market's");
+    expect(SCORED_BY_TOO).toContain("a market rent by a later rent roll's in-place rent, said as in-place, not market");
     // The operating expenses by the later T-12 on the row's own footing.
     expect(r.rows.find((x) => x.key === "opex")!.later?.source).toBe("t12");
     expect(SCORED_BY_TOO).toContain("The operating expenses are scored by a later T-12 on the row's own footing");
@@ -1323,6 +1330,7 @@ describe("what will score what — the grid is the scorer's own rules, never wri
       taxes: [],
       insurance: [],
       opex: ["t12"],
+      market_rent: ["rent_roll"],
       renovation_premium: [],
       other: [],
     });
@@ -1357,7 +1365,7 @@ describe("what will score what — the grid is the scorer's own rules, never wri
     // decisions, are exactly the marked cells.
     const grid = marked(scorableGrid());
     const figureKeys = Object.entries(grid).filter(([, s]) => s.some((x) => x !== "outcome")).map(([k]) => k);
-    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
+    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "opex", "market_rent", "basis"]));
     expect(Object.entries(grid).filter(([, s]) => s.includes("outcome")).map(([k]) => k).sort()).toEqual(["basis", "debt"]);
     const component = readFileSync(join(process.cwd(), "app/(app)/scorable-grid.tsx"), "utf8");
     const order = [...component.matchAll(/source: "(\w+)"/g)].map((m) => m[1]);

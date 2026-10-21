@@ -42,7 +42,7 @@ describe("the sample's stress test", () => {
   };
   const own = Number((computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
 
-  it("tests seven of its ten assumptions; the three unchecked are the loan rate no document states, a rent growth no figure was read for and the operating expenses it states no total for", () => {
+  it("tests seven of its eleven assumptions; the four unchecked are the loan rate no document states, a rent growth no figure was read for, a market rent its one lease comp, graded favorable, cannot decide, and the operating expenses it states no total for", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["basis", "stretched"],
@@ -53,6 +53,8 @@ describe("the sample's stress test", () => {
       ["noi", "stretched"],
       ["vacancy", "unsupported"],
       ["rent_growth", "unchecked"],
+      // One lease comp, graded favorable: no median of three graded clean.
+      ["market_rent", "unchecked"],
       // The reset is conditional on the jurisdiction: stretched at most.
       ["taxes", "stretched"],
       // The pro forma's premium sits under the seller's own T-12 premium:

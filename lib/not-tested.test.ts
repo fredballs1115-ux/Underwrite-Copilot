@@ -68,13 +68,14 @@ describe("what the test does not check yet", () => {
     expect(item("reserves").why).toContain("the higher of the OM's stated replacement reserve and the class's default");
   });
 
-  it("says loss-to-lease is filed on the rent growth row, and the NOI row shows the rent roll's rent in words", () => {
-    expect(challengeKey(challenge("Loss-to-lease burn-off"))).toBe("rent_growth");
-    expect(challengeKey(challenge("Market rent on turnover"))).toBe("rent_growth");
-    expect(CHALLENGE_KEYWORDS.find((k) => k.key === "rent_growth")!.re.test("loss to lease")).toBe(true);
-    const noi = STRESS_METHODS.find((m) => m.key === "noi")!;
-    expect(noi.against.join(" ")).toContain("The rent roll's in-place rent against the pro forma's, in words beside it");
-    expect(item("market_rent").beside).toEqual({ key: "noi", line: expect.stringContaining("in-place rent against the pro forma's") });
+  it("files loss-to-lease and a market rent on the market-rent row, and says how fast the gap closes is not tested", () => {
+    expect(challengeKey(challenge("Loss-to-lease burn-off"))).toBe("market_rent");
+    expect(challengeKey(challenge("Market rent on turnover"))).toBe("market_rent");
+    expect(CHALLENGE_KEYWORDS.find((k) => k.key === "market_rent")!.re.test("loss to lease")).toBe(true);
+    const rent = STRESS_METHODS.find((m) => m.key === "market_rent")!;
+    expect(rent.against[1]).toContain("The deal's rent roll: its in-place rent on the same yardstick, the gap the OM claims to close");
+    expect(rent.limits).toContain("How fast the in-place rent reaches the market rent is not tested.");
+    expect(item("loss_to_lease_burn_off").beside).toEqual({ key: "market_rent", line: expect.stringContaining("the gap the OM claims to close") });
   });
 
   it("says the headline names a rolling roster, at the stress test's own share", () => {

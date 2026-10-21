@@ -1437,6 +1437,8 @@ function stressFigure(key: StressKey, value: number, per: string, evidence = fal
       return { value, numFmt: per ? `$#,##0"${per}"` : "$#,##0" };
     case "renovation_premium":
       return { value, numFmt: '$#,##0"/mo"' };
+    case "market_rent":
+      return { value, numFmt: per === "/SF" ? '$#,##0.00"/SF"' : '$#,##0"/mo"' };
     default:
       return { value, numFmt: "General" };
   }
@@ -1459,6 +1461,7 @@ function stressGap(gap: NonNullable<StressRow["gap"]>): { value: number; numFmt:
 /** The basis's noun, as the reader writes the OM's figure first in its text
  *  ("$274k/unit …") — lib/stress-test-words `figureText`'s own read. */
 const basisPer = (row: StressRow): string => {
+  if (row.key === "market_rent") return row.yardstick ?? "";
   const noun = row.omSays.text.match(/^\$[\d.,]+[kMB]?\/(\S+)/)?.[1];
   return noun ? `/${noun}` : "";
 };

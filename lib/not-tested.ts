@@ -48,10 +48,10 @@ export const NOT_TESTED: readonly NotTested[] = [
     beside: { key: "vacancy", line: "Where a T-12 nets them into its vacancy and credit loss, the vacancy row reads that economic figure." },
   },
   {
-    id: "market_rent",
-    title: "Market rent and loss-to-lease",
-    why: "No row of their own: a challenge naming them is filed on the rent growth row.",
-    beside: { key: "noi", line: "The NOI row sets the rent roll's in-place rent against the pro forma's, in words." },
+    id: "loss_to_lease_burn_off",
+    title: "How fast the loss to lease closes",
+    why: "The market-rent row holds the OM's rent to its lease comps; how fast in-place rents reach it is not tested, and the model runs today's rent.",
+    beside: { key: "market_rent", line: "The rent roll's in-place rent is shown beside the row, said as the gap the OM claims to close." },
   },
   {
     id: "reserves",

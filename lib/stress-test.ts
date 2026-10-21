@@ -77,6 +77,9 @@
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
+//   market rent      BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
+//                    the median of the memorandum's lease comps graded
+//                    clean, three or more (MEDIAN_FLOOR), else unchecked
 //   opex             the NOI's bands: within NOI_IN_LINE_BAND (5%) under
 //                    the T-12's operating expenses (on the OM figure's
 //                    footing, less the taxes and insurance it states) holds,
@@ -113,6 +116,7 @@ import type {
   MarketResult,
 } from "@/lib/anthropic/types";
 import { avgRentOf, type ActualsRead } from "@/lib/actuals/actuals-read";
+import { statedRent } from "@/lib/lease-comp-rent";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -202,6 +206,8 @@ import {
   exitCapDecider,
   expenseGrowthDecider,
   insuranceDecider,
+  marketRentDecider,
+  MARKET_RENT_COMPS_LABEL,
   noiDecider,
   opexDecider,
   renovationPremiumDecider,
@@ -684,7 +690,10 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
   { key: "debt", re: /(?<!\bbad\s)\bdebt\b|\b(?:loan|financing|interest rate|dscr|coverage|leverage|refinanc|ltv|ltc|sofr|treasury|lender)\b/i },
   { key: "vacancy", re: /\b(?:vacancy|occupancy|lease[- ]up|absorption|occupied)\b/i },
   { key: "noi", re: /\bnoi\b|net operating income|\bt-?12\b|trailing/i },
-  { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b|loss[- ]to[- ]lease|mark[- ]to[- ]market|market rent|pro ?forma rent/i },
+  // A market or pro forma rent, and the loss to lease it claims to close,
+  // are the market-rent row's; a rent's growth rate is the rent growth row's.
+  { key: "market_rent", re: /loss[- ]to[- ]lease|mark[- ]to[- ]market|market rents?\b|pro ?forma rents?\b|lease comps?\b/i },
+  { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b/i },
   // A growth rate only: an expense ratio or load is a share of income, which
   // the growth row's CPI test does not speak to (`expenseLevelNotGrowth`).
   { key: "expense_growth", re: /\b(?:expense|opex|operating expense)s?\s+(?:growth|escalation|inflation)|expense growth/i },
@@ -917,6 +926,9 @@ const NO_RERUN_SHORT: readonly [(why: string) => boolean, string][] = [
   [(w) => w === INSURANCE_NO_RERUN || w === INSURANCE_NO_RERUN_NO_T12, "nothing tests the premium"],
   [(w) => w === PLAN_INSURANCE_NOT_PRO_FORMA, "no pro forma premium"],
   [(w) => w === PLAN_OPEX_NOT_PRO_FORMA, "no pro forma expense line"],
+  [(w) => w === MARKET_RENT_NO_RERUN, "the model runs today's rent"],
+  [(w) => w === PLAN_MARKET_RENT_VALUE_ADD_ONLY, "the finished building's rent"],
+  [(w) => w === PLAN_MARKET_RENT_NO_COUNT, "no count stated"],
   [(w) => /no count of doors to renovate/.test(w), "no doors to renovate stated"],
 ];
 
@@ -993,6 +1005,7 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
+  market_rent: "Market rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
@@ -2238,6 +2251,208 @@ function noiRow(ctx: Ctx): StressRow | null {
     }
   }
   return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, decidedBy: decided.index, impact, challenge: null, method: methodSentence("noi", evidence, decided.index) };
+}
+
+// — Market rent —
+
+/** Why a stabilized deal's market-rent row carries no re-run: the model runs
+ *  today's rent, which the NOI row carries. */
+export const MARKET_RENT_NO_RERUN =
+  "No return is re-run: the model runs today's rent, which the NOI row tests, so a market rent is no input of its own.";
+
+/** Why a plan deal other than a value-add carries none. */
+export const PLAN_MARKET_RENT_VALUE_ADD_ONLY =
+  "On a lease-up, conversion or development the pro forma rent is the finished building's whole rent, not a gap on rents let today, so it is not carried to the stabilized NOI and no yield on cost is re-run on it.";
+
+/** Why a value-add's market rent carries none where no count is stated. */
+export const PLAN_MARKET_RENT_NO_COUNT =
+  "The OM states no count to carry the rent's gap to the stabilized NOI on, so no yield on cost is re-run on it.";
+
+/** Why the market rent is left out of a plan headline beside the premium. */
+export const PLAN_MARKET_RENT_BESIDE_PREMIUM =
+  "the renovation premium already moves the stabilized NOI by the rent the renovated doors earn, so the market rent beside it would count that rent twice";
+
+/**
+ * The market-rent row (the owner's decision of 2026-10-21): the OM's pro
+ * forma or market rent, on the class's own yardstick (a month a unit where
+ * the class quotes rent that way, else a square foot a year), set against
+ * the median of the memorandum's own lease comps graded `supports` — three
+ * or more stating a rent on that yardstick (lib/lease-comp-rent, the comps'
+ * own floor, `MEDIAN_FLOOR`), else no median and the row unchecked, the
+ * comps named. The memorandum against itself (`om_internal`), as the basis
+ * row's sale comps are. Beside it, never deciding: the rent roll's in-place
+ * rent, said as the gap the OM claims to close, and Zillow's asking rent for
+ * the metro's apartments (all home types where the apartment figure was not
+ * read), dated, the metro's and never the building's. Holds within
+ * BASIS_STRETCH_PCT (5%) over the median, unsupported past
+ * BASIS_UNSUPPORTED_PCT (15%) — the comps' own lines. No re-run on a
+ * stabilized deal (the model runs today's rent, which the NOI row carries);
+ * on a value-add, the plan's yield on cost with the stabilized NOI moved by
+ * the gap on every unit (or foot) the OM counts, at its own stabilized
+ * vacancy where it states one.
+ */
+function marketRentRow(ctx: Ctx): StressRow | null {
+  const words = assetWords(ctx.assetClass);
+  const monthly = rentQuotedMonthly(ctx.assetClass);
+  const bySf = !monthly && words.income === "rent / SF / yr";
+  if (!monthly && !bySf) return null;
+  const yard: "/mo" | "/SF" = monthly ? "/mo" : "/SF";
+  const say = (n: number) => (monthly ? `$${Math.round(n).toLocaleString("en-US")}/mo` : `$${n.toFixed(2)}/SF`);
+  const on = (r: ReturnType<typeof statedRent>) => (monthly ? r.perUnitMonthly : r.perSfYear);
+  const row = findMetric(ctx.rows, PRO_FORMA_RENT_ROW, RENT_NOT);
+  let om = row ? on(statedRent(row.value, { bareSfIsYear: bySf })) : null;
+  // A bare dollar figure under a label that names the month ("Market rent
+  // (monthly)") is a month's rent, as stated.
+  if (row && om == null && monthly && /\bmo(?:nth(?:ly)?)?\b/i.test(row.label) && /^\$?\s?[\d,]+(?:\.\d+)?$/.test(row.value.trim())) om = parseUsd(row.value, 100);
+  const leaseComps = ctx.brokerComps?.leaseComps ?? [];
+  const evidence: StressEvidence[] = [];
+  // The memorandum's lease comps, each graded by the comps step: a median
+  // only over the comps graded `supports`, three or more stating a rent on
+  // the yardstick; the others named, left out.
+  const stating = leaseComps.map((comp) => ({ comp, figure: on(statedRent(comp.detail, { bareSfIsYear: bySf })) })).filter((c): c is { comp: (typeof leaseComps)[number]; figure: number } => c.figure != null);
+  const clean = stating.filter((c) => c.comp.support === "supports");
+  const named = (cs: typeof stating) => cs.map((c) => `${c.comp.name} ${say(c.figure)}`).join("; ");
+  let median3: number | null = null;
+  if (leaseComps.length > 0) {
+    median3 = clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : null;
+    const leftOut = (["favorable", "stretched"] as const)
+      .map((grade) => {
+        const cs = stating.filter((c) => c.comp.support === grade);
+        return cs.length > 0 ? `; left out, graded ${LEFT_OUT_GRADE[grade]}: ${named(cs)}` : "";
+      })
+      .join("");
+    const cleanPages = new Set(clean.map((c) => locatedPage(c.comp.page, ctx.ex?.totalPages)));
+    const page = median3 != null && cleanPages.size === 1 ? [...cleanPages][0] : null;
+    evidence.push({
+      kind: "om_internal",
+      label: MARKET_RENT_COMPS_LABEL,
+      text: `${stating.length} of ${leaseComps.length} state a rent ${monthly ? "a month a unit" : "a square foot a year"}${clean.length ? `; graded clean (supports): ${named(clean)}` : ""}${
+        median3 != null
+          ? ` — median ${say(median3)} over the ${clean.length}`
+          : clean.length > 0
+            ? `, too few graded clean for a median (${MEDIAN_FLOOR} or more)`
+            : ", none graded clean (supports), so none is set against the OM's rent"
+      }${leftOut}`,
+      value: median3 != null ? Math.round(median3 * 100) / 100 : null,
+      asOf: null,
+      publisher: "the offering memorandum",
+      scope: "deal",
+      ...(page != null ? { page } : {}),
+    });
+  }
+  // The rent roll's in-place rent on the class's yardstick: the gap the OM
+  // claims to close, never the figure that decides.
+  const rr = ctx.actuals?.rentRoll;
+  const rrClass = ctx.actuals?.assetClass ?? ctx.assetClass;
+  const inPlace = rr ? (monthly ? rr.summary.avgRentMonthly : rr.summary.weightedAvgRentPsf) : null;
+  if (rr && inPlace != null && Number.isFinite(inPlace) && inPlace > 0) {
+    const avg = avgRentOf(rr.summary, rrClass);
+    const asOf = rr.asOf ?? rr.summary.asOfUsed ?? null;
+    const gapWords = om != null ? `, ${say(Math.abs(om - inPlace))} ${om >= inPlace ? "under" : "over"} the OM's ${say(om)}: the gap the OM claims to close` : "";
+    evidence.push({
+      kind: "document",
+      label: "The rent roll's in-place rent",
+      text: `${say(inPlace)} in place${avg.basis ? `, ${avg.basis}` : ""}${asOf ? ` (as of ${proseDay(asOf)})` : ""}${gapWords}; today's rent, not a market's`,
+      value: Math.round(inPlace * 100) / 100,
+      asOf,
+      publisher: "the deal's rent roll",
+      scope: "deal",
+    });
+  }
+  // Zillow's asking rent for the metro, as the market check read it, on a
+  // class whose rent is housing's a month: the metro's, never the building's.
+  if (monthly && words.residential) {
+    const figs = ctx.market?.liveBrief?.figures ?? [];
+    const z = figs.find((f) => f.key === "zori_mfr_rent") ?? figs.find((f) => f.key === "zori_rent") ?? null;
+    if (z && Number.isFinite(z.value) && z.value > 0) {
+      const apartments = z.key === "zori_mfr_rent";
+      const when = /^\d{4}-\d{2}-\d{2}$/.test(z.asOf) ? periodLabel(z.asOf, "monthly") : z.asOf;
+      const grain = ctx.market?.liveBrief?.grain === "state" ? "the state's" : "the metro's";
+      evidence.push({
+        kind: "published",
+        label: apartments ? "Asking rent, apartments, metro area" : "Asking rent, all home types, metro area",
+        text: `${say(z.value)} (${when}), ${grain} asking rent ${apartments ? "for apartments" : "across all home types"} before concessions: ${grain === "the state's" ? "the state's" : "the metro's"}, not this building's`,
+        value: Math.round(z.value),
+        asOf: z.asOf,
+        publisher: "Zillow Research",
+        scope: ctx.market?.liveBrief?.grain === "state" ? "state" : "metro",
+      });
+    }
+  }
+  if (om == null && evidence.length === 0) return null;
+  const omSays: StressRow["omSays"] =
+    row && om != null
+      ? { text: `${say(om)}: ${row.label} ${row.value}`, value: om, page: pageOf(row, ctx.ex) }
+      : { text: row ? `${row.label}: ${row.value}, not ${monthly ? "a month's rent a unit" : "a rent a square foot a year"} as stated` : NO_FIGURE("pro forma or market rent"), value: null, page: row ? pageOf(row, ctx.ex) : null };
+  const base = { yardstick: yard };
+  if (om == null) return { ...unchecked("market_rent", omSays, evidence, row ? omSays.text : NO_FIGURE("pro forma or market rent")), ...base };
+  const decided = marketRentDecider(candidatesOf(evidence));
+  if (!decided) {
+    const why =
+      leaseComps.length === 0
+        ? "The memorandum lists no lease comps, so no median of comps graded clean can be set against its rent."
+        : `Fewer than ${MEDIAN_FLOOR} of the memorandum's lease comps graded clean (supports) state a rent ${monthly ? "a month a unit" : "a square foot a year"} (${clean.length} of ${leaseComps.length}), so no median is struck: the comps' own floor.`;
+    return { ...unchecked("market_rent", omSays, evidence, why), ...base };
+  }
+  const best = decided.figure;
+  const sharePct = ((om - best) / best) * 100;
+  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  const ofBest = `the median of its lease comps graded clean, ${say(best)}`;
+  const gap: StressRow["gap"] = {
+    value: Math.round(sharePct * 10) / 10,
+    unit: "pct",
+    text:
+      Math.abs(sharePct) < 0.5
+        ? `The OM's ${say(om)} is at ${ofBest}.`
+        : sharePct > 0
+          ? `The OM's ${say(om)} is ${pct1(sharePct)} over ${ofBest}.`
+          : `The OM's ${say(om)} is ${pct1(-sharePct)} under ${ofBest} — the conservative side.`,
+  };
+  // A stabilized deal re-runs nothing (the model runs today's rent, which
+  // the NOI row carries); a value-add moves its stabilized NOI by the gap on
+  // every unit or foot the OM counts, at its own stated vacancy.
+  let impact: StressImpact | null = null;
+  let noRerun: string | null = ctx.plan ? null : MARKET_RENT_NO_RERUN;
+  if (ctx.planYield) {
+    if (ctx.kind !== "value_add") noRerun = PLAN_MARKET_RENT_VALUE_ADD_ONLY;
+    else {
+      const count = monthly ? unitCountFromMetrics(ctx.rows) : buildingSfFromMetrics(ctx.rows);
+      if (count == null || !(count > 0)) noRerun = PLAN_MARKET_RENT_NO_COUNT;
+      else {
+        const v = omVacancy(ctx.rows);
+        const occupied = v && v.from === "vacancy" ? 1 - v.pct / 100 : 1;
+        const year = (om - best) * count * (monthly ? 12 : 1) * occupied;
+        const noun = monthly ? countNoun(unitCountRow(ctx.rows)?.label, ctx.assetClass) : "square feet";
+        const run = yocSplit(
+          yocImpact(ctx.planYield, "stabilizedNoi", decided.index, ctx.planYield.noi, ctx.planYield.noi - year, {
+            what: "the market rent",
+            om: say(om),
+            alt: say(best),
+            evidence: "the lease comps' median",
+            how: `the gap on the ${count.toLocaleString("en-US")} ${noun}${monthly ? ", twelve months each" : ""}, ${
+              v && v.from === "vacancy" ? `at the OM's own ${pct1(v.pct)} vacancy` : "at full occupancy, since the OM states no stabilized vacancy"
+            }, the stabilized NOI read as carrying the OM's rent on every one`,
+          }),
+        );
+        impact = run.impact;
+        noRerun = run.noRerun;
+      }
+    }
+  }
+  return {
+    key: "market_rent",
+    title: TITLES.market_rent,
+    omSays,
+    evidence,
+    gap,
+    verdict,
+    decidedBy: decided.index,
+    impact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("market_rent", evidence, decided.index),
+    ...base,
+  };
 }
 
 // — Taxes —
@@ -3702,6 +3917,7 @@ export function holdsBand(row: StressRow): string {
     case "opex":
       return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${best?.label === CLASS_OPEX_LABEL ? "the class's ratio" : "the T-12"}`;
     case "basis":
+    case "market_rent":
       return `within ${BASIS_STRETCH_PCT}% of the comps`;
     case "taxes":
     case "renovation_premium":
@@ -3887,6 +4103,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     noi: noiRow(ctx) ?? undefined,
     vacancy: vacancyRow(ctx) ?? undefined,
     rent_growth: rentGrowthRow(ctx) ?? undefined,
+    market_rent: marketRentRow(ctx) ?? undefined,
     expense_growth: expenseGrowthRow(ctx) ?? undefined,
     taxes: taxesRow(ctx) ?? undefined,
     insurance: insuranceRow(ctx) ?? undefined,
@@ -4080,6 +4297,7 @@ function headlineSwap(row: StressRow): HeadlineSwap | null {
  *  carries no swap into the headline. */
 function noSwapWhy(row: StressRow): string {
   if (row.key === "renovation_premium") return "the premium is no model input: the model grows today's rent at one rate";
+  if (row.key === "market_rent") return "a market rent is no model input: the model runs today's rent, which the NOI row carries";
   if (!row.impact) return "no return is re-run on it, so it has no figure to swap";
   return "its re-run moves an input the two cases cannot combine";
 }
@@ -4339,6 +4557,14 @@ export function planStressHeadline(
   if (basis) {
     players = players.filter((s) => s !== basis);
     omitted.push({ key: basis.row.key, label: basis.row.title, why: base.plan?.forward ? PLAN_BASIS_LEFT_OUT_FORWARD : PLAN_BASIS_LEFT_OUT });
+  }
+  // A market rent beside a renovation premium would carry the renovated
+  // doors' rent into the stabilized NOI twice: the premium stays, the
+  // market rent is left out, said so.
+  const rent = players.find((s) => s.row.key === "market_rent");
+  if (rent && players.some((s) => s.row.key === "renovation_premium")) {
+    players = players.filter((s) => s !== rent);
+    omitted.push({ key: rent.row.key, label: rent.row.title, why: PLAN_MARKET_RENT_BESIDE_PREMIUM });
   }
   /** The plan's two figures with the swaps `alt` answers true for moved. */
   const figures = (alt: (s: Swap) => boolean) => {

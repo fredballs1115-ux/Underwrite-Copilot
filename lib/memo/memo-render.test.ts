@@ -1564,7 +1564,7 @@ describe("the memo leads with the stress test", () => {
       return `IRR ${i.baseIrrPct!.toFixed(1)}% to ${i.altIrrPct!.toFixed(1)}%`;
     };
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("10 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 3 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("11 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 4 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The headline, in the read line's paragraph: the OM's case against the
     // evidence's (lib/stress-test `stressHeadline`); the split is the
     // report's, since the one page has no line to spare for it.
@@ -1675,7 +1675,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest?.count).toBe("none past the evidence");
     expect(data.dealKillers.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text).toContain("10 of the memorandum's assumptions read in code — 10 tested (10 hold).");
+    expect(text).toContain("11 of the memorandum's assumptions read in code — 11 tested (11 hold).");
     expect(text).not.toContain("Ticks:");
   }, 60000);
 

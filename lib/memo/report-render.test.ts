@@ -2960,7 +2960,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("10 assumptions · 2 unsupported · 5 stretched · 3 unchecked");
+    expect(page).toContain("11 assumptions · 2 unsupported · 5 stretched · 4 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, in its parts — the lead, what the
     // split is, a row a part, then each sentence after — every part the
@@ -3071,7 +3071,7 @@ describe("the report's stress-test page", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
     // The reason is one whole sentence, never behind a second "No return re-run".
-    expect(text).toContain("3 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("4 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");

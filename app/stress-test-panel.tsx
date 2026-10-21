@@ -226,6 +226,7 @@ const UNCHECKED_NAME: Record<Exclude<StressKey, "other">, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
+  market_rent: "the market rent",
   expense_growth: "expense growth",
   taxes: "real estate taxes",
   insurance: "insurance",

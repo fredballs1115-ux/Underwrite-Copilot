@@ -55,6 +55,9 @@
 //     and insurance (the lines the OM states apart, each with its own row),
 //     then the class's expense ratio, a rule of thumb, only where no T-12 is
 //     on file; each T-12 line a unit and the OM's own lines are beside it;
+//   - market rent: the median of the memorandum's lease comps graded clean,
+//     three or more (the comps' own floor); the rent roll's in-place rent
+//     and the metro's asking rent are beside it;
 //   - other: none — the challenger's words are not a figure.
 //
 // Pure: types and the rent-growth order only. A later step that runs the
@@ -94,6 +97,7 @@ export const PAST_SCREENS_PUBLISHER = "your past screens";
 export const T12_OPEX_LABEL = "The deal's T-12 operating expenses less taxes and insurance";
 export const T12_OPEX_LINES_LABEL = "The deal's T-12 expense lines";
 export const CLASS_OPEX_LABEL = "The class's expense ratio, a rule of thumb";
+export const MARKET_RENT_COMPS_LABEL = "The memorandum's lease comps";
 
 /** One step of a row's order: how a sentence names the figure, why it
  *  decides where it does, and which piece it is. */
@@ -335,6 +339,18 @@ export function opexDecider(candidates: readonly DeciderCandidate[]): DecidingFi
   return pickDecider(OPEX_ORDER, candidates);
 }
 
+// — Market rent —
+
+/** The median of the memorandum's lease comps graded clean, three or more;
+ *  the rent roll's in-place rent and the metro's asking rent are beside it. */
+export const MARKET_RENT_ORDER: readonly DeciderStep[] = [
+  { name: "the median of the memorandum's lease comps graded clean", why: "leases of the building's own kind the memorandum names, three or more", is: isLabel(MARKET_RENT_COMPS_LABEL) },
+];
+
+export function marketRentDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
+  return pickDecider(MARKET_RENT_ORDER, candidates);
+}
+
 // — The challenger's rows —
 
 /** Each row's order in words, best first, as /how-we-test and the tests read
@@ -347,6 +363,7 @@ export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   noi: NOI_ORDER.map((s) => s.name),
   vacancy: VACANCY_ORDER.stabilized.map((s) => s.name),
   rent_growth: ["Zillow's apartment asking rents", "Zillow's asking rents across all home types", "the rent sitting tenants pay (CPI rent)", "the national index of rents its kind of lessor charges"],
+  market_rent: MARKET_RENT_ORDER.map((s) => s.name),
   expense_growth: EXPENSE_GROWTH_ORDER.map((s) => s.name),
   taxes: TAXES_ORDER.map((s) => s.name),
   insurance: INSURANCE_ORDER.map((s) => s.name),

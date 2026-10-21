@@ -386,6 +386,7 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
+  market_rent: "Market rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
@@ -401,6 +402,8 @@ const PERCENT_KEYS: ReadonlySet<StressKey> = new Set(["exit_cap", "debt", "vacan
 export function recordFigure(key: StressKey, n: number): string {
   if (PERCENT_KEYS.has(key)) return `${n.toFixed(1)}%`;
   if (key === "renovation_premium") return `$${Math.round(n).toLocaleString("en-US")}/mo`;
+  // A market rent's yardstick rides beside it (the row's `per`).
+  if (key === "market_rent") return n < 200 ? `$${n.toFixed(2)}` : `$${Math.round(n).toLocaleString("en-US")}`;
   if (key === "other") return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(2);
   return compactUsd(n, { millions: 2 });
 }
@@ -918,7 +921,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic", less: r.key === "opex" ? (r.less ?? []) : null };
+  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic", less: r.key === "opex" ? (r.less ?? []) : null, per: r.per };
   // A snapshot kept before the measure was carried (2026-10-20) has none,
   // and keeps the row's title and the deciding evidence, never the OM's own
   // label the measure is read off (lib/stress-test `measureOf`): it is read
@@ -1141,6 +1144,9 @@ function laterFor(
      *  (lib/stress-snapshot `less`). Absent on an older screen's challenge,
      *  whose figure's footing is not known, so none scores it */
     less?: readonly ("taxes" | "insurance")[] | null;
+    /** a market-rent row's yardstick ("/mo" or "/SF"); absent on an older
+     *  screen's challenge, whose figure's yardstick is not known */
+    per?: string | null;
   },
 ): Later | null {
   const t12When = t12WhenOf(ev);
@@ -1206,6 +1212,22 @@ function laterFor(
       }
       if (ev.decision?.reason === "price") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on price", decision: true };
       return null;
+    }
+    // A market rent is scored by a later rent roll's in-place rent on the
+    // row's own yardstick, said as in-place: what the building's leases
+    // reached, never a market's.
+    case "market_rent": {
+      if (!ev.roll || (ev.per !== "/mo" && ev.per !== "/SF")) return null;
+      const s = ev.roll.summary;
+      const v = ev.per === "/mo" ? s.avgRentMonthly : s.weightedAvgRentPsf;
+      if (v == null || !Number.isFinite(v) || !(v > 0)) return null;
+      const said = ev.per === "/mo" ? `$${Math.round(v).toLocaleString("en-US")} a month a unit` : `$${v.toFixed(2)} a square foot a year`;
+      return {
+        source: "rent_roll",
+        value: v,
+        at: ev.roll.arrivedAt,
+        text: `the rent roll${ev.roll.dated ? ` as of ${statedDay(ev.roll.dated)}` : ""} ran ${said} in place — an in-place rent, not a market's`,
+      };
     }
     case "debt":
       if (ev.decision?.reason === "financing") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on financing", decision: true };
@@ -1326,7 +1348,7 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
   };
   const none: Admitted = { t12: null, t12Overlap: null, roll: null, decision: null, trade: null, purchase: null };
   const t12: T12Summary = { collectedRent: 1_000, vacancyLoss: 100, otherIncome: 0, egi: 900, opex: [], totalOpex: 400, noi: 500, noiDerived: false };
-  const roll = { unitCount: 10, occupiedUnits: 9, totalSf: 1_000, occupiedSf: 900, sfWeightedOccupancy: 0.9 } as RentRollSummary;
+  const roll = { unitCount: 10, occupiedUnits: 9, totalSf: 1_000, occupiedSf: 900, sfWeightedOccupancy: 0.9, avgRentMonthly: 80, weightedAvgRentPsf: 80 } as RentRollSummary;
   const kinds: Record<LaterSource, Admitted[]> = {
     t12: [{ ...none, t12: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: t12 } }],
     rent_roll: [{ ...none, roll: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: roll } }],
@@ -1350,6 +1372,8 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
       per: null,
       threshold: snapshotThreshold(key),
       worse: WORSE_WHEN[key],
+      // A market rent carries its yardstick, which a later rent roll is read on.
+      ...(key === "market_rent" ? { per: "/mo" } : {}),
     };
     // A vacancy is scored in its own measure: the deal's own row's, else
     // (the account's grid) a row of either measure.

@@ -18,6 +18,7 @@ export const STRESS_KEYS = [
   "noi",
   "vacancy",
   "rent_growth",
+  "market_rent",
   "expense_growth",
   "taxes",
   "insurance",
@@ -203,6 +204,10 @@ export interface StressRow {
    *  and the track record scores a later T-12 on the same one. Absent
    *  elsewhere */
   footing?: { less: ("taxes" | "insurance")[] };
+  /** on the market-rent row, the yardstick its figures stand on: "/mo", a
+   *  month a unit, or "/SF", a square foot a year (the class's own). Absent
+   *  elsewhere */
+  yardstick?: "/mo" | "/SF";
 }
 
 export interface StressTest {
@@ -465,15 +470,16 @@ export const HEADLINE_METHOD = {
     "An insurance premium the T-12's decides moves it only where the OM states the premium as its pro forma's line.",
     "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
     "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
+    "A market rent beside a renovation premium past its evidence would carry the renovated doors' rent twice, so the market rent is left out of the split beside it.",
     "A re-run that moves the stabilized NOI to zero or under, or the yield to 25% or more, is struck nowhere: the figures do not tie.",
     "A row at its evidence whose re-run lowers the yield on cost 0.5 points or more reads stretched, as a 100-bps move in the levered IRR does on a stabilized deal.",
-    "Rent growth, expense growth, the exit cap and the debt have no yield-on-cost meaning, and the NOI row tests today's income: each keeps its verdict and has no re-run.",
+    "Rent growth, expense growth, the exit cap and the debt have no yield-on-cost meaning, and the NOI row tests today's income: each keeps its verdict and has no re-run. A market rent is re-run on a value-add alone.",
     "Both cases pay the total cost, so the price row is left out of the split, which is struck by Shapley values as above, in points of yield on cost.",
     "A yield on cost the OM states in a row of its own is drawn beside the two cases, as the OM's; where it differs from the plan's, the headline says what the plan's is struck on, the price plus the budget, and whether the OM's row names the cost it is struck on.",
     "No plan headline where the OM states no stabilized NOI or no total cost, where the yield is 25% or more, or where the all-in basis is outside the band any market delivers at.",
   ],
   limits: [
-    "On a stabilized deal an assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
+    "On a stabilized deal an assumption with no model input, such as a renovation premium or a market rent, is not in the headline, and the headline names it.",
     "No headline on a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
@@ -612,6 +618,23 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       GROWTH_HISTORY_HELD,
       "The highest figure is not the test: where Zillow's asking rents are read, a sitting-tenant index running ahead of them is shown beside them, never held to.",
       "Lodging and licensed care read no rent index: they sell nights and care, not leases.",
+    ],
+  },
+  {
+    key: "market_rent",
+    title: "Market rent",
+    claim: "The pro forma's market rent is what the building's units or space will lease for.",
+    against: [
+      "The memorandum's own lease comps as the comps step grades them: the median of three or more graded as supporting the rent, on the class's yardstick (a month a unit, else a square foot a year), the one figure that decides",
+      "The deal's rent roll: its in-place rent on the same yardstick, the gap the OM claims to close, shown beside it and never deciding",
+      "Zillow's asking rent for the metro's apartments (all home types where that is not read), dated, the metro's and never the building's, shown beside it",
+    ],
+    engine: "No return is re-run on a stabilized deal: the model runs today's rent, which the NOI row carries. A value-add's yield on cost is re-run with the gap carried to its stabilized NOI on every unit it counts.",
+    limits: [
+      "Under three lease comps graded clean that state a rent, no median is struck and the row stands unchecked, the comps named: the comps' own floor.",
+      "A comp graded favorable or stretched is named and left out of the median; a comp's rent is read only as its line states it, never inferred.",
+      "A comp's rent is for the unit it names, not the building's average mix, and no unit mix is weighted.",
+      "How fast the in-place rent reaches the market rent is not tested.",
     ],
   },
   {

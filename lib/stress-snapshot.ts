@@ -103,6 +103,7 @@ export const WORSE_WHEN: Record<StressKey, "higher" | "lower"> = {
   noi: "lower",
   vacancy: "higher",
   rent_growth: "lower",
+  market_rent: "lower",
   expense_growth: "higher",
   taxes: "higher",
   insurance: "higher",
@@ -133,6 +134,7 @@ export function snapshotThreshold(key: StressKey): StressSnapshotRow["threshold"
     case "renovation_premium":
       return { value: SAME_SHARE, unit: "share" };
     case "basis":
+    case "market_rent":
       return { value: BASIS_STRETCH_PCT / 100, unit: "share" };
     default:
       return null;
@@ -192,7 +194,9 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       evidence: decider
         ? { value: decider.value as number, label: decider.label, asOf: decider.asOf ?? null, kind: decider.kind, publisher: decider.publisher }
         : null,
-      per: own ? own.per : null,
+      // A market rent's yardstick, "/mo" or "/SF", so a later rent roll is
+      // read on the same one.
+      per: own ? own.per : (r.yardstick ?? null),
       threshold: rowThreshold(r.key, decider),
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,

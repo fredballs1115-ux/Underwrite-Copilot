@@ -1511,11 +1511,13 @@ describe("ModelView — the sample model renders every panel", () => {
       const vac = data.stressTest!.rows.find((r) => r.key === "vacancy")!.impact!;
       expect(vac.baseIrrPct!).toBeGreaterThan(vac.altIrrPct!);
       expect(visibleText(row)).toContain(`Levered IRR ${vac.baseIrrPct!.toFixed(1)}% → ${vac.altIrrPct!.toFixed(1)}%`);
-      // The sample's three unchecked rows are one folded group at the end:
-      // the memorandum states no loan rate and no expense total, and no
-      // figure was read today for rent growth. Its taxes, insurance and renovation premium are tested.
-      expect(visibleText(html)).toContain("3 could not be checked: debt, rent growth, the operating expenses");
-      expect(visibleText(html)).toContain("Read why (3)");
+      // The sample's four unchecked rows are one folded group at the end:
+      // the memorandum states no loan rate and no expense total, no figure
+      // was read today for rent growth, and its one lease comp, graded
+      // favorable, strikes no median for the market rent. Its taxes,
+      // insurance and renovation premium are tested.
+      expect(visibleText(html)).toContain("4 could not be checked: debt, rent growth, the market rent, the operating expenses");
+      expect(visibleText(html)).toContain("Read why (4)");
       // The insurance row is held to the seller's own T-12 premium, $385k,
       // which the pro forma's $310k sits under: stretched, re-run at it.
       const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));

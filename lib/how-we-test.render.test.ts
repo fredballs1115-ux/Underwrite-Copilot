@@ -122,6 +122,8 @@ describe("/how-we-test draws every method from the table", () => {
       // T-12's in dollars, each its own measure.
       vacancy: ["published", "published", "document", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
+      // The memorandum's own lease comps decide; the rent roll and Zillow beside.
+      market_rent: ["om_internal", "document", "published"],
       expense_growth: ["published", "published", "published", "published"],
       // The seller's T-12 bill decides only where nothing above does.
       taxes: ["om_internal", "om_internal", "document"],
