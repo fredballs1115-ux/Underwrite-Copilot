@@ -549,6 +549,12 @@ where a list is cut, and dates every call wherever a deal is summarized. These a
    one cost: on a deal that still holds several old job rows, the comp
    search's and the model build's first progress mark is refused; the run
    itself still starts.
+   **Then run 0038** (`supabase/migrations/0038_screen_history.sql`, your
+   decision of 2026-10-21: keep every screen) and `CHECK_MIGRATIONS.sql`
+   again. It adds `screen_snapshots`, an append-only history of each
+   screen's stress test, so a re-screen never drops a row the track record
+   already scored. Until it runs the app reads `prior_screen` alone, as
+   before, and every write to the table is best-effort.
 2. **Your buy box on a shared screen.** The verdict is handed your buy box
    so its call can weigh it, and the shared screen prints the verdict's
    reason and risks as written, so where a deal misses your box those
