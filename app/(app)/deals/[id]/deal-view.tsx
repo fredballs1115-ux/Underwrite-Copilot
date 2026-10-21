@@ -150,9 +150,15 @@ const STEP_LABELS: Record<string, string> = {
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Grilling the assumptions the way an investment committee would…",
   comps: "Weighing the OM’s comps — sell-side sets tend to lean favorable…",
-  market: "Sanity-checking the assumptions against market norms…",
+  // The check reads the published figures of the market the address
+  // places the deal in (its metro area, else its state) where it places
+  // one, beside rules of thumb, which are all it has where it does not
+  // (lib/anthropic/pipeline `liveMarketFromDb`).
+  market: "Checking the assumptions against the published figures for the market the address places the deal in, and rules of thumb…",
   reconcile: "Reconciling your model against the OM…",
-  verdict: "Writing the one-screen verdict…",
+  // The verdict step strikes the stress test in code first, then writes
+  // the call on it (lib/anthropic/pipeline `screenStressTest`).
+  verdict: "Striking the stress test in code, then writing the verdict…",
   model: "Reconciling your documents into a first-draft model…",
   comps_search: "Searching the public web for comparable sales…",
 };
@@ -856,7 +862,7 @@ export function DealView({
       >
         {section === "overview" && (
           <div className="flex flex-col gap-6">
-            {isSample && <SampleGuide onNavigate={navigateLegacy} />}
+            {isSample && <SampleGuide onNavigate={navigateLegacy} stressTest={!!stressTest && stressTest.rows.length > 0} />}
             {marketMemory && <MarketMemoryStrip group={marketMemory} ranges={marketMemoryRanges} />}
             <OverviewView
               results={results}
@@ -1893,6 +1899,8 @@ function ProgressRail({
     { key: "challenge", label: "Challenge" },
     { key: "comps", label: "Comps" },
     { key: "market", label: "Market" },
+    // The last step strikes the stress test in code, then writes the call
+    // on it: named as both, so the rail never hides the product.
     { key: "verdict", label: "Verdict" },
   ];
   const cur = steps.findIndex((s) => s.key === job.step);
@@ -1913,7 +1921,8 @@ function ProgressRail({
           {elapsed}
         </span>
       </div>
-      <ol className="mt-4 flex items-end gap-2">
+      {/* items-start: the bars on one line whichever label wraps. */}
+      <ol className="mt-4 flex items-start gap-2">
         {steps.map((s, i) => {
           const done = cur < 0 ? false : i < cur;
           const current = i === cur;
@@ -1927,7 +1936,7 @@ function ProgressRail({
                 {current && <div className="h-full w-1/3 bg-brand/60" />}
               </div>
               <p
-                className={`mt-1.5 text-[10px] ${
+                className={`mt-1.5 text-[10px] leading-tight ${
                   done || current ? "text-ink" : "text-muted"
                 }`}
               >

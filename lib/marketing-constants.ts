@@ -124,8 +124,13 @@ export const FREE_DEALS = 3;
  *  it promises nothing about the rule staying as it is. */
 export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
 
-/** The free plan's card, on the homepage and the billing page alike. */
+/** The free plan's card, on the homepage and the billing page alike. The
+ *  stress test leads it: it is the product, and nothing gates it — the deal
+ *  page builds it for every deal (lib/stress-test `buildStressTest`), and
+ *  lib/plan-features.test.ts holds it ungated. */
+export const FREE_PLAN_STRESS_LINE = "The stress test: the OM's key assumptions against their evidence, the return re-run where a gap moves it";
 export const FREE_PLAN: readonly string[] = [
+  FREE_PLAN_STRESS_LINE,
   `Up to ${FREE_DEALS} deals, the full six-stage test on each`,
   "Sourced ranges + the three deal-killers",
   // Each said where it holds: the card had promised recorded-sales comps and
@@ -146,7 +151,7 @@ export const FREE_PLAN: readonly string[] = [
 export const PRO_UPSELL = {
   memo: "export the IC memo",
   report: "export the full multi-page report",
-  underwrite: "export the institutional Excel model",
+  underwrite: "export the screening model's Excel workbook",
   rentroll: "export the live-formula rent-roll workbook",
   loi: "export the LOI draft",
   branding: "put your firm's name and logo on exported reports",
@@ -169,7 +174,9 @@ export const PRO_PLAN: readonly ProPlanLine[] = [
   { label: "Unlimited deals", gates: ["deal-cap"] },
   { label: "IC memo, full PDF report, and LOI draft", gates: ["memo", "report", "loi"] },
   { label: "Excel models with live formulas — the screening model and the rent roll", gates: ["underwrite", "rentroll"] },
-  { label: "The model, included: a first draft built from your documents", gates: ["model-build"] },
+  // Built from the documents added to the deal (lib/model/build-model reads
+  // its deal_documents: the OM, a rent roll, a T-12 and the rest).
+  { label: "A first-draft model built from the OM, rent roll and T-12 you attach", gates: ["model-build"] },
   { label: "Ask the deal — answers cite the OM's pages", gates: ["ask"] },
   { label: "Public-web comp search", gates: ["comp-search"] },
   { label: "Your firm's branding on memos, reports, workbooks & LOI", gates: ["branding"] },

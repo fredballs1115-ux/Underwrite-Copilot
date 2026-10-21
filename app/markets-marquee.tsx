@@ -5,6 +5,7 @@ import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
 import {
   blockCitations,
+  figureRead,
   figuresTitle,
   houseShort,
   rentOf,
@@ -13,7 +14,7 @@ import {
   type CitedFigure,
 } from "@/lib/tracker-read";
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
-import { sharedAreaFor } from "@/lib/sector-leaderboard";
+import { sharedAreaFor, unrankedReason } from "@/lib/sector-leaderboard";
 import { PausableTicker } from "./pausable-ticker";
 
 // Server-component module only: it pulls a research seed JSON, which must
@@ -29,8 +30,18 @@ export { MARKET_COUNT };
  *  read (office / industrial / multifamily / retail, same derivation as the
  *  pulse tiles) plus the rules-on-file count; HUD's two-bedroom fair market
  *  rent, with the fiscal year its block states (lib/fmr), is the fallback
- *  only when no sector read exists yet. `rotate` varies which sector leads,
- *  so a strip of many metros shows a mix instead of an all-office wall.
+ *  only when the block carries no sector read at all. `rotate` varies which
+ *  sector leads, so a strip of many metros shows a mix instead of an
+ *  all-office wall.
+ *
+ *  A sector leads only where its vacancy passes the sector leaderboard's
+ *  ranking rule on `today` (lib/sector-leaderboard `unrankedReason`: a named
+ *  publisher, dated, no more than a year old, the whole stock, one read),
+ *  and its rent rides beside it only where the rent passes the same rule.
+ *  The tile had picked a sector by its index alone, so the homepage printed
+ *  "Multifamily 5.2% vac (undated)" and "publisher not recorded" two
+ *  sections above "Every number carries its source". A market none of whose
+ *  sectors passes shows no tracker figure: the rules count alone.
  *  Shared by the marquee and the homepage's gallery so the two surfaces can
  *  never describe the same market differently.
  *
@@ -104,7 +115,7 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function metroFact(m: unknown, rotate = 0): MetroFact | null {
+export function metroFact(m: unknown, rotate = 0, today: string = todayIso()): MetroFact | null {
   const entry = m as {
     id?: string;
     rule_ids?: string[];
@@ -117,6 +128,9 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
         asking_rent_psf?: number | null;
         asking_rent_psf_low?: number | null;
         asking_rent_psf_high?: number | null;
+        vacancy_read?: unknown;
+        rent_read?: unknown;
+        sources?: string[];
       } | null
     > | null;
   };
@@ -128,14 +142,27 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     const b = entry.sector_snapshot?.[s];
     return b != null && typeof (b.vacancy_pct ?? b.vacancy_pct_low) === "number";
   });
-  if (readable.length > 0) {
-    const sector = readable[((rotate % readable.length) + readable.length) % readable.length];
+  // …of them, those whose vacancy the sector leaderboard would rank today.
+  const passes = (read: unknown, sources: string[] | undefined, lo: number, hi: number | null) =>
+    unrankedReason(figureRead(read, sources), lo, hi, today) === null;
+  const rankable = readable.filter((s) => {
+    const b = entry.sector_snapshot![s]!;
+    const lo = (b.vacancy_pct ?? b.vacancy_pct_low) as number;
+    const hi = b.vacancy_pct ?? b.vacancy_pct_high ?? lo;
+    return passes(b.vacancy_read, b.sources, lo, hi);
+  });
+  if (rankable.length > 0) {
+    const sector = rankable[((rotate % rankable.length) + rankable.length) % rankable.length];
     const b = entry.sector_snapshot![sector]!;
     const lo = b.vacancy_pct ?? b.vacancy_pct_low;
     const hi = b.vacancy_pct ?? b.vacancy_pct_high ?? lo;
     const vac = lo === hi ? `${lo}%` : `${lo}–${hi}%`;
+    // A band as the file states it ("$10–15/SF"), never a point made of one,
+    // and only where the rent passes the vacancy's rule.
+    const rentStated = rentOf(b);
+    const rentBand = rentStated && passes(b.rent_read, b.sources, rentStated.low, rentStated.high) ? rentStated : null;
     // Each figure's own period, never the day the research was read.
-    const shown = blockCitations(b).filter((f) => f.label !== "Cap");
+    const shown = blockCitations(b).filter((f) => f.label === "Vacancy" || (f.label === "Rent" && rentBand !== null));
     // A figure's period, and the narrower stock it covers where the file
     // says it is one ("Class A space, Q2 2026") — and, where the market
     // reads a figure it shares with others, whose figure it is ("Suburban
@@ -148,8 +175,6 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
       const house = credited ? houseShort(read ?? { house: null }) : null;
       return [house, shared, read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
     };
-    // A band as the file states it ("$10–15/SF"), never a point made of one.
-    const rentBand = rentOf(b);
     const line = (credited: boolean) =>
       [
         `${SECTOR_LABEL[sector]} ${vac} vac (${when("Vacancy", credited)})${rentBand ? ` · ${rentText(rentBand)}/SF (${when("Rent", credited)})` : ""}`,
@@ -164,6 +189,13 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
       cite: figuresTitle(shown),
       readOn: snapshotReadOn(entry.sector_snapshot),
     };
+  }
+
+  // No sector passes the rule: the rules count alone, never a figure the
+  // leaderboard would list unranked.
+  if (readable.length > 0) {
+    if (!rulesPart) return null;
+    return { text: rulesPart, credited: rulesPart, houses: null, cite: null, readOn: null };
   }
 
   // The FMR through the one reader, so the text names the year its block
@@ -197,13 +229,17 @@ function housesLine(shown: readonly CitedFigure[]): string | null {
 }
 
 export function MarketsMarquee({ today = todayIso() }: { today?: string }) {
-  const facts = (metrosSeed.metros ?? []).map((m, i) => ({ entry: m as { id: string; name: string; region?: string }, fact: metroFact(m, i) }));
+  const facts = (metrosSeed.metros ?? []).map((m, i) => ({ entry: m as { id: string; name: string; region?: string }, fact: metroFact(m, i, today) }));
   // Each figure carries its own period in its text; the heading says the
   // day the research was read where every market's was read the same day,
   // and past the research rule's limit how old the read is and that it is
   // stale (lib/research-age) — never hiding the figures or the day.
-  const first = facts[0]?.fact?.readOn ?? null;
-  const shared = first && facts.every((f) => f.fact?.readOn === first) ? first : null;
+  // (Over the markets whose tile carries a tracker figure: a market whose
+  // figures the leaderboard would not rank shows the rules count alone, and
+  // dates nothing.)
+  const dated = facts.map((f) => f.fact?.readOn ?? null).filter((d): d is string => d !== null);
+  const first = dated[0] ?? null;
+  const shared = first && dated.every((d) => d === first) ? first : null;
   const { stale } = marketsResearch(
     facts.map((f) => f.fact),
     today,

@@ -630,6 +630,24 @@ export async function createSampleDeal() {
     .single();
   if (error || !deal) redirect("/deals?error=save");
 
+  // Two clicks can both pass the check above (the empty pipeline offers
+  // the sample from its card and its button) and no index holds one sample
+  // a reader. The earliest row is the sample: a later one deletes itself
+  // and opens it, so whichever insert lost, the reader keeps one.
+  const { data: samples } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_sample", true)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(1);
+  const first = (samples?.[0]?.id as string | undefined) ?? (deal.id as string);
+  if (first !== deal.id) {
+    await supabase.from("deals").delete().eq("id", deal.id);
+    redirect(`/deals/${first}`);
+  }
+
   // Neighborhood-level address (real submarket, fictional building) so the
   // regulation panel and the recorded-sales pull demo on REAL Philadelphia
   // data. Best-effort like every address write; comps pull rides after().

@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-21",
+      "title": "The stress test leads every first look",
+      "href": "/how-we-test",
+      "blurb": "The homepage, the sample test and /how-we-test now open on the stress test: a worked row of the sample on /how-we-test, the sample's reading guide starting at the test, the chip that jumps to it from any tab, and a screen in progress saying the test fills in before the verdict. Every line about the test now says what the code does: the key assumptions are set against their evidence, and the return is re-run where a gap moves it. A market card prints a figure only where it is dated and names its publisher."
+    },
+    {
       "date": "2026-10-20",
       "title": "A stress test you can read in a minute",
       "href": "/how-we-test#model",

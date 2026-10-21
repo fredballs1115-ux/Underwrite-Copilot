@@ -41,8 +41,23 @@ function tally<K extends string>(items: K[], order: [K, string][]): string {
  *  with figures it did not read (the stress test reads today's figures on
  *  its own, beside it). */
 export function sampleMarketAgainst(): string {
+  return sampleMarketReadFigures() ? "beside the published figures and the rules of thumb" : "against rules of thumb";
+}
+
+/** Whether the sample's stored market check read published figures. */
+function sampleMarketReadFigures(): boolean {
   const brief = SAMPLE_DEAL.market.liveBrief;
-  return brief && brief.lines.length > 0 ? "beside the published figures and the rules of thumb" : "against rules of thumb";
+  return !!brief && brief.lines.length > 0;
+}
+
+/** Where the published figures are read on the sample, said beside the
+ *  market check's line where the check read none: the stress test reads
+ *  today's (lib/sample-stress-read `sampleTodayReads`, the homepage's and
+ *  /demo's one read), so the hero's "today's published figures" and this
+ *  trace's "rules of thumb" are two stages' claims, each true of its own
+ *  stage. Empty where the check itself read them. */
+export function samplePublishedFiguresNote(): string {
+  return sampleMarketReadFigures() ? "" : "the stress test reads today's published figures";
 }
 
 /** The trace's lines, one a stage, each crediting the stage with what IT
@@ -102,7 +117,10 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
       `${plural(challenges.length, "assumption")} challenged (${severities}), ${asked === challenges.length ? "each" : asked} with a question for the broker`,
     ],
     ["comps", `${plural(comps.length, "broker comp")} rated: ${ratings}${flags ? ` · ${plural(flags, "selection flag")}` : ""}`],
-    ["market", `${plural(checks.length, "assumption")} read ${sampleMarketAgainst()}: ${reads}`],
+    [
+      "market",
+      `${plural(checks.length, "assumption")} read ${sampleMarketAgainst()}: ${reads}${samplePublishedFiguresNote() ? `; ${samplePublishedFiguresNote()}` : ""}`,
+    ],
     [
       "verdict",
       `${verdictWord} · ${plural(screen?.ranges.length ?? 0, "sourced range")} · ${plural(levers.length, "deal-killer")} named first: ${levers.map((l) => STRIP_WORDS.lever[l]).join(" · ")}`,
@@ -131,6 +149,7 @@ export function screenRunLines(): [(typeof STRIP_STAGES)[number], string][] {
 export function ScreenRunStrip() {
   const LINES = screenRunLines();
   const marketAgainst = sampleMarketAgainst();
+  const published = samplePublishedFiguresNote();
   return (
     <section
       aria-label="A replay of the six analysis stages on the sample deal"
@@ -153,7 +172,7 @@ export function ScreenRunStrip() {
           The test runs in order: a first read of the headline figures,
           extraction with page cites, the assumptions challenged with a
           question for the broker, the broker&apos;s comps rated, the market
-          check {marketAgainst}, and a verdict with sourced ranges and
+          check {marketAgainst}{published ? ` (${published})` : ""}, and a verdict with sourced ranges and
           the three deal-killers named first; when you add your own model,
           a reconciliation against it re-runs the verdict.
         </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { STRESS_TEST_ANCHOR } from "./(app)/deals/[id]/stress-chip";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { SAMPLE_OM_HREF } from "@/lib/sample-om-link";
 import type { BoxCriterion } from "@/lib/buy-box-chip";
@@ -602,6 +603,35 @@ export function DemoTabs({
     io.observe(el);
     return () => io.disconnect();
   }, []);
+
+  // The hero's stress-test chip links to the Overview's panel
+  // (`#stress-test`), drawn only while the Overview is open: from another
+  // tab the link opens the Overview first and lands on the panel once it is
+  // drawn — the deal page's and /demo's own rule.
+  const stressJump = useRef(false);
+  const onOverview = section === "overview";
+  useEffect(() => {
+    if (onOverview) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (!(e.target instanceof Element) || !e.target.closest(`a[href="#${STRESS_TEST_ANCHOR}"]`)) return;
+      e.preventDefault();
+      stressJump.current = true;
+      setSection("overview");
+      const url = new URL(window.location.href);
+      url.hash = STRESS_TEST_ANCHOR;
+      window.history.replaceState(null, "", url);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [onOverview]);
+  useEffect(() => {
+    if (!onOverview || !stressJump.current) return;
+    stressJump.current = false;
+    const panel = document.getElementById(STRESS_TEST_ANCHOR);
+    panel?.scrollIntoView({ block: "start" });
+    panel?.focus({ preventScroll: true });
+  }, [onOverview]);
 
   /** A jump from the Overview, by the deal page's own keys
    *  (lib/deal-tabs `LEGACY_TABS`); focus moves to the tab now open. */

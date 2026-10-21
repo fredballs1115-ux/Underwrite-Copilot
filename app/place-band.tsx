@@ -85,10 +85,13 @@ export type Scrim = "band" | "center" | "caption" | "hero";
  * strip, a phone shows three quarters of the skyline's width, where
  * covering the whole 1,200px stack had shown a sliver of sky.
  * `HERO_WORDS_TOP` is the padding that starts the words at the strip's
- * foot; lib/place-band.contrast.test.ts holds the two to each other.
+ * foot; lib/place-band.contrast.test.ts holds the two to each other. On a
+ * phone the strip is 10rem (the first-hour review of 2026-10-21): at 18rem
+ * the headline, the line under it and "Get started free" ran past the first
+ * screen of a 390 × 844 phone, and the button is the hero's one job.
  */
-export const HERO_STRIP = "absolute inset-x-0 top-0 h-[18rem] sm:h-[22rem] lg:inset-0 lg:h-auto";
-export const HERO_WORDS_TOP = "pt-[18rem] sm:pt-[22rem] lg:pt-24";
+export const HERO_STRIP = "absolute inset-x-0 top-0 h-[10rem] sm:h-[22rem] lg:inset-0 lg:h-auto";
+export const HERO_WORDS_TOP = "pt-[10rem] sm:pt-[22rem] lg:pt-24";
 
 /**
  * The hero's scrim from `lg` up, left to right across the band (0–1 of its

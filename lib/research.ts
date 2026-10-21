@@ -44,6 +44,11 @@ export interface Benchmark {
    *  (lib/tracker-read's `figureNote`); a row that carries one has `as_of`
    *  as the day the research was read, not the figure's date */
   cite?: string | null;
+  /** the house a research-tracker figure's own read names, or null where
+   *  its block names none ("publisher not recorded" in `cite`) — so the
+   *  panel never badges such a figure "sourced"; undefined on a row that is
+   *  no tracker figure */
+  house?: string | null;
 }
 
 /** What the evaluator knows about this deal + buyer. Every field optional —

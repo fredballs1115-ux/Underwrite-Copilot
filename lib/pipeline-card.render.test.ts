@@ -91,6 +91,15 @@ describe("the empty pipeline", () => {
     const buttons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].map((m) => visibleText(m[1]).trim());
     expect(buttons.filter((b) => /sample/i.test(b))).toEqual(["Try a sample deal"]);
     expect(html).toContain('data-qa="tile-still"');
+    // A click on the card runs the same action (first-hour review: it
+    // looked tappable and did nothing): a cover out of the tab order and
+    // the accessibility tree, holding none of the card's content.
+    const cover = html.match(/<form[^>]*data-qa="tile-action"[^>]*>([\s\S]*?)<\/form>/);
+    expect(cover).not.toBeNull();
+    expect(cover![1]).toMatch(/<button type="submit" tabindex="-1" aria-hidden="true" aria-label="Open the sample deal"/);
+    expect(visibleText(cover![1]).trim()).toBe("");
+    // and it lifts on hover, as a card that acts does
+    expect(html).toContain("hover:-translate-y-0.5");
     // No buy box, no fit: the card the reader's sample would show them.
     expect(html).not.toContain('data-qa="fit-checked"');
   });

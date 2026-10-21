@@ -371,7 +371,7 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(check.note).toMatch(/the stress test sets the 4\.0% against today's published rents\.$/);
   });
 
-  it("draws one renovation program under the header on all three: the deal page's props, /demo's and the homepage's", () => {
+  it("draws one renovation program under the header: the deal page's props and /demo's, the homepage leaving it to the stress test", () => {
     // The deal page (page.tsx `ValueAddPanel`): the stored memorandum's
     // program, the derived model's exit cap and read where its reads stand.
     const { derived } = signedInParts(READS);
@@ -386,14 +386,14 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(page.modelLine).toMatch(/exit cap a door's premium priced at \$200 is worth .* At the \$140 achieved on the doors already renovated, a door's premium is worth /);
     const { data } = sampleDemoData({ today: TODAY, reads: READS, debt: NO_DEBT_SEEDS });
     expect(data.valueAdd).toEqual(page);
-    // The deal page hands the panel those three, /demo draws it under the
-    // sample's header and the homepage at its walkthrough's head, each from
-    // /demo's one build.
+    // The deal page hands the panel those three and /demo draws it under the
+    // sample's header from its one build; the homepage's walkthrough leaves
+    // it off, its premium being the stress test's row (lib/sample-tabs.test).
     expect(src("app/(app)/deals/[id]/page.tsx")).toMatch(
       /<ValueAddPanel\s+program=\{readValueAdd\(extraction\)\}\s+exitCapPct=\{shown \? shown\.inputs\.exitCapPct : null\}\s+modelLine=\{shown\?\.meta\.valueAdd\?\.read \?\? ""\}/,
     );
     expect(src("app/demo/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
-    expect(src("app/page.tsx")).toContain("<ValueAddPanel {...data.valueAdd} />");
+    expect(src("app/page.tsx")).not.toContain("<ValueAddPanel");
   });
 
   it("places the sample where the deal page places it", () => {

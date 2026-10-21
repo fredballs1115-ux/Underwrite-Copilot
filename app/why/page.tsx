@@ -27,7 +27,7 @@ export const revalidate = 300;
 export const metadata = publicMetadata({
   title: "Why Underwrite Copilot",
   description:
-    "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Each OM assumption set against the evidence, deterministic math, page citations, a read on fit to your mandate.",
+    "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Key OM assumptions set against evidence, deterministic math, page citations, a read on fit to your mandate.",
   canonical: "/why",
 });
 

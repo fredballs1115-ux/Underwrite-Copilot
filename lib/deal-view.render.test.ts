@@ -253,6 +253,18 @@ describe("DealView — the sample deal renders every section without a runtime e
     }
   });
 
+  it("the reading guide leads with the stress test, jumping to its panel on the same Overview (first-hour review)", () => {
+    const html = render(sampleProps("overview"));
+    const guide = html.slice(html.indexOf("How to read this screen"), html.indexOf('id="stress-test"'));
+    // The first step, before the verdict's, and its target drawn below it.
+    expect(guide).toMatch(/<button type="button" data-guide-step="stress-test"/);
+    expect(guide.indexOf('data-guide-step="stress-test"')).toBeLessThan(guide.indexOf('data-guide-step="verdict"'));
+    expect(textOf(guide)).toContain("The stress test");
+    expect(textOf(guide)).toContain("Each assumption against its evidence");
+    expect(html).toContain('<div id="stress-test" tabindex="-1"');
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
   it("draws where each range's base sits in one neutral colour, and calls no end of a range optimistic", () => {
     // The sample's vacancy base, 9.0% between 6.0% and 9.5%, hugs the high
     // end — the buyer's end on a vacancy, not the sponsor's.
@@ -884,6 +896,31 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).not.toMatch(/failed before reaching them/);
     expect(html).toMatch(/title="A new screen of this deal is running\./);
     expect(textOf(render(running("analyses", "verdict")))).toMatch(/From the previous screen/);
+  });
+
+  it("a screen in progress names the stress test, in the pipeline's order, and claims no duration (first-hour review)", () => {
+    const base = sampleProps("overview");
+    const props: Props = {
+      ...base,
+      isSample: false,
+      hasOm: true,
+      omUrl: "/api/deals/d1/om",
+      results: { ...base.results, verdict: null },
+      job: { status: "running", step: "market", progress: 70, error: null },
+    } as unknown as Props;
+    const html = render(props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Screening in progress");
+    expect(text).toContain("The stress test fills in below as each step finishes; the verdict and the risk digest land last.");
+    // The rail keeps the screen's one set of stage names (lib/screen-stages).
+    expect(text).toContain("Verdict");
+    // The market check reads published figures where the address places
+    // the deal, never only "market norms".
+    expect(text).toContain("Checking the assumptions against the published figures for the market the address places the deal in, and rules of thumb");
+    expect(text).not.toMatch(/market norms/);
+    expect(text).not.toMatch(/typically \d|\d+[–-]\d+ minutes/);
   });
 
   it("the verdict says the day it was written", () => {

@@ -39,7 +39,7 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
   const items = (metrosSeed.metros ?? [])
     .map((m, i) => {
       const entry = m as { id: string; name: string; region?: string };
-      const fact = metroFact(m, i);
+      const fact = metroFact(m, i, today);
       return {
         id: entry.id,
         name: entry.name,

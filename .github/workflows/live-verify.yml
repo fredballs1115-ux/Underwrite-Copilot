@@ -101,7 +101,7 @@ jobs:
           for path in demo why whats-new market how-we-test; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
-          grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
+          grep -q "Behind this test" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
           # The sample's stress test as the live site prints it (2026-10-20):
           # the headline and each row's verdict, on /demo and the homepage,
           # so the figures the tests quote can be read against today's feeds.
@@ -134,7 +134,7 @@ jobs:
           # The sample screen and the homepage render the same DEEP_TOOLS
           # constant, so this marker failing while the homepage one passes
           # means the two surfaces have drifted.
-          grep -q "Four more tools pick up where it stops" p_demo.html && echo "DEMO DEEP TOOLS BLOCK (Aug 28): present" || echo "DEMO DEEP TOOLS BLOCK: not yet deployed"
+          grep -q "Four more tools carry a deal of your own further" p_demo.html && echo "DEMO DEEP TOOLS BLOCK (Aug 28): present" || echo "DEMO DEEP TOOLS BLOCK: not yet deployed"
           # The sample's summary bar carries its deal kind, inferred from its
           # own extraction; the chip's tooltip is the grep.
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"

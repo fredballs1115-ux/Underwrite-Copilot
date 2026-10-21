@@ -175,12 +175,18 @@ describe("a market's tile names whose figure it shows, never the county's", () =
   it("says Suburban Maryland on Montgomery County's office figure, and the region on the DMV's apartments", () => {
     expect(sharedAreaFor("office", "montgomery_county")).toBe("Suburban Maryland");
     expect(sharedAreaFor("office", "chicago")).toBeNull();
-    // The tile rotates through the sectors that carry a vacancy figure.
-    const office = metroFact(entry("montgomery_county"), 0)!;
+    // The tile rotates through the sectors whose vacancy the leaderboard
+    // ranks: the DMV's regional apartment figure names no publisher, so
+    // Montgomery County's tile leads with its office figure at every turn.
+    const day = "2026-10-21";
+    const office = metroFact(entry("montgomery_county"), 0, day)!;
     expect(office.text).toMatch(/^Office 19\.2% vac \(Suburban Maryland, Q1 2026\)/);
-    const apartments = metroFact(entry("montgomery_county"), 1)!;
-    expect(apartments.text).toMatch(/^Multifamily 5\.2% vac \(Washington DC region, year-end 2025\)/);
-    // A market's own figure is said as before.
-    expect(metroFact(entry("chicago"), 0)!.text).toMatch(/^Office 27\.3% vac \(Q1 2026\)/);
+    expect(sectorStandings(["multifamily"], day).multifamily.montgomery_county.reason).toBe("publisher not recorded");
+    expect(metroFact(entry("montgomery_county"), 1, day)!.text).toBe(office.text);
+    // A market's own figure is said as before, where it is ranked: Chicago's
+    // office figure names no publisher, so its tile leads with the first
+    // sector that does.
+    expect(sectorStandings(["office"], day).office.chicago.reason).toBe("publisher not recorded");
+    expect(metroFact(entry("chicago"), 0, day)!.text).toMatch(/^Multifamily 5\.1% vac \(Q2 2026\)/);
   });
 });
