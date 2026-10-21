@@ -882,7 +882,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args) });
+  const later = laterFor(key, { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" });
   if (!later) return unscored("nothing that arrived after the screen speaks to it.");
   // The market decided a stabilized vacancy where its published figure did.
   const cannot = documentCannotSpeak(key, later, args, key === "vacancy" && r.evidence?.kind === "published");
@@ -985,7 +985,7 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   // document scores these, whatever arrives.
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args) });
+  const later = laterFor(key, { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: false });
   if (!later) return unscored("nothing that arrived after the screen speaks to it.");
   // The stress test's own rule: a stabilized assumption on a deal read as
   // stabilized is held to the market's published figures, and a
@@ -1064,14 +1064,20 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
 }
 
 /** The later figure that speaks to a key, where one arrived. A figure beats
- *  a decision; the roll's occupancy beats the T-12's economic vacancy. Each
- *  carries when it arrived (`at`), which makes it one piece of evidence. */
+ *  a decision. A vacancy is scored in its own measure: a figure counted by
+ *  doors by the rent roll's count alone, an economic one (dollars over gross
+ *  potential rent) by the T-12 alone — the stress test's own rule
+ *  (lib/stress-deciders `VACANCY_ORDER`), so doors are never scored against
+ *  dollars. Each carries when it arrived (`at`), which makes it one piece of
+ *  evidence. */
 function laterFor(
   key: StressKey,
   ev: Admitted & {
     omFigure: number | null;
     askingPrice: number | null;
     perUnit: boolean;
+    /** the row's OM figure is an economic vacancy, not one counted by doors */
+    economic: boolean;
   },
 ): Later | null {
   const t12When = `${ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12"}${ev.t12Overlap ? ` (${ev.t12Overlap})` : ""}`;
@@ -1084,7 +1090,7 @@ function laterFor(
   };
   switch (key) {
     case "vacancy": {
-      const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
+      const rv = !ev.economic && ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
       if (rv != null) {
         return {
           source: "rent_roll",
@@ -1096,7 +1102,7 @@ function laterFor(
       // Over gross potential rent, the statement's own EGI saying whether
       // its rent line is gross or net (lib/actuals/analyze, the stress
       // test's one reading).
-      const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
+      const tv = ev.economic && ev.t12 ? t12Vacancy(ev.t12.summary) : null;
       if (tv != null) {
         return {
           source: "t12",
