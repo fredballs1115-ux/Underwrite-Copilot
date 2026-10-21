@@ -91,7 +91,9 @@ tested and whether that is right. So:
   most lenient piece. Expense growth is all-items CPI (core only where it
   is not fresh); the exit cap the going-in cap, else the tracker range's
   low end. A row that holds draws no re-run; the insurance row is unchecked
-  until a new owner's quote exists (the T-12's premium is the seller's).
+  until a new owner's quote exists (the T-12's premium is the seller's),
+  except where the OM's premium sits under the seller's own (2026-10-21,
+  below).
   The headline draws the screening model's own levered IRR beside its two
   cases, names what the evidence's case keeps at the OM's, what of the
   NOI's gap neither case carries, and what it does not test.
