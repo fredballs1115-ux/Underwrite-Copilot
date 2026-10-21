@@ -19,6 +19,7 @@ import {
 import type { StressMethod, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 import { drawsRerun } from "@/lib/stress-test-words";
 import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
+import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
 import { STRESS_TEST_ANCHOR } from "@/app/(app)/deals/[id]/stress-chip";
 
 /**
@@ -242,6 +243,13 @@ function WorkedExample({ test }: { test: StressTest }) {
       <div className="mt-2">
         <StressRowExample row={row} test={test} />
       </div>
+      {/* A re-run is the stabilized deal's: said, as on every other surface
+          that draws the sample's re-runs. */}
+      {!test.impactsWithheld && row.impact && (
+        <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="sample-plan-note">
+          {SAMPLE_PLAN_NOTE}
+        </p>
+      )}
       <Link href={`/demo#${STRESS_TEST_ANCHOR}`} className="mt-3 inline-block text-sm font-medium text-brand hover:text-brand-strong">
         See the whole sample test
       </Link>

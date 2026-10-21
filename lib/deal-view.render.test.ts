@@ -918,7 +918,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toContain("Verdict");
     // The market check reads published figures where the address places
     // the deal, never only "market norms".
-    expect(text).toContain("Checking the assumptions against the market’s published figures where the address places it, and rules of thumb");
+    expect(text).toContain("Checking the assumptions against the published figures for the market the address places the deal in, and rules of thumb");
     expect(text).not.toMatch(/market norms/);
     expect(text).not.toMatch(/typically \d|\d+[–-]\d+ minutes/);
   });

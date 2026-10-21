@@ -475,7 +475,9 @@ export function OverviewView({
               ? "The stress test fills in below as each step finishes; the verdict and the risk digest land last."
               : stopped
                 ? "The screen stopped before its verdict — the reason is at the top of the page."
-                : "Run the analysis to see the stress test, the verdict and the consolidated risk digest."}
+                : stressTest && stressTest.rows.length > 0
+                  ? "Run the analysis to see the verdict and the consolidated risk digest."
+                  : "Run the analysis to see the stress test, the verdict and the consolidated risk digest."}
           </p>
         </div>
       )}

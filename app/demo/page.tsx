@@ -26,7 +26,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Sample test — one OM, its assumptions tested",
   description:
-    "Browse a full Underwrite Copilot test: each assumption set against dated published figures, the deal's own rent roll and T-12, or a rule of thumb named as one, the broker's comps graded, a market check, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
+    "Browse a full Underwrite Copilot test: the key assumptions set against dated published figures, the deal's own rent roll and T-12, or a rule of thumb named as one, the broker's comps graded, a market check, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
   alternates: { canonical: "/demo" },
   // Child `openGraph`/`twitter` REPLACE the root objects wholesale, so the
   // image and card type must be restated or shares lose their preview.

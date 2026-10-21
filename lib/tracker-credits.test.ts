@@ -195,6 +195,18 @@ describe("an asking rent the file states as a band is never a point made of one"
     // spread of two reads: its tile leads with no industrial figure at all.
     expect(sectorLeaderboard("industrial", "2026-10-21").rows.find((r) => r.id === "pg_county")!.reason).toBe("a spread of two reads");
     expect(metroFact({ sector_snapshot: { industrial: pg } }, 0, "2026-10-21")).toBeNull();
+    // The same block read as one figure ranks, and its tile prints the rent
+    // as the band, never a midpoint (a synthetic block: the file's own is a
+    // spread).
+    const single = {
+      ...pg,
+      vacancy_pct_low: 10.1,
+      vacancy_pct_high: 10.1,
+      rent_read: { house: "Colliers", period: "Q1 2026", band: "printed", links: [pg.sources![2]] },
+    };
+    const tile = metroFact({ sector_snapshot: { industrial: single } }, 0, "2026-10-21")?.text ?? "";
+    expect(tile).toContain("$10–15/SF");
+    expect(tile).not.toContain("12.5");
     // The sector leaderboard's rent column.
     expect(sectorLeaderboard("industrial").rows.find((r) => r.id === "pg_county")!.rent).toEqual({ low: 10, high: 15 });
     // The compare card's cell.

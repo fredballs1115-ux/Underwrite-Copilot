@@ -377,7 +377,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does the test make me more accurate?",
-    a: "It cannot say yet. It checks each OM assumption against evidence that exists on the day and shows what the gap does to the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
+    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
   },
   {
     q: "Are my documents private?",
@@ -777,7 +777,7 @@ export default async function Home() {
                       return the gap moves, in code. The model is included,
                       not the product. */}
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    Each OM assumption, checked against the rent roll and T-12 you add and today&apos;s published figures — and what each gap does to your return. The model is included.
+                    The OM&apos;s key assumptions, each set against the rent roll and T-12 you add, today&apos;s published figures or a rule of thumb named as one — and the return re-run where a gap moves it. The model is included.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link

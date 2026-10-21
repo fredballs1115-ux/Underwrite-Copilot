@@ -128,7 +128,7 @@ export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
  *  stress test leads it: it is the product, and nothing gates it — the deal
  *  page builds it for every deal (lib/stress-test `buildStressTest`), and
  *  lib/plan-features.test.ts holds it ungated. */
-export const FREE_PLAN_STRESS_LINE = "The stress test: each OM assumption against its evidence, and what the gap does to the return";
+export const FREE_PLAN_STRESS_LINE = "The stress test: the OM's key assumptions against their evidence, the return re-run where a gap moves it";
 export const FREE_PLAN: readonly string[] = [
   FREE_PLAN_STRESS_LINE,
   `Up to ${FREE_DEALS} deals, the full six-stage test on each`,
@@ -176,7 +176,7 @@ export const PRO_PLAN: readonly ProPlanLine[] = [
   { label: "Excel models with live formulas — the screening model and the rent roll", gates: ["underwrite", "rentroll"] },
   // Built from the documents added to the deal (lib/model/build-model reads
   // its deal_documents: the OM, a rent roll, a T-12 and the rest).
-  { label: "A first-draft model built from your OM, rent roll and T-12", gates: ["model-build"] },
+  { label: "A first-draft model built from the OM, rent roll and T-12 you attach", gates: ["model-build"] },
   { label: "Ask the deal — answers cite the OM's pages", gates: ["ask"] },
   { label: "Public-web comp search", gates: ["comp-search"] },
   { label: "Your firm's branding on memos, reports, workbooks & LOI", gates: ["branding"] },

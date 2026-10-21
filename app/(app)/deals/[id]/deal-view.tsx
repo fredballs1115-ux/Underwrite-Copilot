@@ -154,7 +154,7 @@ const STEP_LABELS: Record<string, string> = {
   // places the deal in (its metro area, else its state) where it places
   // one, beside rules of thumb, which are all it has where it does not
   // (lib/anthropic/pipeline `liveMarketFromDb`).
-  market: "Checking the assumptions against the market’s published figures where the address places it, and rules of thumb…",
+  market: "Checking the assumptions against the published figures for the market the address places the deal in, and rules of thumb…",
   reconcile: "Reconciling your model against the OM…",
   // The verdict step strikes the stress test in code first, then writes
   // the call on it (lib/anthropic/pipeline `screenStressTest`).

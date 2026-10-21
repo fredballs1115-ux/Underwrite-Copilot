@@ -1725,7 +1725,7 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(page).not.toMatch(/triage|Behind this screen|Past the screen|A complete test/);
     expect(page).toContain("The sample test, worked end to end");
     expect(page).not.toContain("a market check against dated figures");
-    expect(page).toContain("each assumption set against dated published figures, the deal's own rent roll and T-12");
+    expect(page).toContain("the key assumptions set against dated published figures, the deal's own rent roll and T-12");
     // each tool's blurb on its tile (a fold, its whole text in the HTML),
     // never a title tooltip alone
     expect(page).toContain("<Fold text={t.blurb}");
