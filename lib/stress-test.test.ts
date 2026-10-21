@@ -82,6 +82,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel } from "@/app/stress-test-panel";
 import { readRoster } from "./tenant-roster";
+import { extractionInstruction } from "./anthropic/prompts";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -698,7 +699,9 @@ describe("a stabilized apartment deal with a T-12", () => {
   });
 
   it("omits a row with nothing stated and nothing found, and no impact is withheld", () => {
-    expect(test.rows.map((r) => r.key)).toEqual(["basis", "exit_cap", "debt", "noi", "vacancy", "rent_growth", "expense_growth", "taxes", "insurance"]);
+    // The operating expenses stand unchecked beside the T-12: the OM states
+    // no total and no ratio.
+    expect(test.rows.map((r) => r.key)).toEqual(["basis", "exit_cap", "debt", "noi", "vacancy", "rent_growth", "expense_growth", "taxes", "insurance", "opex"]);
     expect(test.impactsWithheld).toBeNull();
     expect(test.readOn).toBe(READ_ON);
     // Its published evidence is today's read; with none handed in, the
@@ -2044,8 +2047,10 @@ describe("the challenger's words ride beside the rows", () => {
     expect(k("Renovation premium $200/mo")).toBe("renovation_premium");
     expect(k("Premium at the expiring policy's renewal")).toBe("insurance");
     expect(k("Rent premium of $150")).not.toBe("insurance");
-    // A figure per unit is the basis's only beside a price word.
-    expect(k("Payroll of $1,200 per unit")).toBe("other");
+    // A figure per unit is the basis's only beside a price word; an expense
+    // line's level is the operating expenses'.
+    expect(k("Payroll of $1,200 per unit")).toBe("opex");
+    expect(k("Management fee of 2.5% is light")).toBe("opex");
     expect(k("Asking $275,000 per unit")).toBe("basis");
     expect(k("Pricing at $310 psf")).toBe("basis");
   });
@@ -2062,12 +2067,13 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   basis: ["The memorandum's sale comps", "Recorded sales (", "Other memoranda's asking prices in"],
   exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
   debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
-  noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
+  noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma", "The OM's other income against the T-12's"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "Core CPI", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement", "The deal's T-12 tax line"],
   insurance: ["moved by the national premium index", "The deal's T-12 insurance line"],
+  opex: ["The deal's T-12 operating expenses", "The deal's T-12 expense lines", "The class's expense ratio, a rule of thumb"],
   renovation_premium: ["Achieved premium", "classic and renovated rents", "The program's pace against the turnover the OM states"],
   other: ["The challenger's own critique"],
 };
@@ -2091,6 +2097,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
       row("Renovated rent", "$1,900", "p. 23"),
       row("Annual turnover", "35%", "p. 23"),
       row("Renovation period", "24 months", "p. 22"),
+      row("Operating expenses (pro forma)", "$1,640,000", "p. 9"),
+      row("Management fee", "3.0%", "p. 9"),
+      row("Payroll", "$590,000", "p. 9"),
+      row("Other income", "$110,000", "p. 9"),
     ],
   };
   const rentRoll = {
@@ -2131,7 +2141,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
   const office: ExtractionResult = {
     ...APARTMENT,
     assetClass: "office",
-    metrics: APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)),
+    metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Operating expenses (pro forma)", "$1,300,000", "p. 9")],
   };
   const officeDerived = deriveUnderwriteInputs(office, "x", undefined, { debtIndex: FIVE });
   const officeTest = buildStressTest({
@@ -3255,13 +3265,13 @@ describe("the NOI row's rent roll is said on the class's own yardstick", () => {
   });
 });
 
-describe("a challenge on an expense's level is no expense growth challenge", () => {
+describe("a challenge on an expense's level is the operating expenses', never the expense growth's", () => {
   const ch = (assumption: string, extra: Partial<ChallengerResult["challenges"][number]> = {}) => ({ assumption, severity: "medium" as const, challenge: "c", question: "q", page: "p. 21", ...extra });
 
-  it("files a ratio, a share of income or a figure a unit as an other row, by its words or its figure", () => {
-    expect(challengeKey(ch("Expense ratio of 28%"))).toBe("other");
-    expect(challengeKey(ch("Operating expenses at 28% of EGI", { key: "expense_growth", omFigure: 28 }))).toBe("other");
-    expect(challengeKey(ch("Operating expenses held at a low level", { key: "expense_growth", omFigure: 6_500 }))).toBe("other");
+  it("files a ratio, a share of income or a figure a unit on the operating-expense row, by its words or its figure", () => {
+    expect(challengeKey(ch("Expense ratio of 28%"))).toBe("opex");
+    expect(challengeKey(ch("Operating expenses at 28% of EGI", { key: "expense_growth", omFigure: 28 }))).toBe("opex");
+    expect(challengeKey(ch("Operating expenses held at a low level", { key: "expense_growth", omFigure: 6_500 }))).toBe("opex");
     expect(challengeKey(ch("Expense growth of 2.5% a year", { key: "expense_growth", omFigure: 2.5 }))).toBe("expense_growth");
     expect(challengeKey(ch("Expense growth of 2.5%"))).toBe("expense_growth");
   });
@@ -3271,9 +3281,10 @@ describe("a challenge on an expense's level is no expense growth challenge", () 
       apartmentArgs({ challenger: { stressTest: "", challenges: [ch("Expense ratio of 28% of EGI", { key: "expense_growth", omFigure: 28, altFigure: 40, altBasis: "a rule of thumb" })] } }),
     );
     expect(rowOf(test, "expense_growth").challenge).toBeNull();
-    const other = test.rows.find((r) => r.key === "other")!;
-    expect(other.title).toBe("Expense ratio of 28% of EGI");
-    expect(other.unchecked).toBe("No reader tests this assumption; the challenger's words stand alone.");
+    // It rides on the operating-expense row, which the T-12 beside it would
+    // test once the OM states a total or a ratio.
+    expect(rowOf(test, "opex").challenge?.challenge).toBe("c");
+    expect(test.rows.some((r) => r.key === "other")).toBe(false);
   });
 
   it("prints the challenge's own words as the OM's figure on an other row, never its bare number", () => {
@@ -3385,5 +3396,139 @@ describe("the headline names a hold the OM states that the model does not run", 
     const ex: ExtractionResult = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Hold period", "5 years", "p. 30")] };
     const test = buildStressTest(apartmentArgs({ extraction: ex }));
     expect(test.headline!.untested?.hold).toBeUndefined();
+  });
+});
+
+describe("the operating-expense row (the owner's decision of 2026-10-21)", () => {
+  const withOpex = (...extra: ReturnType<typeof row>[]): ExtractionResult => ({ ...APARTMENT, metrics: [...APARTMENT.metrics, ...extra] });
+
+  it("holds the OM's total, less the tax bill and premium it states, to the T-12 on the same footing, and re-runs one input apart", () => {
+    const args = apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")) });
+    const test = buildStressTest(args);
+    const o = rowOf(test, "opex");
+    // $1.5M less the OM's $380k bill and $120k premium, against the T-12's
+    // $1.75M less its $380k tax line and $150k insurance line.
+    expect(o.omSays).toMatchObject({ value: 1_000_000, page: 9 });
+    expect(o.omSays.text).toBe("$1M ($6,536 a unit): the OM's operating expenses (pro forma) of $1.5M less its $380k tax bill (p. 15) and $120k premium (p. 15)");
+    expect(o.footing).toEqual({ less: ["taxes", "insurance"] });
+    const decider = o.evidence[o.decidedBy!];
+    expect(decider).toMatchObject({ kind: "document", label: "The deal's T-12 operating expenses less taxes and insurance", value: 1_220_000, asOf: "2026-06-30" });
+    expect(decider.text).toBe("$1.22M ($7,974 a unit): the T-12's $1.75M total less its $380k tax line and $150k insurance line (TTM to Jun 30, 2026)");
+    // Each T-12 line on the footing, a unit, beside it and never deciding.
+    const lines = o.evidence.find((e) => e.label === "The deal's T-12 expense lines")!;
+    expect(lines).toMatchObject({ kind: "document", value: null });
+    expect(lines.text).toBe("Payroll $620k ($4,052 a unit); Repairs & maintenance $600k ($3,922 a unit) (TTM to Jun 30, 2026)");
+    // 18.0% under the T-12: past the NOI's 10% band, unsupported.
+    expect(o.gap).toMatchObject({ value: 220_000, unit: "usd" });
+    expect(o.gap!.text).toBe("The OM's $1M is $220k (18.0%) under the T-12's $1.22M.");
+    expect(o.verdict).toBe("unsupported");
+    expect(o.method).toBe(
+      "The OM's operating expenses against the deal's T-12 operating expenses less taxes and insurance, the one figure that decides; beside it, not deciding: the deal's T-12 expense lines.",
+    );
+    // The model's line is the T-12's load: the OM's run swaps the T-12's
+    // $1.22M for the OM's $1M, the evidence's is the line as it stands.
+    const model = args.derived!.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    expect(o.impact!.input).toBe("expenseLines");
+    expect(o.impact!.altValue).toBeCloseTo(model, 0);
+    expect(o.impact!.omValue).toBeCloseTo(model - 220_000, 0);
+    expect(o.impact!.altIrrPct!).toBeLessThan(o.impact!.baseIrrPct!);
+    // The headline swaps it as a component of the NOI, never beside it.
+    const h = test.headline!;
+    expect(h.parts.map((p) => p.key)).toContain("opex");
+    expect(HEADLINE_NOI_COMPONENTS).toContain("opex");
+    if (rowOf(test, "noi").verdict !== "holds") expect(h.omitted.find((x) => x.key === "noi")?.why).toBe(HEADLINE_NOI_LEFT_OUT);
+  });
+
+  it("sets the OM's case expense line at the OM's own stated total where the model carries the T-12's load: taxes, insurance and the rest swapped, none added twice", () => {
+    const args = apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")) });
+    const test = buildStressTest(args);
+    const model = args.derived!.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    // The model's line ties to the T-12's $1.75M total, so each row's OM run
+    // is the line less the T-12's figure plus the OM's; the three moves add
+    // to the OM's stated $1.5M total.
+    expect(model).toBeCloseTo(1_750_000, -2);
+    const move = (["taxes", "insurance", "opex"] as const).reduce((s, k) => s + (rowOf(test, k).impact ? rowOf(test, k).impact!.omValue - model : 0), 0);
+    expect(model + move).toBeCloseTo(1_500_000, -2);
+  });
+
+  it("holds a figure within 5% of the T-12, or over it", () => {
+    for (const [total, verdict] of [["$1,690,000", "holds"], ["$1,900,000", "holds"], ["$1,600,000", "stretched"]] as const) {
+      const o = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", total, "p. 9")) })), "opex");
+      expect(o.verdict, total).toBe(verdict);
+    }
+  });
+
+  it("reads a ratio the OM states on its stated EGI, and its own lines beside the T-12's", () => {
+    const o = rowOf(
+      buildStressTest(
+        apartmentArgs({
+          extraction: withOpex(row("Expense ratio (pro forma)", "40%", "p. 9"), row("Effective gross income (pro forma)", "$4,000,000", "p. 9"), row("Management fee", "3.0%", "p. 9"), row("Payroll", "$590,000", "p. 9")),
+        }),
+      ),
+      "opex",
+    );
+    expect(o.omSays.text).toContain("the OM's 40.0% expense ratio (pro forma) on the OM's effective gross income (pro forma) of $4M, $1.6M");
+    expect(o.omSays.value).toBe(1_100_000);
+    expect(o.evidence.find((e) => e.label === "The deal's T-12 expense lines")!.text).toContain(
+      "payroll $590k ($3,856 a unit) (p. 9), the T-12's $620k ($4,052 a unit)",
+    );
+  });
+
+  it("decides on the class's ratio, a rule of thumb, only where no T-12 is on file, stretched at most", () => {
+    const ex = withOpex(row("Operating expenses (pro forma)", "$1,000,000", "p. 9"));
+    const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
+    const o = rowOf(buildStressTest(apartmentArgs({ extraction: ex, actuals: null, derived, modelVsMarket: readFor(derived) })), "opex");
+    const decider = o.evidence[o.decidedBy!];
+    expect(decider).toMatchObject({ kind: "rule_of_thumb", label: "The class's expense ratio, a rule of thumb" });
+    expect(decider.text).toMatch(/^42% of EGI, the multifamily screening default, on the \$3\.65M the OM's \$2\.65M NOI and its \$1M of expenses make is \$1\.53M less the OM's own \$380k tax bill and \$120k premium, \$1\.03M: a rule of thumb, not this building's cost$/);
+    expect(o.ruleOfThumbOnly).toBe(true);
+    expect(o.gap!.text).toContain("Against a rule of thumb only.");
+    expect(["holds", "stretched"]).toContain(o.verdict);
+  });
+
+  it("stands unchecked where the T-12 breaks out no line the OM's figure leaves out", () => {
+    const noIns = { ...T12, opex: T12.opex.filter((l) => l.key !== "insurance"), totalOpex: 1_600_000 };
+    const ex = withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9"));
+    const actuals = readActuals({ metrics: ex.metrics, strategy: inferStrategy(ex), rentRoll: null, t12: { summary: noIns, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+    const o = rowOf(buildStressTest(apartmentArgs({ extraction: ex, actuals })), "opex");
+    expect(o.verdict).toBe("unchecked");
+    expect(o.unchecked).toBe("The deal's T-12 breaks out no insurance line, so its expenses cannot be set apart from the premium the OM's figure leaves out to its own row.");
+    expect(o.impact).toBeNull();
+  });
+
+  it("builds no row on a development or a conversion, and none where nothing is stated or found", () => {
+    const dev: ExtractionResult = { ...withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")), strategy: { kind: "development", summary: "", capitalBudget: "", timeline: "" } };
+    expect(buildStressTest(apartmentArgs({ extraction: dev })).rows.some((r) => r.key === "opex")).toBe(false);
+    expect(buildStressTest(apartmentArgs({ actuals: null })).rows.some((r) => r.key === "opex")).toBe(false);
+  });
+
+  it("sets the OM's other income beside the NOI against the T-12's, never deciding it", () => {
+    const n = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Other income", "$110,000", "p. 9")) })), "noi");
+    const oi = n.evidence.find((e) => e.label === "The OM's other income against the T-12's")!;
+    expect(oi).toMatchObject({ kind: "document", value: null });
+    expect(oi.text).toBe("the OM's other income of $110k (p. 9) against the T-12's $100k (TTM to Jun 30, 2026), 10.0% over it: beside the NOI, never deciding it");
+    expect(n.evidence[n.decidedBy!].label).toBe("The deal's T-12 NOI");
+  });
+
+  it("holds the prompt's expense labels to the reader", () => {
+    const prompt = extractionInstruction("multifamily");
+    for (const label of ["Operating expenses (pro forma)", "Expense ratio (pro forma)", "Effective gross income (pro forma)", "Management fee", "Payroll", "Repairs and maintenance", "Utilities", "Other income"]) {
+      expect(prompt, label).toContain(`"${label}"`);
+    }
+    const test = buildStressTest(
+      apartmentArgs({
+        extraction: withOpex(
+          row("Operating expenses (pro forma)", "$1,500,000", "p. 9"),
+          row("Management fee", "$120,000", "p. 9"),
+          row("Payroll", "$590,000", "p. 9"),
+          row("Repairs and maintenance", "$560,000", "p. 9"),
+          row("Utilities", "$300,000", "p. 9"),
+          row("Other income", "$110,000", "p. 9"),
+        ),
+      }),
+    );
+    const beside = rowOf(test, "opex").evidence.find((e) => e.label === "The deal's T-12 expense lines")!.text;
+    for (const name of ["management fee $120k", "payroll $590k", "repairs and maintenance $560k", "utilities $300k"]) expect(beside, name).toContain(name);
+    expect(rowOf(test, "noi").evidence.some((e) => e.label === "The OM's other income against the T-12's")).toBe(true);
   });
 });

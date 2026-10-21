@@ -77,6 +77,11 @@
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
+//   opex             the NOI's bands: within NOI_IN_LINE_BAND (5%) under
+//                    the T-12's operating expenses (on the OM figure's
+//                    footing, less the taxes and insurance it states) holds,
+//                    past NOI_UNSUPPORTED_SHARE (10%) unsupported; against
+//                    the class's ratio (no T-12 on file) stretched at most
 //   insurance        SAME_SHARE (2%) under the seller's own T-12 premium reads
 //                    stretched, never more (the T-12's is a floor, not a
 //                    quote); at or over it, or with no T-12, unchecked — a
@@ -187,14 +192,18 @@ import {
   SEEDED_RATE_ONLY_LABEL,
   T12_INSURANCE_LABEL,
   T12_NOI_LABEL,
+  T12_OPEX_LABEL,
+  T12_OPEX_LINES_LABEL,
   T12_TAX_LABEL,
   T12_VACANCY_LABEL,
   basisDecider,
+  CLASS_OPEX_LABEL,
   debtDecider,
   exitCapDecider,
   expenseGrowthDecider,
   insuranceDecider,
   noiDecider,
+  opexDecider,
   renovationPremiumDecider,
   rentGrowthDeciding,
   taxesDecider,
@@ -679,6 +688,10 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
   // A growth rate only: an expense ratio or load is a share of income, which
   // the growth row's CPI test does not speak to (`expenseLevelNotGrowth`).
   { key: "expense_growth", re: /\b(?:expense|opex|operating expense)s?\s+(?:growth|escalation|inflation)|expense growth/i },
+  // An expense's level — the total, a ratio or load, a line other than the
+  // taxes and the insurance (which file above) — is the operating-expense
+  // row's; its growth rate is the expense growth row's (above).
+  { key: "opex", re: /\b(?:operating\s+expenses?|opex|expense\s+(?:ratio|load)|management\s+fee|payroll|repairs?(?:\s+and\s+maintenance)?|r\s?&\s?m|utilit(?:y|ies))\b/i },
   { key: "basis", re: /\bprice\b|\bpricing\b|\bbasis\b|\bask(?:ing)?\b[^;]*\b(?:per (?:unit|door|key|sf)|psf)\b|replacement cost|overpay|\bcomps?\b/i },
 ];
 
@@ -686,7 +699,9 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
  *  challenger wrote one, else the keyword table on its assumption text,
  *  else "other". */
 export function challengeKey(c: Challenge): StressKey {
-  if (c.key && (STRESS_KEYS as readonly string[]).includes(c.key)) return c.key === "expense_growth" && expenseLevelNotGrowth(c) ? "other" : (c.key as StressKey);
+  // A challenge on an expense's level filed as its growth is the operating
+  // expenses' (`expenseLevelNotGrowth`).
+  if (c.key && (STRESS_KEYS as readonly string[]).includes(c.key)) return c.key === "expense_growth" && expenseLevelNotGrowth(c) ? "opex" : (c.key as StressKey);
   const hit = CHALLENGE_KEYWORDS.find((k) => k.re.test(c.assumption ?? ""));
   return hit?.key ?? "other";
 }
@@ -699,9 +714,10 @@ const EXPENSE_GROWTH_WORDS = /\bgrowth\b|\bgrow(?:s|ing)?\b|escalat|inflat|\binc
 /**
  * Whether a challenge filed on the expense growth row is about the expense's
  * level — a ratio, a share of income, a figure a unit — rather than its growth
- * rate (the challenger's key names "the expense growth rate or ratio"): the
- * growth row holds a rate a year to the CPI's, a different quantity, so such a
- * challenge is an `other` row. Read off its words, and off its figure where
+ * rate (a challenge stored before the operating-expense row was keyed named
+ * "the expense growth rate or ratio"): the growth row holds a rate a year to
+ * the CPI's, a different quantity, so such a challenge is the operating
+ * expenses' row's (`opex`). Read off its words, and off its figure where
  * that is a dollar amount no growth rate could be (100 or more).
  */
 function expenseLevelNotGrowth(c: Challenge): boolean {
@@ -900,6 +916,7 @@ const NO_RERUN_SHORT: readonly [(why: string) => boolean, string][] = [
   [(w) => /^No achieved premium is stated/.test(w), "no achieved premium stated"],
   [(w) => w === INSURANCE_NO_RERUN || w === INSURANCE_NO_RERUN_NO_T12, "nothing tests the premium"],
   [(w) => w === PLAN_INSURANCE_NOT_PRO_FORMA, "no pro forma premium"],
+  [(w) => w === PLAN_OPEX_NOT_PRO_FORMA, "no pro forma expense line"],
   [(w) => /no count of doors to renovate/.test(w), "no doors to renovate stated"],
 ];
 
@@ -979,6 +996,7 @@ const TITLES: Record<StressKey, string> = {
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
+  opex: "Operating expenses",
   renovation_premium: "Renovation premium",
   other: "Everything else the challenger raised",
 };
@@ -2124,6 +2142,27 @@ function noiRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
+  // The OM's other income against the T-12's, where both state one: words
+  // beside the NOI, never deciding it (the model folds other income into its
+  // rent line, so it is no input of its own).
+  const otherRow = findMetric(ctx.rows, OTHER_INCOME_ROW, OTHER_INCOME_NOT);
+  const omOther = otherRow && !statesRange(otherRow.value) && !/%/.test(otherRow.value) ? parseUsd(otherRow.value, 1_000) : null;
+  const t12Other = t12?.summary.otherIncome ?? null;
+  if (t12 && otherRow && omOther != null && t12Other != null && Number.isFinite(t12Other) && t12Other > 0) {
+    const page = pageOf(otherRow, ctx.ex);
+    const d = (omOther - t12Other) / t12Other;
+    evidence.push({
+      kind: "document",
+      label: OTHER_INCOME_LABEL,
+      text: `the OM's ${lowerFirst(otherRow.label)} of ${money(omOther)}${page != null ? ` (p. ${page})` : ""} against the T-12's ${money(t12Other)} (${t12.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated"}), ${
+        Math.abs(d) <= 0.005 ? "in line" : d > 0 ? `${pct1(d * 100)} over it` : `${pct1(-d * 100)} under it`
+      }: beside the NOI, never deciding it`,
+      value: null,
+      asOf: t12.periodEnd,
+      publisher: "the deal's T-12",
+      scope: "deal",
+    });
+  }
   // The memorandum's own in-place figure against its stabilized one.
   const figs = noiFigures(ctx.rows);
   const inPlace = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
@@ -2203,19 +2242,61 @@ function noiRow(ctx: Ctx): StressRow | null {
 
 // — Taxes —
 
-function taxesRow(ctx: Ctx): StressRow | null {
+/**
+ * The OM's tax bill as the taxes row tests it. On a plan deal the memorandum
+ * may state two bills: today's, on today's assessment, and its pro forma's
+ * line, the one the stabilized NOI carries. Every row is searched for each,
+ * never the first alone. The OM's figure tested is the pro forma's line where
+ * stated (else today's bill). A deal read as stabilized reads its first bill
+ * for both. The operating-expense row leaves this same bill out of the OM's
+ * total (`opexRow`), so the two rows never hold one line twice.
+ */
+function omTaxLine(ctx: Pick<Ctx, "rows" | "plan">): { proFormaRow: Row | null; todayRow: Row | null; billRow: Row | null; bill: number | null } {
   const taxRows = ctx.rows.filter((m) => TAX_BILL_ROW.test(m.label) && !TAX_BILL_NOT.test(m.label) && taxBillOf(m.value) != null);
-  // On a plan deal the memorandum may state two bills: today's, on today's
-  // assessment, and its pro forma's line, the one the stabilized NOI
-  // carries. Every row is searched for each, never the first alone. The
-  // OM's figure tested is the pro forma's line where stated (else today's
-  // bill), and the rate the reset is struck at is today's bill over today's
-  // assessed value — never a pro forma bill over an assessment it was not
-  // levied on. A deal read as stabilized reads its first bill for both.
   const proFormaRow = ctx.plan ? (taxRows.find((m) => PLAN_FIGURE.test(m.label)) ?? null) : null;
   const todayRow = ctx.plan ? (taxRows.find((m) => !PLAN_FIGURE.test(m.label)) ?? null) : (taxRows[0] ?? null);
   const billRow = proFormaRow ?? todayRow;
-  const bill = billRow ? taxBillOf(billRow.value) : null;
+  return { proFormaRow, todayRow, billRow, bill: billRow ? taxBillOf(billRow.value) : null };
+}
+
+/** The T-12's real estate tax line: the first line naming a tax that is no
+ *  abatement, payroll or transfer tax and no line combined with insurance. */
+const t12TaxLineOf = (t12: ActualsRead["t12"] | null | undefined) => t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !T12_TAX_NOT.test(l.label)) ?? null;
+/** The T-12's property premium: no mortgage or title policy, no line
+ *  combined with taxes. */
+const t12InsuranceLineOf = (t12: ActualsRead["t12"] | null | undefined) => t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
+
+/**
+ * A T-12's operating expenses on an operating-expense row's footing: its
+ * expense total less its tax and insurance lines where the row leaves those
+ * out (`StressRow.footing`) — the one reading the row and the track record
+ * strike. Null where the T-12 states no expense total, or breaks out no line
+ * the footing leaves out (`missing` names it). The tax and insurance lines
+ * are subtracted here, never read as a figure of their own: a seller's bill
+ * and premium score no row.
+ */
+export function t12OpexOnFooting(
+  t12: ActualsRead["t12"] | null | undefined,
+  less: readonly ("taxes" | "insurance")[],
+): { value: number; total: number; tax: number | null; insurance: number | null } | { missing: ("tax" | "insurance")[] } | null {
+  const total = t12?.summary.totalOpex ?? null;
+  if (!t12 || total == null || !Number.isFinite(total) || !(total > 0)) return null;
+  const tax = t12TaxLineOf(t12);
+  const ins = t12InsuranceLineOf(t12);
+  const missing: ("tax" | "insurance")[] = [
+    ...(less.includes("taxes") && !(tax && tax.amount > 0) ? (["tax"] as const) : []),
+    ...(less.includes("insurance") && !(ins && ins.amount > 0) ? (["insurance"] as const) : []),
+  ];
+  if (missing.length > 0) return { missing };
+  const taxOut = less.includes("taxes") ? tax!.amount : null;
+  const insOut = less.includes("insurance") ? ins!.amount : null;
+  return { value: total - (taxOut ?? 0) - (insOut ?? 0), total, tax: taxOut, insurance: insOut };
+}
+
+function taxesRow(ctx: Ctx): StressRow | null {
+  // The rate the reset is struck at is today's bill over today's assessed
+  // value — never a pro forma bill over an assessment it was not levied on.
+  const { proFormaRow, todayRow, billRow, bill } = omTaxLine(ctx);
   const todayBill = todayRow ? taxBillOf(todayRow.value) : null;
   const assessedRow = findMetric(ctx.rows, ASSESSED_ROW, ASSESSED_NOT);
   const assessed = assessedRow ? parseUsd(assessedRow.value, 10_000) : null;
@@ -2283,7 +2364,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
   // and a rule of thumb, never the bill a new owner pays (the insurance
   // row's rule).
   const t12 = ctx.actuals?.t12;
-  const t12Tax = t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !T12_TAX_NOT.test(l.label)) ?? null;
+  const t12Tax = t12TaxLineOf(t12);
   const t12Bill = t12Tax && t12Tax.amount > 0 ? t12Tax.amount : null;
   const aboveDecides = evidence.some((e) => e.kind === "om_internal" && e.value != null);
   const t12TaxDecides =
@@ -2605,16 +2686,24 @@ export const PLAN_INSURANCE_NOT_PRO_FORMA =
  * nation's carriers' year (shown, held to nothing, carrying no figure of its
  * own).
  */
+/** The building's premium as the OM states it, the insurance row's figure:
+ *  a year's premium for the building, never a figure a unit or a month, a
+ *  range, or insurance income. The operating-expense row leaves this same
+ *  premium out of the OM's total. */
+function omPremiumLine(rows: Row[]): { row: Row | null; premium: number | null } {
+  const row =
+    rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
+  return { row, premium: row ? parseUsd(row.value, 500) : null };
+}
+
 function insuranceRow(ctx: Ctx): StressRow | null {
-  const premiumRow =
-    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
-  const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
+  const { row: premiumRow, premium } = omPremiumLine(ctx.rows);
   const evidence: StressEvidence[] = [];
   // The T-12's own insurance line: the seller's actual premium. It decides
   // only where the OM's premium sits under it past SAME_SHARE, on a building
   // already delivered — the OM against its own building's history.
   const t12 = ctx.actuals?.t12;
-  const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
+  const t12Ins = t12InsuranceLineOf(t12);
   const t12Premium = t12Ins && t12Ins.amount > 0 ? t12Ins.amount : null;
   const delivered = !notYetDelivered(ctx.kind);
   const under = premium != null && t12Premium != null && (t12Premium - premium) / t12Premium > SAME_SHARE;
@@ -2705,6 +2794,292 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     ...(noRerun ? { noRerun } : {}),
     challenge: null,
     method: methodSentence("insurance", evidence, evidenceIndex),
+  };
+}
+
+// — Operating expenses —
+
+/** The OM's operating-expense total: the pro forma's whole expense line, its
+ *  taxes and insurance in it, as stated — never a growth rate, a ratio, a
+ *  figure a unit or a foot, the T-12's or today's actual, recoveries, a later
+ *  year's, or a line that says what it leaves out. */
+const OPEX_ROW = /\b(?:total\s+)?operating\s+expenses?\b|\bopex\b|\btotal\s+expenses\b/i;
+const OPEX_NOT =
+  /growth|escalat|inflat|ratio|\bper\b|\/|psf|t-?12|ttm|trailing|in[- ]place|actual|historical|current|reimburs|recover|excl|\bex\.|\bless\b|net of|controllable|before|after|non[- ]?recoverable|capital|reserve|year ?[2-9]|yr\.? ?[2-9]/i;
+/** The OM's expense ratio: its operating expenses as a share of its income
+ *  (EGI), never a share of gross potential rent, a market's or the T-12's. */
+const OPEX_RATIO_ROW = /\b(?:operating\s+)?expense\s+ratio\b|\bopex\s+ratio\b/i;
+const OPEX_RATIO_NOT = /t-?12|ttm|trailing|in[- ]place|actual|historical|current|market|class|industry|typical|comp|gross potential|potential gross|\bgpr\b|year ?[2-9]|yr\.? ?[2-9]/i;
+/** The pro forma's own figure first. */
+const OPEX_PRO_FORMA = /stabili[sz]ed|pro ?forma|underwrit|budget|year ?1\b|yr\.? ?1\b/i;
+const EGI_NOT = /\bper\b|\/|psf|month|\bmo\b|growth|t-?12|ttm|trailing|in[- ]place|current|actual|year ?[2-9]|yr\.? ?[2-9]/i;
+
+/** The OM's own expense lines, each read as stated and set beside the T-12's
+ *  same line in words — never summed into a total the OM does not state. */
+const OM_EXPENSE_LINES: readonly { name: string; om: RegExp; t12: RegExp }[] = [
+  { name: "management fee", om: /\bmanagement\s+fees?\b/i, t12: /\bmanage/i },
+  { name: "payroll", om: /\bpayroll\b|\bsalar(?:y|ies)\b|\bpersonnel\b/i, t12: /\bpayroll\b|\bsalar|\bpersonnel\b|\bwages?\b/i },
+  { name: "repairs and maintenance", om: /\brepairs?\b|\br\s?&\s?m\b|\bmaintenance\b/i, t12: /\brepair|\bmainten|\br\s?&\s?m\b/i },
+  { name: "utilities", om: /\butilit/i, t12: /\butilit|\belectric|\bgas\b|\bwater\b|\bsewer\b|\btrash\b|\bpower\b/i },
+];
+const OM_LINE_NOT = /growth|escalat|\bper\b|\/|psf|t-?12|ttm|trailing|actual|historical|reserve|asset management|income|revenue|reimburs/i;
+
+/** The OM's other income, the pro forma's (never the T-12's or a figure a
+ *  unit), beside the NOI. */
+const OTHER_INCOME_ROW = /\bother\s+(?:income|revenue)\b/i;
+const OTHER_INCOME_NOT = /growth|\bper\b|\/|psf|t-?12|ttm|trailing|actual|in[- ]place|current|historical/i;
+/** The NOI row's piece where the OM and the T-12 both state other income. */
+export const OTHER_INCOME_LABEL = "The OM's other income against the T-12's";
+
+/** Why a plan deal's operating-expense row carries no re-run where the OM's
+ *  figure is not its pro forma's line. */
+export const PLAN_OPEX_NOT_PRO_FORMA =
+  "The OM states its operating expenses as no pro forma line, so which expenses the stabilized NOI carries is not stated, and no yield on cost is re-run on it.";
+
+/** The OM's figure under test: its pro forma's preferred row. */
+function preferredRow(rows: Row[], re: RegExp, not: RegExp, ok: (r: Row) => boolean): Row | null {
+  const hits = rows.filter((m) => re.test(m.label) && !not.test(m.label) && !statesRange(m.value) && ok(m));
+  return hits.find((m) => OPEX_PRO_FORMA.test(m.label)) ?? hits[0] ?? null;
+}
+
+/** The OM's operating expenses as it states them: a total, else a ratio on
+ *  its EGI (the EGI it states, else the one its NOI implies at that ratio),
+ *  each said with its arithmetic; and the EGI the class's ratio would be
+ *  struck on. Null where it states neither. */
+function omOpexOf(rows: Row[], omNoi: number | null): { total: number; row: Row; words: string; egi: number | null; egiWords: string | null } | null {
+  const egiRow = preferredRow(rows, EGI_ROW, EGI_NOT, (m) => parseUsd(m.value, 10_000) != null);
+  const egiStated = egiRow ? parseUsd(egiRow.value, 10_000) : null;
+  const egiStatedWords = egiRow && egiStated != null ? `the OM's ${lowerFirst(egiRow.label)} of ${money(egiStated)}` : null;
+  const totalRow = preferredRow(rows, OPEX_ROW, OPEX_NOT, (m) => !/%/.test(m.value) && parseUsd(m.value, 10_000) != null);
+  if (totalRow) {
+    const total = parseUsd(totalRow.value, 10_000)!;
+    const egi = egiStated ?? (omNoi != null ? omNoi + total : null);
+    return {
+      total,
+      row: totalRow,
+      words: `the OM's ${lowerFirst(totalRow.label)} of ${money(total)}`,
+      egi,
+      egiWords: egiStatedWords ?? (egi != null && omNoi != null ? `the ${money(egi)} the OM's ${money(omNoi)} NOI and its ${money(total)} of expenses make` : null),
+    };
+  }
+  const ratioRow = preferredRow(rows, OPEX_RATIO_ROW, OPEX_RATIO_NOT, (m) => {
+    const p = parsePct(m.value);
+    return p != null && p > 0 && p < 100;
+  });
+  if (!ratioRow) return null;
+  const r = parsePct(ratioRow.value)! / 100;
+  const egi = egiStated ?? (omNoi != null ? omNoi / (1 - r) : null);
+  if (egi == null || !(egi > 0)) return null;
+  const egiWords = egiStatedWords ?? `the ${money(egi)} EGI the OM's ${money(omNoi!)} NOI implies at that ratio`;
+  return { total: r * egi, row: ratioRow, words: `the OM's ${pct1(r * 100)} ${lowerFirst(ratioRow.label)} on ${egiWords}, ${money(r * egi)}`, egi, egiWords };
+}
+
+/**
+ * The operating-expense row (the owner's decision of 2026-10-21): the OM's
+ * pro forma operating expenses less the taxes and the insurance it states
+ * (each has a row of its own, so neither line is held twice), set against
+ * the deal's own T-12 on the same footing — its total less its tax and
+ * insurance lines where the OM's figure leaves them out. The T-12 decides
+ * (`document`); each of its lines a unit (a foot on a class priced by the
+ * foot), the management fee as a share of its EGI and the OM's own lines are
+ * shown beside it, deciding nothing. Only where no T-12 is on file does the
+ * class's expense ratio decide, struck on the OM's own EGI, a rule of thumb
+ * read stretched at most. Holds within the NOI's in-line band
+ * (NOI_IN_LINE_BAND, 5%) of the deciding figure or over it; unsupported past
+ * NOI_UNSUPPORTED_SHARE (10%) under it. The return is re-run with the
+ * model's one expense line set at the OM's figure and at the evidence's
+ * (`expenseImpact`, swapped, never added). Never on a development or a
+ * conversion (no building runs today), a leased fee (the building is not the
+ * buyer's) or a class that operates nothing.
+ */
+function opexRow(ctx: Ctx): StressRow | null {
+  if (notYetDelivered(ctx.kind) || interestOf(ctx.ex).kind === "leased_fee" || !assetWords(ctx.assetClass).operating) return null;
+  const omNoi = pickOmNoi(ctx.rows, ctx.kind);
+  const om = omOpexOf(ctx.rows, omNoi?.noi ?? null);
+  const tax = omTaxLine(ctx);
+  const ins = omPremiumLine(ctx.rows);
+  const less: ("taxes" | "insurance")[] = [...(tax.bill != null ? (["taxes"] as const) : []), ...(ins.premium != null ? (["insurance"] as const) : [])];
+  const omFigure = om ? om.total - (tax.bill ?? 0) - (ins.premium ?? 0) : null;
+  // A figure a unit, or a foot on a class priced by the foot.
+  const words = assetWords(ctx.assetClass);
+  const bySf = words.basis === "sf";
+  const units = unitCountFromMetrics(ctx.rows);
+  const sf = buildingSfFromMetrics(ctx.rows);
+  const noun = countNoun(unitCountRow(ctx.rows)?.label, ctx.assetClass).replace(/s$/, "");
+  const per = (n: number): string | null =>
+    bySf ? (sf != null && sf > 0 ? `$${(n / sf).toFixed(2)} a square foot` : null) : units != null && units > 0 ? `$${Math.round(n / units).toLocaleString("en-US")} ${withArticle(noun)}` : null;
+  const perSaid = (n: number) => (per(n) ? ` (${per(n)})` : "");
+  const lessWords = (whose: string, taxW: string | null, insW: string | null) => {
+    const parts = [...(taxW ? [taxW] : []), ...(insW ? [insW] : [])];
+    return parts.length ? ` less ${whose} ${joinWords(parts)}` : "";
+  };
+  const evidence: StressEvidence[] = [];
+  const t12 = ctx.actuals?.t12 ?? null;
+  const t12Tax = t12TaxLineOf(t12);
+  const t12Ins = t12InsuranceLineOf(t12);
+  let t12Figure: number | null = null;
+  let cannotFoot: string | null = null;
+  const when = t12?.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated";
+  const footed = t12OpexOnFooting(t12, less);
+  if (t12 && footed && "missing" in footed) {
+    cannotFoot = `The deal's T-12 breaks out no ${joinWords(footed.missing)} line, so its expenses cannot be set apart from the ${joinWords(footed.missing.map((m) => (m === "tax" ? "tax bill" : "premium")))} the OM's figure leaves out to its own row.`;
+  } else if (t12 && footed && "value" in footed) {
+    t12Figure = footed.value;
+    evidence.push({
+      kind: "document",
+      label: T12_OPEX_LABEL,
+      text: `${money(footed.value)}${perSaid(footed.value)}: the T-12's ${money(footed.total)} total${lessWords(
+        "its",
+        footed.tax != null ? `${money(footed.tax)} tax line` : null,
+        footed.insurance != null ? `${money(footed.insurance)} insurance line` : null,
+      )} (${when})`,
+      value: Math.round(footed.value),
+      asOf: t12.periodEnd,
+      publisher: "the deal's T-12",
+      scope: "deal",
+    });
+  }
+  // The OM's own lines, each beside the T-12's same line where it states one.
+  const omLines = OM_EXPENSE_LINES.flatMap((l) => {
+    const row = ctx.rows.find((m) => l.om.test(m.label) && !OM_LINE_NOT.test(m.label) && !statesRange(m.value)) ?? null;
+    if (!row) return [];
+    const pctStated = /%/.test(row.value) ? parsePct(row.value) : null;
+    const usd = pctStated == null ? parseUsd(row.value, 1_000) : null;
+    if (pctStated == null && usd == null) return [];
+    const t12Lines = (t12?.summary.opex ?? []).filter((x) => l.t12.test(x.label) && x !== t12Tax && x !== t12Ins && Number.isFinite(x.amount));
+    const t12Sum = t12Lines.length ? t12Lines.reduce((s, x) => s + x.amount, 0) : null;
+    const egi = t12?.summary.egi ?? null;
+    const page = pageOf(row, ctx.ex);
+    const omSaid = pctStated != null ? `${pct1(pctStated)}` : `${money(usd!)}${perSaid(usd!)}`;
+    const t12Said =
+      t12Sum == null
+        ? ""
+        : pctStated != null
+          ? egi != null && egi > 0
+            ? `, the T-12's ${pct1((t12Sum / egi) * 100)} of its EGI`
+            : ""
+          : `, the T-12's ${money(t12Sum)}${perSaid(t12Sum)}`;
+    return [`${l.name} ${omSaid}${page != null ? ` (p. ${page})` : ""}${t12Said}`];
+  });
+  // Each T-12 line on the footing, a unit, the management fee as a share of
+  // the T-12's own EGI: words beside the figure, never deciding.
+  if (t12) {
+    const lines = t12.summary.opex.filter(
+      (l) => Number.isFinite(l.amount) && l.amount !== 0 && !(less.includes("taxes") && l === t12Tax) && !(less.includes("insurance") && l === t12Ins),
+    );
+    if (lines.length > 0) {
+      const egi = t12.summary.egi;
+      const parts = lines.map((l) => {
+        const share = /\bmanage/i.test(l.label) && egi != null && egi > 0 ? `${pct1((l.amount / egi) * 100)} of the T-12's ${money(egi)} EGI` : null;
+        const inner = [per(l.amount), share].filter(Boolean);
+        return `${l.label} ${money(l.amount)}${inner.length ? ` (${inner.join(", ")})` : ""}`;
+      });
+      evidence.push({
+        kind: "document",
+        label: T12_OPEX_LINES_LABEL,
+        text: `${parts.join("; ")} (${when})${omLines.length ? `; beside the OM's own lines: ${omLines.join("; ")}` : ""}`,
+        value: null,
+        asOf: t12.periodEnd,
+        publisher: "the deal's T-12",
+        scope: "deal",
+      });
+    }
+  } else if (omLines.length > 0) {
+    evidence.push({ kind: "om_internal", label: "The OM's own expense lines", text: omLines.join("; "), value: null, asOf: null, publisher: "the offering memorandum", scope: "deal" });
+  }
+  // The class's expense ratio, a rule of thumb: only where no T-12 is on
+  // file, struck on the OM's own EGI, less the OM's own tax bill and premium
+  // so it stands on the OM figure's footing. The ratio is the model's own
+  // screening default (lib/underwrite/inputs `meta.defaultExpenseRatio`,
+  // carried only where the model struck its expenses on it).
+  const ratio = ctx.derived?.meta.defaultExpenseRatio ?? null;
+  if (!t12 && ratio && om?.egi != null && om.egi > 0) {
+    const whole = ratio.ratio * om.egi;
+    const fig = whole - (tax.bill ?? 0) - (ins.premium ?? 0);
+    evidence.push({
+      kind: "rule_of_thumb",
+      label: CLASS_OPEX_LABEL,
+      text: `${Math.round(ratio.ratio * 100)}% of EGI, the ${lowerFirst(ratio.classWord)} screening default, on ${om.egiWords ?? `the OM's ${money(om.egi)} EGI`} is ${money(whole)}${
+        less.length ? `${lessWords("the OM's own", tax.bill != null ? `${money(tax.bill)} tax bill` : null, ins.premium != null ? `${money(ins.premium)} premium` : null)}, ${money(fig)}` : ""
+      }: a rule of thumb, not this building's cost`,
+      value: fig > 0 ? Math.round(fig) : null,
+      asOf: null,
+      publisher: "a rule of thumb",
+      scope: "class",
+    });
+  }
+  if (omFigure == null && evidence.length === 0) return null;
+  const pageSaid = (r: Row | null) => {
+    const p = r ? pageOf(r, ctx.ex) : null;
+    return p != null ? ` (p. ${p})` : "";
+  };
+  const omSays: StressRow["omSays"] =
+    om && omFigure != null
+      ? {
+          text: `${money(omFigure)}${perSaid(omFigure)}: ${om.words}${lessWords(
+            "its",
+            tax.bill != null ? `${money(tax.bill)} tax bill${pageSaid(tax.billRow)}` : null,
+            ins.premium != null ? `${money(ins.premium)} premium${pageSaid(ins.row)}` : null,
+          )}`,
+          value: Math.round(omFigure),
+          page: pageOf(om.row, ctx.ex),
+        }
+      : { text: NO_FIGURE("operating-expense total or expense ratio"), value: null, page: null };
+  const footing = { less };
+  if (omFigure == null) return { ...unchecked("opex", omSays, evidence, NO_FIGURE("operating-expense total or expense ratio")), footing };
+  if (!(omFigure > 0)) return { ...unchecked("opex", omSays, evidence, "The OM's operating expenses less its tax bill and premium come to nothing or less, so the figures do not tie."), footing };
+  // ONE figure decides (lib/stress-deciders `opexDecider`): the T-12, else
+  // the class's ratio where no T-12 is on file.
+  const decided = opexDecider(candidatesOf(evidence));
+  if (!decided) return { ...unchecked("opex", omSays, evidence, cannotFoot ?? (t12 ? "The deal's T-12 states no expense total to set the OM's figure against." : NO_EVIDENCE)), footing };
+  const best = evidence[decided.index];
+  const fig = decided.figure;
+  const ruleOnly = best.label === CLASS_OPEX_LABEL;
+  const share = (fig - omFigure) / fig;
+  const graded: StressVerdict = share <= NOI_IN_LINE_BAND ? "holds" : share > NOI_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  const verdict: StressVerdict = ruleOnly && graded === "unsupported" ? "stretched" : graded;
+  const whose = ruleOnly ? `the class's ratio's ${money(fig)}, a rule of thumb` : `the T-12's ${money(fig)}`;
+  const gap: StressRow["gap"] = {
+    value: Math.round(fig - omFigure),
+    unit: "usd",
+    text:
+      Math.abs(share) <= 0.005
+        ? `The OM's ${money(omFigure)} is at ${whose}.`
+        : share > 0
+          ? `The OM's ${money(omFigure)} is ${money(fig - omFigure)} (${pct1(share * 100)}) under ${whose}.`
+          : `The OM's ${money(omFigure)} is over ${whose} — the conservative side.`,
+  };
+  const what = less.length ? "the operating expenses less taxes and insurance" : "the operating expenses";
+  const lineWord = less.length ? "operating expenses less taxes and insurance" : "operating expenses";
+  const altWords = ruleOnly ? `the ${money(fig)} the class's ratio strikes, a rule of thumb` : money(fig);
+  const runWords = { what, om: money(omFigure), alt: altWords, evidence: ruleOnly ? "" : "the deal's T-12" };
+  const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, omFigure, fig, t12Figure, lineWord, decided.index, runWords) : null;
+  // A plan deal re-runs its yield on cost on the expenses only where the OM
+  // states them as its pro forma's line, as the tax row does.
+  let planImpact: StressImpact | null = null;
+  let noRerun: string | null = null;
+  if (ctx.planYield && om) {
+    if (!PLAN_FIGURE.test(om.row.label)) noRerun = PLAN_OPEX_NOT_PRO_FORMA;
+    else {
+      const run = yocSplit(yocImpact(ctx.planYield, "stabilizedNoi", decided.index, ctx.planYield.noi, ctx.planYield.noi - (fig - omFigure), runWords));
+      planImpact = run.impact;
+      noRerun = run.noRerun;
+    }
+  }
+  return {
+    key: "opex",
+    title: TITLES.opex,
+    omSays,
+    evidence,
+    gap,
+    verdict,
+    decidedBy: decided.index,
+    impact: impact ?? planImpact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("opex", evidence, decided.index),
+    ...(ruleOnly ? { ruleOfThumbOnly: true } : {}),
+    footing,
   };
 }
 
@@ -3324,6 +3699,8 @@ export function holdsBand(row: StressRow): string {
               : "the evidence's figure";
       return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${against}`;
     }
+    case "opex":
+      return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${best?.label === CLASS_OPEX_LABEL ? "the class's ratio" : "the T-12"}`;
     case "basis":
       return `within ${BASIS_STRETCH_PCT}% of the comps`;
     case "taxes":
@@ -3513,6 +3890,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     expense_growth: expenseGrowthRow(ctx) ?? undefined,
     taxes: taxesRow(ctx) ?? undefined,
     insurance: insuranceRow(ctx) ?? undefined,
+    opex: opexRow(ctx) ?? undefined,
     renovation_premium: renovationPremiumRow(ctx) ?? undefined,
   };
   // On a plan deal a tested row with no yield-on-cost meaning says so, its
@@ -3657,7 +4035,7 @@ function holdUntested(rows: Row[], ex: ExtractionResult | null, modelMonths: num
 /** The rows whose figures the NOI already holds: where one of them is swapped
  *  in the evidence's case, the NOI's own swap is left out of the headline
  *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
-export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
+export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance", "opex"];
 
 /** The share of the OM's NOI past which the rest of the NOI's gap — what the
  *  component swaps leave of it (`StressHeadline.noiRest`) — is said. */

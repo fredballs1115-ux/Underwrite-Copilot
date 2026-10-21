@@ -209,6 +209,7 @@ export function testedByHint(row: StressRow): string | null {
   if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
   switch (row.key) {
     case "noi":
+    case "opex":
       return "Add the T-12 to test this.";
     case "vacancy":
       return row.measure === "economic" ? "Add the T-12 to test this." : "Add the rent roll to test this.";
@@ -228,6 +229,7 @@ const UNCHECKED_NAME: Record<Exclude<StressKey, "other">, string> = {
   expense_growth: "expense growth",
   taxes: "real estate taxes",
   insurance: "insurance",
+  opex: "the operating expenses",
   renovation_premium: "the renovation premium",
 };
 

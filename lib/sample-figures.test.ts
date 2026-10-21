@@ -42,7 +42,7 @@ describe("the sample's stress test", () => {
   };
   const own = Number((computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
 
-  it("tests seven of its nine assumptions; the two unchecked are the loan rate no document states and a rent growth no figure was read for", () => {
+  it("tests seven of its ten assumptions; the three unchecked are the loan rate no document states, a rent growth no figure was read for and the operating expenses it states no total for", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["basis", "stretched"],
@@ -60,6 +60,9 @@ describe("the sample's stress test", () => {
       // floor and a rule of thumb, never a quote, so stretched at most (the
       // review of 2026-10-21).
       ["insurance", "stretched"],
+      // The memorandum states no expense total or ratio: the T-12's lines
+      // stand beside the row, and nothing is held to them.
+      ["opex", "unchecked"],
       ["renovation_premium", "unsupported"],
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");

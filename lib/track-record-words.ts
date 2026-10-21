@@ -65,6 +65,12 @@ export const VACANCY_MEASURE_RULE =
 export const SCORED_BY =
   "A row is scored only where a later figure speaks to it: a vacancy by a rent roll (doors or area) or T-12 (dollars), dated after the verdict, unless the market decided it; the NOI by a T-12, neither on a plan deal; the price by a reported trade on a Dead deal.";
 
+/** The rows the owner's decision of 2026-10-21 added, each scored by the
+ *  later figure that speaks to it (lib/track-record `laterFor`; its test
+ *  holds the words to the scorer). */
+export const SCORED_BY_TOO =
+  "The operating expenses are scored by a later T-12 on the row's own footing: a seller's operating lines are the building's own, and only its taxes and insurance are left out.";
+
 /** A decision's part in the record, said apart from the figures'. */
 export const DECISION_SCORES =
   "A Dead decision on price or financing answers the price or the loan, and a Closed deal's own price answers the price, each counted apart.";
@@ -77,7 +83,7 @@ export const NOT_YET_SCORABLE =
 
 /** What the deal page's card scores against, in one sentence. */
 export const CARD_SCOPE =
-  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
+  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal, or the operating expenses; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
 
 /** Under this many scored rows the record is a start, and no share is
  *  printed (the owner's decision of 2026-10-20: five, not the comps' three).

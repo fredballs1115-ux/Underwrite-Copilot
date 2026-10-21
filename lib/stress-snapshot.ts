@@ -81,6 +81,11 @@ export interface StressSnapshotRow {
    *  absent, a figure counted by doors (lib/stress-test-types
    *  `StressRow.measure`) */
   measure?: "economic";
+  /** on the operating-expense row, the lines its figures leave out (the
+   *  taxes and the insurance where the OM stated each), so a later T-12 is
+   *  scored on the same footing (lib/stress-test-types `StressRow.footing`);
+   *  absent elsewhere, and on a row kept before it was carried */
+  less?: ("taxes" | "insurance")[];
 }
 
 export interface StressSnapshot {
@@ -101,6 +106,7 @@ export const WORSE_WHEN: Record<StressKey, "higher" | "lower"> = {
   expense_growth: "higher",
   taxes: "higher",
   insurance: "higher",
+  opex: "higher",
   renovation_premium: "lower",
   other: "higher",
 };
@@ -121,6 +127,7 @@ export function snapshotThreshold(key: StressKey): StressSnapshotRow["threshold"
     case "debt":
       return { value: SAME, unit: "pts" };
     case "noi":
+    case "opex":
       return { value: NOI_IN_LINE_BAND, unit: "share" };
     case "taxes":
     case "renovation_premium":
@@ -190,6 +197,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
+      ...(r.footing ? { less: [...r.footing.less] } : {}),
     };
   });
   return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows };
@@ -234,6 +242,7 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       // or a snapshot kept before it was carried, is left absent (unknown).
       ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
+      ...(Array.isArray(r.less) ? { less: (r.less as unknown[]).filter((x): x is "taxes" | "insurance" => x === "taxes" || x === "insurance") } : {}),
     });
   }
   if (rows.length === 0) return null;

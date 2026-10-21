@@ -38,13 +38,22 @@ describe("what the test does not check yet", () => {
     }
   });
 
-  it("no row reads an expense line, other income, leasing capital or the hold: the model carries one opex line and none of the rest", () => {
-    // No key names them.
+  it("holds the expense lines to the operating-expense row's total, each line beside it; no row reads other income, leasing capital or the hold: the model carries one opex line and none of the rest", () => {
+    // No key names a line, other income, the reserves, leasing or the hold.
     for (const k of STRESS_KEYS) expect(k).not.toMatch(/mgmt|management|payroll|repair|utilit|income|reserve|leasing|commission|\bti\b|hold|sale|concession/);
-    // A challenge naming one files on no row the engine re-runs.
-    expect(challengeKey(challenge("Management fee of 2.5% is light"))).toBe("other");
-    expect(challengeKey(challenge("Payroll per unit"))).toBe("other");
+    // An expense line's level files on the operating-expense row, which
+    // holds the lines' total to the T-12 and shows each line beside it.
+    expect(challengeKey(challenge("Management fee of 2.5% is light"))).toBe("opex");
+    expect(challengeKey(challenge("Payroll per unit"))).toBe("opex");
     expect(challengeKey(challenge("RUBS and parking upside"))).toBe("other");
+    const opex = STRESS_METHODS.find((m) => m.key === "opex")!;
+    expect(opex.against[1]).toMatch(/^Each T-12 expense line a unit .*shown beside it, never deciding$/);
+    expect(item("expense_lines").beside?.key).toBe("opex");
+    const src = readFileSync("lib/stress-test.ts", "utf8");
+    expect(src).toMatch(/label: T12_OPEX_LINES_LABEL,\s+text: [^\n]+\n\s+value: null,/);
+    // Other income is shown beside the NOI, never a row of its own.
+    expect(STRESS_METHODS.find((m) => m.key === "noi")!.against.join(" ")).toContain("The OM's other income against the T-12's, where both state one, in words beside it and never deciding");
+    expect(item("other_income").beside?.line).toContain("other income against the T-12's");
     const { inputs, sources } = sampleDerivedInputs();
     expect(inputs.expenseLines).toHaveLength(1);
     expect(inputs.otherRevenueAnnual).toBe(0);
@@ -73,15 +82,17 @@ describe("what the test does not check yet", () => {
     expect(item("leasing_capital").beside?.line).toContain(`${ROSTER_UNTESTED_PCT}% or more`);
   });
 
-  it("says the debt row is unchecked with no stated rate, its lender tests beside it, and prices no floating loan against SOFR", () => {
+  it("says the debt row is unchecked with no stated rate or a floating one, its lender tests beside it, and prices no floating loan against SOFR", () => {
     const src = readFileSync("lib/stress-test.ts", "utf8");
     expect(src).toContain('if (!om) return unchecked("debt", omSays, evidence, NO_FIGURE("loan rate"));');
+    expect(src).toContain('if (rateRow && floating) return unchecked("debt", omSays, evidence, floatingRateWhy(rateRow.value.trim(), floating));');
     expect(src).toContain('label: "Lender tests at screening defaults, the binding one named"');
-    // The debt row's decider is the Treasury-tenor seed plus the class's spread.
     const debt = STRESS_METHODS.find((m) => m.key === "debt")!;
     expect(debt.against[0]).toMatch(/^Today's index \(the Treasury tenor nearest the OM's stated loan term where read, else the hold's/);
     // A floating rate is recognised and priced on nothing: no SOFR pricing.
     expect(src).toContain("floatingRateOf");
+    expect(debt.limits.join(" ")).toContain("priced on nothing: the row stands unchecked");
+    expect(item("floating_rate").why).toContain("priced on nothing: the debt row stands unchecked");
     expect(src).not.toMatch(/termSofr|sofrSpread/);
   });
 

@@ -31,15 +31,15 @@ export const NOT_TESTED_LINK = "What the test does not check yet is listed too."
 export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "expense_lines",
-    title: "Each operating expense line",
-    why: "Management fee, payroll, repairs, utilities and the rest have no row of their own: only the tax and insurance lines and the expense growth rate are tested.",
-    beside: { key: "noi", line: "The NOI row holds the whole NOI to a T-12 where one is on file." },
+    title: "Each operating expense line on its own",
+    why: "The management fee, payroll, repairs and utilities are not each held to a figure: the operating-expense row holds their total, less the taxes and insurance, to the T-12.",
+    beside: { key: "opex", line: "Each T-12 line is shown a unit beside the row, with the OM's own line where it states one, deciding nothing." },
   },
   {
     id: "other_income",
     title: "Other income",
     why: "Parking, utility billing and fees have no row: the model folds them into its rent line.",
-    beside: { key: "noi", line: "They sit inside the NOI the NOI row holds to a T-12." },
+    beside: { key: "noi", line: "The NOI row sets the OM's other income against the T-12's in words, where both state one, deciding nothing." },
   },
   {
     id: "concessions",
@@ -80,7 +80,8 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "floating_rate",
     title: "A floating-rate loan",
-    why: "A loan quoted over an index (SOFR, Prime) is read as stated and priced on nothing: the debt row stands unchecked, and its spread and rate cap are not set against SOFR.",
+    why: "A rate quoted over SOFR, or a coupon that resets, is shown as stated and priced on nothing: the debt row stands unchecked, and no rate cap is priced.",
+    beside: { key: "debt", line: "The lender tests and the leverage read are shown, sized at the model's own rate." },
   },
   {
     id: "debt_no_rate",

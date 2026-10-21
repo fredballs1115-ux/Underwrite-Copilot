@@ -51,6 +51,10 @@
 //     the OM's premium sits under it past SAME_SHARE (the OM against its own
 //     building's history, a working floor and a rule of thumb, never a quote);
 //     at or over it nothing decides;
+//   - operating expenses: the deal's T-12 operating expenses less its taxes
+//     and insurance (the lines the OM states apart, each with its own row),
+//     then the class's expense ratio, a rule of thumb, only where no T-12 is
+//     on file; each T-12 line a unit and the OM's own lines are beside it;
 //   - other: none — the challenger's words are not a figure.
 //
 // Pure: types and the rent-growth order only. A later step that runs the
@@ -87,6 +91,9 @@ export const RESET_BILL_LABEL = "The bill the OM's own figures imply on the pric
 export const ABATEMENT_LABEL = "The stated tax abatement and when it ends";
 export const ACHIEVED_PREMIUM_LABEL = "Achieved premium on the doors already renovated";
 export const PAST_SCREENS_PUBLISHER = "your past screens";
+export const T12_OPEX_LABEL = "The deal's T-12 operating expenses less taxes and insurance";
+export const T12_OPEX_LINES_LABEL = "The deal's T-12 expense lines";
+export const CLASS_OPEX_LABEL = "The class's expense ratio, a rule of thumb";
 
 /** One step of a row's order: how a sentence names the figure, why it
  *  decides where it does, and which piece it is. */
@@ -310,6 +317,24 @@ export function insuranceDecider(candidates: readonly DeciderCandidate[] = []): 
   return pickDecider(INSURANCE_ORDER, candidates);
 }
 
+// — Operating expenses —
+
+/** The deal's T-12, then — only where no T-12 is on file — the class's
+ *  expense ratio struck on the OM's own income, a rule of thumb. The T-12's
+ *  lines a unit and the OM's own lines are words beside it. */
+export const OPEX_ORDER: readonly DeciderStep[] = [
+  {
+    name: "the deal's T-12 operating expenses less taxes and insurance",
+    why: "what the building cost to run over its trailing year, on the OM figure's footing",
+    is: isLabel(T12_OPEX_LABEL),
+  },
+  { name: "the class's expense ratio, a rule of thumb", why: "only where no T-12 is on file", is: isLabel(CLASS_OPEX_LABEL) },
+];
+
+export function opexDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
+  return pickDecider(OPEX_ORDER, candidates);
+}
+
 // — The challenger's rows —
 
 /** Each row's order in words, best first, as /how-we-test and the tests read
@@ -325,6 +350,7 @@ export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   expense_growth: EXPENSE_GROWTH_ORDER.map((s) => s.name),
   taxes: TAXES_ORDER.map((s) => s.name),
   insurance: INSURANCE_ORDER.map((s) => s.name),
+  opex: OPEX_ORDER.map((s) => s.name),
   renovation_premium: PREMIUM_ORDER.map((s) => s.name),
   other: [],
 };

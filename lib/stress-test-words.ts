@@ -209,6 +209,7 @@ export function figureText(key: StressKey, value: number | null, rowText?: strin
     case "noi":
     case "taxes":
     case "insurance":
+    case "opex":
       return money(value);
     case "basis": {
       // The reader writes the OM's basis first in its text ("$274k/unit …");
@@ -574,6 +575,7 @@ const HEADLINE_NAME: Record<StressKey, string> = {
   expense_growth: "expense growth",
   taxes: "the taxes",
   insurance: "insurance",
+  opex: "the operating expenses",
   renovation_premium: "the renovation premium",
   other: "another assumption",
 };
@@ -749,7 +751,7 @@ export function unsolvedSentence(h: StressHeadline): string {
 const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
 /** A component swap named before "swap": "the tax swap". */
-const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance" };
+const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance", opex: "operating-expense" };
 
 /**
  * What the component swaps leave of the NOI's gap where the NOI is left out

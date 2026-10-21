@@ -110,7 +110,7 @@ import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
 import { WORSE_WHEN, readStressSnapshot, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
-import { challengeKey } from "@/lib/stress-test";
+import { challengeKey, t12OpexOnFooting } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey, type StressVerdict } from "@/lib/stress-test-types";
 
 import { RECORD_FLOOR, shareWords, wholeShares, type CapturedPlace, type GapCapturedLike, type RowOutcome } from "@/lib/track-record-words";
@@ -134,6 +134,7 @@ export {
   type CapturedPlace,
   type GapCapturedLike,
   SCORED_BY,
+  SCORED_BY_TOO,
   RESCREEN_LINE,
   RESCREEN_RULE,
   SAMPLE_NO_RECORD,
@@ -388,6 +389,7 @@ const TITLES: Record<StressKey, string> = {
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
+  opex: "Operating expenses",
   renovation_premium: "Renovation premium",
   other: "Everything else the challenger raised",
 };
@@ -916,7 +918,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" };
+  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic", less: r.key === "opex" ? (r.less ?? []) : null };
   // A snapshot kept before the measure was carried (2026-10-20) has none,
   // and keeps the row's title and the deciding evidence, never the OM's own
   // label the measure is read off (lib/stress-test `measureOf`): it is read
@@ -1135,6 +1137,10 @@ function laterFor(
     perUnit: boolean;
     /** the row's OM figure is an economic vacancy, not one counted by doors */
     economic: boolean;
+    /** an operating-expense row's footing: the lines its figures leave out
+     *  (lib/stress-snapshot `less`). Absent on an older screen's challenge,
+     *  whose figure's footing is not known, so none scores it */
+    less?: readonly ("taxes" | "insurance")[] | null;
   },
 ): Later | null {
   const t12When = t12WhenOf(ev);
@@ -1156,7 +1162,26 @@ function laterFor(
       return null;
     }
     // Taxes and insurance are never here: a seller's T-12 cannot show a new
-    // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`).
+    // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`). The operating
+    // lines are the building's own, so a seller's later T-12 speaks to them:
+    // its expense total less the tax and insurance lines the row's figures
+    // left out, on the row's own footing — none where it breaks out no such
+    // line, and none for a challenge, whose figure's footing is not known.
+    case "opex": {
+      // The stress test's own reading of a T-12 on the row's footing
+      // (lib/stress-test `t12OpexOnFooting`): its tax and insurance lines
+      // are subtracted, never scored.
+      if (!ev.t12 || !ev.less) return null;
+      const footed = t12OpexOnFooting({ periodEnd: ev.t12.dated, summary: ev.t12.summary }, ev.less);
+      if (!footed || "missing" in footed) return null;
+      const out = [...(footed.tax != null ? ["taxes"] : []), ...(footed.insurance != null ? ["insurance"] : [])];
+      return {
+        source: "t12",
+        value: footed.value,
+        at: ev.t12.arrivedAt,
+        text: `${t12When} ran ${compactUsd(footed.value, { millions: 2 })} of operating expenses${out.length ? ` less its ${out.join(" and ")}` : ""}`,
+      };
+    }
     case "basis": {
       if (ev.trade) {
         const { value, whole } = onBasis(ev.trade.price);

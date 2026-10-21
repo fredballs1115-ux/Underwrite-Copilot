@@ -116,7 +116,7 @@ describe("/how-we-test draws every method from the table", () => {
       basis: ["om_internal", "published", "rule_of_thumb"],
       exit_cap: ["om_internal", "published", "published"],
       debt: ["published", null, null],
-      noi: ["document", "document", "om_internal"],
+      noi: ["document", "document", "om_internal", "document"],
       // A stabilized assumption is the market's to judge first; the
       // documents' vacancy is today's: the rent roll's by its doors, the
       // T-12's in dollars, each its own measure.
@@ -127,6 +127,8 @@ describe("/how-we-test draws every method from the table", () => {
       taxes: ["om_internal", "om_internal", "document"],
       // The seller's own T-12 premium decides where the OM's sits under it.
       insurance: ["document", "published"],
+      // The deal's own T-12 decides; the class's ratio only where none is on file.
+      opex: ["document", "document", "rule_of_thumb"],
       // The break-even is said beside the row, never set against it.
       renovation_premium: ["om_internal", "om_internal", "om_internal"],
       other: [null],

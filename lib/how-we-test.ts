@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
+import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, SCORED_BY_TOO, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
@@ -112,6 +112,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   expense_growth: `Held to all-items CPI's trailing year; to core CPI only where all-items is not fresh. Core, the insurance index, the breakeven and the CPI's own average over the years its history holds are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the OM's implied reset bill, else its unabated bill, else the T-12's bill where the OM's is over ${pctOf(SAME_SHARE)} under it. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported; the reset bill and the T-12's read stretched at most.`,
   insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a working floor and a rule of thumb, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
+  opex: `Held to the T-12's expenses on the OM figure's footing, less the taxes and insurance it states; with no T-12, to the class's ratio, a rule of thumb, stretched at most. Holds within ${pctOf(NOI_IN_LINE_BAND)} under it or over it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} under it.`,
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };
@@ -299,6 +300,7 @@ export const TRACK_RECORD = {
     "Each row of the stress test, holds included, is scored where a later figure can speak to it: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
     "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade, the price a Closed deal was bought at.",
     SCORED_BY,
+    SCORED_BY_TOO,
     DECISION_SCORES,
     PURCHASE_IS_DECISION,
     NOT_YET_SCORABLE,

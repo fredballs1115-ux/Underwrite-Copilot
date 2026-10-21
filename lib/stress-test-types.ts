@@ -21,6 +21,7 @@ export const STRESS_KEYS = [
   "expense_growth",
   "taxes",
   "insurance",
+  "opex",
   "renovation_premium",
   "other",
 ] as const;
@@ -196,6 +197,12 @@ export interface StressRow {
    *  where the figure counts doors (a stated occupancy, a vacancy), which the
    *  T-12's economic loss never decides */
   measure?: "economic";
+  /** on the operating-expense row, the lines its figures leave out on both
+   *  sides: the taxes and the insurance where the OM states each (each has a
+   *  row of its own), so the OM's figure and the T-12's are on one footing
+   *  and the track record scores a later T-12 on the same one. Absent
+   *  elsewhere */
+  footing?: { less: ("taxes" | "insurance")[] };
 }
 
 export interface StressTest {
@@ -392,7 +399,7 @@ export interface StressAtEvidence {
  *  of it is swapped too: one clause, the omitted row's `why` and the
  *  method's own words. */
 export const HEADLINE_NOI_LEFT_OUT =
-  "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
+  "the NOI already holds the vacancy, the taxes, the insurance and the operating expenses, so swapping it beside one of them would count that line twice";
 
 /** Why the price is in neither side of the headline's split: both cases pay
  *  the price the model runs on, so the headline is what that price earns on
@@ -420,7 +427,7 @@ export const HEADLINE_METHOD = {
   claim: "The return the memorandum's figures make, all of them at once.",
   omCase: [
     "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
-    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium and the NOI; the price is the model's own in both cases, below.",
+    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium, the operating expenses and the NOI; the price is the model's own in both cases, below.",
     "The premium is re-run only where the seller's T-12 premium decides its row; else both cases keep the model's premium.",
     "The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.",
     "It is struck as the rent line that makes that NOI at the OM's own vacancy and expenses.",
@@ -443,10 +450,10 @@ export const HEADLINE_METHOD = {
     "And the insurance part, struck at the seller's own T-12 premium: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote.",
   ],
   overlap: [
-    `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
-    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
+    `The NOI is left out where the vacancy, taxes, insurance or operating-expense row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
+    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the four past its evidence, the NOI's own swap stands.",
     "What the component swaps leave of the NOI's gap, the NOI row's gap less the year-one NOI they move, is in neither case, and the headline says how much wherever it passes 1% of the OM's NOI.",
-    "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
+    "A tax bill, a premium or the operating expenses the T-12 already carries in the model's expense line are swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
   plan: [
@@ -557,6 +564,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The deal's own T-12 NOI, the one figure that decides where one is on file, with its period printed beside it and the sign of every deduction read once",
       "The rent roll's in-place rent against the pro forma's, in words beside it, on the class's own yardstick: a month a unit, else per SF a year",
       "The memorandum's own in-place figures against its stabilized ones, deciding only where no T-12 is on file",
+      "The OM's other income against the T-12's, where both state one, in words beside it and never deciding",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
     limits: [
@@ -649,6 +657,24 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The seller's T-12 premium is history, not a quote: a rule of thumb says a new owner is rarely quoted under it, so a premium under it reads stretched at most, and the re-run at it is a working floor, not the premium a new owner will pay.",
       "A premium at or over the T-12's stays unchecked: the seller's history cannot say a new owner will pay less, and the national index says nothing of this building.",
       "On a development or a conversion the T-12 insures the building before the plan delivers a new one, so it decides nothing.",
+    ],
+  },
+  {
+    key: "opex",
+    title: "Operating expenses",
+    claim: "The pro forma's operating expenses, less the taxes and the insurance, are what the building costs to run.",
+    against: [
+      "The deal's own T-12 operating expenses less its taxes and insurance, the one figure that decides, with its period printed beside it",
+      "Each T-12 expense line a unit (a square foot on a class priced by the foot), the management fee as a share of the T-12's EGI, and the OM's own lines where it states them, shown beside it, never deciding",
+      "The class's expense ratio from the model's screening defaults, a rule of thumb named as one, struck on the OM's own income, deciding only where no T-12 is on file",
+    ],
+    engine: "The expense line is an input: the return is re-run at the deciding figure, swapped into the model's expense line, never added on top. A plan's yield on cost is re-run on its pro forma line.",
+    limits: [
+      "The taxes and the insurance are left out on both sides wherever the OM states them, since each has a row of its own; a T-12 that breaks out neither line cannot be set on that footing.",
+      "Where the OM states only a total or a ratio, that is what is read; a line the OM does not state is never inferred, and its own lines decide nothing.",
+      "The T-12's period is not matched to the OM's figure, and neither is scaled to the other's year.",
+      "A rule of thumb reads stretched at most.",
+      "No row on a development or a conversion: no building runs today to have a T-12, and its pro forma is the finished building's.",
     ],
   },
   {

@@ -1431,6 +1431,7 @@ function stressFigure(key: StressKey, value: number, per: string, evidence = fal
     case "noi":
     case "taxes":
     case "insurance":
+    case "opex":
       return { value, numFmt: FMT.usd };
     case "basis":
       return { value, numFmt: per ? `$#,##0"${per}"` : "$#,##0" };
