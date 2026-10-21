@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, marginWords } from "@/lib/track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
@@ -300,12 +300,19 @@ export const TRACK_RECORD = {
     SCORED_BY,
     DECISION_SCORES,
     NOT_YET_SCORABLE,
-    "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands at or better than the OM's.",
+    "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands within that margin, or better for the buyer.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
     `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
     "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
-    "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",
+    // lib/track-record `scoreScreen`'s `admit`: refused where the document's
+    // own day is on or before the verdict's.
+    "A document the screen itself read is never scored: the challenger was handed it. Nor is a T-12 whose period ended, or a rent roll dated, on or before the verdict's day, only uploaded later.",
+    "A T-12 whose period ends after the verdict's day is scored even where most of its months precede the verdict, and each row it scores says how many do.",
+    TRADE_DATE_RULE,
+    // lib/anthropic/pipeline: a document is read on a screen, and a re-screen
+    // writes the screen it replaces to deals.prior_screen, over the last.
+    RESCREEN_RULE,
     "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
     "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
@@ -313,6 +320,26 @@ export const TRACK_RECORD = {
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record. A share is always printed with its count beside it ("3 of 5 rows").`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
   ],
+} as const;
+
+/**
+ * The words of the scoring rule's picture on /how-we-test (its track: the
+ * OM's figure, the row's margin past it on the buyer's bad side, a later
+ * figure; and where right and wrong fall for a flag and for a hold) — the
+ * rule as lib/track-record `scoreTestRow` strikes it, drawn with no deal's
+ * figures.
+ */
+export const SCORING_RULE = {
+  caption: "The rule, drawn: no deal's figures.",
+  axis: { better: "Better for the buyer", worse: "Worse for the buyer" },
+  row: "The row",
+  flag: "A flag (stretched or unsupported)",
+  hold: "A hold",
+  om: "The OM's figure",
+  margin: "The row's own margin, on the buyer's bad side of it",
+  later: "A later figure, here past the margin",
+  right: "Right: a flag the later figure lands past the margin; a hold it lands within, or better",
+  wrong: "Wrong: a flag it lands within the margin, or better; a hold it lands past",
 } as const;
 
 // The headline's method (lib/stress-test-types `HEADLINE_METHOD`, held to

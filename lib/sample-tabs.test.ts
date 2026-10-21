@@ -289,6 +289,18 @@ describe("the walkthrough draws /demo's build, part for part", () => {
     expect(html).not.toContain('data-qa="walkthrough-part-loading"');
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+    // The sample's lack of a track record is said beside its test, on /demo
+    // and the walkthrough alike, linking to how one is scored — whose anchor
+    // /how-we-test carries.
+    for (const page of [html, demo("overview")]) {
+      const at = page.indexOf('data-qa="sample-no-record"');
+      expect(at).toBeGreaterThan(page.indexOf('data-qa="stress-test-panel"'));
+      expect(at).toBeLessThan(page.indexOf("Risk digest"));
+      const note = page.slice(at, page.indexOf("</p>", at));
+      expect(visibleText(note).replace(/&#x27;/g, "'")).toContain("Nothing has arrived since the sample's screen, so it has no track record.");
+      expect(note).toMatch(/<a [^>]*href="\/how-we-test#track-record"[^>]*>How one is scored<\/a>/);
+    }
+    expect(src("app/how-we-test/view.tsx")).toContain('id="track-record"');
   });
 
   it("Financials: the model against today's figures between the debt sizer and the model card, as on /demo", () => {

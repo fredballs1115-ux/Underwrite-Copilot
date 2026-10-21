@@ -11,7 +11,21 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { T12Summary } from "@/lib/actuals/types";
 import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
-import { ACCOUNT_VACANCY_NOTE, CARD_SCOPE, DOCUMENT_DATE_RULE, RECORD_NONE_LINE, TAX_INSURANCE_NOT_SCORED, accountRecord, scoreDeal, type DealRecord } from "./track-record";
+import {
+  ACCOUNT_VACANCY_NOTE,
+  CARD_SCOPE,
+  DOCUMENT_DATE_RULE,
+  RECORD_NONE_LINE,
+  RESCREEN_LINE,
+  RESCREEN_RULE,
+  TAX_INSURANCE_NOT_SCORED,
+  TRADE_DATE_RULE,
+  accountRecord,
+  scorableGrid,
+  scoreDeal,
+  type DealRecord,
+} from "./track-record";
+import { ScorableGrid } from "@/app/(app)/scorable-grid";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { STRESS_SNAPSHOT_V, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "./stress-snapshot";
 
@@ -157,11 +171,45 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     );
   });
 
-  it("draws nothing where nothing arrived after the screen, or with no record", () => {
+  it("draws what will score what where nothing arrived after a verdict, and nothing with no record or no verdict stamp", () => {
     expect(html(React.createElement(TrackRecordCard, { record: null }))).toBe("");
+    expect(html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: null, challenges: [vacancy] }) }))).toBe("");
     const before = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: "2026-09-01T00:00:00Z", dated: null, summary: t12 } });
     expect(before.notScored).toHaveLength(1);
-    expect(html(React.createElement(TrackRecordCard, { record: before }))).toBe("");
+    const out = html(React.createElement(TrackRecordCard, { record: before }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toContain('data-state="waiting"');
+    expect(text).toContain("Screened Oct 1, 2026. Nothing has arrived since, so no row is scored yet.");
+    expect(out).toContain('data-qa="scorable-grid"');
+    expect(text).toContain(RESCREEN_LINE);
+    // The grid is the deal's own record's, drawn as data: a row a key, a mark
+    // a kind of evidence that can score it.
+    expect((out.match(/<tr [^>]*data-row="/g) ?? []).length).toBe(before.scorable!.length);
+    expect((out.match(/data-scores="/g) ?? []).length).toBe(before.scorable!.reduce((n, r) => n + Object.values(r.by).filter(Boolean).length, 0));
+    expect(out).toContain('data-row="vacancy"><th scope="row"');
+    // Nothing is claimed: no row, no share, no evidence list; the read T-12's refusal stays.
+    expect(out).not.toContain('data-qa="track-record-rows"');
+    expect(out).not.toContain('data-qa="track-record-evidence"');
+    expect(text).not.toMatch(/\d+%/);
+    expect(text).toContain("T-12 (period not stated) was on the deal before the screen");
+  });
+
+  it("draws a decision's badge in a neutral tone, never a verdict's green or red; its words unchanged", () => {
+    const out = html(React.createElement(TrackRecordCard, { record: withLater() }));
+    const badge = out.match(/<span class="([^"]*)"[^>]*data-decision=""[^>]*>([^<]*)<\/span>/);
+    expect(badge).not.toBeNull();
+    expect(badge![1]).toContain("text-muted");
+    expect(badge![1]).not.toMatch(/text-pass|text-kill/);
+    expect(badge![2]).toBe("Screen&#x27;s side");
+  });
+
+  it("prints a vacancy row's three figures each as a share vacant", () => {
+    const text = visibleText(html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) })));
+    expect(text).toContain("6.0% vacant");
+    expect(text).toContain("9.0% vacant");
+    expect(text).toContain("9.1% vacant");
   });
 
   it("says no row is scored where the later evidence speaks to no challenge with figures", () => {
@@ -186,8 +234,31 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // market's, which a deal's own page does only where the market decided:
     // said where the record is drawn (audit M5).
     expect(text.replace(/&#x27;/g, "'")).toContain(ACCOUNT_VACANCY_NOTE);
-    // What a document must be to score, and what no document scores.
-    expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
+    // What a document must be to score, a trade's own date, and what no document scores.
+    expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TRADE_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
+    expect(text.replace(/&#x27;/g, "'")).toContain(RESCREEN_RULE);
+    // Nothing scored: the grid of what will score what, not words alone.
+    expect(out).toContain('data-qa="scorable-grid"');
+    expect(text).toContain(RESCREEN_LINE);
+  });
+
+  it("ScorableGrid: a row a stress-test assumption by its title, a column a kind of later evidence, a mark the scorer can make", () => {
+    const rows = scorableGrid();
+    const out = html(React.createElement(ScorableGrid, { rows }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out);
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toMatch(/<caption[^>]*>What will score what<\/caption>/);
+    for (const h of ["T-12", "Rent roll", "Decision", "Trade"]) expect(out).toContain(`scope="col" class="w-16 px-1 py-1 text-center font-medium text-muted">${h}</th>`);
+    for (const r of rows) expect(out).toContain(`data-row="${r.key}"><th scope="row" class="py-1 pr-2 text-left font-normal">${r.title.replace(/'/g, "&#x27;")}</th>`);
+    // Each marked cell says so to a screen reader; an empty one says nothing scores it.
+    const marks = rows.reduce((n, r) => n + Object.values(r.by).filter(Boolean).length, 0);
+    expect(marks).toBeGreaterThan(0);
+    expect((out.match(/can score it/g) ?? []).length).toBe(marks);
+    expect((out.match(/>nothing</g) ?? []).length).toBe(rows.length * 4 - marks);
+    expect(out).toContain('data-row="noi"');
+    expect(out).toMatch(/data-row="noi">[\s\S]*?data-scores="t12"/);
+    expect(html(React.createElement(ScorableGrid, { rows: [] }))).toBe("");
   });
 
   it("few: the counts, a bar a key, and 'a start, not a record' with no share", () => {
@@ -200,10 +271,13 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(text).toContain("1 deal tested · 1 with later evidence · 2 rows scored");
     expect(text).toContain("2 challenges scored from screens whose stress test was not kept are a start, not a record: no share is printed under 5.");
     expect(text).not.toMatch(/\d+%/);
-    expect(few).toContain('data-bar="record-screen"');
-    expect(few).toContain('data-bar="record-between"');
-    expect(few).not.toContain('data-bar="record-om"');
-    expect(text).toContain("No share is printed under 5 scored rows.");
+    // Under the floor, a dot a scored row in its tone, never a share bar.
+    expect(few).not.toContain("data-bar=");
+    expect((few.match(/data-dot="record-screen"/g) ?? []).length).toBe(1);
+    expect((few.match(/data-dot="record-between"/g) ?? []).length).toBe(1);
+    expect(few).not.toContain('data-dot="record-om"');
+    expect(text).toContain("Under 5 scored rows an assumption draws a dot a row, never a bar.");
+    expect(few).not.toContain('data-qa="scorable-grid"');
     // A decision is no scored row: withLater's basis row is the Dead
     // decision, counted apart, so its deal alone is two scored rows.
     const decided = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
@@ -228,8 +302,11 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(out).toContain('data-state="record"');
     // The two Dead decisions are said apart, never in the shares.
     expect(text.replace(/&#x27;/g, "'")).toContain(
-      "5 challenges scored from screens whose stress test was not kept: 3 of 5 challenges on the screen's side (60%), 0 of 5 challenges on the OM's (0%), 2 of 5 challenges between (40%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
+      "5 challenges from 3 deals scored, from screens whose stress test was not kept: 3 of 5 challenges on the screen's side (60%), 0 of 5 challenges on the OM's (0%), 2 of 5 challenges between (40%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
     );
+    // Each key holds under five rows, so each draws dots: 3 and 2.
+    expect((out.match(/data-dot="record-screen"/g) ?? []).length).toBe(3);
+    expect((out.match(/data-dot="record-between"/g) ?? []).length).toBe(2);
     expect(text).toContain("3 screen · 0 OM");
     expect(text).toContain("0 screen · 0 OM · 2 between");
   });
@@ -247,11 +324,17 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     const text = visibleText(out);
     expect(gluedWords(text)).toEqual([]);
     expect(out).toContain('data-state="record"');
-    expect(text).toContain("5 stress-test rows scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%), 2 of them false holds.");
-    expect(out).toContain('data-bar="record-right"');
-    expect(out).toContain('data-bar="record-wrong"');
+    expect(text).toContain("5 stress-test rows from 3 deals scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%), 2 of them false holds.");
+    expect((out.match(/data-dot="record-right"/g) ?? []).length).toBe(3);
+    expect((out.match(/data-dot="record-wrong"/g) ?? []).length).toBe(2);
     expect(text).toContain("3 right · 0 wrong");
     expect(text).toContain("0 right · 2 wrong");
+    // A key of five scored rows draws its bar.
+    const bar = accountRecord([snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" })]);
+    const barred = html(React.createElement(TrackRecordSection, { record: bar }));
+    expect(barred).toContain('data-bar="record-right"');
+    expect(barred).not.toContain("data-dot=");
+    expect(a11yIssues(barred)).toEqual([]);
   });
 
   it("its bar markers are its own across the app's sources", () => {
@@ -264,8 +347,9 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
       }
     };
     walk(join(process.cwd(), "app"));
+    // The markers are the section's `DOTS` table, a bar's segment and a dot alike.
     for (const marker of ["record-right", "record-wrong", "record-screen", "record-between", "record-om"]) {
-      const holders = files.filter((f) => readFileSync(f, "utf8").includes(`data-bar="${marker}"`));
+      const holders = files.filter((f) => readFileSync(f, "utf8").includes(`"${marker}"`));
       expect(holders.map((f) => f.replace(process.cwd(), "")), marker).toEqual(["/app/(app)/analytics/track-record.tsx"]);
     }
     const landing = files.filter((f) => readFileSync(f, "utf8").includes("data-landing="));

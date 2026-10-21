@@ -377,7 +377,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does the test make me more accurate?",
-    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether that was right is known only when a later document, your decision or a trade arrives, and the track record will count exactly those.",
+    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether each of its rows was right is scored only when a later document, your decision or a trade arrives, and the track record counts exactly those: it scores the test's rows, never your own calls.",
   },
   {
     q: "Are my documents private?",

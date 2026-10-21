@@ -976,14 +976,16 @@ export default async function DealPage({
     assetClass: readClass,
   }) ?? { rentRoll: null, t12: null, noiComparison: null, noiNote: null, assetClass: readClass };
 
-  // The track record (lib/track-record): the stored challenges against what
-  // arrived AFTER the verdict — a rent roll or T-12 by its document's
-  // upload, the decision and the trade off the move that ended the deal.
-  // A document the screen read is named and never scored — and the
-  // previous screen's challenges (the re-screen's snapshot) are scored
-  // against what arrived after THAT verdict, since the re-screen read it.
-  // Scored once the stress test is built (below), which says whether the
-  // market or the documents decided the vacancy row.
+  // The track record (lib/track-record): the stress test's rows as kept with
+  // the verdict (its challenges, where the verdict kept none) against what
+  // arrived AFTER the verdict — a rent roll or T-12 uploaded after it AND
+  // dated after its day, the decision, and a trade reported after it and not
+  // traded on or before its day, off the move that ended the deal. A
+  // document the screen read is named and never scored — and the previous
+  // screen's rows (the re-screen's snapshot) are scored against what
+  // arrived after THAT verdict, since the re-screen read it. Scored once the
+  // stress test is built (below), which says whether the market or the
+  // documents decided the vacancy row.
   const scoreTrackRecord = (vacancyHeldToMarket: boolean) => scoreDeal({
     screenedAt: verdict?.generatedAt ?? null,
     // The stress test as it stood at the verdict (lib/stress-snapshot): its

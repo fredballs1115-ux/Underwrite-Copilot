@@ -27,6 +27,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCORING_RULE,
   SCREENING_MODEL_SECTION,
   TRACK_RECORD,
   VERDICT_RULES,
@@ -45,7 +46,7 @@ import {
   RENT_GROWTH_UNSUPPORTED_PTS,
   VACANCY_UNSUPPORTED_PTS,
 } from "./stress-test";
-import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY } from "./track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -263,6 +264,34 @@ describe("/how-we-test draws every method from the table", () => {
     // The closing card names the sample for what it is.
     expect(text).toContain("See it on the sample deal");
     expect(text).not.toContain("real deal");
+  });
+
+  it("states the record's date rules as the scorer's own, and draws the scoring rule as the rule, with no figure in it", () => {
+    const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+    // The documents' rule is the code's: on or before the verdict's day, a
+    // T-12 by its period end and a rent roll by its as-of; the trade's own
+    // date; and how a document reaches the record — on the re-screen.
+    expect(TRACK_RECORD.lines).toContain(TRADE_DATE_RULE);
+    expect(TRACK_RECORD.lines).toContain(RESCREEN_RULE);
+    expect(flat).toContain("Nor is a T-12 whose period ended, or a rent roll dated, on or before the verdict's day, only uploaded later.");
+    expect(flat).not.toContain("whose year ended before the verdict");
+    expect(RESCREEN_RULE).toContain("each re-screen keeps the one screen it replaces, none before it");
+    // The picture: under the record's heading, its marks the panels' own parts.
+    const at = html.indexOf('data-qa="scoring-rule"');
+    expect(at).toBeGreaterThan(html.indexOf('id="track-record"'));
+    const picture = html.slice(at, html.indexOf("</figure>", at));
+    for (const bar of ["rule-om", "rule-margin", "rule-later", "rule-flag-right", "rule-flag-wrong", "rule-hold-right", "rule-hold-wrong"]) {
+      expect(picture, bar).toContain(`data-bar="${bar}"`);
+    }
+    // A flag is right past the margin and wrong short of it; a hold the other way.
+    const left = (bar: string) => Number(picture.match(new RegExp(`left:(\\d+)%[^"]*"[^>]*data-bar="${bar}"`))?.[1]);
+    expect(left("rule-flag-right")).toBe(left("rule-hold-wrong"));
+    expect(left("rule-flag-wrong")).toBe(0);
+    expect(left("rule-hold-right")).toBe(0);
+    for (const words of Object.values(SCORING_RULE).flatMap((v) => (typeof v === "string" ? [v] : Object.values(v)))) expect(flat).toContain(words);
+    expect(visibleText(picture).replace(/&#x27;/g, "'")).toContain("The rule, drawn: no deal's figures.");
+    expect(visibleText(picture)).not.toMatch(/\d/);
+    expect(a11yIssues(picture)).toEqual([]);
   });
 
   it("says how the headline is struck, in HEADLINE_METHOD's own words, before the assumptions' sections", () => {

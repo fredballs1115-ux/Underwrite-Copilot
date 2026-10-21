@@ -1,5 +1,6 @@
 import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
 import { CARD_SCOPE, NOT_YET_SCORABLE, OUTCOME_WORD, TAX_INSURANCE_NOT_SCORED, dealRecordLine } from "@/lib/track-record-words";
+import { ScorableGrid } from "../../scorable-grid";
 
 /**
  * What came after the screen (the track record, 2026-10-19; every stress-test
@@ -10,15 +11,35 @@ import { CARD_SCOPE, NOT_YET_SCORABLE, OUTCOME_WORD, TAX_INSURANCE_NOT_SCORED, d
  * (the rows nothing can score yet named, `NOT_YET_SCORABLE`). A screen whose test was not kept has
  * its challenges scored instead, by which side the later figure landed on,
  * and the card says the rows were not snapshotted. Pure: the record is
- * scored in lib/track-record and handed in as data. Drawn only where
- * something arrived after the screen; a deal with nothing after it draws
- * nothing, since there is nothing to score and nothing to claim.
+ * scored in lib/track-record and handed in as data. Where nothing has
+ * arrived after the screen, a deal with a verdict draws what will score what
+ * (`ScorableGrid`, the scorer's own rules on this deal) and claims nothing;
+ * a deal with no verdict stamp draws nothing.
  */
 export function TrackRecordCard({ record }: { record: DealRecord | null }) {
-  // Drawn where something arrived after the screen — or where a document
-  // uploaded after it was refused for its own date, so the refusal is said
-  // where the reader looks for the score.
-  if (!record || (record.evidence.length === 0 && !record.refusedLater)) return null;
+  if (!record) return null;
+  // Nothing arrived after the screen (and nothing uploaded after it was
+  // refused for its own date): what will score what, once there is a
+  // verdict to score against.
+  if (record.evidence.length === 0 && !record.refusedLater) {
+    if (!record.screenedAt || !record.scorable?.length) return null;
+    return (
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record" data-state="waiting">
+        <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted">
+          {record.screenedOn ? `Screened ${record.screenedOn}. Nothing has arrived since, so no row is scored yet.` : "Nothing has arrived since the screen, so no row is scored yet."}
+        </p>
+        <ScorableGrid rows={record.scorable} />
+        {record.notScored.length > 0 && (
+          <ul className="mt-3 space-y-1 text-xs leading-relaxed text-muted" data-qa="track-record-not-scored">
+            {record.notScored.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
+  }
   const scored = record.rows.filter((r) => r.landing !== "unscored");
   const unscored = record.rows.filter((r) => r.landing === "unscored");
   const taxOrInsurance = record.rows.some((r) => r.key === "taxes" || r.key === "insurance");
@@ -107,6 +128,10 @@ const LANDING_WORD: Record<"screen_side" | "om_side" | "between", string> = {
   between: "Between",
 };
 
+// A decision is a direction, in no share: its badge is neutral, never the
+// green or red of a figure borne out or not.
+const DECISION_TONE = "border-line bg-faint text-muted";
+
 const LANDING_TONE: Record<Scored, string> = {
   right: "border-pass/40 bg-pass/10 text-pass",
   wrong: "border-kill/40 bg-kill/10 text-kill",
@@ -133,7 +158,12 @@ function RowView({ row }: { row: ScoredRow }) {
           {row.title}
           {row.fromTest && row.verdict ? <span className="ml-1.5 text-xs font-normal text-muted">{`· the test's verdict: ${row.verdict}`}</span> : null}
         </p>
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${LANDING_TONE[landing]}`} data-landing={landing} data-outcome={row.outcome ?? undefined}>
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${row.decision ? DECISION_TONE : LANDING_TONE[landing]}`}
+          data-landing={landing}
+          data-outcome={row.outcome ?? undefined}
+          data-decision={row.decision ? "" : undefined}
+        >
           {badgeWord(row)}
         </span>
       </div>

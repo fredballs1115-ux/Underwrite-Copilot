@@ -205,10 +205,12 @@ export default async function AnalyticsPage() {
     }),
   );
 
-  // The track record (lib/track-record): every pooled deal's stored
-  // challenges against what arrived AFTER its verdict — its rent roll and
-  // T-12 by their documents' upload, the decision and the trade off the
-  // move that ended it. Best-effort reads of the actuals tables (0020): on
+  // The track record (lib/track-record): every pooled deal's stress-test
+  // rows as kept with its verdict (its challenges, where the verdict kept
+  // none) against what arrived AFTER that verdict — its rent roll and T-12
+  // uploaded after it and dated after its day, the decision, and a trade
+  // reported after it and not traded on or before its day, off the move
+  // that ended it. Best-effort reads of the actuals tables (0020): on
   // an older schema they error and read as none, and the record is scored
   // on decisions and trades alone.
   const ids = new Set(pooled.map((r) => r.id));

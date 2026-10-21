@@ -13,6 +13,7 @@ import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { incomeGapShare } from "@/lib/gap-detail";
 import { reconciledAgainst } from "@/lib/reconciliation-words";
 import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
+import { SAMPLE_NO_RECORD } from "@/lib/track-record-words";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
 import { StressTestPanel } from "@/app/stress-test-panel";
@@ -502,6 +503,17 @@ export function OverviewView({
           {sample && !stressTest.impactsWithheld && (
             <p className="mt-1 max-w-2xl px-1 text-xs leading-relaxed text-muted" data-qa="sample-plan-note">
               {SAMPLE_PLAN_NOTE}
+            </p>
+          )}
+          {/* Nothing postdates the sample's screen, so it has no worked
+              track record, and none is faked: said beside its test, with
+              how a record is scored a link away. */}
+          {sample && (
+            <p className="mt-1 max-w-2xl px-1 text-xs leading-relaxed text-muted" data-qa="sample-no-record">
+              {`${SAMPLE_NO_RECORD} `}
+              <Link href="/how-we-test#track-record" className="font-medium text-brand hover:underline">
+                How one is scored
+              </Link>
             </p>
           )}
         </div>
