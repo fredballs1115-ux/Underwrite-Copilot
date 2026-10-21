@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-21",
+      "title": "The stress test in the workbook, and on paper as on the page",
+      "href": "/how-we-test",
+      "blurb": "The underwriting workbook has a Stress Test tab: each row's OM figure, the one figure that decides it with its publisher and period, the gap, the verdict and the return's move, then the headline and its split, as data beside the live model. The memo, the report and the verdict's brief now date each published figure by its own month or quarter, say a trailing year as one rather than a yearly rate, cite the memorandum's own page where the engine has a checked one, and mention a re-run only where one is made. A shared screen shows the call's own stress-test counts beside the panel it rebuilds."
+    },
+    {
+      "date": "2026-10-21",
       "title": "The stress test leads every first look",
       "href": "/how-we-test",
       "blurb": "The homepage, the sample test and /how-we-test now open on the stress test: a worked row of the sample on /how-we-test, the sample's reading guide starting at the test, the chip that jumps to it from any tab, and a screen in progress saying the test fills in before the verdict. Every line about the test now says what the code does: the key assumptions are set against their evidence, and the return is re-run where a gap moves it. A market card prints a figure only where it is dated and names its publisher."
