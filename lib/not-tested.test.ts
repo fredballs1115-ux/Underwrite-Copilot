@@ -92,7 +92,7 @@ describe("what the test does not check yet", () => {
     // A lender's quote on file decides first; else today's index plus the
     // class's spread, the Treasury tenor nearest the OM's stated loan term.
     expect(debt.against[0]).toMatch(/^The lender's quote on file/);
-    expect(debt.against.some((a) => /^Today's index \(the Treasury tenor nearest the OM's stated loan term where read, else the hold's/.test(a))).toBe(true);
+    expect(debt.against.some((a) => /today's index \(the Treasury tenor nearest the OM's stated loan term where read, else the hold's/.test(a))).toBe(true);
     // A floating rate is recognised and priced on nothing: no SOFR pricing.
     expect(src).toContain("floatingRateOf");
     expect(debt.limits.join(" ")).toContain("priced on nothing: the row stands unchecked");
