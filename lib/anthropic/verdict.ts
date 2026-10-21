@@ -1,4 +1,5 @@
 import "server-only";
+import { LOAN_QUOTE_LABEL } from "@/lib/stress-deciders";
 import { compactUsd } from "@/lib/money";
 import { z } from "zod";
 import { screenOutputFormat } from "./output-format";
@@ -138,15 +139,38 @@ export const STRESS_SECTION_HEADING = "## STRESS TEST, STRUCK IN CODE";
  * swapped) and the challenger's question — then the instruction: the moves
  * are the engine's, cited by figure and date and never estimated.
  */
+/** What the brief says of a debt row a lender's quote decided: the quote is
+ *  the buyer's, and the call's words reach the shared screen. A guard only:
+ *  the pipeline hands the brief a test built with no quote
+ *  (lib/anthropic/pipeline `screenStressTest`'s `brief`), so no row of it is
+ *  quote-decided; a caller that hands one anyway gets neither the row's
+ *  verdict word (which says where the OM's rate sits against the quote) nor
+ *  the headline (whose split and "the model's" pairs carry the quote's rate). */
+export const LOAN_QUOTE_WITHHELD =
+  "Decided by the buyer's own lender quote on file; its rate, its terms and the row's figures are kept out of this brief because the call's words can reach a shared screen. Never cite a loan rate, a spread or this row's move.";
+
+/** The guard's headline line: withheld whole where a quote decides a row. */
+export const QUOTE_HEADLINE_WITHHELD = "Withheld from this brief: a row in it is decided by the buyer's own lender quote, whose rate the split would carry. Never cite a headline return.";
+
 export function stressSection(test: StressTest): string[] {
   const lines: string[] = [stressReadLine(test)];
   // The headline, struck in code: the OM's case against the evidence's,
   // the gap split by assumption (lib/stress-test `stressHeadline`), which
   // the call may cite as it stands.
-  if (liveHeadline(test)) lines.push(`HEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+  const quoted = test.rows.some((r) => r.evidence.some((e) => e.label === LOAN_QUOTE_LABEL));
+  if (quoted) lines.push(`HEADLINE: ${QUOTE_HEADLINE_WITHHELD}`);
+  else if (liveHeadline(test)) lines.push(`HEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
   else if (test.impactsWithheld) lines.push(`HEADLINE: ${HEADLINE_WITHHELD}`);
   for (const r of test.rows) {
     const page = r.omSays.page != null ? ` [p. ${r.omSays.page}]` : "";
+    // A lender's quote is the buyer's own financing: the call's words reach
+    // the shared screen, so its terms never enter this brief (the buy box's
+    // 1031 clock is kept out for the same reason). The row says only that a
+    // quote decided it.
+    if (r.evidence.some((e) => e.label === LOAN_QUOTE_LABEL)) {
+      lines.push(`- ${r.title} (${r.key}) — ${LOAN_QUOTE_WITHHELD}`);
+      continue;
+    }
     const evidence = r.evidence.length
       ? r.evidence
           .map((e, i) => {

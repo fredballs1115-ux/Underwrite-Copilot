@@ -97,6 +97,7 @@ import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy, vacancyEconomicStated } from "@/lib/stress-test";
+import { loanQuoteOf } from "@/lib/loan-quote";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
@@ -1518,6 +1519,10 @@ export default async function DealPage({
     // held by its test).
     recordedSales,
     pastScreens,
+    // The lender's quote on file (lib/loan-quote): a term sheet among the
+    // deal's documents whose rate the first-draft model carries as the
+    // loan's own paper states it, the debt sizer's own rule.
+    loanQuote: isSampleDeal ? null : loanQuoteOf(model, documents),
     sample: isSampleDeal,
     readOn: todayIso,
   });

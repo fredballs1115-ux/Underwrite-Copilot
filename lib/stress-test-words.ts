@@ -209,6 +209,7 @@ export function figureText(key: StressKey, value: number | null, rowText?: strin
     case "noi":
     case "taxes":
     case "insurance":
+    case "opex":
       return money(value);
     case "basis": {
       // The reader writes the OM's basis first in its text ("$274k/unit …");
@@ -218,6 +219,12 @@ export function figureText(key: StressKey, value: number | null, rowText?: strin
     }
     case "renovation_premium":
       return `$${Math.round(value).toLocaleString("en-US")}/mo`;
+    case "market_rent": {
+      // The reader writes the OM's rent first on its own yardstick ("$2,600/mo
+      // …", "$38.00/SF …"); without it, a figure a foot is under $200.
+      const perSf = rowText ? /^\$[\d.,]+\/SF/.test(rowText) : value < 200;
+      return perSf ? `$${value.toFixed(2)}/SF` : `$${Math.round(value).toLocaleString("en-US")}/mo`;
+    }
     default:
       return String(value);
   }
@@ -571,9 +578,11 @@ const HEADLINE_NAME: Record<StressKey, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
+  market_rent: "the market rent",
   expense_growth: "expense growth",
   taxes: "the taxes",
   insurance: "insurance",
+  opex: "the operating expenses",
   renovation_premium: "the renovation premium",
   other: "another assumption",
 };
@@ -749,7 +758,7 @@ export function unsolvedSentence(h: StressHeadline): string {
 const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
 /** A component swap named before "swap": "the tax swap". */
-const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance" };
+const SWAP_NAME: Partial<Record<StressKey, string>> = { vacancy: "vacancy", taxes: "tax", insurance: "insurance", opex: "operating-expense" };
 
 /**
  * What the component swaps leave of the NOI's gap where the NOI is left out
@@ -817,10 +826,15 @@ export function untestedSentence(h: StressHeadline): string {
   if (!u) return "";
   const items = u.keys.map(headlineName);
   if (u.roll) items.push(`the ${Math.round(u.roll.sharePct)}% of the listed ${u.roll.basis} rolling in the year to ${u.roll.through}`);
+  // Every re-run sells at the model's hold, never the OM's.
+  if (u.hold) items.push(`the OM's ${yearsText(u.hold.omYears)} hold${u.hold.page != null ? ` (p. ${u.hold.page})` : ""}, since the model sells at ${u.hold.modelYears} year${u.hold.modelYears === 1 ? "" : "s"}`);
   if (items.length === 0) return "";
   const said = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
   return `This headline does not test ${said}.`;
 }
+
+/** "7-year", "7.5-year". */
+const yearsText = (y: number): string => `${Number.isInteger(y) ? y : y.toFixed(1)}-year`;
 
 /** `noiRestClause` as a sentence; "" with none. */
 export function noiRestSentence(h: StressHeadline, test?: StressTest): string {

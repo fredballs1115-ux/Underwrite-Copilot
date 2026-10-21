@@ -735,8 +735,12 @@ describe("ReportDocument (full report)", () => {
     // The grid's terms: the rate a placeholder, said only as an assumption;
     // the asset-management fee and the reserves every year carries, as the
     // model holds them.
+    // The reserve the model runs: the OM's stated $250 a unit, the higher of
+    // it and the class's default, put on the model's area (the owner's rule,
+    // 2026-10-21) — its figure and provenance as the model holds them.
+    expect(b.reservesSource?.note).toMatch(/^The OM's stated \$250 a unit a year/);
     expect(text).toContain(
-      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). Every year's cash flow carries an asset-management fee of 0.5% of equity (assumption) and capital reserves of $0.25 a square foot, grown with expenses (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
+      `The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). Every year's cash flow carries an asset-management fee of 0.5% of equity (assumption) and capital reserves of $${b.reservesPsf.toFixed(2)} a square foot, grown with expenses (${b.reservesSource!.provenance}). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.`,
     );
     // A memorandum that states no cap: the model's default, said as one.
     const uncapped = await render(
@@ -2956,7 +2960,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("9 assumptions · 2 unsupported · 5 stretched · 2 unchecked");
+    expect(page).toContain("11 assumptions · 2 unsupported · 5 stretched · 4 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, in its parts — the lead, what the
     // split is, a row a part, then each sentence after — every part the
@@ -3009,7 +3013,12 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll)");
     expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
     expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
-    expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
+    // The vacancy's two runs and the model's own IRR, read off the test,
+    // never typed.
+    const vac = test.rows.find((r) => r.key === "vacancy")!.impact!;
+    expect(page).toContain(
+      `The return: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's. If vacancy is the deal's rent roll's 9.3%, not the OM's 6.0%, the levered IRR moves from ${vac.baseIrrPct!.toFixed(1)}% to ${vac.altIrrPct!.toFixed(1)}%`,
+    );
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The memorandum's own pieces carry their validated page, as the panel's
@@ -3062,7 +3071,7 @@ describe("the report's stress-test page", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
     // The reason is one whole sentence, never behind a second "No return re-run".
-    expect(text).toContain("2 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("4 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");

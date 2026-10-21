@@ -33,6 +33,7 @@ import { shownAssetClass } from "@/lib/asset-class";
 import { buildStressTest } from "@/lib/stress-test";
 import type { StressTest } from "@/lib/stress-test-types";
 import { readStressBasisEvidence } from "@/lib/stress-basis-read";
+import { readLoanQuote } from "@/lib/loan-quote-read";
 
 export const runtime = "nodejs";
 
@@ -254,6 +255,8 @@ export async function GET(
         brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
         recordedSales,
         pastScreens,
+        // The lender's quote on file, as the deal page reads it.
+        loanQuote: await readLoanQuote(supabase, deal),
         sample: !!(deal as { is_sample?: boolean }).is_sample,
         readOn: readerDay,
       });

@@ -209,6 +209,7 @@ export function testedByHint(row: StressRow): string | null {
   if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
   switch (row.key) {
     case "noi":
+    case "opex":
       return "Add the T-12 to test this.";
     case "vacancy":
       return row.measure === "economic" ? "Add the T-12 to test this." : "Add the rent roll to test this.";
@@ -225,9 +226,11 @@ const UNCHECKED_NAME: Record<Exclude<StressKey, "other">, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
+  market_rent: "the market rent",
   expense_growth: "expense growth",
   taxes: "real estate taxes",
   insurance: "insurance",
+  opex: "the operating expenses",
   renovation_premium: "the renovation premium",
 };
 
@@ -688,7 +691,9 @@ function MethodLine({ row }: { row: StressRow }) {
  *  loan rate." is the reason already). */
 function UncheckedRow({ row }: { row: StressRow }) {
   const why = row.unchecked ?? "No evidence with a figure could be read for this deal.";
-  const hasFigure = row.omSays.value != null;
+  // A page is chipped where the OM states a figure, or states the line in
+  // words the row shows as stated (a floating rate, priced on nothing).
+  const hasFigure = row.omSays.value != null || row.omSays.page != null;
   const figure = row.omSays.text !== row.title && row.omSays.text !== why ? row.omSays.text : null;
   return (
     <li className="py-2 first:pt-1 last:pb-0" data-qa={`stress-row-${row.key}`} data-verdict="unchecked">

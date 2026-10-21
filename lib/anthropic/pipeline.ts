@@ -82,9 +82,10 @@ import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread } from "@/lib/
 import { modelMarketFor } from "@/lib/model-market";
 import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import { buildStressTest } from "@/lib/stress-test";
+import { buildStressTest, type StressTestArgs } from "@/lib/stress-test";
 import { stressSnapshotOf } from "@/lib/stress-snapshot";
 import { PAST_SCREENS_IN_BRIEF, compsCallSubjectOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
+import { readLoanQuote } from "@/lib/loan-quote-read";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import type { StressTest } from "@/lib/stress-test-types";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
@@ -584,6 +585,13 @@ async function verdictMarketReads(
  * from the worker. A model that cannot be derived (no extraction) tests the
  * rows with no return re-run, and the test says so. Best-effort: a build
  * that throws hands the verdict no test, logged, never a failed screen.
+ *
+ * Two tests come back where a lender's quote is on file: `full`, the deal
+ * page's own (the quote decides the debt row), and `brief`, the same build
+ * with no quote, the one the verdict's brief is handed — the call's words
+ * reach the shared screen, and a quote-decided row would carry the quote's
+ * rate into the headline's split and its "the model's" pairs, which the row's
+ * own guard never reached. Without a quote the two are one.
  */
 async function screenStressTest(
   admin: ReturnType<typeof createSupabaseAdminClient>,
@@ -599,9 +607,10 @@ async function screenStressTest(
     comps?: unknown;
     market?: unknown;
     public_comps?: unknown;
+    model?: unknown;
   },
   reads: VerdictReads | undefined,
-): Promise<StressTest | null> {
+): Promise<{ full: StressTest; brief: StressTest } | null> {
   try {
     const extraction = (row.extraction as ExtractionResult | null | undefined) ?? null;
     const firstSignal = (row.first_signal as FirstSignal | null | undefined) ?? null;
@@ -653,7 +662,7 @@ async function screenStressTest(
       memoryGroup: null,
       isSample: !!row.is_sample,
     });
-    return buildStressTest({
+    const args: StressTestArgs = {
       extraction,
       firstSignal,
       challenger: (row.challenges as ChallengerResult | null | undefined) ?? null,
@@ -677,9 +686,15 @@ async function screenStressTest(
       recordedSales,
       pastScreens: null,
       pastScreensWithheld: PAST_SCREENS_IN_BRIEF,
+      // The lender's quote on file (lib/loan-quote-read): a term sheet the
+      // deal's first-draft model was built from, read as the deal page reads
+      // it; the screen reads the deal's documents, as it reads its T-12.
+      loanQuote: await readLoanQuote(admin, { id: dealId, model: row.model, is_sample: row.is_sample }),
       sample: !!row.is_sample,
       readOn: today,
-    });
+    };
+    const full = buildStressTest(args);
+    return { full, brief: args.loanQuote ? buildStressTest({ ...args, loanQuote: null }) : full };
   } catch (err) {
     console.warn(`[pipeline] the stress test was not built for deal ${dealId}:`, err instanceof Error ? err.message : err);
     return null;
@@ -991,7 +1006,7 @@ async function regenerateVerdict(
 ): Promise<StressTest | null> {
   const { data, error: readErr } = await admin
     .from("deals")
-    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps")
+    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps, model")
     .eq("id", dealId)
     .single();
   // A verdict synthesized over a read that failed would judge a deal with
@@ -1058,7 +1073,18 @@ async function regenerateVerdict(
   // verdict, the OM's figure and the evidence that decided it — so the track
   // record (lib/track-record) scores the test the call was reached on, and a
   // re-screen carries it into prior_screen with the verdict.
-  const stressTest = await screenStressTest(admin, dealId, data, reads);
+  //
+  // Where a lender's quote is on file the brief, and so the call, is struck
+  // on the test built without it (`screenStressTest`'s `brief`), and the
+  // snapshot kept with the verdict is that same test: it is the test the
+  // call was reached on, and the shared screen prints its counts ("At the
+  // call: …", `callStressLine`), which a quote-decided row must not shape.
+  // The track record loses nothing by it: a debt row is scored only by a
+  // decision to walk away on financing, counted apart and in no share. The
+  // full test, the deal page's own, goes back for the screen-complete
+  // email, read by the person who asked, so its counts are the page's.
+  const tests = await screenStressTest(admin, dealId, data, reads);
+  const stressTest = tests?.brief ?? null;
 
   const verdict = await synthesizeVerdict({
     extraction,
@@ -1086,9 +1112,9 @@ async function regenerateVerdict(
   // generatedAt lets consumers (the weekly digest) know when THIS verdict
   // landed — deals.updated_at bumps on any edit and can't be trusted.
   await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString(), stressSnapshot: stressSnapshotOf(stressTest) });
-  // The test the call was reached on, for the screen-complete email's
-  // counts: nothing is stored on the verdict, so the run hands it over.
-  return stressTest;
+  // The deal page's test, for the screen-complete email's counts: nothing
+  // but the snapshot is stored on the verdict, so the run hands it over.
+  return tests?.full ?? null;
 }
 
 /**

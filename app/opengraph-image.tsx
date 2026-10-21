@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 // Branded card shown when the site is shared (iMessage, Slack, X, LinkedIn…).
 export const alt =
-  "Underwrite Copilot — the OM's assumptions, tested. Each assumption the memorandum makes, set against the evidence with its date and source.";
+  "Underwrite Copilot — the OM's assumptions, tested. The OM's key assumptions, each set against the evidence with its date and source.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -131,7 +131,7 @@ export default function Image() {
                 maxWidth: 920,
               }}
             >
-              Each assumption the memorandum makes, set against the evidence
+              The OM&apos;s key assumptions, each set against the evidence
               with its date and source. The model is included.
             </div>
           </div>

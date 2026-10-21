@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-21",
+      "title": "Three more assumptions tested, and the list of what is not",
+      "href": "/how-we-test",
+      "blurb": "The stress test now sets the OM's operating expenses against the deal's own T-12, line by line; the OM's market rent against the median of its own lease comps graded as supporting it; and, where a lender's term sheet is on the deal, the OM's loan rate against that quote, kept out of anything a shared link shows. A rate quoted over SOFR is read as stated and priced on nothing, the loan's own term picks the Treasury tenor, and the model runs the higher of the OM's stated replacement reserve and its default. /how-we-test now lists what the test does not check yet."
+    },
+    {
+      "date": "2026-10-21",
       "title": "Doors against doors, and a track record that keeps every screen",
       "href": "/how-we-test",
       "blurb": "A vacancy counted by doors is now set against the rent roll's count or a published vacancy rate, and an economic vacancy against the T-12, never one against the other. An OM's insurance premium under the seller's own trailing premium is flagged, re-run at that premium as a floor rather than a quote. A growth figure decided by one year shows the same series' longer average beside it where the history is held. The track record now shows how far each later figure landed toward the evidence, the base rate beside the shares, counts a Closed deal's own price as a decision, and keeps every screen so a scored row never disappears."

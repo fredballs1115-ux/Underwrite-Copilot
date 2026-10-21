@@ -110,7 +110,7 @@ import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
 import { WORSE_WHEN, readStressSnapshot, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
-import { challengeKey } from "@/lib/stress-test";
+import { challengeKey, t12OpexOnFooting } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey, type StressVerdict } from "@/lib/stress-test-types";
 
 import { RECORD_FLOOR, shareWords, wholeShares, type CapturedPlace, type GapCapturedLike, type RowOutcome } from "@/lib/track-record-words";
@@ -134,6 +134,7 @@ export {
   type CapturedPlace,
   type GapCapturedLike,
   SCORED_BY,
+  SCORED_BY_TOO,
   RESCREEN_LINE,
   RESCREEN_RULE,
   SAMPLE_NO_RECORD,
@@ -385,9 +386,11 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
+  market_rent: "Market rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
+  opex: "Operating expenses",
   renovation_premium: "Renovation premium",
   other: "Everything else the challenger raised",
 };
@@ -395,10 +398,14 @@ const TITLES: Record<StressKey, string> = {
 /** The keys whose figures are percents; the rest are dollars. */
 const PERCENT_KEYS: ReadonlySet<StressKey> = new Set(["exit_cap", "debt", "vacancy", "rent_growth", "expense_growth"]);
 
-/** A figure in the key's own unit: a percent to one place, a dollar compact. */
-export function recordFigure(key: StressKey, n: number): string {
+/** A figure in the key's own unit: a percent to one place, a dollar compact.
+ *  A market rent's places follow its yardstick (the row's `per`, which rides
+ *  beside the figure): a foot's rent to the cent, a unit's month in whole
+ *  dollars — never decided by the figure's size. */
+export function recordFigure(key: StressKey, n: number, per: string | null = null): string {
   if (PERCENT_KEYS.has(key)) return `${n.toFixed(1)}%`;
   if (key === "renovation_premium") return `$${Math.round(n).toLocaleString("en-US")}/mo`;
+  if (key === "market_rent") return per != null && /sf/i.test(per) ? `$${n.toFixed(2)}` : `$${Math.round(n).toLocaleString("en-US")}`;
   if (key === "other") return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(2);
   return compactUsd(n, { millions: 2 });
 }
@@ -451,6 +458,12 @@ const PLAN_VACANCY_WHY = "the OM's vacancy is the stabilized figure a plan deal 
 /** A stabilized vacancy the market decided, against a later document. */
 const MARKET_VACANCY_WHY =
   "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.";
+
+/** A market rent against a later rent roll: the roll's rent is what its
+ *  leases are paying, which sits under market by its loss to lease, so it
+ *  would score every market rent as overstated. */
+export const MARKET_RENT_WHY =
+  "a rent roll shows in-place rent, which sits under market by its loss to lease; a later rent roll cannot score a market rent.";
 
 /** An unchecked stress-test row. */
 const UNCHECKED_WHY = "the stress test left it unchecked — no evidence with a figure decided it — so there is no verdict to score.";
@@ -866,6 +879,7 @@ function documentCannotSpeak(key: StressKey, later: Later, args: ScoreDealArgs, 
   if (key === "vacancy" && args.vacancyIsPlanTarget) return PLAN_VACANCY_WHY;
   if (key === "vacancy" && heldToMarket) return MARKET_VACANCY_WHY;
   if (key === "noi" && args.plan) return PLAN_NOI_WHY;
+  if (key === "market_rent") return MARKET_RENT_WHY;
   return null;
 }
 
@@ -891,7 +905,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   const key = r.key;
   const title = r.title || TITLES[key];
   const per = r.per ?? "";
-  const fig = (n: number) => `${recordFigure(key, n)}${per}`;
+  const fig = (n: number) => `${recordFigure(key, n, r.per)}${per}`;
   const base = {
     key,
     title,
@@ -916,7 +930,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" };
+  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic", less: r.key === "opex" ? (r.less ?? []) : null, per: r.per };
   // A snapshot kept before the measure was carried (2026-10-20) has none,
   // and keeps the row's title and the deciding evidence, never the OM's own
   // label the measure is read off (lib/stress-test `measureOf`): it is read
@@ -1135,6 +1149,13 @@ function laterFor(
     perUnit: boolean;
     /** the row's OM figure is an economic vacancy, not one counted by doors */
     economic: boolean;
+    /** an operating-expense row's footing: the lines its figures leave out
+     *  (lib/stress-snapshot `less`). Absent on an older screen's challenge,
+     *  whose figure's footing is not known, so none scores it */
+    less?: readonly ("taxes" | "insurance")[] | null;
+    /** a market-rent row's yardstick ("/mo" or "/SF"); absent on an older
+     *  screen's challenge, whose figure's yardstick is not known */
+    per?: string | null;
   },
 ): Later | null {
   const t12When = t12WhenOf(ev);
@@ -1156,7 +1177,26 @@ function laterFor(
       return null;
     }
     // Taxes and insurance are never here: a seller's T-12 cannot show a new
-    // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`).
+    // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`). The operating
+    // lines are the building's own, so a seller's later T-12 speaks to them:
+    // its expense total less the tax and insurance lines the row's figures
+    // left out, on the row's own footing — none where it breaks out no such
+    // line, and none for a challenge, whose figure's footing is not known.
+    case "opex": {
+      // The stress test's own reading of a T-12 on the row's footing
+      // (lib/stress-test `t12OpexOnFooting`): its tax and insurance lines
+      // are subtracted, never scored.
+      if (!ev.t12 || !ev.less) return null;
+      const footed = t12OpexOnFooting({ periodEnd: ev.t12.dated, summary: ev.t12.summary }, ev.less);
+      if (!footed || "missing" in footed) return null;
+      const out = [...(footed.tax != null ? ["taxes"] : []), ...(footed.insurance != null ? ["insurance"] : [])];
+      return {
+        source: "t12",
+        value: footed.value,
+        at: ev.t12.arrivedAt,
+        text: `${t12When} ran ${compactUsd(footed.value, { millions: 2 })} of operating expenses${out.length ? ` less its ${out.join(" and ")}` : ""}`,
+      };
+    }
     case "basis": {
       if (ev.trade) {
         const { value, whole } = onBasis(ev.trade.price);
@@ -1181,6 +1221,23 @@ function laterFor(
       }
       if (ev.decision?.reason === "price") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on price", decision: true };
       return null;
+    }
+    // A later rent roll's in-place rent on the row's own yardstick, read
+    // only to be named beside the row: an in-place rent sits under market by
+    // its loss to lease, so it never scores a market rent
+    // (`documentCannotSpeak`, `MARKET_RENT_WHY`).
+    case "market_rent": {
+      if (!ev.roll || (ev.per !== "/mo" && ev.per !== "/SF")) return null;
+      const s = ev.roll.summary;
+      const v = ev.per === "/mo" ? s.avgRentMonthly : s.weightedAvgRentPsf;
+      if (v == null || !Number.isFinite(v) || !(v > 0)) return null;
+      const said = ev.per === "/mo" ? `$${Math.round(v).toLocaleString("en-US")} a month a unit` : `$${v.toFixed(2)} a square foot a year`;
+      return {
+        source: "rent_roll",
+        value: v,
+        at: ev.roll.arrivedAt,
+        text: `the rent roll${ev.roll.dated ? ` as of ${statedDay(ev.roll.dated)}` : ""} ran ${said} in place — an in-place rent, not a market's`,
+      };
     }
     case "debt":
       if (ev.decision?.reason === "financing") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on financing", decision: true };
@@ -1301,7 +1358,7 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
   };
   const none: Admitted = { t12: null, t12Overlap: null, roll: null, decision: null, trade: null, purchase: null };
   const t12: T12Summary = { collectedRent: 1_000, vacancyLoss: 100, otherIncome: 0, egi: 900, opex: [], totalOpex: 400, noi: 500, noiDerived: false };
-  const roll = { unitCount: 10, occupiedUnits: 9, totalSf: 1_000, occupiedSf: 900, sfWeightedOccupancy: 0.9 } as RentRollSummary;
+  const roll = { unitCount: 10, occupiedUnits: 9, totalSf: 1_000, occupiedSf: 900, sfWeightedOccupancy: 0.9, avgRentMonthly: 80, weightedAvgRentPsf: 80 } as RentRollSummary;
   const kinds: Record<LaterSource, Admitted[]> = {
     t12: [{ ...none, t12: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: t12 } }],
     rent_roll: [{ ...none, roll: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: roll } }],
@@ -1325,6 +1382,8 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
       per: null,
       threshold: snapshotThreshold(key),
       worse: WORSE_WHEN[key],
+      // A market rent carries its yardstick, which a later rent roll is read on.
+      ...(key === "market_rent" ? { per: "/mo" } : {}),
     };
     // A vacancy is scored in its own measure: the deal's own row's, else
     // (the account's grid) a row of either measure.

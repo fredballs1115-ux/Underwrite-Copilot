@@ -411,8 +411,8 @@ export interface Challenge {
   page?: string;
   /** The assumption the challenge tests, by the stress test's own name
    *  (lib/stress-test-types `STRESS_KEYS`: "basis", "exit_cap", "debt",
-   *  "noi", "vacancy", "rent_growth", "expense_growth", "taxes",
-   *  "insurance", "renovation_premium", or "other"). Absent on a result
+   *  "noi", "vacancy", "rent_growth", "market_rent", "expense_growth", "taxes",
+   *  "insurance", "opex", "renovation_premium", or "other"). Absent on a result
    *  stored before 2026-10-19, which lib/stress-test matches on its
    *  `assumption` text by keyword instead. */
   key?: string;

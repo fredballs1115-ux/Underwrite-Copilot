@@ -73,10 +73,20 @@
 //                    CPI (core CPI only where all-items is not fresh)
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
 //                    going-in cap (else the tracker cap range's low end)
-//   debt             DEBT_UNSUPPORTED_BPS      50 bps under the seeded rate
+//   debt             DEBT_UNSUPPORTED_BPS      50 bps under the lender's quote
+//                    on file (a term sheet's rate), else under the seeded
+//                    rate (stretched at most unless under the bare index)
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
+//   market rent      BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
+//                    the median of the memorandum's lease comps graded
+//                    clean, three or more (MEDIAN_FLOOR), else unchecked
+//   opex             the NOI's bands: within NOI_IN_LINE_BAND (5%) under
+//                    the T-12's operating expenses (on the OM figure's
+//                    footing, less the taxes and insurance it states) holds,
+//                    past NOI_UNSUPPORTED_SHARE (10%) unsupported; against
+//                    the class's ratio (no T-12 on file) stretched at most
 //   insurance        SAME_SHARE (2%) under the seller's own T-12 premium reads
 //                    stretched, never more (the T-12's is a floor, not a
 //                    quote); at or over it, or with no T-12, unchecked — a
@@ -107,11 +117,13 @@ import type {
   FirstSignal,
   MarketResult,
 } from "@/lib/anthropic/types";
-import type { ActualsRead } from "@/lib/actuals/actuals-read";
+import { avgRentOf, type ActualsRead } from "@/lib/actuals/actuals-read";
+import { monthlyRentFloor, statedLeaseBasis, statedRent, type LeaseBasis } from "@/lib/lease-comp-rent";
+import type { LoanQuote } from "@/lib/loan-quote";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
-import { assetWords, countNoun } from "@/lib/asset-words";
+import { assetClassKey, assetWords, countNoun, rentQuotedMonthly } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
 import { findGoingInCap, findMetric, occupancyRow, parsePct, planCountRow, screenYearOf, unitCountFromMetrics, unitCountRow, buildingSfFromMetrics } from "@/lib/criteria";
 import { condoUnitsOffered } from "@/lib/condo-units";
@@ -138,7 +150,9 @@ import { planYieldBase, yieldOnCost } from "@/lib/plan-sensitivity";
 import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
-import { periodLabel, publisherTag } from "@/lib/live-rates-core";
+import { periodLabel, publisherTag, treasuryForTerm, type CurveSeed } from "@/lib/live-rates-core";
+import { SERIES } from "@/lib/live-rates";
+import { floatingRateOf, type FloatingRate } from "@/lib/assumable-debt";
 import type { ModelCheck, ModelVsMarket, PublishedFigure } from "@/lib/model-vs-market";
 import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
@@ -175,6 +189,7 @@ import {
   ABATEMENT_LABEL,
   ACHIEVED_PREMIUM_LABEL,
   GOING_IN_CAP_LABEL,
+  LOAN_QUOTE_LABEL,
   OM_IN_PLACE_NOI_LABEL,
   PAST_SCREENS_PUBLISHER,
   RENT_ROLL_VACANCY_LABEL,
@@ -185,13 +200,20 @@ import {
   SEEDED_RATE_ONLY_LABEL,
   T12_INSURANCE_LABEL,
   T12_NOI_LABEL,
+  T12_OPEX_LABEL,
+  T12_OPEX_LINES_LABEL,
+  T12_TAX_LABEL,
   T12_VACANCY_LABEL,
   basisDecider,
+  CLASS_OPEX_LABEL,
   debtDecider,
   exitCapDecider,
   expenseGrowthDecider,
   insuranceDecider,
+  marketRentDecider,
+  MARKET_RENT_COMPS_LABEL,
   noiDecider,
+  opexDecider,
   renovationPremiumDecider,
   rentGrowthDeciding,
   taxesDecider,
@@ -288,6 +310,11 @@ export interface StressTestArgs {
    *  the debt row's evidence, never handed to a model (lib/sample-derive's
    *  guard) */
   indexGiven?: DebtIndex | null;
+  /** the lender's quote on file (lib/loan-quote `loanQuoteOf`): a term sheet
+   *  the deal holds whose rate its first-draft model carries as a loan's own
+   *  paper states it — handed in only where the surface may read the deal's
+   *  documents (never the shared screen) */
+  loanQuote?: LoanQuote | null;
   /** why no model is handed in, where the surface carries none BY DESIGN
    *  (the shared screen) — said ahead of the default "No model was derived
    *  for this deal", which would read as a failure */
@@ -664,13 +691,30 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
   // and a figure per unit is the basis's only beside a price word, so
   // "payroll per unit" files nowhere.
   { key: "taxes", re: /\btax(?:es)?\b(?!-exempt)|reassess|assessed|millage/i },
-  { key: "insurance", re: /\binsurance\b|\bpremium\b(?![^,;]*\breplacement cost\b)/i },
+  // Insurance by its own words: a premium only beside a policy's, a
+  // coverage's or a deductible's, so a rent premium ("Market rent premium of
+  // $200") or a premium over replacement cost never files here — and a debt
+  // service coverage is the loan's, never a policy's ("Debt service coverage
+  // at a rate premium" is the debt's).
+  { key: "insurance", re: /\binsur|(?<!\bservice\s)\b(?:coverage|policy|deductible)\b[^,;]*\bpremium\b|\bpremium\b[^,;]*(?:(?<!\bservice\s)\bcoverage|\bpolicy|\bdeductible)\b/i },
   { key: "exit_cap", re: /\b(?:exit|terminal|reversion|residual|disposition)\b|compression/i },
   { key: "debt", re: /(?<!\bbad\s)\bdebt\b|\b(?:loan|financing|interest rate|dscr|coverage|leverage|refinanc|ltv|ltc|sofr|treasury|lender)\b/i },
   { key: "vacancy", re: /\b(?:vacancy|occupancy|lease[- ]up|absorption|occupied)\b/i },
   { key: "noi", re: /\bnoi\b|net operating income|\bt-?12\b|trailing/i },
-  { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b|loss[- ]to[- ]lease|mark[- ]to[- ]market|market rent|pro ?forma rent/i },
-  { key: "expense_growth", re: /\b(?:expense|opex|operating expense)s?\s+(?:growth|ratio|load|escalation)|expense (?:growth|ratio)/i },
+  // A market or pro forma rent, and the loss to lease it claims to close,
+  // are the market-rent row's; a rent's growth rate is the rent growth row's
+  // ("Market rent growth of 4% a year", "Pro forma rent growth").
+  { key: "market_rent", re: /loss[- ]to[- ]lease|mark[- ]to[- ]market|market rents?\b(?!\s+growth)|pro ?forma rents?\b(?!\s+growth)|lease comps?\b/i },
+  { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b/i },
+  // A growth rate only: an expense ratio or load is a share of income, which
+  // the growth row's CPI test does not speak to (`expenseLevelNotGrowth`).
+  // "Operating expenses grow 2% a year" is a growth rate, read ahead of the
+  // operating-expense row's level words.
+  { key: "expense_growth", re: /\b(?:expense|opex|operating expense)s?\s+(?:growth|escalation|inflation|grow(?:s|ing)?\b|increas)|expense growth/i },
+  // An expense's level — the total, a ratio or load, a line other than the
+  // taxes and the insurance (which file above) — is the operating-expense
+  // row's; its growth rate is the expense growth row's (above).
+  { key: "opex", re: /\b(?:operating\s+expenses?|opex|expense\s+(?:ratio|load)|management\s+fee|payroll|repairs?(?:\s+and\s+maintenance)?|r\s?&\s?m|utilit(?:y|ies))\b/i },
   { key: "basis", re: /\bprice\b|\bpricing\b|\bbasis\b|\bask(?:ing)?\b[^;]*\b(?:per (?:unit|door|key|sf)|psf)\b|replacement cost|overpay|\bcomps?\b/i },
 ];
 
@@ -678,9 +722,31 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
  *  challenger wrote one, else the keyword table on its assumption text,
  *  else "other". */
 export function challengeKey(c: Challenge): StressKey {
-  if (c.key && (STRESS_KEYS as readonly string[]).includes(c.key)) return c.key as StressKey;
+  // A challenge on an expense's level filed as its growth is the operating
+  // expenses' (`expenseLevelNotGrowth`).
+  if (c.key && (STRESS_KEYS as readonly string[]).includes(c.key)) return c.key === "expense_growth" && expenseLevelNotGrowth(c) ? "opex" : (c.key as StressKey);
   const hit = CHALLENGE_KEYWORDS.find((k) => k.re.test(c.assumption ?? ""));
   return hit?.key ?? "other";
+}
+
+/** Words that state an expense's LEVEL, not its growth: a ratio or load, a
+ *  share of income or revenue, a figure a unit, a door, a key or a foot. */
+const EXPENSE_LEVEL = /\bratio\b|\bload\b|%\s*of\s+(?:egi|effective|gross|income|revenue|rents?|collections)\b|\bshare\s+of\b|\bper\s+(?:unit|door|key|bed|pad|room|sf|square\s+f(?:oo|ee)t|foot)\b|\/\s*(?:unit|door|key|bed|pad|room|sf)\b|\bpsf\b/i;
+const EXPENSE_GROWTH_WORDS = /\bgrowth\b|\bgrow(?:s|ing)?\b|escalat|inflat|\bincrease|\bper\s+(?:year|annum)\b|\/\s*yr\b|\ba\s+year\b/i;
+
+/**
+ * Whether a challenge filed on the expense growth row is about the expense's
+ * level — a ratio, a share of income, a figure a unit — rather than its growth
+ * rate (a challenge stored before the operating-expense row was keyed named
+ * "the expense growth rate or ratio"): the growth row holds a rate a year to
+ * the CPI's, a different quantity, so such a challenge is the operating
+ * expenses' row's (`opex`). Read off its words, and off its figure where
+ * that is a dollar amount no growth rate could be (100 or more).
+ */
+function expenseLevelNotGrowth(c: Challenge): boolean {
+  const words = c.assumption ?? "";
+  if (EXPENSE_LEVEL.test(words) && !EXPENSE_GROWTH_WORDS.test(words)) return true;
+  return c.omFigure != null && Number.isFinite(c.omFigure) && Math.abs(c.omFigure) >= 100;
 }
 
 const challengeWords = (c: Challenge): StressRow["challenge"] => ({ severity: c.severity, challenge: c.challenge, question: c.question });
@@ -708,6 +774,7 @@ interface Ctx {
   pastScreens: PastScreensEvidence | null;
   pastScreensWithheld: string | null;
   indexGiven: DebtIndex | null;
+  loanQuote: LoanQuote | null;
   readOn: string;
 }
 
@@ -873,6 +940,10 @@ const NO_RERUN_SHORT: readonly [(why: string) => boolean, string][] = [
   [(w) => /^No achieved premium is stated/.test(w), "no achieved premium stated"],
   [(w) => w === INSURANCE_NO_RERUN || w === INSURANCE_NO_RERUN_NO_T12, "nothing tests the premium"],
   [(w) => w === PLAN_INSURANCE_NOT_PRO_FORMA, "no pro forma premium"],
+  [(w) => w === PLAN_OPEX_NOT_PRO_FORMA, "no pro forma expense line"],
+  [(w) => w === MARKET_RENT_NO_RERUN, "the model runs today's rent"],
+  [(w) => w === PLAN_MARKET_RENT_VALUE_ADD_ONLY, "the finished building's rent"],
+  [(w) => w === PLAN_MARKET_RENT_NO_COUNT, "no count stated"],
   [(w) => /no count of doors to renovate/.test(w), "no doors to renovate stated"],
 ];
 
@@ -949,9 +1020,11 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
+  market_rent: "Market rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
+  opex: "Operating expenses",
   renovation_premium: "Renovation premium",
   other: "Everything else the challenger raised",
 };
@@ -1780,32 +1853,150 @@ function seedIndex(seed: RateSeed, given: DebtIndex | null): { name: string; pct
   return { name: m[1], pct: Number(m[2]), asOf, credit: m[3], spreadBps: Number(m[7]) };
 }
 
+/** The OM's own acquisition loan's term — "Loan term: 10 years" — never an
+ *  amortization, an interest-only period, a term left on another loan or an
+ *  extension. */
+const LOAN_TERM_ROW = /\b(?:loan|debt|financing|mortgage)\s+term\b|^term$/i;
+const LOAN_TERM_NOT = new RegExp(`${DEBT_RATE_NOT.source}|amorti|interest[- ]only|\\bio\\b|remaining|extension|prepay|lockout|sheet|construction|bridge`, "i");
+/** The hold the OM states: "Hold period: 7 years", "Investment horizon". */
+const HOLD_ROW = /\bhold(?:ing)?\s+period\b|\binvestment\s+(?:horizon|period)\b|\bprojected\s+hold\b|^hold$/i;
+const HOLD_NOT = /\blease|ground|\btenant/i;
+
+/** A span the OM states in years or months, in months: one figure with its
+ *  unit ("10 years", "10-year", "120 months"), or a bare figure under a
+ *  label that names years. Two figures ("10 years, 30-year amortization"), a
+ *  range or no unit is none. */
+function statedMonths(row: Row | null): number | null {
+  if (!row) return null;
+  const v = row.value.trim();
+  if (!v || /\d\s*(?:-|–|—|to)\s*\d/.test(v)) return null;
+  const spans = [...v.matchAll(/(\d+(?:\.\d+)?)[\s-]*(years?|yrs?|months?|mos?)\b/gi)];
+  if (spans.length > 1) return null;
+  const n = spans.length === 1 ? Number(spans[0][1]) * (/^m/i.test(spans[0][2]) ? 1 : 12) : /\b(?:years?|yrs?)\b/i.test(row.label) && /^\d+(?:\.\d+)?$/.test(v) ? Number(v) * 12 : NaN;
+  return Number.isFinite(n) && n > 0 && n <= 600 ? Math.round(n) : null;
+}
+
+/** "10-year", "7.5-year" — a span in months said in years. */
+const yearsWord = (months: number): string => `${Math.round((months / 12) * 10) / 10}-year`;
+
+/** The Treasury tenors the site reads (data/fred-series.json, the curve's own
+ *  list), each as `treasuryForTerm` takes it — named here, priced only where
+ *  a figure for it is in hand. */
+const TREASURY_TENORS: readonly CurveSeed[] = SERIES.filter((s) => s.tenorMonths != null).map((s) => ({ id: s.id, short: s.short, tenorMonths: s.tenorMonths!, pct: NaN, asOf: "" }));
+const tenorName = (t: Pick<CurveSeed, "short">): string => (/treasury/i.test(t.short) ? t.short : `${t.short} Treasury`);
+
+/** The Treasury tenor nearest the OM's loan term, and its figure where one
+ *  is in hand — the index the model priced off (the tenor nearest the hold),
+ *  or the 10-year the model's read or the market check printed — else null
+ *  (named, never priced). */
+function termIndex(ctx: Ctx, termMonths: number, hold: { name: string; pct: number; asOf: string; credit: string }): { name: string; pct: number | null; asOf: string | null; credit: string; same: boolean } | null {
+  const tenor = treasuryForTerm(TREASURY_TENORS, termMonths);
+  if (!tenor) return null;
+  const name = tenorName(tenor);
+  if (name === hold.name) return { name, pct: hold.pct, asOf: hold.asOf, credit: hold.credit, same: true };
+  if (tenor.id === "DGS10") {
+    const read = checkOf(ctx.mvm, "exit_cap")?.published.find((f) => f.label === "10-year Treasury") ?? null;
+    const stored = ctx.market?.liveBrief?.figures?.find((f) => f.key === "dgs10") ?? null;
+    if (read) return { name, pct: read.value, asOf: read.asOf, credit: "FRED", same: false };
+    if (stored) return { name, pct: stored.value, asOf: stored.asOf, credit: "FRED", same: false };
+  }
+  return { name, pct: null, asOf: null, credit: "FRED", same: false };
+}
+
+/** Why the debt row stands unchecked where the OM's rate floats: an index
+ *  and a spread, or a coupon fixed only until it resets, is no fixed rate to
+ *  set against a fixed one. Shown as stated, priced on nothing. */
+export function floatingRateWhy(stated: string, f: FloatingRate): string {
+  if (f.resets) return `The OM states a rate fixed only until it resets (${stated}), not a fixed rate for the loan's term, so it is shown as stated and priced on nothing.`;
+  return `The OM states a floating rate (${stated}), ${f.index ? "an index plus a spread" : "a rate that moves"}, not a fixed rate, so it is shown as stated and priced on nothing.`;
+}
+
 function debtRow(ctx: Ctx): StressRow | null {
   // A note's buyer takes no acquisition loan on the collateral: the rate
   // on file is the note's own coupon (#416), and no row is built.
   if (interestOf(ctx.ex).kind === "note") return null;
-  const om = statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
+  // A rate that names an index or says it floats ("SOFR + 3.25%", "SOFR +
+  // 325 bps") is no fixed rate: its first percentage is the spread, never the
+  // rate (lib/assumable-debt's own reader, research pass 37). It is shown as
+  // stated and priced on nothing, and the lender tests run at the model's
+  // rate.
+  const rateRow = findMetric(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
+  const floating = rateRow ? floatingRateOf(rateRow.value) : null;
+  const om = floating ? null : statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
   const evidence: StressEvidence[] = [];
+  // The lender's quote on file (lib/loan-quote): the rate the deal's own
+  // loan terms state, read off the model built from them, a document of the
+  // deal's own. It decides first; a floating quote (an index and a spread)
+  // is shown as stated and priced on nothing, as an OM's floating rate is.
+  const quote = ctx.loanQuote;
+  if (quote) {
+    const onFile = `${quote.filename}${quote.asOf ? `, on file since ${datedLong(quote.asOf)}` : ""}`;
+    evidence.push({
+      kind: "document",
+      label: LOAN_QUOTE_LABEL,
+      text:
+        quote.ratePct != null
+          ? `${pct2(quote.ratePct)} as the deal's loan terms state it (${onFile}): a lender's quote, not a screening default`
+          : `${quote.stated} as the deal's loan terms state it (${onFile}): a floating rate, shown as stated and priced on nothing`,
+      value: quote.ratePct,
+      asOf: quote.asOf,
+      publisher: "the deal's loan terms",
+      scope: "deal",
+    });
+  }
   const seed = ctx.derived?.meta.rateSeed ?? null;
   const index = seed ? seedIndex(seed, ctx.indexGiven) : null;
+  // The index is the Treasury tenor nearest the OM's own loan term where it
+  // states one, else the tenor nearest the model's hold, which the model
+  // prices off — each said so.
+  const termRow = findMetric(ctx.rows, LOAN_TERM_ROW, LOAN_TERM_NOT);
+  const termMonths = statedMonths(termRow);
+  const holdMonths = ctx.derived?.inputs.holdMonths ?? HOLD_MONTHS;
+  const term = index && termMonths != null ? termIndex(ctx, termMonths, index) : null;
+  const termPage = termRow ? pageOf(termRow, ctx.ex) : null;
+  const termSaid = termMonths != null ? `the OM's ${yearsWord(termMonths)} loan term${termPage != null ? ` (p. ${termPage})` : ""}` : "";
+  // The index the decider stands on: the term's where its figure is in hand.
+  const decideOn = term && !term.same && term.pct != null && term.asOf ? { name: term.name, pct: term.pct, asOf: term.asOf, credit: term.credit } : index;
   // Today's index, the fact, dated and published; then the class's
   // screening spread over it, a rule of thumb named as one — never the two
   // as one published figure, since the spread is nobody's print.
-  if (seed && index) {
+  if (seed && index && decideOn) {
+    const tenorWhy = term?.same
+      ? `the tenor nearest ${termSaid} and the model's ${yearsWord(holdMonths)} hold`
+      : term && decideOn !== index
+        ? `the tenor nearest the model's ${yearsWord(holdMonths)} hold; ${termSaid} is set against the ${term.name} below`
+        : term
+          ? `the tenor nearest the model's ${yearsWord(holdMonths)} hold; the ${term.name}, the tenor nearest ${termSaid}, was not read here, so the rate is set against the hold's`
+          : `the tenor nearest the model's ${yearsWord(holdMonths)} hold, since the OM states no loan term`;
     evidence.push({
       kind: "published",
       label: `The index the model prices off: ${index.name}`,
-      text: `${pct2(index.pct)} (${index.credit}, ${datedLong(index.asOf)})`,
+      text: `${pct2(index.pct)} (${index.credit}, ${datedLong(index.asOf)}), ${tenorWhy}`,
       value: index.pct,
       asOf: index.asOf,
       publisher: index.credit,
       scope: "nation",
     });
+    if (decideOn !== index) {
+      evidence.push({
+        kind: "published",
+        label: `The index for ${termSaid}: ${decideOn.name}`,
+        text: `${pct2(decideOn.pct)} (${decideOn.credit}, ${datedLong(decideOn.asOf)}), the Treasury tenor nearest the term`,
+        value: decideOn.pct,
+        asOf: decideOn.asOf,
+        publisher: decideOn.credit,
+        scope: "nation",
+      });
+    }
+    const termAllIn = Math.round((decideOn.pct + index.spreadBps / 100) * 100) / 100;
     evidence.push({
       kind: "rule_of_thumb",
       label: SEEDED_RATE_LABEL,
-      text: `+${index.spreadBps} bps over the index, the class's screening default, not a quote: ${pct2(seed.pct)} all in — ${seed.note}`,
-      value: seed.pct,
+      text:
+        decideOn === index
+          ? `+${index.spreadBps} bps over the index, the class's screening default, not a quote: ${pct2(seed.pct)} all in — ${seed.note}`
+          : `+${index.spreadBps} bps over the ${decideOn.name}, the class's screening default, not a quote: ${pct2(termAllIn)} all in`,
+      value: decideOn === index ? seed.pct : termAllIn,
       asOf: null,
       publisher: "a screening default",
       scope: "class",
@@ -1821,8 +2012,10 @@ function debtRow(ctx: Ctx): StressRow | null {
       scope: "class",
     });
   }
+  // The 10-year as the market check read it, unless the term's index above
+  // is the 10-year already.
   const ten = ctx.market?.liveBrief?.figures?.find((f) => f.key === "dgs10") ?? null;
-  if (ten) {
+  if (ten && !(seed && index && decideOn && decideOn !== index && /^10-yr/.test(decideOn.name))) {
     evidence.push({
       kind: "published",
       label: "10-year Treasury, as the market check read it",
@@ -1896,38 +2089,55 @@ function debtRow(ctx: Ctx): StressRow | null {
       });
     }
   }
-  if (!om && evidence.length === 0) return null;
+  if (!om && !floating && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
-    : { text: NO_FIGURE("loan rate"), value: null, page: null };
+    : rateRow && floating
+      ? { text: `${rateRow.label}: ${rateRow.value}`, value: null, page: pageOf(rateRow, ctx.ex) }
+      : { text: NO_FIGURE("loan rate"), value: null, page: null };
+  if (rateRow && floating) return unchecked("debt", omSays, evidence, floatingRateWhy(rateRow.value.trim(), floating));
   if (!om) return unchecked("debt", omSays, evidence, NO_FIGURE("loan rate"));
-  // ONE figure decides (lib/stress-deciders `debtDecider`): today's index
-  // plus the class's screening spread. The bare index, the 10-year, the
-  // lender tests and the leverage read are shown beside it; the bare index
-  // sets only how far under the decider a rate may read unsupported (below).
-  const decided = seed ? debtDecider(candidatesOf(evidence)) : null;
-  if (!seed || !decided) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
+  // ONE figure decides (lib/stress-deciders `debtDecider`): the lender's
+  // quote on file, else today's index plus the class's screening spread. The
+  // bare index, the 10-year, the lender tests and the leverage read are shown
+  // beside it; the bare index sets only how far under the screening default
+  // a rate may read unsupported (below).
+  const decided = debtDecider(candidatesOf(evidence));
+  if (!decided) {
+    return unchecked(
+      "debt",
+      omSays,
+      evidence,
+      quote?.floating ? "The lender's quote on file floats, priced on nothing, and no index was read today to set the OM's rate against." : "No index was read today to set the OM's rate against.",
+    );
+  }
+  if (evidence[decided.index].label === LOAN_QUOTE_LABEL) return quotedDebtRow(ctx, omSays, evidence, decided.index, om.pct, decided.figure);
+  if (!seed) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
+  const allIn = decided.figure;
+  const tenorClause = decideOn && decideOn !== index ? `, the ${decideOn.name} for the term` : "";
   // The figures are percent points here; the threshold is in bps.
-  const judged = judge(om.pct, decided.figure, "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
-    const d = (seed.pct - om.pct) * 100;
+  const judged = judge(om.pct, allIn, "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
+    const d = (allIn - om.pct) * 100;
     return Math.abs(d) < SAME * 100
-      ? `The OM's ${pct2(om.pct)} is at the seeded ${pct2(seed.pct)}.`
+      ? tenorClause
+        ? `The OM's ${pct2(om.pct)} is at the index plus the class's spread${tenorClause}, ${pct2(allIn)}.`
+        : `The OM's ${pct2(om.pct)} is at the seeded ${pct2(allIn)}.`
       : d > 0
-        ? `The OM's ${pct2(om.pct)} is ${bps(d)} under the index plus the class's spread, ${pct2(seed.pct)}.`
-        : `The OM's ${pct2(om.pct)} is ${bps(d)} over the index plus the class's spread, ${pct2(seed.pct)} — the conservative side.`;
+        ? `The OM's ${pct2(om.pct)} is ${bps(d)} under the index plus the class's spread${tenorClause}, ${pct2(allIn)}.`
+        : `The OM's ${pct2(om.pct)} is ${bps(d)} over the index plus the class's spread${tenorClause}, ${pct2(allIn)} — the conservative side.`;
   });
-  judged.gap = { ...judged.gap, value: Math.round((seed.pct - om.pct) * 100), unit: "bps" };
+  judged.gap = { ...judged.gap, value: Math.round((allIn - om.pct) * 100), unit: "bps" };
   // The spread is a screening default, so a rate under the index plus the
   // spread is stretched at most; only a rate under the bare index — under
   // the fact — reads unsupported.
-  if (judged.verdict === "unsupported" && index && om.pct >= index.pct - SAME) judged.verdict = "stretched";
+  if (judged.verdict === "unsupported" && decideOn && om.pct >= decideOn.pct - SAME) judged.verdict = "stretched";
   const seedIndexAt = decided.index;
   const impact =
     ctx.derived && irrRuns(ctx)
-      ? pctImpact(ctx.derived, "allInRatePct", seedIndexAt, om.pct, seed.pct, {
+      ? pctImpact(ctx.derived, "allInRatePct", seedIndexAt, om.pct, allIn, {
           what: "the all-in rate",
           om: pct2(om.pct),
-          alt: pct2(seed.pct),
+          alt: pct2(allIn),
           evidence: "the index plus the class's spread",
           model: pct2(ctx.derived.inputs.allInRatePct * 100),
         })
@@ -1935,6 +2145,36 @@ function debtRow(ctx: Ctx): StressRow | null {
   // The rate is held to the index plus the class's screening spread: the
   // spread is the site's own default, so the verdict is a rule of thumb's.
   return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: seedIndexAt, impact, challenge: null, method: methodSentence("debt", evidence, seedIndexAt), ruleOfThumbOnly: true };
+}
+
+/**
+ * The debt row where the lender's quote on file decides it: the OM's rate
+ * held to the rate the deal's own loan terms state, a document of the deal's
+ * — no screening default, so it may read unsupported past
+ * DEBT_UNSUPPORTED_BPS under it — and the return re-run at the quote, the
+ * model's rate one input apart.
+ */
+function quotedDebtRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEvidence[], at: number, omPct: number, quotePct: number): StressRow {
+  const judged = judge(omPct, quotePct, "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
+    const d = (quotePct - omPct) * 100;
+    return Math.abs(d) < SAME * 100
+      ? `The OM's ${pct2(omPct)} is at the lender's quote on file, ${pct2(quotePct)}.`
+      : d > 0
+        ? `The OM's ${pct2(omPct)} is ${bps(d)} under the lender's quote on file, ${pct2(quotePct)}.`
+        : `The OM's ${pct2(omPct)} is ${bps(d)} over the lender's quote on file, ${pct2(quotePct)} — the conservative side.`;
+  });
+  judged.gap = { ...judged.gap, value: Math.round((quotePct - omPct) * 100), unit: "bps" };
+  const impact =
+    ctx.derived && irrRuns(ctx)
+      ? pctImpact(ctx.derived, "allInRatePct", at, omPct, quotePct, {
+          what: "the all-in rate",
+          om: pct2(omPct),
+          alt: `the lender's quote on file, ${pct2(quotePct)}`,
+          evidence: "",
+          model: pct2(ctx.derived.inputs.allInRatePct * 100),
+        })
+      : null;
+  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: at, impact, challenge: null, method: methodSentence("debt", evidence, at) };
 }
 
 // — NOI —
@@ -1969,18 +2209,45 @@ function noiRow(ctx: Ctx): StressRow | null {
     });
   }
   // The rent roll's in-place rent against the OM's pro forma rent, in words
-  // — a month's rent a unit, not a year's NOI, so it never drives the gap.
+  // — a rent, not a year's NOI, so it never drives the gap. Said on the
+  // class's own yardstick, the actuals card's (`avgRentOf`): a month a unit
+  // (a key, a pad, a bed) where the class quotes rent that way, else per SF
+  // a year — never a suite's month beside a market rent a foot a year.
   const rr = ctx.actuals?.rentRoll;
   const proForma = findMetric(ctx.rows, PRO_FORMA_RENT_ROW, RENT_NOT);
-  if (rr && rr.summary.avgRentMonthly != null && proForma) {
+  const rrClass = ctx.actuals?.assetClass ?? ctx.assetClass;
+  const avg = rr ? avgRentOf(rr.summary, rrClass) : null;
+  if (rr && avg && avg.text !== "—" && proForma) {
     const asOf = rr.asOf ?? rr.summary.asOfUsed ?? null;
+    const perYear = !rentQuotedMonthly(rrClass) && !/\/yr$/.test(avg.text) ? " a year" : "";
     evidence.push({
       kind: "document",
       label: "The rent roll's in-place rent against the OM's pro forma rent",
-      text: `$${Math.round(rr.summary.avgRentMonthly).toLocaleString("en-US")} a unit a month in place${asOf ? ` (as of ${proseDay(asOf)})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
+      text: `${avg.text}${perYear} in place${avg.basis ? `, ${avg.basis}` : ""}${asOf ? ` (as of ${proseDay(asOf)})` : ""} against the OM's ${proForma.label.toLowerCase()} of ${proForma.value}`,
       value: null,
       asOf,
       publisher: "the deal's rent roll",
+      scope: "deal",
+    });
+  }
+  // The OM's other income against the T-12's, where both state one: words
+  // beside the NOI, never deciding it (the model folds other income into its
+  // rent line, so it is no input of its own).
+  const otherRow = findMetric(ctx.rows, OTHER_INCOME_ROW, OTHER_INCOME_NOT);
+  const omOther = otherRow && !statesRange(otherRow.value) && !/%/.test(otherRow.value) ? parseUsd(otherRow.value, 1_000) : null;
+  const t12Other = t12?.summary.otherIncome ?? null;
+  if (t12 && otherRow && omOther != null && t12Other != null && Number.isFinite(t12Other) && t12Other > 0) {
+    const page = pageOf(otherRow, ctx.ex);
+    const d = (omOther - t12Other) / t12Other;
+    evidence.push({
+      kind: "document",
+      label: OTHER_INCOME_LABEL,
+      text: `the OM's ${lowerFirst(otherRow.label)} of ${money(omOther)}${page != null ? ` (p. ${page})` : ""} against the T-12's ${money(t12Other)} (${t12.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated"}), ${
+        Math.abs(d) <= 0.005 ? "in line" : d > 0 ? `${pct1(d * 100)} over it` : `${pct1(-d * 100)} under it`
+      }: beside the NOI, never deciding it`,
+      value: null,
+      asOf: t12.periodEnd,
+      publisher: "the deal's T-12",
       scope: "deal",
     });
   }
@@ -2061,21 +2328,287 @@ function noiRow(ctx: Ctx): StressRow | null {
   return { key: "noi", title: TITLES.noi, omSays, evidence, gap, verdict, decidedBy: decided.index, impact, challenge: null, method: methodSentence("noi", evidence, decided.index) };
 }
 
+// — Market rent —
+
+/** Why a stabilized deal's market-rent row carries no re-run: the model runs
+ *  today's rent, which the NOI row carries. */
+export const MARKET_RENT_NO_RERUN =
+  "No return is re-run: the model runs today's rent, which the NOI row tests, so a market rent is no input of its own.";
+
+/** Why a plan deal other than a value-add carries none. */
+export const PLAN_MARKET_RENT_VALUE_ADD_ONLY =
+  "On a lease-up, conversion or development the pro forma rent is the finished building's whole rent, not a gap on rents let today, so it is not carried to the stabilized NOI and no yield on cost is re-run on it.";
+
+/** Why a value-add's market rent carries none where no count is stated. */
+export const PLAN_MARKET_RENT_NO_COUNT =
+  "The OM states no count to carry the rent's gap to the stabilized NOI on, so no yield on cost is re-run on it.";
+
+/** Why the market rent is left out of a plan headline beside the premium. */
+export const PLAN_MARKET_RENT_BESIDE_PREMIUM =
+  "the renovation premium already moves the stabilized NOI by the rent the renovated doors earn, so the market rent beside it would count that rent twice";
+
+/**
+ * The market-rent row (the owner's decision of 2026-10-21): the OM's pro
+ * forma or market rent, on the class's own yardstick (a month a unit where
+ * the class quotes rent that way, else a square foot a year), set against
+ * the median of the memorandum's own lease comps graded `supports` — three
+ * or more stating a rent on that yardstick (lib/lease-comp-rent, the comps'
+ * own floor, `MEDIAN_FLOOR`), else no median and the row unchecked, the
+ * comps named. The memorandum against itself (`om_internal`), as the basis
+ * row's sale comps are. Beside it, never deciding: the rent roll's in-place
+ * rent, said as the gap the OM claims to close, and Zillow's asking rent for
+ * the metro's apartments on an apartment building (all home types where the
+ * apartment figure was not read) or all home types on rented homes, never
+ * beside a bed's, a pad's or any other class's rent — dated, the metro's and
+ * never the building's. Holds within
+ * BASIS_STRETCH_PCT (5%) over the median, unsupported past
+ * BASIS_UNSUPPORTED_PCT (15%) — the comps' own lines. No re-run on a
+ * stabilized deal (the model runs today's rent, which the NOI row carries);
+ * on a value-add, the plan's yield on cost with the stabilized NOI moved by
+ * the gap on every unit (or foot) the OM counts, at its own stabilized
+ * vacancy where it states one.
+ */
+function marketRentRow(ctx: Ctx): StressRow | null {
+  const words = assetWords(ctx.assetClass);
+  const monthly = rentQuotedMonthly(ctx.assetClass);
+  const bySf = !monthly && words.income === "rent / SF / yr";
+  if (!monthly && !bySf) return null;
+  const yard: "/mo" | "/SF" = monthly ? "/mo" : "/SF";
+  const say = (n: number) => (monthly ? `$${Math.round(n).toLocaleString("en-US")}/mo` : `$${n.toFixed(2)}/SF`);
+  const on = (r: ReturnType<typeof statedRent>) => (monthly ? r.perUnitMonthly : r.perSfYear);
+  // The yardstick in words, in the class's own noun: "a month a unit", "a
+  // month a space".
+  const nounOne = words.noun?.one ?? "unit";
+  const yardWords = monthly ? `a month ${withArticle(nounOne)}` : "a square foot a year";
+  const readOpts = { bareSfIsYear: bySf, unitFloor: monthlyRentFloor(nounOne) };
+  const row = findMetric(ctx.rows, PRO_FORMA_RENT_ROW, RENT_NOT);
+  let om = row ? on(statedRent(row.value, readOpts)) : null;
+  // A bare dollar figure under a label that names the month ("Market rent
+  // (monthly)") is a month's rent, as stated.
+  if (row && om == null && monthly && /\bmo(?:nth(?:ly)?)?\b/i.test(row.label) && /^\$?\s?[\d,]+(?:\.\d+)?$/.test(row.value.trim())) om = parseUsd(row.value, 100);
+  const leaseComps = ctx.brokerComps?.leaseComps ?? [];
+  const evidence: StressEvidence[] = [];
+  // The memorandum's lease comps, each graded by the comps step: a median
+  // only over the comps graded `supports`, three or more stating a rent on
+  // the yardstick; the others named, left out.
+  const stating = leaseComps.map((comp) => ({ comp, figure: on(statedRent(comp.detail, readOpts)) })).filter((c): c is { comp: (typeof leaseComps)[number]; figure: number } => c.figure != null);
+  const clean = stating.filter((c) => c.comp.support === "supports");
+  // On a class quoted by the foot, a rent on one lease basis is not the same
+  // rent on another (a gross rent carries the expenses a net one passes
+  // through): where the comps graded clean state different bases, no median
+  // is struck over them.
+  const bases = bySf ? [...new Set(clean.map((c) => statedLeaseBasis(c.comp.detail)).filter((b): b is LeaseBasis => b != null))] : [];
+  const mixedBases = bases.length > 1 ? bases : null;
+  const named = (cs: typeof stating) => cs.map((c) => `${c.comp.name} ${say(c.figure)}`).join("; ");
+  let median3: number | null = null;
+  if (leaseComps.length > 0) {
+    median3 = clean.length >= MEDIAN_FLOOR && !mixedBases ? median(clean.map((c) => c.figure)) : null;
+    const leftOut = (["favorable", "stretched"] as const)
+      .map((grade) => {
+        const cs = stating.filter((c) => c.comp.support === grade);
+        return cs.length > 0 ? `; left out, graded ${LEFT_OUT_GRADE[grade]}: ${named(cs)}` : "";
+      })
+      .join("");
+    const cleanPages = new Set(clean.map((c) => locatedPage(c.comp.page, ctx.ex?.totalPages)));
+    const page = median3 != null && cleanPages.size === 1 ? [...cleanPages][0] : null;
+    evidence.push({
+      kind: "om_internal",
+      label: MARKET_RENT_COMPS_LABEL,
+      text: `${stating.length} of ${leaseComps.length} state a rent ${yardWords}${clean.length ? `; graded clean (supports): ${named(clean)}` : ""}${
+        median3 != null
+          ? ` — median ${say(median3)} over the ${clean.length}`
+          : mixedBases
+            ? `, stated on different lease bases (${joinWords(mixedBases)}), so no median is struck over them`
+            : clean.length > 0
+              ? `, too few graded clean for a median (${MEDIAN_FLOOR} or more)`
+              : ", none graded clean (supports), so none is set against the OM's rent"
+      }${leftOut}`,
+      value: median3 != null ? Math.round(median3 * 100) / 100 : null,
+      asOf: null,
+      publisher: "the offering memorandum",
+      scope: "deal",
+      ...(page != null ? { page } : {}),
+    });
+  }
+  // The rent roll's in-place rent on the class's yardstick: the gap the OM
+  // claims to close, never the figure that decides.
+  const rr = ctx.actuals?.rentRoll;
+  const rrClass = ctx.actuals?.assetClass ?? ctx.assetClass;
+  const inPlace = rr ? (monthly ? rr.summary.avgRentMonthly : rr.summary.weightedAvgRentPsf) : null;
+  if (rr && inPlace != null && Number.isFinite(inPlace) && inPlace > 0) {
+    const avg = avgRentOf(rr.summary, rrClass);
+    const asOf = rr.asOf ?? rr.summary.asOfUsed ?? null;
+    const gapWords = om != null ? `, ${say(Math.abs(om - inPlace))} ${om >= inPlace ? "under" : "over"} the OM's ${say(om)}: the gap the OM claims to close` : "";
+    evidence.push({
+      kind: "document",
+      label: "The rent roll's in-place rent",
+      text: `${say(inPlace)} in place${avg.basis ? `, ${avg.basis}` : ""}${asOf ? ` (as of ${proseDay(asOf)})` : ""}${gapWords}; today's rent, not a market's`,
+      value: Math.round(inPlace * 100) / 100,
+      asOf,
+      publisher: "the deal's rent roll",
+      scope: "deal",
+    });
+  }
+  // Zillow's asking rent for the metro, as the market check read it, only
+  // beside the rent it measures: an apartment's (the apartments' figure,
+  // else all home types) and a rented home's (all home types) — never a bed's
+  // or a pad's rent, or any other class's, which no index of Zillow's
+  // prices. The metro's, never the building's.
+  const zClass = assetClassKey(ctx.assetClass);
+  const zKeys: readonly string[] = zClass === "multifamily" ? ["zori_mfr_rent", "zori_rent"] : zClass === "sfr_btr" ? ["zori_rent"] : [];
+  if (monthly && words.residential && zKeys.length > 0) {
+    const figs = ctx.market?.liveBrief?.figures ?? [];
+    const z = zKeys.map((k) => figs.find((f) => f.key === k)).find((f) => f != null) ?? null;
+    if (z && Number.isFinite(z.value) && z.value > 0) {
+      const apartments = z.key === "zori_mfr_rent";
+      const when = /^\d{4}-\d{2}-\d{2}$/.test(z.asOf) ? periodLabel(z.asOf, "monthly") : z.asOf;
+      const grain = ctx.market?.liveBrief?.grain === "state" ? "the state's" : "the metro's";
+      evidence.push({
+        kind: "published",
+        label: apartments ? "Asking rent, apartments, metro area" : "Asking rent, all home types, metro area",
+        text: `${say(z.value)} (${when}), ${grain} asking rent ${apartments ? "for apartments" : "across all home types"} before concessions: ${grain === "the state's" ? "the state's" : "the metro's"}, not this building's`,
+        value: Math.round(z.value),
+        asOf: z.asOf,
+        publisher: "Zillow Research",
+        scope: ctx.market?.liveBrief?.grain === "state" ? "state" : "metro",
+      });
+    }
+  }
+  if (om == null && evidence.length === 0) return null;
+  const omSays: StressRow["omSays"] =
+    row && om != null
+      ? { text: `${say(om)}: ${row.label} ${row.value}`, value: om, page: pageOf(row, ctx.ex) }
+      : { text: row ? `${row.label}: ${row.value}, not ${monthly ? "a month's rent a unit" : "a rent a square foot a year"} as stated` : NO_FIGURE("pro forma or market rent"), value: null, page: row ? pageOf(row, ctx.ex) : null };
+  const base = { yardstick: yard };
+  if (om == null) return { ...unchecked("market_rent", omSays, evidence, row ? omSays.text : NO_FIGURE("pro forma or market rent")), ...base };
+  const decided = marketRentDecider(candidatesOf(evidence));
+  if (!decided) {
+    const why =
+      leaseComps.length === 0
+        ? "The memorandum lists no lease comps, so no median of comps graded clean can be set against its rent."
+        : mixedBases
+          ? `The memorandum's lease comps graded clean (supports) state their rents on different lease bases (${joinWords(mixedBases)}), and a rent on one basis is not the same rent on another, so no median is struck over them.`
+          : `Fewer than ${MEDIAN_FLOOR} of the memorandum's lease comps graded clean (supports) state a rent ${yardWords} (${clean.length} of ${leaseComps.length}), so no median is struck: the comps' own floor.`;
+    return { ...unchecked("market_rent", omSays, evidence, why), ...base };
+  }
+  const best = decided.figure;
+  const sharePct = ((om - best) / best) * 100;
+  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  const ofBest = `the median of its lease comps graded clean, ${say(best)}`;
+  const gap: StressRow["gap"] = {
+    value: Math.round(sharePct * 10) / 10,
+    unit: "pct",
+    text:
+      Math.abs(sharePct) < 0.5
+        ? `The OM's ${say(om)} is at ${ofBest}.`
+        : sharePct > 0
+          ? `The OM's ${say(om)} is ${pct1(sharePct)} over ${ofBest}.`
+          : `The OM's ${say(om)} is ${pct1(-sharePct)} under ${ofBest} — the conservative side.`,
+  };
+  // A stabilized deal re-runs nothing (the model runs today's rent, which
+  // the NOI row carries); a value-add moves its stabilized NOI by the gap on
+  // every unit or foot the OM counts, at its own stated vacancy.
+  let impact: StressImpact | null = null;
+  let noRerun: string | null = ctx.plan ? null : MARKET_RENT_NO_RERUN;
+  if (ctx.planYield) {
+    if (ctx.kind !== "value_add") noRerun = PLAN_MARKET_RENT_VALUE_ADD_ONLY;
+    else {
+      const count = monthly ? unitCountFromMetrics(ctx.rows) : buildingSfFromMetrics(ctx.rows);
+      if (count == null || !(count > 0)) noRerun = PLAN_MARKET_RENT_NO_COUNT;
+      else {
+        const v = omVacancy(ctx.rows);
+        const occupied = v && v.from === "vacancy" ? 1 - v.pct / 100 : 1;
+        const year = (om - best) * count * (monthly ? 12 : 1) * occupied;
+        const noun = monthly ? countNoun(unitCountRow(ctx.rows)?.label, ctx.assetClass) : "square feet";
+        const run = yocSplit(
+          yocImpact(ctx.planYield, "stabilizedNoi", decided.index, ctx.planYield.noi, ctx.planYield.noi - year, {
+            what: "the market rent",
+            om: say(om),
+            alt: say(best),
+            evidence: "the lease comps' median",
+            how: `the gap on the ${count.toLocaleString("en-US")} ${noun}${monthly ? ", twelve months each" : ""}, ${
+              v && v.from === "vacancy" ? `at the OM's own ${pct1(v.pct)} vacancy` : "at full occupancy, since the OM states no stabilized vacancy"
+            }, the stabilized NOI read as carrying the OM's rent on every one`,
+          }),
+        );
+        impact = run.impact;
+        noRerun = run.noRerun;
+      }
+    }
+  }
+  return {
+    key: "market_rent",
+    title: TITLES.market_rent,
+    omSays,
+    evidence,
+    gap,
+    verdict,
+    decidedBy: decided.index,
+    impact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("market_rent", evidence, decided.index),
+    ...base,
+  };
+}
+
 // — Taxes —
 
-function taxesRow(ctx: Ctx): StressRow | null {
+/**
+ * The OM's tax bill as the taxes row tests it. On a plan deal the memorandum
+ * may state two bills: today's, on today's assessment, and its pro forma's
+ * line, the one the stabilized NOI carries. Every row is searched for each,
+ * never the first alone. The OM's figure tested is the pro forma's line where
+ * stated (else today's bill). A deal read as stabilized reads its first bill
+ * for both. The operating-expense row leaves this same bill out of the OM's
+ * total (`opexRow`), so the two rows never hold one line twice.
+ */
+function omTaxLine(ctx: Pick<Ctx, "rows" | "plan">): { proFormaRow: Row | null; todayRow: Row | null; billRow: Row | null; bill: number | null } {
   const taxRows = ctx.rows.filter((m) => TAX_BILL_ROW.test(m.label) && !TAX_BILL_NOT.test(m.label) && taxBillOf(m.value) != null);
-  // On a plan deal the memorandum may state two bills: today's, on today's
-  // assessment, and its pro forma's line, the one the stabilized NOI
-  // carries. Every row is searched for each, never the first alone. The
-  // OM's figure tested is the pro forma's line where stated (else today's
-  // bill), and the rate the reset is struck at is today's bill over today's
-  // assessed value — never a pro forma bill over an assessment it was not
-  // levied on. A deal read as stabilized reads its first bill for both.
   const proFormaRow = ctx.plan ? (taxRows.find((m) => PLAN_FIGURE.test(m.label)) ?? null) : null;
   const todayRow = ctx.plan ? (taxRows.find((m) => !PLAN_FIGURE.test(m.label)) ?? null) : (taxRows[0] ?? null);
   const billRow = proFormaRow ?? todayRow;
-  const bill = billRow ? taxBillOf(billRow.value) : null;
+  return { proFormaRow, todayRow, billRow, bill: billRow ? taxBillOf(billRow.value) : null };
+}
+
+/** The T-12's real estate tax line: the first line naming a tax that is no
+ *  abatement, payroll or transfer tax and no line combined with insurance. */
+const t12TaxLineOf = (t12: ActualsRead["t12"] | null | undefined) => t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !T12_TAX_NOT.test(l.label)) ?? null;
+/** The T-12's property premium: no mortgage or title policy, no line
+ *  combined with taxes. */
+const t12InsuranceLineOf = (t12: ActualsRead["t12"] | null | undefined) => t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
+
+/**
+ * A T-12's operating expenses on an operating-expense row's footing: its
+ * expense total less its tax and insurance lines where the row leaves those
+ * out (`StressRow.footing`) — the one reading the row and the track record
+ * strike. Null where the T-12 states no expense total, or breaks out no line
+ * the footing leaves out (`missing` names it). The tax and insurance lines
+ * are subtracted here, never read as a figure of their own: a seller's bill
+ * and premium score no row.
+ */
+export function t12OpexOnFooting(
+  t12: ActualsRead["t12"] | null | undefined,
+  less: readonly ("taxes" | "insurance")[],
+): { value: number; total: number; tax: number | null; insurance: number | null } | { missing: ("tax" | "insurance")[] } | null {
+  const total = t12?.summary.totalOpex ?? null;
+  if (!t12 || total == null || !Number.isFinite(total) || !(total > 0)) return null;
+  const tax = t12TaxLineOf(t12);
+  const ins = t12InsuranceLineOf(t12);
+  const missing: ("tax" | "insurance")[] = [
+    ...(less.includes("taxes") && !(tax && tax.amount > 0) ? (["tax"] as const) : []),
+    ...(less.includes("insurance") && !(ins && ins.amount > 0) ? (["insurance"] as const) : []),
+  ];
+  if (missing.length > 0) return { missing };
+  const taxOut = less.includes("taxes") ? tax!.amount : null;
+  const insOut = less.includes("insurance") ? ins!.amount : null;
+  return { value: total - (taxOut ?? 0) - (insOut ?? 0), total, tax: taxOut, insurance: insOut };
+}
+
+function taxesRow(ctx: Ctx): StressRow | null {
+  // The rate the reset is struck at is today's bill over today's assessed
+  // value — never a pro forma bill over an assessment it was not levied on.
+  const { proFormaRow, todayRow, billRow, bill } = omTaxLine(ctx);
   const todayBill = todayRow ? taxBillOf(todayRow.value) : null;
   const assessedRow = findMetric(ctx.rows, ASSESSED_ROW, ASSESSED_NOT);
   const assessed = assessedRow ? parseUsd(assessedRow.value, 10_000) : null;
@@ -2136,14 +2669,23 @@ function taxesRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
-  // The T-12's own tax line.
+  // The T-12's own tax line: the seller's actual bill. It decides only where
+  // nothing above does — no reset bill and no abatement ending in the hold —
+  // and the OM's line sits under it past SAME_SHARE on a building already
+  // delivered: the OM against its own building's history, a working floor
+  // and a rule of thumb, never the bill a new owner pays (the insurance
+  // row's rule).
   const t12 = ctx.actuals?.t12;
-  const t12Tax = t12?.summary.opex.find((l) => /\btax/i.test(l.label) && !T12_TAX_NOT.test(l.label)) ?? null;
-  if (t12Tax && t12Tax.amount > 0) {
+  const t12Tax = t12TaxLineOf(t12);
+  const t12Bill = t12Tax && t12Tax.amount > 0 ? t12Tax.amount : null;
+  const aboveDecides = evidence.some((e) => e.kind === "om_internal" && e.value != null);
+  const t12TaxDecides =
+    !aboveDecides && bill != null && t12Bill != null && (t12Bill - bill) / t12Bill > SAME_SHARE && !notYetDelivered(ctx.kind) && !ctx.planYield?.plan.forward;
+  if (t12Tax && t12Bill != null) {
     evidence.push({
       kind: "document",
-      label: "The deal's T-12 tax line",
-      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})`,
+      label: T12_TAX_LABEL,
+      text: `${money(t12Tax.amount)} (${t12Tax.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""})${t12TaxDecides ? `; ${TAX_T12_FLOOR}` : ""}`,
       value: Math.round(t12Tax.amount),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
@@ -2158,7 +2700,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
   // ONE figure decides (lib/stress-deciders `taxesDecider`): the reset bill
   // the OM's own figures imply, else the unabated bill an abatement ends into
   // inside the hold; the T-12's tax line (the seller's bill) is beside it.
-  const decided = taxesDecider(candidatesOf(evidence, (e) => e.kind === "om_internal"));
+  const decided = taxesDecider(candidatesOf(evidence, (e) => e.kind === "om_internal" || (e.label === T12_TAX_LABEL && t12TaxDecides)));
   if (!decided) {
     return unchecked(
       "taxes",
@@ -2174,6 +2716,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
     );
   }
   const best = evidence[decided.index];
+  if (best.label === T12_TAX_LABEL) return t12TaxRow(ctx, omSays, evidence, decided.index, bill, billRow!, best.value!, assessed == null);
   // The grade is struck on the reset (or unabated) bill, as its thresholds
   // are written ("15% under the reset bill"); a sentence that says "over the
   // OM's line" divides by the OM's line.
@@ -2265,6 +2808,59 @@ function taxesRow(ctx: Ctx): StressRow | null {
   };
 }
 
+/** What the T-12's tax line is where it decides the row: the seller's own
+ *  bill, a working floor and a rule of thumb, never the bill a new owner pays. */
+export const TAX_T12_FLOOR = "the seller's own bill, a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays";
+
+/** What a re-run at the T-12's tax bill is, said wherever its part of the
+ *  headline is (`StressHeadlinePart.conditional`). */
+export const TAX_T12_FLOOR_CONDITION = "at the seller's own T-12 bill, a working floor, not a new owner's bill";
+
+/**
+ * The taxes row where the seller's T-12 bill decides it: no reset bill can be
+ * struck (no assessed value stated) and no abatement ends inside the hold, and
+ * the OM's line sits under the T-12's past SAME_SHARE. The OM against its own
+ * building's history, read stretched at most: the T-12's bill is a floor (a
+ * sale rarely lowers a bill, and a reset would raise it), never the bill a new
+ * owner pays. The return is re-run at it, the expense line as `expenseImpact`
+ * sets it — swapped, never added to a line that already carries it; a plan
+ * deal's yield on cost only where the OM states its bill as its pro forma's
+ * line.
+ */
+function t12TaxRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEvidence[], evidenceIndex: number, bill: number, billRow: Row, floor: number, noAssessed: boolean): StressRow {
+  const share = (floor - bill) / floor;
+  const gap: StressRow["gap"] = {
+    value: Math.round(floor - bill),
+    unit: "usd",
+    text: `The OM's ${money(bill)} tax line is ${money(floor - bill)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. ${noAssessed ? "With no assessed value stated, no reset bill is struck" : "No reset bill is struck"}; the T-12's is a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays, so the row reads stretched at most.`,
+  };
+  const words = { what: "the tax line", om: money(bill), alt: `the seller's ${money(floor)} T-12 bill, a working floor and a rule of thumb, not a new owner's bill`, evidence: "" };
+  const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, bill, floor, floor, "tax line", evidenceIndex, words) : null;
+  let planImpact: StressImpact | null = null;
+  let noRerun: string | null = null;
+  if (ctx.planYield) {
+    if (!PLAN_FIGURE.test(billRow.label)) noRerun = PLAN_TAX_NOT_PRO_FORMA;
+    else {
+      const run = yocSplit(yocImpact(ctx.planYield, "stabilizedNoi", evidenceIndex, ctx.planYield.noi, ctx.planYield.noi - (floor - bill), words));
+      planImpact = run.impact;
+      noRerun = run.noRerun;
+    }
+  }
+  return {
+    key: "taxes",
+    title: TITLES.taxes,
+    omSays,
+    evidence,
+    gap,
+    verdict: "stretched",
+    decidedBy: evidenceIndex,
+    impact: impact ?? planImpact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("taxes", evidence, evidenceIndex),
+  };
+}
+
 /**
  * The model's one expense line, run twice: once carrying the OM's figure for
  * one of its lines (a tax bill, a premium) and once the evidence's, every
@@ -2277,9 +2873,15 @@ function taxesRow(ctx: Ctx): StressRow | null {
  *     figure plus the OM's, the evidence's the line less the T-12's figure
  *     plus the evidence's — never the gap added on top of a line that
  *     already holds the T-12's figure, which counted the gap twice;
- *   - where the line is the class's ratio struck on the OM's NOI, it is read
- *     as carrying the OM's figure: the OM's run is the model's own and the
- *     evidence's moves it by the gap.
+ *   - where the line is the class's ratio struck on the model's NOI and the
+ *     class's ratio is the evidence (`classFigure`, the operating-expense row
+ *     with no T-12 on file), it is read as carrying the class's figure: the
+ *     OM's run is the line less the class's figure plus the OM's, the
+ *     evidence's the model's own line — never the gap added on top of a line
+ *     that already holds the class's figure, which counted the gap twice;
+ *   - otherwise, where the line is the class's ratio struck on the OM's NOI,
+ *     it is read as carrying the OM's figure: the OM's run is the model's own
+ *     and the evidence's moves it by the gap.
  * `omValue` and `altValue` on the impact are the two runs' whole expense
  * lines, which the headline's cases set the line to. `words.evidence` is ""
  * where `alt` is already a whole phrase.
@@ -2292,6 +2894,7 @@ function expenseImpact(
   lineWord: string,
   evidenceIndex: number,
   words: { what: string; om: string; alt: string; evidence: string; omSide?: string },
+  classFigure: number | null = null,
 ): StressImpact | null {
   const derived = ctx.derived;
   if (!derived) return null;
@@ -2311,6 +2914,13 @@ function expenseImpact(
     carriedWords = tied
       ? `its one expense line at the T-12's ${money(total)} total, with the T-12's ${money(t12Line)} ${lineWord} in it`
       : `its one expense line at the T-12's expense load, ${money(total)}, with the T-12's ${money(t12Line)} ${lineWord} in it scaled to that load, ${money(carried)}`;
+  }
+  // The class's ratio deciding a line the model struck on that ratio: the
+  // line holds the class's figure (meta.defaultExpenseRatio is carried only
+  // where the model struck its expenses on it).
+  if (carried == null && !fromT12 && classFigure != null && derived.meta.defaultExpenseRatio) {
+    carried = classFigure;
+    carriedWords = `its one expense line struck on the class's ratio, read as carrying the class's ${money(classFigure)} ${lineWord}`;
   }
   const omTotal = carried != null ? total - carried + omFigure : total;
   const altTotal = carried != null ? total - carried + altFigure : total + (altFigure - omFigure);
@@ -2402,16 +3012,24 @@ export const PLAN_INSURANCE_NOT_PRO_FORMA =
  * nation's carriers' year (shown, held to nothing, carrying no figure of its
  * own).
  */
+/** The building's premium as the OM states it, the insurance row's figure:
+ *  a year's premium for the building, never a figure a unit or a month, a
+ *  range, or insurance income. The operating-expense row leaves this same
+ *  premium out of the OM's total. */
+function omPremiumLine(rows: Row[]): { row: Row | null; premium: number | null } {
+  const row =
+    rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
+  return { row, premium: row ? parseUsd(row.value, 500) : null };
+}
+
 function insuranceRow(ctx: Ctx): StressRow | null {
-  const premiumRow =
-    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
-  const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
+  const { row: premiumRow, premium } = omPremiumLine(ctx.rows);
   const evidence: StressEvidence[] = [];
   // The T-12's own insurance line: the seller's actual premium. It decides
   // only where the OM's premium sits under it past SAME_SHARE, on a building
   // already delivered — the OM against its own building's history.
   const t12 = ctx.actuals?.t12;
-  const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
+  const t12Ins = t12InsuranceLineOf(t12);
   const t12Premium = t12Ins && t12Ins.amount > 0 ? t12Ins.amount : null;
   const delivered = !notYetDelivered(ctx.kind);
   const under = premium != null && t12Premium != null && (t12Premium - premium) / t12Premium > SAME_SHARE;
@@ -2502,6 +3120,348 @@ function insuranceRow(ctx: Ctx): StressRow | null {
     ...(noRerun ? { noRerun } : {}),
     challenge: null,
     method: methodSentence("insurance", evidence, evidenceIndex),
+  };
+}
+
+// — Operating expenses —
+
+/** The OM's operating-expense total: the pro forma's whole expense line, its
+ *  taxes and insurance in it, as stated — never a growth rate, a ratio, a
+ *  figure a unit or a foot, the T-12's or today's actual, recoveries, a later
+ *  year's, or a line that says what it leaves out. */
+const OPEX_ROW = /\b(?:total\s+)?operating\s+expenses?\b|\bopex\b|\btotal\s+expenses\b/i;
+const OPEX_NOT =
+  /growth|escalat|inflat|ratio|\bper\b|\/|psf|t-?12|ttm|trailing|in[- ]place|actual|historical|current|reimburs|recover|excl|\bex\.|\bless\b|net of|controllable|before|after|non[- ]?recoverable|capital|reserve|year ?[2-9]|yr\.? ?[2-9]/i;
+/** The OM's expense ratio: its operating expenses as a share of its income
+ *  (EGI), never a share of gross potential rent, a market's or the T-12's. */
+const OPEX_RATIO_ROW = /\b(?:operating\s+)?expense\s+ratio\b|\bopex\s+ratio\b/i;
+const OPEX_RATIO_NOT = /t-?12|ttm|trailing|in[- ]place|actual|historical|current|market|class|industry|typical|comp|gross potential|potential gross|\bgpr\b|year ?[2-9]|yr\.? ?[2-9]/i;
+/** The pro forma's own figure first. */
+const OPEX_PRO_FORMA = /stabili[sz]ed|pro ?forma|underwrit|budget|year ?1\b|yr\.? ?1\b/i;
+const EGI_NOT = /\bper\b|\/|psf|month|\bmo\b|growth|t-?12|ttm|trailing|in[- ]place|current|actual|year ?[2-9]|yr\.? ?[2-9]/i;
+
+/** The OM's own expense lines, each read as stated and set beside the T-12's
+ *  same line in words — never summed into a total the OM does not state. */
+const OM_EXPENSE_LINES: readonly { name: string; om: RegExp; t12: RegExp }[] = [
+  { name: "management fee", om: /\bmanagement\s+fees?\b/i, t12: /\bmanage/i },
+  { name: "payroll", om: /\bpayroll\b|\bsalar(?:y|ies)\b|\bpersonnel\b/i, t12: /\bpayroll\b|\bsalar|\bpersonnel\b|\bwages?\b/i },
+  { name: "repairs and maintenance", om: /\brepairs?\b|\br\s?&\s?m\b|\bmaintenance\b/i, t12: /\brepair|\bmainten|\br\s?&\s?m\b/i },
+  { name: "utilities", om: /\butilit/i, t12: /\butilit|\belectric|\bgas\b|\bwater\b|\bsewer\b|\btrash\b|\bpower\b/i },
+];
+const OM_LINE_NOT = /growth|escalat|\bper\b|\/|psf|t-?12|ttm|trailing|actual|historical|reserve|asset management|income|revenue|reimburs/i;
+
+/** The OM's other income, the pro forma's (never the T-12's or a figure a
+ *  unit), beside the NOI. */
+const OTHER_INCOME_ROW = /\bother\s+(?:income|revenue)\b/i;
+const OTHER_INCOME_NOT = /growth|\bper\b|\/|psf|t-?12|ttm|trailing|actual|in[- ]place|current|historical/i;
+/** The NOI row's piece where the OM and the T-12 both state other income. */
+export const OTHER_INCOME_LABEL = "The OM's other income against the T-12's";
+
+/** Why a plan deal's operating-expense row carries no re-run where the OM's
+ *  figure is not its pro forma's line. */
+export const PLAN_OPEX_NOT_PRO_FORMA =
+  "The OM states its operating expenses as no pro forma line, so which expenses the stabilized NOI carries is not stated, and no yield on cost is re-run on it.";
+
+/** The OM's figure under test: its pro forma's preferred row. */
+function preferredRow(rows: Row[], re: RegExp, not: RegExp, ok: (r: Row) => boolean): Row | null {
+  const hits = rows.filter((m) => re.test(m.label) && !not.test(m.label) && !statesRange(m.value) && ok(m));
+  return hits.find((m) => OPEX_PRO_FORMA.test(m.label)) ?? hits[0] ?? null;
+}
+
+/** What an expense total's own label says it leaves out of itself:
+ *  "Operating expenses (excl. taxes)", "Total expenses less taxes and
+ *  insurance". Only the taxes and the insurance are read so; a label that
+ *  leaves out anything else stays refused (`OPEX_NOT`). */
+const OPEX_EXCLUDES =
+  /\b(?:excl(?:uding|udes|\.)?|ex\.|less|net\s+of|before|without|w\/o)\s+(?:(?:real\s+estate|property|re)\s+)?(tax(?:es)?|insurance)(?:\s*(?:,|and|&)\s*(?:(?:real\s+estate|property|re)\s+)?(tax(?:es)?|insurance))?/i;
+
+type OpexExcluded = "taxes" | "insurance";
+
+/**
+ * The OM's operating-expense total under test: among the rows that state one
+ * (the pro forma's first, where any is labelled so), the one whose label
+ * names a total, else the largest stated — never simply the first, since an
+ * "Operating expenses" line that leaves the taxes out can sit above the
+ * "Total expenses" that holds them. What its label says it leaves out is
+ * carried (`excludes`), so those lines are not taken out of it again.
+ */
+function opexTotalRow(rows: Row[]): { row: Row; total: number; excludes: OpexExcluded[] } | null {
+  const hits = rows.flatMap((m) => {
+    if (!OPEX_ROW.test(m.label) || statesRange(m.value) || /%/.test(m.value)) return [];
+    const total = parseUsd(m.value, 10_000);
+    if (total == null) return [];
+    const ex = OPEX_EXCLUDES.exec(m.label);
+    if (OPEX_NOT.test(ex ? m.label.replace(ex[0], " ") : m.label)) return [];
+    const excludes = ex ? [...new Set([ex[1], ex[2]].filter((w): w is string => !!w).map((w): OpexExcluded => (/insur/i.test(w) ? "insurance" : "taxes")))] : [];
+    return [{ row: m, total, excludes }];
+  });
+  const proForma = hits.filter((h) => OPEX_PRO_FORMA.test(h.row.label));
+  const pool = proForma.length > 0 ? proForma : hits;
+  return pool.find((h) => /\btotal\b/i.test(h.row.label)) ?? [...pool].sort((a, b) => b.total - a.total)[0] ?? null;
+}
+
+/** The OM's operating expenses as it states them: a total, else a ratio on
+ *  its EGI (the EGI it states, else the one its NOI implies at that ratio),
+ *  each said with its arithmetic; and the EGI the class's ratio would be
+ *  struck on. A total whose label leaves the taxes or the insurance out
+ *  carries `excludes`, and its EGI is derived from the NOI only where the
+ *  OM states each line it leaves out (`stated`). Null where it states
+ *  neither. */
+function omOpexOf(
+  rows: Row[],
+  omNoi: number | null,
+  stated: { taxes: number | null; insurance: number | null } = { taxes: null, insurance: null },
+): { total: number; row: Row; words: string; egi: number | null; egiWords: string | null; excludes: OpexExcluded[] } | null {
+  const egiRow = preferredRow(rows, EGI_ROW, EGI_NOT, (m) => parseUsd(m.value, 10_000) != null);
+  const egiStated = egiRow ? parseUsd(egiRow.value, 10_000) : null;
+  const egiStatedWords = egiRow && egiStated != null ? `the OM's ${lowerFirst(egiRow.label)} of ${money(egiStated)}` : null;
+  const picked = opexTotalRow(rows);
+  if (picked) {
+    const { row: totalRow, total, excludes } = picked;
+    // The whole expense load the NOI is struck after: the total plus each
+    // line its label leaves out, where the OM states it.
+    const left = excludes.map((k) => stated[k]);
+    const whole = left.every((v): v is number => v != null) ? total + left.reduce((a: number, b) => a + (b ?? 0), 0) : null;
+    const egi = egiStated ?? (omNoi != null && whole != null ? omNoi + whole : null);
+    return {
+      total,
+      row: totalRow,
+      words: `the OM's ${lowerFirst(totalRow.label)} of ${money(total)}`,
+      egi,
+      egiWords: egiStatedWords ?? (egi != null && omNoi != null && whole != null ? `the ${money(egi)} the OM's ${money(omNoi)} NOI and its ${money(whole)} of expenses make` : null),
+      excludes,
+    };
+  }
+  const ratioRow = preferredRow(rows, OPEX_RATIO_ROW, OPEX_RATIO_NOT, (m) => {
+    const p = parsePct(m.value);
+    return p != null && p > 0 && p < 100;
+  });
+  if (!ratioRow) return null;
+  const r = parsePct(ratioRow.value)! / 100;
+  const egi = egiStated ?? (omNoi != null ? omNoi / (1 - r) : null);
+  if (egi == null || !(egi > 0)) return null;
+  const egiWords = egiStatedWords ?? `the ${money(egi)} EGI the OM's ${money(omNoi!)} NOI implies at that ratio`;
+  return { total: r * egi, row: ratioRow, words: `the OM's ${pct1(r * 100)} ${lowerFirst(ratioRow.label)} on ${egiWords}, ${money(r * egi)}`, egi, egiWords, excludes: [] };
+}
+
+/**
+ * The operating-expense row (the owner's decision of 2026-10-21): the OM's
+ * pro forma operating expenses less the taxes and the insurance it states
+ * (each has a row of its own, so neither line is held twice), set against
+ * the deal's own T-12 on the same footing — its total less its tax and
+ * insurance lines where the OM's figure leaves them out. The T-12 decides
+ * (`document`); each of its lines a unit (a foot on a class priced by the
+ * foot), the management fee as a share of its EGI and the OM's own lines are
+ * shown beside it, deciding nothing. Only where no T-12 is on file does the
+ * class's expense ratio decide, struck on the OM's own EGI, a rule of thumb
+ * read stretched at most. Holds within the NOI's in-line band
+ * (NOI_IN_LINE_BAND, 5%) of the deciding figure or over it; unsupported past
+ * NOI_UNSUPPORTED_SHARE (10%) under it. The return is re-run with the
+ * model's one expense line set at the OM's figure and at the evidence's
+ * (`expenseImpact`, swapped, never added). Never on a development or a
+ * conversion (no building runs today), a leased fee (the building is not the
+ * buyer's) or a class that operates nothing.
+ */
+function opexRow(ctx: Ctx): StressRow | null {
+  if (notYetDelivered(ctx.kind) || interestOf(ctx.ex).kind === "leased_fee" || !assetWords(ctx.assetClass).operating) return null;
+  const omNoi = pickOmNoi(ctx.rows, ctx.kind);
+  const tax = omTaxLine(ctx);
+  const ins = omPremiumLine(ctx.rows);
+  const om = omOpexOf(ctx.rows, omNoi?.noi ?? null, { taxes: tax.bill, insurance: ins.premium });
+  // A line the total's own label leaves out is already out of it: never taken
+  // out again, and still out of the footing the evidence is set on.
+  const excl = om?.excludes ?? [];
+  const subTax = tax.bill != null && !excl.includes("taxes");
+  const subIns = ins.premium != null && !excl.includes("insurance");
+  const less: ("taxes" | "insurance")[] = [
+    ...(tax.bill != null || excl.includes("taxes") ? (["taxes"] as const) : []),
+    ...(ins.premium != null || excl.includes("insurance") ? (["insurance"] as const) : []),
+  ];
+  const omFigure = om ? om.total - (subTax ? tax.bill! : 0) - (subIns ? ins.premium! : 0) : null;
+  // A figure a unit, or a foot on a class priced by the foot.
+  const words = assetWords(ctx.assetClass);
+  const bySf = words.basis === "sf";
+  const units = unitCountFromMetrics(ctx.rows);
+  const sf = buildingSfFromMetrics(ctx.rows);
+  const noun = countNoun(unitCountRow(ctx.rows)?.label, ctx.assetClass).replace(/s$/, "");
+  const per = (n: number): string | null =>
+    bySf ? (sf != null && sf > 0 ? `$${(n / sf).toFixed(2)} a square foot` : null) : units != null && units > 0 ? `$${Math.round(n / units).toLocaleString("en-US")} ${withArticle(noun)}` : null;
+  const perSaid = (n: number) => (per(n) ? ` (${per(n)})` : "");
+  const lessWords = (whose: string, taxW: string | null, insW: string | null) => {
+    const parts = [...(taxW ? [taxW] : []), ...(insW ? [insW] : [])];
+    return parts.length ? ` less ${whose} ${joinWords(parts)}` : "";
+  };
+  const evidence: StressEvidence[] = [];
+  const t12 = ctx.actuals?.t12 ?? null;
+  const t12Tax = t12TaxLineOf(t12);
+  const t12Ins = t12InsuranceLineOf(t12);
+  let t12Figure: number | null = null;
+  let cannotFoot: string | null = null;
+  const when = t12?.periodEnd ? `TTM to ${proseDay(t12.periodEnd)}` : "period not stated";
+  const footed = t12OpexOnFooting(t12, less);
+  if (t12 && footed && "missing" in footed) {
+    cannotFoot = `The deal's T-12 breaks out no ${joinWords(footed.missing)} line, so its expenses cannot be set apart from the ${joinWords(footed.missing.map((m) => (m === "tax" ? "tax bill" : "premium")))} the OM's figure leaves out to its own row.`;
+  } else if (t12 && footed && "value" in footed) {
+    t12Figure = footed.value;
+    evidence.push({
+      kind: "document",
+      label: T12_OPEX_LABEL,
+      text: `${money(footed.value)}${perSaid(footed.value)}: the T-12's ${money(footed.total)} total${lessWords(
+        "its",
+        footed.tax != null ? `${money(footed.tax)} tax line` : null,
+        footed.insurance != null ? `${money(footed.insurance)} insurance line` : null,
+      )} (${when})`,
+      value: Math.round(footed.value),
+      asOf: t12.periodEnd,
+      publisher: "the deal's T-12",
+      scope: "deal",
+    });
+  }
+  // The OM's own lines, each beside the T-12's same line where it states one.
+  const omLines = OM_EXPENSE_LINES.flatMap((l) => {
+    const row = ctx.rows.find((m) => l.om.test(m.label) && !OM_LINE_NOT.test(m.label) && !statesRange(m.value)) ?? null;
+    if (!row) return [];
+    const pctStated = /%/.test(row.value) ? parsePct(row.value) : null;
+    const usd = pctStated == null ? parseUsd(row.value, 1_000) : null;
+    if (pctStated == null && usd == null) return [];
+    const t12Lines = (t12?.summary.opex ?? []).filter((x) => l.t12.test(x.label) && x !== t12Tax && x !== t12Ins && Number.isFinite(x.amount));
+    const t12Sum = t12Lines.length ? t12Lines.reduce((s, x) => s + x.amount, 0) : null;
+    const egi = t12?.summary.egi ?? null;
+    const page = pageOf(row, ctx.ex);
+    const omSaid = pctStated != null ? `${pct1(pctStated)}` : `${money(usd!)}${perSaid(usd!)}`;
+    const t12Said =
+      t12Sum == null
+        ? ""
+        : pctStated != null
+          ? egi != null && egi > 0
+            ? `, the T-12's ${pct1((t12Sum / egi) * 100)} of its EGI`
+            : ""
+          : `, the T-12's ${money(t12Sum)}${perSaid(t12Sum)}`;
+    return [`${l.name} ${omSaid}${page != null ? ` (p. ${page})` : ""}${t12Said}`];
+  });
+  // Each T-12 line on the footing, a unit, the management fee as a share of
+  // the T-12's own EGI: words beside the figure, never deciding.
+  if (t12) {
+    const lines = t12.summary.opex.filter(
+      (l) => Number.isFinite(l.amount) && l.amount !== 0 && !(less.includes("taxes") && l === t12Tax) && !(less.includes("insurance") && l === t12Ins),
+    );
+    if (lines.length > 0) {
+      const egi = t12.summary.egi;
+      const parts = lines.map((l) => {
+        const share = /\bmanage/i.test(l.label) && egi != null && egi > 0 ? `${pct1((l.amount / egi) * 100)} of the T-12's ${money(egi)} EGI` : null;
+        const inner = [per(l.amount), share].filter(Boolean);
+        return `${l.label} ${money(l.amount)}${inner.length ? ` (${inner.join(", ")})` : ""}`;
+      });
+      evidence.push({
+        kind: "document",
+        label: T12_OPEX_LINES_LABEL,
+        text: `${parts.join("; ")} (${when})${omLines.length ? `; beside the OM's own lines: ${omLines.join("; ")}` : ""}`,
+        value: null,
+        asOf: t12.periodEnd,
+        publisher: "the deal's T-12",
+        scope: "deal",
+      });
+    }
+  } else if (omLines.length > 0) {
+    evidence.push({ kind: "om_internal", label: "The OM's own expense lines", text: omLines.join("; "), value: null, asOf: null, publisher: "the offering memorandum", scope: "deal" });
+  }
+  // The class's expense ratio, a rule of thumb: only where no T-12 is on
+  // file, struck on the OM's own EGI, less the OM's own tax bill and premium
+  // so it stands on the OM figure's footing. The ratio is the model's own
+  // screening default (lib/underwrite/inputs `meta.defaultExpenseRatio`,
+  // carried only where the model struck its expenses on it).
+  const ratio = ctx.derived?.meta.defaultExpenseRatio ?? null;
+  // Only where each line the footing leaves out has a stated figure to take
+  // out of the class's whole load.
+  const classFootable = less.every((k) => (k === "taxes" ? tax.bill != null : ins.premium != null));
+  if (!t12 && ratio && classFootable && om?.egi != null && om.egi > 0) {
+    const whole = ratio.ratio * om.egi;
+    const fig = whole - (tax.bill ?? 0) - (ins.premium ?? 0);
+    evidence.push({
+      kind: "rule_of_thumb",
+      label: CLASS_OPEX_LABEL,
+      text: `${Math.round(ratio.ratio * 100)}% of EGI, the ${lowerFirst(ratio.classWord)} screening default, on ${om.egiWords ?? `the OM's ${money(om.egi)} EGI`} is ${money(whole)}${
+        less.length ? `${lessWords("the OM's own", tax.bill != null ? `${money(tax.bill)} tax bill` : null, ins.premium != null ? `${money(ins.premium)} premium` : null)}, ${money(fig)}` : ""
+      }: a rule of thumb, not this building's cost`,
+      value: fig > 0 ? Math.round(fig) : null,
+      asOf: null,
+      publisher: "a rule of thumb",
+      scope: "class",
+    });
+  }
+  if (omFigure == null && evidence.length === 0) return null;
+  const pageSaid = (r: Row | null) => {
+    const p = r ? pageOf(r, ctx.ex) : null;
+    return p != null ? ` (p. ${p})` : "";
+  };
+  const omSays: StressRow["omSays"] =
+    om && omFigure != null
+      ? {
+          text: `${money(omFigure)}${perSaid(omFigure)}: ${om.words}${lessWords(
+            "its",
+            subTax ? `${money(tax.bill!)} tax bill${pageSaid(tax.billRow)}` : null,
+            subIns ? `${money(ins.premium!)} premium${pageSaid(ins.row)}` : null,
+          )}`,
+          value: Math.round(omFigure),
+          page: pageOf(om.row, ctx.ex),
+        }
+      : { text: NO_FIGURE("operating-expense total or expense ratio"), value: null, page: null };
+  const footing = { less };
+  if (omFigure == null) return { ...unchecked("opex", omSays, evidence, NO_FIGURE("operating-expense total or expense ratio")), footing };
+  if (!(omFigure > 0)) return { ...unchecked("opex", omSays, evidence, "The OM's operating expenses less its tax bill and premium come to nothing or less, so the figures do not tie."), footing };
+  // ONE figure decides (lib/stress-deciders `opexDecider`): the T-12, else
+  // the class's ratio where no T-12 is on file.
+  const decided = opexDecider(candidatesOf(evidence));
+  if (!decided) return { ...unchecked("opex", omSays, evidence, cannotFoot ?? (t12 ? "The deal's T-12 states no expense total to set the OM's figure against." : NO_EVIDENCE)), footing };
+  const best = evidence[decided.index];
+  const fig = decided.figure;
+  const ruleOnly = best.label === CLASS_OPEX_LABEL;
+  const share = (fig - omFigure) / fig;
+  const graded: StressVerdict = share <= NOI_IN_LINE_BAND ? "holds" : share > NOI_UNSUPPORTED_SHARE ? "unsupported" : "stretched";
+  const verdict: StressVerdict = ruleOnly && graded === "unsupported" ? "stretched" : graded;
+  const whose = ruleOnly ? `the class's ratio's ${money(fig)}, a rule of thumb` : `the T-12's ${money(fig)}`;
+  const gap: StressRow["gap"] = {
+    value: Math.round(fig - omFigure),
+    unit: "usd",
+    text:
+      Math.abs(share) <= 0.005
+        ? `The OM's ${money(omFigure)} is at ${whose}.`
+        : share > 0
+          ? `The OM's ${money(omFigure)} is ${money(fig - omFigure)} (${pct1(share * 100)}) under ${whose}.`
+          : `The OM's ${money(omFigure)} is over ${whose} — the conservative side.`,
+  };
+  // "the operating-expense line … is", one line in the singular.
+  const what = `the operating-expense line${less.length ? ` less ${joinWords(less)}` : ""}`;
+  const lineWord = `operating expenses${less.length ? ` less ${joinWords(less)}` : ""}`;
+  const altWords = ruleOnly ? `the ${money(fig)} the class's ratio strikes, a rule of thumb` : money(fig);
+  const runWords = { what, om: money(omFigure), alt: altWords, evidence: ruleOnly ? "" : "the deal's T-12" };
+  const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, omFigure, fig, t12Figure, lineWord, decided.index, runWords, ruleOnly ? fig : null) : null;
+  // A plan deal re-runs its yield on cost on the expenses only where the OM
+  // states them as its pro forma's line, as the tax row does.
+  let planImpact: StressImpact | null = null;
+  let noRerun: string | null = null;
+  if (ctx.planYield && om) {
+    if (!PLAN_FIGURE.test(om.row.label)) noRerun = PLAN_OPEX_NOT_PRO_FORMA;
+    else {
+      const run = yocSplit(yocImpact(ctx.planYield, "stabilizedNoi", decided.index, ctx.planYield.noi, ctx.planYield.noi - (fig - omFigure), runWords));
+      planImpact = run.impact;
+      noRerun = run.noRerun;
+    }
+  }
+  return {
+    key: "opex",
+    title: TITLES.opex,
+    omSays,
+    evidence,
+    gap,
+    verdict,
+    decidedBy: decided.index,
+    impact: impact ?? planImpact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("opex", evidence, decided.index),
+    ...(ruleOnly ? { ruleOfThumbOnly: true } : {}),
+    footing,
   };
 }
 
@@ -2974,6 +3934,32 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
       scope: "deal",
     });
   }
+  // The program's pace, the OM against itself (lib/value-add's own read): a
+  // unit is renovated when its tenant leaves, so the stated period needs a
+  // share of the classic units to turn each year, set against the turnover
+  // the OM states. Beside the premium, never deciding it, and no return is
+  // re-run on it. Beside it, where the rent roll dates its leases, the share
+  // expiring within a year — expiries, not move-outs.
+  if (r.programMonths != null && r.turnoverNeededPct != null && r.turnoverPct != null) {
+    const slow = r.turnoverPct + 0.5 < r.turnoverNeededPct;
+    const rr = ctx.actuals?.rentRoll;
+    const next12 = rr?.summary.expiryBuckets?.next12mo;
+    const expiries =
+      next12 != null && Number.isFinite(next12)
+        ? `; the rent roll's leases ending within a year${rr?.asOf || rr?.summary.asOfUsed ? ` of ${proseDay((rr.asOf || rr.summary.asOfUsed)!)}` : ""} cover ${Math.round(next12 * 100)}% of the occupied area that states an end: expiries, not move-outs`
+        : "";
+    evidence.push({
+      kind: "om_internal",
+      label: "The program's pace against the turnover the OM states",
+      text: `${withArticle(`${r.programMonths}-month program`)} needs ${Math.round(r.turnoverNeededPct)}% of the classic units to turn each year; the OM states ${Math.round(r.turnoverPct)}% a year, ${
+        slow ? `so the program takes ${(Math.round(r.yearsAtTurnover! * 10) / 10).toFixed(1)} years` : "enough for the stated period"
+      }${expiries}`,
+      value: null,
+      asOf: null,
+      publisher: "the offering memorandum",
+      scope: "deal",
+    });
+  }
   // The break-even premium — a door's cost at the model's exit cap — is
   // what the program NEEDS, never evidence of what a door EARNS: it is said
   // beside the row (in its gap, or in why it is unchecked) and never filed
@@ -3095,7 +4081,10 @@ export function holdsBand(row: StressRow): string {
               : "the evidence's figure";
       return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${against}`;
     }
+    case "opex":
+      return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${best?.label === CLASS_OPEX_LABEL ? "the class's ratio" : "the T-12"}`;
     case "basis":
+    case "market_rent":
       return `within ${BASIS_STRETCH_PCT}% of the comps`;
     case "taxes":
     case "renovation_premium":
@@ -3272,6 +4261,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     pastScreens: args.pastScreens ?? null,
     pastScreensWithheld: args.pastScreensWithheld ?? null,
     indexGiven: args.indexGiven ?? null,
+    loanQuote: args.loanQuote ?? null,
     readOn: args.readOn,
   };
   const built: Partial<Record<StressKey, StressRow>> = {
@@ -3281,9 +4271,11 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     noi: noiRow(ctx) ?? undefined,
     vacancy: vacancyRow(ctx) ?? undefined,
     rent_growth: rentGrowthRow(ctx) ?? undefined,
+    market_rent: marketRentRow(ctx) ?? undefined,
     expense_growth: expenseGrowthRow(ctx) ?? undefined,
     taxes: taxesRow(ctx) ?? undefined,
     insurance: insuranceRow(ctx) ?? undefined,
+    opex: opexRow(ctx) ?? undefined,
     renovation_premium: renovationPremiumRow(ctx) ?? undefined,
   };
   // On a plan deal a tested row with no yield-on-cost meaning says so, its
@@ -3317,14 +4309,18 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     others.push({
       key: "other",
       title: c.assumption,
-      omSays: { text: c.omFigure != null ? `${c.assumption}: ${c.omFigure}` : c.assumption, value: c.omFigure ?? null, page },
+      // The challenger's figure carries no unit on a row no reader tests (a
+      // fee's 3 is 3%, a payroll's 1,200 dollars a unit), so the OM's figure
+      // is the challenge's own words, never the bare number beside them.
+      omSays: { text: c.assumption, value: null, page },
       evidence: [],
       gap: null,
       verdict: "unchecked",
       impact: null,
       challenge: challengeWords(c),
       // The challenger's `altBasis` says what it held the figure against in
-      // words; its bare `altFigure` carries no unit, so it is never printed.
+      // words; its bare `altFigure` carries no unit, so it is never printed —
+      // nor its `omFigure` (above).
       method: `The challenger's own critique${basis ? `, holding the figure against ${basis}` : ""}; no reader tests it and no figure is swapped.`,
       // A challenge whose key has a row carries the first; one whose key
       // built no row on this deal (no premium stated, no value-add program)
@@ -3347,7 +4343,11 @@ export function buildStressTest(args: StressTestArgs): StressTest {
       : derived && impactsWithheld == null
         ? stressHeadline(rows, derived.inputs, headlinePrice(derived))
         : null;
-  const headline = struck ? { ...struck, untested: headlineUntested(built, ex, args.readOn, planYield ? PLAN_UNTESTED_KEYS : HEADLINE_UNTESTED_KEYS) } : null;
+  // A levered return is struck at the model's hold; where the OM states
+  // another, the headline says it does not test the OM's (a plan's yield on
+  // cost has no hold in it).
+  const hold = planYield || !derived ? null : holdUntested(ctx.rows, ex, derived.inputs.holdMonths);
+  const headline = struck ? { ...struck, untested: headlineUntested(built, ex, args.readOn, planYield ? PLAN_UNTESTED_KEYS : HEADLINE_UNTESTED_KEYS, hold) } : null;
   return {
     rows,
     readOn: args.readOn,
@@ -3389,6 +4389,7 @@ function headlineUntested(
   ex: ExtractionResult | null,
   readOn: string,
   named: readonly StressKey[] = HEADLINE_UNTESTED_KEYS,
+  hold: NonNullable<StressHeadline["untested"]>["hold"] = null,
 ): StressHeadline["untested"] {
   const keys = named.filter((k) => !built[k] || built[k]!.verdict === "unchecked");
   const asOf = new Date(`${readOn}T12:00:00Z`);
@@ -3400,7 +4401,18 @@ function headlineUntested(
     end.setUTCFullYear(end.getUTCFullYear() + worst.year);
     roll = { sharePct: worst.sharePct, basis: roster.rollBasis, through: `${MONTH_WORDS[end.getUTCMonth()]} ${end.getUTCFullYear()}` };
   }
-  return keys.length > 0 || roll ? { keys, roll } : null;
+  return keys.length > 0 || roll || hold ? { keys, roll, ...(hold ? { hold } : {}) } : null;
+}
+
+/** The hold the OM states, where it differs from the model's (HOLD_MONTHS,
+ *  the model's own `holdMonths`): its years and the model's, with its page.
+ *  Null where the OM states none, states one the reader cannot read as one
+ *  span, or states the model's own. */
+function holdUntested(rows: Row[], ex: ExtractionResult | null, modelMonths: number): NonNullable<StressHeadline["untested"]>["hold"] {
+  const row = findMetric(rows, HOLD_ROW, HOLD_NOT);
+  const months = statedMonths(row);
+  if (months == null || Math.abs(months - modelMonths) < 1) return null;
+  return { omYears: Math.round((months / 12) * 10) / 10, modelYears: Math.round((modelMonths / 12) * 10) / 10, page: pageOf(row, ex) };
 }
 
 // ── The headline: the OM's case against the evidence's ───────────────────
@@ -3408,7 +4420,7 @@ function headlineUntested(
 /** The rows whose figures the NOI already holds: where one of them is swapped
  *  in the evidence's case, the NOI's own swap is left out of the headline
  *  (`HEADLINE_NOI_LEFT_OUT`), and the components carry the move. */
-export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance"];
+export const HEADLINE_NOI_COMPONENTS: readonly StressKey[] = ["vacancy", "taxes", "insurance", "opex"];
 
 /** The share of the OM's NOI past which the rest of the NOI's gap — what the
  *  component swaps leave of it (`StressHeadline.noiRest`) — is said. */
@@ -3453,6 +4465,7 @@ function headlineSwap(row: StressRow): HeadlineSwap | null {
  *  carries no swap into the headline. */
 function noSwapWhy(row: StressRow): string {
   if (row.key === "renovation_premium") return "the premium is no model input: the model grows today's rent at one rate";
+  if (row.key === "market_rent") return "a market rent is no model input: the model runs today's rent, which the NOI row carries";
   if (!row.impact) return "no return is re-run on it, so it has no figure to swap";
   return "its re-run moves an input the two cases cannot combine";
 }
@@ -3467,6 +4480,7 @@ function conditionOf(row: StressRow): string | null {
   // floor and a rule of thumb, never a quote, said beside the part.
   if (row.key === "insurance") return at != null && row.evidence[at]?.label === T12_INSURANCE_LABEL ? INSURANCE_FLOOR_CONDITION : null;
   if (row.key !== "taxes") return null;
+  if (at != null && row.evidence[at]?.label === T12_TAX_LABEL) return TAX_T12_FLOOR_CONDITION;
   return at != null && row.evidence[at]?.label === RESET_BILL_LABEL ? TAX_RESET_CONDITION : null;
 }
 
@@ -3711,6 +4725,14 @@ export function planStressHeadline(
   if (basis) {
     players = players.filter((s) => s !== basis);
     omitted.push({ key: basis.row.key, label: basis.row.title, why: base.plan?.forward ? PLAN_BASIS_LEFT_OUT_FORWARD : PLAN_BASIS_LEFT_OUT });
+  }
+  // A market rent beside a renovation premium would carry the renovated
+  // doors' rent into the stabilized NOI twice: the premium stays, the
+  // market rent is left out, said so.
+  const rent = players.find((s) => s.row.key === "market_rent");
+  if (rent && players.some((s) => s.row.key === "renovation_premium")) {
+    players = players.filter((s) => s !== rent);
+    omitted.push({ key: rent.row.key, label: rent.row.title, why: PLAN_MARKET_RENT_BESIDE_PREMIUM });
   }
   /** The plan's two figures with the swaps `alt` answers true for moved. */
   const figures = (alt: (s: Swap) => boolean) => {

@@ -23,6 +23,7 @@ import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
 import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
 import { STRESS_TEST_ANCHOR } from "@/app/(app)/deals/[id]/stress-chip";
 import { BarRow, BarRows, Key, KeyItem, Tick } from "@/app/panel-parts";
+import { NOT_TESTED, NOT_TESTED_HEADING, NOT_TESTED_ID, NOT_TESTED_LINK, type NotTested } from "@/lib/not-tested";
 
 /**
  * The methodology page, pure (2026-10-19): one section an assumption the
@@ -280,6 +281,53 @@ function ScoringRulePicture() {
   );
 }
 
+/** Where an item's "beside it" line comes from, as the reader meets it: a
+ *  tested row by its section's title (linked), or the headline. */
+function besideSource(key: NonNullable<NotTested["beside"]>["key"]): { href: string; title: string } | null {
+  if (key === "headline") return { href: "#headline", title: "the headline" };
+  const m = STRESS_METHODS.find((s) => s.key === key);
+  // "The NOI" reads "the NOI" mid-sentence; an acronym keeps its capitals.
+  return m ? { href: `#${m.key}`, title: `${m.title[0].toLowerCase()}${m.title.slice(1)}` } : null;
+}
+
+/**
+ * What the test does not check yet (lib/not-tested), beside the methods:
+ * a tile a claim, its title, why it is not tested, and — where a tested row
+ * shows part of it — that row named and linked. A grid of short tiles,
+ * never a paragraph.
+ */
+function NotTestedSection() {
+  return (
+    <section className="mt-12" id={NOT_TESTED_ID} data-qa="not-tested" aria-labelledby={`${NOT_TESTED_ID}-heading`}>
+      <h2 id={`${NOT_TESTED_ID}-heading`} className="text-lg font-semibold tracking-tight">
+        {NOT_TESTED_HEADING}
+      </h2>
+      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+        {NOT_TESTED.map((item) => {
+          const from = item.beside ? besideSource(item.beside.key) : null;
+          return (
+            <li key={item.id} className="rounded-2xl border border-dashed border-line bg-surface p-4" data-not-tested={item.id}>
+              <h3 className="flex items-start gap-2 text-sm font-semibold tracking-tight">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-line" aria-hidden="true" />
+                <span>{item.title}</span>
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{item.why}</p>
+              {item.beside && from && (
+                <p className="mt-2 text-xs leading-relaxed text-muted" data-qa="not-tested-beside">
+                  <a href={from.href} className="font-medium text-brand hover:text-brand-strong">
+                    {`Beside it, ${from.title}:`}
+                  </a>{" "}
+                  {item.beside.line}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * The row the page shows as its worked example: the sample's first row, by
  * the panel's own order (the most severe first), that re-runs the return —
@@ -327,7 +375,7 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
     <div className="mx-auto w-full max-w-3xl" data-qa="how-we-test">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{HOW_WE_TEST_TITLE}</h1>
       <p className="mt-4 text-base leading-relaxed text-muted">
-        A memorandum&apos;s assumptions are each set against evidence a buyer can check.
+        A memorandum&apos;s key assumptions are each set against evidence a buyer can check.
       </p>
       <p className="mt-1 text-base leading-relaxed text-muted">
         A dated published figure, the deal&apos;s own documents, or a rule of thumb named as one.
@@ -337,6 +385,11 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
       </p>
       <p className="mt-3 text-sm font-medium text-ink" data-qa="how-we-test-marker">
         {HOW_WE_TEST_MARKER}
+      </p>
+      <p className="mt-2 text-sm">
+        <a href={`#${NOT_TESTED_ID}`} className="font-medium text-brand hover:text-brand-strong" data-qa="not-tested-link">
+          {NOT_TESTED_LINK}
+        </a>
       </p>
 
       {example && <WorkedExample test={example} />}
@@ -403,6 +456,8 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
           <MethodSection key={m.key} method={m} index={i} />
         ))}
       </div>
+
+      <NotTestedSection />
 
       <section className="mt-12" id="sources" data-qa="figure-sources">
         <h2 className="text-lg font-semibold tracking-tight">Where the figures come from</h2>

@@ -1431,11 +1431,14 @@ function stressFigure(key: StressKey, value: number, per: string, evidence = fal
     case "noi":
     case "taxes":
     case "insurance":
+    case "opex":
       return { value, numFmt: FMT.usd };
     case "basis":
       return { value, numFmt: per ? `$#,##0"${per}"` : "$#,##0" };
     case "renovation_premium":
       return { value, numFmt: '$#,##0"/mo"' };
+    case "market_rent":
+      return { value, numFmt: per === "/SF" ? '$#,##0.00"/SF"' : '$#,##0"/mo"' };
     default:
       return { value, numFmt: "General" };
   }
@@ -1458,6 +1461,7 @@ function stressGap(gap: NonNullable<StressRow["gap"]>): { value: number; numFmt:
 /** The basis's noun, as the reader writes the OM's figure first in its text
  *  ("$274k/unit …") — lib/stress-test-words `figureText`'s own read. */
 const basisPer = (row: StressRow): string => {
+  if (row.key === "market_rent") return row.yardstick ?? "";
   const noun = row.omSays.text.match(/^\$[\d.,]+[kMB]?\/(\S+)/)?.[1];
   return noun ? `/${noun}` : "";
 };
@@ -1509,7 +1513,7 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
   const rerun = rerunsStand(test) ? ", and the return re-run in code with that one input swapped for the evidence's" : "";
   across(
     2,
-    `Each assumption the memorandum makes, set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
+    `The memorandum's key assumptions, each set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
   );
   across(3, stressReadLine(test), { color: INK });
   // The sample's note, where its re-runs stand (the memo's and the report's rule).

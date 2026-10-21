@@ -34,6 +34,8 @@ import {
   HEADLINE_NOI_REST_SHARE,
   HEADLINE_UNTESTED_KEYS,
   ROSTER_UNTESTED_PCT,
+  MARKET_RENT_NO_RERUN,
+  PLAN_MARKET_RENT_BESIDE_PREMIUM,
   INSURANCE_AT_HISTORY,
   INSURANCE_FLOOR_CONDITION,
   INSURANCE_NO_QUOTE,
@@ -82,6 +84,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel } from "@/app/stress-test-panel";
 import { readRoster } from "./tenant-roster";
+import { extractionInstruction } from "./anthropic/prompts";
 
 const spy = computeUnderwrite as unknown as ReturnType<typeof vi.fn>;
 afterEach(() => spy.mockClear());
@@ -346,12 +349,16 @@ describe("a stabilized apartment deal with a T-12", () => {
 
   it("never reads holds where its own re-run lowers the levered IRR 100 bps or more", async () => {
     // The sample's NOI is 4.7% over its T-12, inside the 5% band, yet the
-    // re-run moves the levered IRR from 11.7% to 9.3%.
+    // re-run moves the levered IRR well over 100 bps (its figures the
+    // engine's own, read off the row, never typed).
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const n = rowOf(sampleStressTest("2026-10-19"), "noi");
     expect(IRR_MOVE_STRETCH_BPS).toBe(100);
     expect(n.verdict).toBe("stretched");
-    expect(n.gap!.text).toMatch(/^The OM's \$3\.88M is 4\.7% \(\$174k\) over the deal's T-12's \$3\.71M\. The gap is within 5% of the T-12, but the return moves \d+ bps on it \(levered IRR 11\.7% to 9\.3%\)\.$/);
+    const [from, to] = [n.impact!.baseIrrPct!, n.impact!.altIrrPct!].map((x) => x.toFixed(1).replace(".", "\\."));
+    expect(n.gap!.text).toMatch(
+      new RegExp(`^The OM's \\$3\\.88M is 4\\.7% \\(\\$174k\\) over the deal's T-12's \\$3\\.71M\\. The gap is within 5% of the T-12, but the return moves \\d+ bps on it \\(levered IRR ${from}% to ${to}%\\)\\.$`),
+    );
   });
 
   it("says a verdict struck on a rule of thumb alone is one, and the vacancy's turns on the best kind present", () => {
@@ -611,7 +618,8 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(d.evidence[0]).toEqual({
       kind: "published",
       label: "The index the model prices off: 5-yr Treasury",
-      text: "4.78% (FRED, Sep 17, 2026)",
+      // Which tenor, said: the OM states no loan term, so the hold's.
+      text: "4.78% (FRED, Sep 17, 2026), the tenor nearest the model's 5-year hold, since the OM states no loan term",
       value: 4.78,
       asOf: "2026-09-17",
       publisher: "FRED",
@@ -693,7 +701,11 @@ describe("a stabilized apartment deal with a T-12", () => {
   });
 
   it("omits a row with nothing stated and nothing found, and no impact is withheld", () => {
-    expect(test.rows.map((r) => r.key)).toEqual(["basis", "exit_cap", "debt", "noi", "vacancy", "rent_growth", "expense_growth", "taxes", "insurance"]);
+    // The operating expenses stand unchecked beside the T-12: the OM states
+    // no total and no ratio.
+    // The market rent stands unchecked beside the OM's pro forma rent: no
+    // lease comps are on file.
+    expect(test.rows.map((r) => r.key)).toEqual(["basis", "exit_cap", "debt", "noi", "vacancy", "rent_growth", "market_rent", "expense_growth", "taxes", "insurance", "opex"]);
     expect(test.impactsWithheld).toBeNull();
     expect(test.readOn).toBe(READ_ON);
     // Its published evidence is today's read; with none handed in, the
@@ -1383,6 +1395,8 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     expect(Math.round(shown.parts.reduce((s, p) => s + p.shown, 0) * 100)).toBe(Math.round((shown.evidence! - shown.om!) * 100));
     // The vacancy and the premium overlap a little, said on /how-we-test.
     expect(HEADLINE_METHOD.plan.join(" ")).toContain("the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out");
+    // So do the vacancy and a market rent, both past their evidence.
+    expect(HEADLINE_METHOD.plan.join(" ")).toContain("Vacancy and a market rent both past their evidence overlap the same way");
     // The OM's own stated yield on cost rides beside the two cases, as the OM's.
     expect(h.statedYoc).toEqual({ pct: 7.1, label: "Untrended yield on cost", page: 24, namesCost: false });
     // The two differ, so each is said with what it is struck on, from the
@@ -2034,10 +2048,29 @@ describe("the challenger's words ride beside the rows", () => {
     // A premium over replacement cost is the basis's; an insurance premium is insurance.
     expect(k("A 20% premium over replacement cost")).toBe("basis");
     expect(k("Insurance premium at the seller's policy")).toBe("insurance");
-    // A figure per unit is the basis's only beside a price word.
-    expect(k("Payroll of $1,200 per unit")).toBe("other");
+    // A rent or renovation premium is never the insurance row's.
+    expect(k("Market rent premium of $200 is unproven")).toBe("market_rent");
+    expect(k("Rent growth of 4% a year")).toBe("rent_growth");
+    expect(k("Renovation premium $200/mo")).toBe("renovation_premium");
+    expect(k("Premium at the expiring policy's renewal")).toBe("insurance");
+    expect(k("Rent premium of $150")).not.toBe("insurance");
+    // A figure per unit is the basis's only beside a price word; an expense
+    // line's level is the operating expenses'.
+    expect(k("Payroll of $1,200 per unit")).toBe("opex");
+    expect(k("Management fee of 2.5% is light")).toBe("opex");
     expect(k("Asking $275,000 per unit")).toBe("basis");
     expect(k("Pricing at $310 psf")).toBe("basis");
+    // A rent's growth rate is the rent growth row's, whoever's rent it is.
+    expect(k("Market rent growth of 4% a year")).toBe("rent_growth");
+    expect(k("Pro forma rent growth")).toBe("rent_growth");
+    expect(k("Market rents 12% over the comps")).toBe("market_rent");
+    // An expense's growth in words is the growth row's; its level the opex row's.
+    expect(k("Operating expenses grow 2% a year")).toBe("expense_growth");
+    expect(k("Operating expenses increasing 2% annually")).toBe("expense_growth");
+    expect(k("Operating expenses of $1.2M are light")).toBe("opex");
+    // A debt service coverage is the loan's, never a policy's.
+    expect(k("Debt service coverage at a rate premium")).toBe("debt");
+    expect(k("Coverage limits at the expiring premium")).toBe("insurance");
   });
 });
 
@@ -2051,14 +2084,16 @@ describe("the challenger's words ride beside the rows", () => {
 const AGAINST_SOURCES: Record<StressKey, string[]> = {
   basis: ["The memorandum's sale comps", "Recorded sales (", "Other memoranda's asking prices in"],
   exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
-  debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
-  noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
+  debt: ["The lender's quote on file", "The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
+  noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma", "The OM's other income against the T-12's"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "Core CPI", "insurance premiums", "breakeven"],
-  taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
+  taxes: ["The bill the OM's own figures imply", "The stated tax abatement", "The deal's T-12 tax line"],
   insurance: ["moved by the national premium index", "The deal's T-12 insurance line"],
-  renovation_premium: ["Achieved premium", "classic and renovated rents"],
+  market_rent: ["The memorandum's lease comps", "The rent roll's in-place rent", "Asking rent, apartments, metro area"],
+  opex: ["The deal's T-12 operating expenses", "The deal's T-12 expense lines", "The class's expense ratio, a rule of thumb"],
+  renovation_premium: ["Achieved premium", "classic and renovated rents", "The program's pace against the turnover the OM states"],
   other: ["The challenger's own critique"],
 };
 
@@ -2079,6 +2114,12 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
       row("Achieved renovation premium", "$190/mo", "p. 23"),
       row("Classic rent", "$1,650", "p. 23"),
       row("Renovated rent", "$1,900", "p. 23"),
+      row("Annual turnover", "35%", "p. 23"),
+      row("Renovation period", "24 months", "p. 22"),
+      row("Operating expenses (pro forma)", "$1,640,000", "p. 9"),
+      row("Management fee", "3.0%", "p. 9"),
+      row("Payroll", "$590,000", "p. 9"),
+      row("Other income", "$110,000", "p. 9"),
     ],
   };
   const rentRoll = {
@@ -2095,7 +2136,9 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
   const apartmentTest = buildStressTest({
     extraction: withEverything,
     challenger: { stressTest: "", challenges: [{ assumption: "The broker's story", severity: "low", challenge: "words", question: "which?", page: "" }] },
-    market: null,
+    // The market check's stored figures: Zillow's apartment asking rent for
+    // the metro, read beside the market rent.
+    market: { checks: [], summary: "", liveBrief: { metro: "Washington DC", readOn: READ_ON, lines: [], figures: [{ key: "zori_mfr_rent", label: "Asking rent, apartments", value: 2150, unit: "usd", asOf: "2026-08-31" }] } },
     modelVsMarket: readFor(derived, { now: new Date("2026-10-05T12:00:00Z"), regulation }),
     actuals,
     derived,
@@ -2105,12 +2148,18 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
         { name: "The Ellery", detail: "$252,000 per unit, 5.6% cap, sold Mar 2026", support: "supports", note: "" },
         { name: "Park Place", detail: "$261K/door, 5.4% cap", support: "favorable", note: "" },
       ],
-      leaseComps: [{ name: "The Rowan", detail: "$2,050/mo one-bedroom", support: "supports", note: "" }],
+      leaseComps: [
+        { name: "The Rowan", detail: "$2,050/mo one-bedroom", support: "supports", note: "" },
+        { name: "The Calder", detail: "$2,300/mo two-bedroom", support: "supports", note: "" },
+        { name: "Hale House", detail: "$2,250/mo two-bedroom", support: "supports", note: "" },
+      ],
       redFlags: [],
       summary: "",
     },
     recordedSales: { count: 4, medianPerSqft: 310, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01", href: "https://example.test/records" },
     pastScreens: { count: 3, perUnitMedian: 255_000, perSfMedian: 290, market: "Washington DC" },
+    // A term sheet on file whose rate the deal's model carries.
+    loanQuote: { ratePct: 5.6, stated: "5.60%", floating: false, filename: "term-sheet.pdf", asOf: "2026-10-03" },
     readOn: "2026-10-05",
   });
   // An office deal in Washington, whose vacancy and exit read the research
@@ -2119,7 +2168,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
   const office: ExtractionResult = {
     ...APARTMENT,
     assetClass: "office",
-    metrics: APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)),
+    metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Operating expenses (pro forma)", "$1,300,000", "p. 9")],
   };
   const officeDerived = deriveUnderwriteInputs(office, "x", undefined, { debtIndex: FIVE });
   const officeTest = buildStressTest({
@@ -2990,7 +3039,8 @@ describe("the headline", () => {
 
   it("names in the method every assumption the OM's case can hold", () => {
     for (const k of STRESS_KEYS) {
-      if (k === "renovation_premium" || k === "other") continue;
+      // No model input on a stabilized deal: neither is in the OM's case.
+      if (k === "renovation_premium" || k === "market_rent" || k === "other") continue;
       expect(HEADLINE_METHOD.omCase[1], k).toContain(headlineName(k));
     }
     for (const c of HEADLINE_NOI_COMPONENTS) expect(HEADLINE_METHOD.overlap[0], c).toContain(headlineName(c).replace(/^the /, ""));
@@ -3150,5 +3200,674 @@ describe("a growth row's one trailing year stands beside the average its stored 
 
   it("holds the insurance margin the methodology prints to the reader's own", () => {
     expect(STRESS_METHODS.find((m) => m.key === "insurance")!.against[0]).toContain(`more than ${SAME_SHARE * 100}% under it`);
+  });
+});
+
+// ── The review of 2026-10-21: what each row reads, and in whose unit ──────
+
+describe("the debt row reads a fixed rate only, against the tenor of the OM's own loan term", () => {
+  const withRows = (...extra: { label: string; value: string }[]): ExtractionResult => ({
+    ...APARTMENT,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Interest rate"), ...extra.map((r) => row(r.label, r.value, "p. 30"))],
+  });
+
+  for (const value of ["SOFR + 3.25%", "Term SOFR + 2.10%", "Prime + 1%", "SOFR + 325 bps"]) {
+    it(`stands "${value}" unchecked: an index plus a spread, shown as stated and priced on nothing`, () => {
+      const test = buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value }) }));
+      const d = rowOf(test, "debt");
+      expect(d.verdict).toBe("unchecked");
+      // The spread is never read as the rate.
+      expect(d.omSays).toEqual({ text: `Interest rate: ${value}`, value: null, page: 30 });
+      expect(d.unchecked).toBe(`The OM states a floating rate (${value}), an index plus a spread, not a fixed rate, so it is shown as stated and priced on nothing.`);
+      expect(d.gap).toBeNull();
+      expect(d.impact).toBeNull();
+      // The lender tests run at the model's rate, never at the spread.
+      const lender = d.evidence.find((e) => e.label.startsWith("Lender tests"))!;
+      expect(lender.text).toContain("on the model's year-1 NOI at 6.78%");
+      const leverage = d.evidence.find((e) => e.label.startsWith("Negative leverage"))!;
+      expect(leverage.text).toContain("the model's 6.78% rate, a screening default");
+      // No re-run, so the headline does not test the debt, and says so.
+      expect(test.headline?.untested?.keys).toContain("debt");
+    });
+  }
+
+  it("reads '5.25% fixed' as the fixed rate it states", () => {
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value: "5.25% fixed" }) })), "debt");
+    expect(d.omSays.value).toBe(5.25);
+    expect(d.verdict).toBe("stretched");
+    expect(d.impact!.omValue).toBeCloseTo(0.0525, 9);
+  });
+
+  it("sets the rate against the Treasury tenor nearest the OM's loan term where its figure is read, saying which", () => {
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value: "5.25%" }, { label: "Loan term", value: "10 years" }) })), "debt");
+    expect(d.evidence[0].text).toBe("4.78% (FRED, Sep 17, 2026), the tenor nearest the model's 5-year hold; the OM's 10-year loan term (p. 30) is set against the 10-yr Treasury below");
+    const term = d.evidence[1];
+    expect(term).toMatchObject({ kind: "published", label: "The index for the OM's 10-year loan term (p. 30): 10-yr Treasury", publisher: "FRED", scope: "nation" });
+    expect(term.text).toMatch(/, the Treasury tenor nearest the term$/);
+    // The class's 200 bps over the 10-year decides, and the re-run is at it.
+    const decider = d.evidence[d.decidedBy!];
+    expect(decider.label).toBe("The class's screening spread over it, a rule of thumb");
+    expect(decider.value).toBeCloseTo(Math.round((term.value! + 2) * 100) / 100, 9);
+    expect(d.impact!.altValue).toBeCloseTo(decider.value! / 100, 9);
+    expect(d.gap!.value).toBe(Math.round((decider.value! - 5.25) * 100));
+    expect(d.gap!.text).toContain("under the index plus the class's spread, the 10-yr Treasury for the term,");
+    // The market check's 10-year is not drawn a second time.
+    expect(d.evidence.filter((e) => /10-year Treasury|10-yr Treasury/.test(e.label))).toHaveLength(1);
+  });
+
+  it("holds the rate to the hold's tenor where the term's own figure is not read, and says so", () => {
+    const seven = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value: "5.25%" }, { label: "Loan term", value: "7 years" }) })), "debt");
+    expect(seven.evidence[0].text).toBe(
+      "4.78% (FRED, Sep 17, 2026), the tenor nearest the model's 5-year hold; the 7-yr Treasury, the tenor nearest the OM's 7-year loan term (p. 30), was not read here, so the rate is set against the hold's",
+    );
+    expect(seven.evidence[seven.decidedBy!].value).toBe(6.78);
+    const five = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value: "5.25%" }, { label: "Loan term", value: "60 months" }) })), "debt");
+    expect(five.evidence[0].text).toBe("4.78% (FRED, Sep 17, 2026), the tenor nearest the OM's 5-year loan term (p. 30) and the model's 5-year hold");
+    // A term beside an amortization in one line is two spans: no term read.
+    const both = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Interest rate", value: "5.25%" }, { label: "Loan term", value: "10 years, 30-year amortization" }) })), "debt");
+    expect(both.evidence[0].text).toMatch(/since the OM states no loan term$/);
+  });
+});
+
+describe("the NOI row's rent roll is said on the class's own yardstick", () => {
+  it("a month a unit on an apartment roll", () => {
+    const actualsIn = { rentRoll: ROLL, t12: { summary: T12, periodEnd: "2026-06-30" } };
+    const actuals = readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), ...actualsIn, assetClass: "multifamily" });
+    const n = rowOf(buildStressTest(apartmentArgs({ actuals })), "noi");
+    const rr = n.evidence.find((e) => e.label === "The rent roll's in-place rent against the OM's pro forma rent")!;
+    expect(rr.text).toBe("$2,190/unit/mo in place (as of Jul 1, 2026) against the OM's pro forma rent of $2,350/unit/mo");
+  });
+
+  it("per SF a year on an office roll, never a suite's month beside a rent a foot", () => {
+    const office: ExtractionResult = {
+      ...APARTMENT,
+      assetClass: "office",
+      metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Pro forma rent", "$38.00/SF", "p. 20")],
+    };
+    const roll = { asOf: "2026-07-01", summary: { ...ROLL.summary, unitCount: 12, occupiedUnits: 11, weightedAvgRentPsf: 32.5, avgRentMonthly: 18_000, rentUnits: 11 } };
+    const actuals = readActuals({ metrics: office.metrics, strategy: inferStrategy(office), rentRoll: roll, t12: { summary: T12, periodEnd: "2026-06-30" }, assetClass: "office" });
+    const n = rowOf(buildStressTest(apartmentArgs({ extraction: office, actuals, storedAssetClass: "office" })), "noi");
+    const rr = n.evidence.find((e) => e.label === "The rent roll's in-place rent against the OM's pro forma rent")!;
+    expect(rr.text).toBe("$32.50/SF a year in place (as of Jul 1, 2026) against the OM's pro forma rent of $38.00/SF");
+    expect(rr.text).not.toContain("18,000");
+  });
+});
+
+describe("a challenge on an expense's level is the operating expenses', never the expense growth's", () => {
+  const ch = (assumption: string, extra: Partial<ChallengerResult["challenges"][number]> = {}) => ({ assumption, severity: "medium" as const, challenge: "c", question: "q", page: "p. 21", ...extra });
+
+  it("files a ratio, a share of income or a figure a unit on the operating-expense row, by its words or its figure", () => {
+    expect(challengeKey(ch("Expense ratio of 28%"))).toBe("opex");
+    expect(challengeKey(ch("Operating expenses at 28% of EGI", { key: "expense_growth", omFigure: 28 }))).toBe("opex");
+    expect(challengeKey(ch("Operating expenses held at a low level", { key: "expense_growth", omFigure: 6_500 }))).toBe("opex");
+    expect(challengeKey(ch("Expense growth of 2.5% a year", { key: "expense_growth", omFigure: 2.5 }))).toBe("expense_growth");
+    expect(challengeKey(ch("Expense growth of 2.5%"))).toBe("expense_growth");
+  });
+
+  it("never draws a ratio as the growth row's question, beside a CPI test of a growth rate", () => {
+    const test = buildStressTest(
+      apartmentArgs({ challenger: { stressTest: "", challenges: [ch("Expense ratio of 28% of EGI", { key: "expense_growth", omFigure: 28, altFigure: 40, altBasis: "a rule of thumb" })] } }),
+    );
+    expect(rowOf(test, "expense_growth").challenge).toBeNull();
+    // It rides on the operating-expense row, which the T-12 beside it would
+    // test once the OM states a total or a ratio.
+    expect(rowOf(test, "opex").challenge?.challenge).toBe("c");
+    expect(test.rows.some((r) => r.key === "other")).toBe(false);
+  });
+
+  it("prints the challenge's own words as the OM's figure on an other row, never its bare number", () => {
+    const test = buildStressTest(apartmentArgs({ challenger: { stressTest: "", challenges: [ch("Management fee of 3%", { key: "other", omFigure: 3 })] } }));
+    const other = test.rows.find((r) => r.key === "other")!;
+    expect(other.omSays).toEqual({ text: "Management fee of 3%", value: null, page: 21 });
+    const html = renderToStaticMarkup(createElement(StressTestPanel, { test }));
+    expect(html).not.toContain("Management fee of 3%: 3");
+  });
+});
+
+describe("the taxes row is held to the seller's T-12 bill where no reset bill can be struck", () => {
+  const withBill = (bill: string, extra: Partial<ExtractionResult> = {}): ExtractionResult => ({
+    ...APARTMENT,
+    ...extra,
+    metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Assessed value" && m.label !== "Real estate taxes"), row("Real estate taxes", bill, "p. 15")],
+  });
+
+  it("reads a line more than 2% under the T-12's stretched at most, re-run at the T-12's bill as a floor", () => {
+    const args = apartmentArgs({ extraction: withBill("$300,000") });
+    const test = buildStressTest(args);
+    const t = rowOf(test, "taxes");
+    const decider = t.evidence[t.decidedBy!];
+    expect(decider).toMatchObject({ kind: "document", label: "The deal's T-12 tax line", value: 380_000 });
+    expect(decider.text).toContain("; the seller's own bill, a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays");
+    expect(t.verdict).toBe("stretched");
+    expect(t.gap).toMatchObject({ value: 80_000, unit: "usd" });
+    expect(t.gap!.text).toContain("With no assessed value stated, no reset bill is struck");
+    expect(t.impact!.input).toBe("expenseLines");
+    // The model's line is the T-12's load, which already carries the T-12's
+    // $380k: the T-12's run is the model's own line, never the gap added on.
+    const model = args.derived!.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    expect(t.impact!.altValue).toBeCloseTo(model, 0);
+    expect(t.impact!.omValue).toBeCloseTo(model - 80_000, 0);
+    // The headline marks the part as a floor, and the NOI is left out for its
+    // components, the taxes among them.
+    const part = test.headline!.parts.find((p) => p.key === "taxes")!;
+    expect(part.conditional).toBe("at the seller's own T-12 bill, a working floor, not a new owner's bill");
+    expect(test.headline!.omitted.find((o) => o.key === "noi")?.why).toBe(HEADLINE_NOI_LEFT_OUT);
+    if (test.headline!.noiRest) expect(test.headline!.noiRest.components).toContain("taxes");
+  });
+
+  it("stands a line at or over the T-12's unchecked, as before", () => {
+    const t = rowOf(buildStressTest(apartmentArgs({ extraction: withBill("$380,000") })), "taxes");
+    expect(t.verdict).toBe("unchecked");
+    expect(t.unchecked).toBe("The OM states no assessed value to work the reset bill from; the rate is the assessor's to give.");
+    expect(t.evidence.find((e) => e.label === "The deal's T-12 tax line")!.text).toBe("$380k (Real estate taxes, TTM to Jun 30, 2026)");
+  });
+
+  it("never lets the T-12 decide on a conversion: the plan delivers a building assessed when it is finished", () => {
+    const conversion = withBill("$300,000", { strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "" } });
+    const t = rowOf(buildStressTest(apartmentArgs({ extraction: conversion })), "taxes");
+    expect(t.verdict).toBe("unchecked");
+  });
+
+  it("leaves the reset bill deciding where the OM states its assessed value", () => {
+    const t = rowOf(buildStressTest(apartmentArgs()), "taxes");
+    expect(t.evidence[t.decidedBy!].label).toBe("The bill the OM's own figures imply on the price");
+  });
+});
+
+describe("the renovation premium shows the program's pace beside it, the OM against itself", () => {
+  const program: ExtractionResult = {
+    ...APARTMENT,
+    metrics: [
+      ...APARTMENT.metrics,
+      row("Units to renovate", "120", "p. 22"),
+      row("Renovation cost per unit", "$15,000", "p. 22"),
+      row("Renovation premium", "$250/mo", "p. 22"),
+      row("Achieved renovation premium", "$190/mo", "p. 23"),
+      row("Annual turnover", "35%", "p. 23"),
+      row("Renovation period", "24 months", "p. 22"),
+    ],
+  };
+
+  it("says the turnover the period needs against the turnover stated, deciding nothing and re-running nothing", () => {
+    const r = rowOf(buildStressTest(apartmentArgs({ extraction: program })), "renovation_premium");
+    const pace = r.evidence.find((e) => e.label === "The program's pace against the turnover the OM states")!;
+    expect(pace).toMatchObject({ kind: "om_internal", value: null, publisher: "the offering memorandum" });
+    expect(pace.text).toBe("a 24-month program needs 50% of the classic units to turn each year; the OM states 35% a year, so the program takes 2.9 years");
+    expect(r.evidence[r.decidedBy!].label).toBe("Achieved premium on the doors already renovated");
+    expect(r.method).toContain("beside it, not deciding: ");
+  });
+
+  it("puts the rent roll's year of expiries beside it, said as expiries, not move-outs", () => {
+    const roll = { ...ROLL, summary: { ...ROLL.summary, expiryBuckets: { next12mo: 0.42, y1to3: 0.58, y3to5: 0, y5plus: 0 }, expiryCoveredSf: 127_000 } };
+    const actuals = readActuals({ metrics: program.metrics, strategy: inferStrategy(program), rentRoll: roll, t12: { summary: T12, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+    const r = rowOf(buildStressTest(apartmentArgs({ extraction: program, actuals })), "renovation_premium");
+    expect(r.evidence.find((e) => e.label === "The program's pace against the turnover the OM states")!.text).toMatch(
+      /; the rent roll's leases ending within a year of Jul 1, 2026 cover 42% of the occupied area that states an end: expiries, not move-outs$/,
+    );
+  });
+
+  it("says no pace where the OM states no turnover", () => {
+    const r = rowOf(buildStressTest(apartmentArgs({ extraction: { ...program, metrics: program.metrics.filter((m) => m.label !== "Annual turnover") } })), "renovation_premium");
+    expect(r.evidence.some((e) => /pace/.test(e.label))).toBe(false);
+  });
+});
+
+describe("the headline names a hold the OM states that the model does not run", () => {
+  it("says the OM's hold is untested, in one clause, where it differs from the model's", () => {
+    const ex: ExtractionResult = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Hold period", "7 years", "p. 30")] };
+    const test = buildStressTest(apartmentArgs({ extraction: ex }));
+    expect(test.headline!.untested!.hold).toEqual({ omYears: 7, modelYears: 5, page: 30 });
+    expect(untestedSentence(test.headline!)).toContain("the OM's 7-year hold (p. 30), since the model sells at 5 years");
+  });
+
+  it("says nothing where the OM's hold is the model's", () => {
+    const ex: ExtractionResult = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Hold period", "5 years", "p. 30")] };
+    const test = buildStressTest(apartmentArgs({ extraction: ex }));
+    expect(test.headline!.untested?.hold).toBeUndefined();
+  });
+});
+
+describe("the operating-expense row (the owner's decision of 2026-10-21)", () => {
+  const withOpex = (...extra: ReturnType<typeof row>[]): ExtractionResult => ({ ...APARTMENT, metrics: [...APARTMENT.metrics, ...extra] });
+
+  it("holds the OM's total, less the tax bill and premium it states, to the T-12 on the same footing, and re-runs one input apart", () => {
+    const args = apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")) });
+    const test = buildStressTest(args);
+    const o = rowOf(test, "opex");
+    // $1.5M less the OM's $380k bill and $120k premium, against the T-12's
+    // $1.75M less its $380k tax line and $150k insurance line.
+    expect(o.omSays).toMatchObject({ value: 1_000_000, page: 9 });
+    expect(o.omSays.text).toBe("$1M ($6,536 a unit): the OM's operating expenses (pro forma) of $1.5M less its $380k tax bill (p. 15) and $120k premium (p. 15)");
+    expect(o.footing).toEqual({ less: ["taxes", "insurance"] });
+    const decider = o.evidence[o.decidedBy!];
+    expect(decider).toMatchObject({ kind: "document", label: "The deal's T-12 operating expenses less taxes and insurance", value: 1_220_000, asOf: "2026-06-30" });
+    expect(decider.text).toBe("$1.22M ($7,974 a unit): the T-12's $1.75M total less its $380k tax line and $150k insurance line (TTM to Jun 30, 2026)");
+    // Each T-12 line on the footing, a unit, beside it and never deciding.
+    const lines = o.evidence.find((e) => e.label === "The deal's T-12 expense lines")!;
+    expect(lines).toMatchObject({ kind: "document", value: null });
+    expect(lines.text).toBe("Payroll $620k ($4,052 a unit); Repairs & maintenance $600k ($3,922 a unit) (TTM to Jun 30, 2026)");
+    // 18.0% under the T-12: past the NOI's 10% band, unsupported.
+    expect(o.gap).toMatchObject({ value: 220_000, unit: "usd" });
+    expect(o.gap!.text).toBe("The OM's $1M is $220k (18.0%) under the T-12's $1.22M.");
+    expect(o.verdict).toBe("unsupported");
+    expect(o.method).toBe(
+      "The OM's operating expenses against the deal's T-12 operating expenses less taxes and insurance, the one figure that decides; beside it, not deciding: the deal's T-12 expense lines.",
+    );
+    // The model's line is the T-12's load: the OM's run swaps the T-12's
+    // $1.22M for the OM's $1M, the evidence's is the line as it stands.
+    const model = args.derived!.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    expect(o.impact!.input).toBe("expenseLines");
+    expect(o.impact!.altValue).toBeCloseTo(model, 0);
+    expect(o.impact!.omValue).toBeCloseTo(model - 220_000, 0);
+    expect(o.impact!.altIrrPct!).toBeLessThan(o.impact!.baseIrrPct!);
+    // The headline swaps it as a component of the NOI, never beside it.
+    const h = test.headline!;
+    expect(h.parts.map((p) => p.key)).toContain("opex");
+    expect(HEADLINE_NOI_COMPONENTS).toContain("opex");
+    if (rowOf(test, "noi").verdict !== "holds") expect(h.omitted.find((x) => x.key === "noi")?.why).toBe(HEADLINE_NOI_LEFT_OUT);
+  });
+
+  it("sets the OM's case expense line at the OM's own stated total where the model carries the T-12's load: taxes, insurance and the rest swapped, none added twice", () => {
+    const args = apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")) });
+    const test = buildStressTest(args);
+    const model = args.derived!.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    // The model's line ties to the T-12's $1.75M total, so each row's OM run
+    // is the line less the T-12's figure plus the OM's; the three moves add
+    // to the OM's stated $1.5M total.
+    expect(model).toBeCloseTo(1_750_000, -2);
+    const move = (["taxes", "insurance", "opex"] as const).reduce((s, k) => s + (rowOf(test, k).impact ? rowOf(test, k).impact!.omValue - model : 0), 0);
+    expect(model + move).toBeCloseTo(1_500_000, -2);
+  });
+
+  it("takes the total the OM names over a smaller expense line above it, and never takes out again a line the label leaves out", () => {
+    // "Operating expenses" above "Total expenses": the total is the one
+    // tested, less the bill and premium it holds.
+    const both = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses", "$1,000,000", "p. 9"), row("Total expenses", "$1,500,000", "p. 9")) })), "opex");
+    expect(both.omSays.value).toBe(1_000_000);
+    expect(both.omSays.text).toBe("$1M ($6,536 a unit): the OM's total expenses of $1.5M less its $380k tax bill (p. 15) and $120k premium (p. 15)");
+    // With no total named, the larger figure stated.
+    const larger = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses", "$1,000,000", "p. 9"), row("Opex", "$1,500,000", "p. 9")) })), "opex");
+    expect(larger.omSays.value).toBe(1_000_000);
+    // A label that leaves the taxes out: only the premium is taken out of it,
+    // and the footing still leaves both out.
+    const excl = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses (excl. taxes)", "$1,120,000", "p. 9")) })), "opex");
+    expect(excl.omSays.value).toBe(1_000_000);
+    expect(excl.omSays.text).toBe("$1M ($6,536 a unit): the OM's operating expenses (excl. taxes) of $1.12M less its $120k premium (p. 15)");
+    expect(excl.footing).toEqual({ less: ["taxes", "insurance"] });
+    expect(excl.evidence[excl.decidedBy!].value).toBe(1_220_000);
+  });
+
+  it("says the re-run in one line, in the singular", () => {
+    const o = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")) })), "opex");
+    expect(o.impact!.note).toMatch(/^If the operating-expense line less taxes and insurance is the deal's T-12's \$1\.22M, not the OM's \$1M, the levered IRR moves from/);
+  });
+
+  it("holds a figure within 5% of the T-12, or over it", () => {
+    for (const [total, verdict] of [["$1,690,000", "holds"], ["$1,900,000", "holds"], ["$1,600,000", "stretched"]] as const) {
+      const o = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Operating expenses (pro forma)", total, "p. 9")) })), "opex");
+      expect(o.verdict, total).toBe(verdict);
+    }
+  });
+
+  it("reads a ratio the OM states on its stated EGI, and its own lines beside the T-12's", () => {
+    const o = rowOf(
+      buildStressTest(
+        apartmentArgs({
+          extraction: withOpex(row("Expense ratio (pro forma)", "40%", "p. 9"), row("Effective gross income (pro forma)", "$4,000,000", "p. 9"), row("Management fee", "3.0%", "p. 9"), row("Payroll", "$590,000", "p. 9")),
+        }),
+      ),
+      "opex",
+    );
+    expect(o.omSays.text).toContain("the OM's 40.0% expense ratio (pro forma) on the OM's effective gross income (pro forma) of $4M, $1.6M");
+    expect(o.omSays.value).toBe(1_100_000);
+    expect(o.evidence.find((e) => e.label === "The deal's T-12 expense lines")!.text).toContain(
+      "payroll $590k ($3,856 a unit) (p. 9), the T-12's $620k ($4,052 a unit)",
+    );
+  });
+
+  it("decides on the class's ratio, a rule of thumb, only where no T-12 is on file, stretched at most", () => {
+    const ex = withOpex(row("Operating expenses (pro forma)", "$1,000,000", "p. 9"));
+    const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
+    const o = rowOf(buildStressTest(apartmentArgs({ extraction: ex, actuals: null, derived, modelVsMarket: readFor(derived) })), "opex");
+    const decider = o.evidence[o.decidedBy!];
+    expect(decider).toMatchObject({ kind: "rule_of_thumb", label: "The class's expense ratio, a rule of thumb" });
+    expect(decider.text).toMatch(/^42% of EGI, the multifamily screening default, on the \$3\.65M the OM's \$2\.65M NOI and its \$1M of expenses make is \$1\.53M less the OM's own \$380k tax bill and \$120k premium, \$1\.03M: a rule of thumb, not this building's cost$/);
+    expect(o.ruleOfThumbOnly).toBe(true);
+    expect(o.gap!.text).toContain("Against a rule of thumb only.");
+    expect(["holds", "stretched"]).toContain(o.verdict);
+  });
+
+  it("reads the model's line, struck on the class's ratio, as carrying the class's figure: the OM's run swaps it out, the evidence's is the model's own", () => {
+    const ex = withOpex(row("Operating expenses (pro forma)", "$1,000,000", "p. 9"));
+    const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
+    expect(derived.meta.defaultExpenseRatio).toBeTruthy();
+    const test = buildStressTest(apartmentArgs({ extraction: ex, actuals: null, derived, modelVsMarket: readFor(derived) }));
+    const o = rowOf(test, "opex");
+    const model = derived.inputs.expenseLines.reduce((s, l) => s + l.annual, 0);
+    const fig = o.evidence[o.decidedBy!].value!;
+    // The evidence's run is the model's own line; the OM's is that line less
+    // the class's figure plus the OM's — the gap counted once.
+    expect(o.impact!.altValue).toBeCloseTo(model, 0);
+    expect(o.impact!.omValue).toBeCloseTo(model - fig + o.omSays.value!, 0);
+    expect(o.impact!.altValue - o.impact!.omValue).toBeCloseTo(o.gap!.value, 0);
+    // The model's own run is the evidence's: the OM's lighter line earns more.
+    expect(o.impact!.altIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 6);
+    expect(o.impact!.baseIrrPct!).toBeGreaterThan(o.impact!.altIrrPct!);
+    expect(o.impact!.note).toContain("The model itself already runs at it.");
+    // The headline never names the model's line as the OM's figure.
+    expect(keptSentence(test) ?? "").not.toContain("the operating expenses");
+    expect(test.headline!.atEvidence?.some((k) => k.key === "opex")).toBe(false);
+  });
+
+  it("stands unchecked where the T-12 breaks out no line the OM's figure leaves out", () => {
+    const noIns = { ...T12, opex: T12.opex.filter((l) => l.key !== "insurance"), totalOpex: 1_600_000 };
+    const ex = withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9"));
+    const actuals = readActuals({ metrics: ex.metrics, strategy: inferStrategy(ex), rentRoll: null, t12: { summary: noIns, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+    const o = rowOf(buildStressTest(apartmentArgs({ extraction: ex, actuals })), "opex");
+    expect(o.verdict).toBe("unchecked");
+    expect(o.unchecked).toBe("The deal's T-12 breaks out no insurance line, so its expenses cannot be set apart from the premium the OM's figure leaves out to its own row.");
+    expect(o.impact).toBeNull();
+  });
+
+  it("builds no row on a development or a conversion, and none where nothing is stated or found", () => {
+    const dev: ExtractionResult = { ...withOpex(row("Operating expenses (pro forma)", "$1,500,000", "p. 9")), strategy: { kind: "development", summary: "", capitalBudget: "", timeline: "" } };
+    expect(buildStressTest(apartmentArgs({ extraction: dev })).rows.some((r) => r.key === "opex")).toBe(false);
+    expect(buildStressTest(apartmentArgs({ actuals: null })).rows.some((r) => r.key === "opex")).toBe(false);
+  });
+
+  it("sets the OM's other income beside the NOI against the T-12's, never deciding it", () => {
+    const n = rowOf(buildStressTest(apartmentArgs({ extraction: withOpex(row("Other income", "$110,000", "p. 9")) })), "noi");
+    const oi = n.evidence.find((e) => e.label === "The OM's other income against the T-12's")!;
+    expect(oi).toMatchObject({ kind: "document", value: null });
+    expect(oi.text).toBe("the OM's other income of $110k (p. 9) against the T-12's $100k (TTM to Jun 30, 2026), 10.0% over it: beside the NOI, never deciding it");
+    expect(n.evidence[n.decidedBy!].label).toBe("The deal's T-12 NOI");
+  });
+
+  it("holds the prompt's expense labels to the reader", () => {
+    const prompt = extractionInstruction("multifamily");
+    for (const label of ["Operating expenses (pro forma)", "Expense ratio (pro forma)", "Effective gross income (pro forma)", "Management fee", "Payroll", "Repairs and maintenance", "Utilities", "Other income"]) {
+      expect(prompt, label).toContain(`"${label}"`);
+    }
+    const test = buildStressTest(
+      apartmentArgs({
+        extraction: withOpex(
+          row("Operating expenses (pro forma)", "$1,500,000", "p. 9"),
+          row("Management fee", "$120,000", "p. 9"),
+          row("Payroll", "$590,000", "p. 9"),
+          row("Repairs and maintenance", "$560,000", "p. 9"),
+          row("Utilities", "$300,000", "p. 9"),
+          row("Other income", "$110,000", "p. 9"),
+        ),
+      }),
+    );
+    const beside = rowOf(test, "opex").evidence.find((e) => e.label === "The deal's T-12 expense lines")!.text;
+    for (const name of ["management fee $120k", "payroll $590k", "repairs and maintenance $560k", "utilities $300k"]) expect(beside, name).toContain(name);
+    expect(rowOf(test, "noi").evidence.some((e) => e.label === "The OM's other income against the T-12's")).toBe(true);
+  });
+});
+
+describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
+  const comps = (...leaseComps: { name: string; detail: string; support: "supports" | "favorable" | "stretched" }[]) => ({
+    saleComps: [],
+    leaseComps: leaseComps.map((c) => ({ ...c, note: "", page: "p. 16" })),
+    redFlags: [],
+    summary: "",
+  });
+  const three = comps(
+    { name: "The Rowan", detail: "$2,050/mo one-bedroom", support: "supports" },
+    { name: "The Calder", detail: "$2,300/mo two-bedroom", support: "supports" },
+    { name: "Hale House", detail: "$2,250/mo two-bedroom", support: "supports" },
+    { name: "The Vue", detail: "$2,900/mo, new construction", support: "stretched" },
+  );
+
+  it("holds the OM's pro forma rent to the median of three lease comps graded clean, the others named, and re-runs nothing on a stabilized deal", () => {
+    const test = buildStressTest(apartmentArgs({ brokerComps: three }));
+    const r = rowOf(test, "market_rent");
+    expect(r.omSays).toEqual({ text: "$2,350/mo: Pro forma rent $2,350/unit/mo", value: 2_350, page: 20 });
+    expect(r.yardstick).toBe("/mo");
+    const decider = r.evidence[r.decidedBy!];
+    expect(decider).toMatchObject({ kind: "om_internal", label: "The memorandum's lease comps", value: 2_250, page: 16 });
+    expect(decider.text).toBe(
+      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (it does not support the deal): The Vue $2,900/mo",
+    );
+    // 4.4% over the median: inside the comps' 5%, a hold.
+    expect(r.gap).toMatchObject({ value: 4.4, unit: "pct" });
+    expect(r.gap!.text).toBe("The OM's $2,350/mo is 4.4% over the median of its lease comps graded clean, $2,250/mo.");
+    expect(r.verdict).toBe("holds");
+    expect(r.impact).toBeNull();
+    expect(r.noRerun).toBe(MARKET_RENT_NO_RERUN);
+    expect(r.method).toBe("The OM's market rent against the memorandum's lease comps (the offering memorandum), the one figure that decides.");
+  });
+
+  it("reads unsupported past 15% over the median, and the headline names it as no model input", () => {
+    const ex: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Pro forma rent" ? row("Pro forma rent", "$2,650/mo", "p. 20") : m)) };
+    const test = buildStressTest(apartmentArgs({ extraction: ex, brokerComps: three }));
+    const r = rowOf(test, "market_rent");
+    expect(r.verdict).toBe("unsupported");
+    expect(test.headline!.omitted.find((o) => o.key === "market_rent")?.why).toBe("a market rent is no model input: the model runs today's rent, which the NOI row carries");
+  });
+
+  it("strikes no median under three comps graded clean, and says how many there are", () => {
+    const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps({ name: "The Rowan", detail: "$2,050/mo", support: "supports" }, { name: "The Vue", detail: "$2,900/mo", support: "favorable" }) })), "market_rent");
+    expect(r.verdict).toBe("unchecked");
+    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (supports) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
+    expect(r.evidence[0].value).toBeNull();
+    expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded favorable");
+  });
+
+  it("sets the rent roll's in-place rent beside it as the gap the OM claims to close, and Zillow's asking rent as the metro's", () => {
+    const actuals = readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), rentRoll: ROLL, t12: { summary: T12, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+    const market = { checks: [], summary: "", liveBrief: { metro: "Washington DC", readOn: READ_ON, lines: [], figures: [{ key: "zori_mfr_rent", label: "Asking rent, apartments", value: 2150, unit: "usd" as const, asOf: "2026-08-31" }] } };
+    const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: three, actuals, market })), "market_rent");
+    const roll = r.evidence.find((e) => e.label === "The rent roll's in-place rent")!;
+    expect(roll).toMatchObject({ kind: "document", value: 2_190 });
+    expect(roll.text).toBe("$2,190/mo in place (as of Jul 1, 2026), $160/mo under the OM's $2,350/mo: the gap the OM claims to close; today's rent, not a market's");
+    const z = r.evidence.find((e) => e.publisher === "Zillow Research")!;
+    expect(z).toMatchObject({ kind: "published", label: "Asking rent, apartments, metro area", value: 2_150, scope: "metro" });
+    expect(z.text).toBe("$2,150/mo (Aug 2026), the metro's asking rent for apartments before concessions: the metro's, not this building's");
+    // Neither decides: the comps' median does.
+    expect(r.evidence[r.decidedBy!].label).toBe("The memorandum's lease comps");
+  });
+
+  it("reads an office's rent a square foot a year", () => {
+    const office: ExtractionResult = { ...APARTMENT, assetClass: "office", metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Market rent", "$38.00/SF", "p. 20")] };
+    const derived = deriveUnderwriteInputs(office, "x", undefined, { debtIndex: FIVE });
+    const r = rowOf(
+      buildStressTest(
+        apartmentArgs({
+          extraction: office,
+          derived,
+          actuals: null,
+          storedAssetClass: "office",
+          modelVsMarket: null,
+          brokerComps: comps({ name: "One", detail: "$34.00/SF NNN", support: "supports" }, { name: "Two", detail: "$35.50/SF/yr", support: "supports" }, { name: "Three", detail: "$3.00/SF/mo", support: "supports" }),
+        }),
+      ),
+      "market_rent",
+    );
+    expect(r.yardstick).toBe("/SF");
+    expect(r.evidence[0].value).toBe(35.5);
+    expect(r.gap).toMatchObject({ value: 7, unit: "pct" });
+    expect(r.verdict).toBe("stretched");
+  });
+
+  it("strikes no median over comps graded clean that state different lease bases, on a class quoted by the foot", () => {
+    const office: ExtractionResult = { ...APARTMENT, assetClass: "office", metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Market rent", "$38.00/SF", "p. 20")] };
+    const derived = deriveUnderwriteInputs(office, "x", undefined, { debtIndex: FIVE });
+    const r = rowOf(
+      buildStressTest(
+        apartmentArgs({
+          extraction: office,
+          derived,
+          actuals: null,
+          storedAssetClass: "office",
+          modelVsMarket: null,
+          brokerComps: comps({ name: "One", detail: "$34.00/SF NNN", support: "supports" }, { name: "Two", detail: "$41.00/SF full service", support: "supports" }, { name: "Three", detail: "$35.50/SF/yr", support: "supports" }),
+        }),
+      ),
+      "market_rent",
+    );
+    expect(r.verdict).toBe("unchecked");
+    expect(r.unchecked).toBe(
+      "The memorandum's lease comps graded clean (supports) state their rents on different lease bases (net and full service), and a rent on one basis is not the same rent on another, so no median is struck over them.",
+    );
+    expect(r.evidence[0].value).toBeNull();
+    expect(r.evidence[0].text).toContain(", stated on different lease bases (net and full service), so no median is struck over them");
+    expect(STRESS_METHODS.find((m) => m.key === "market_rent")!.limits.join(" ")).toContain("comps graded clean on different bases strike no median");
+  });
+
+  it("sets Zillow's asking rent beside an apartment's or a rented home's rent only, never a pad's or a bed's", () => {
+    const market = {
+      checks: [],
+      summary: "",
+      liveBrief: {
+        metro: "Washington DC",
+        readOn: READ_ON,
+        lines: [],
+        figures: [
+          { key: "zori_mfr_rent", label: "Asking rent, apartments", value: 2150, unit: "usd" as const, asOf: "2026-08-31" },
+          { key: "zori_rent", label: "Asking rent, all homes", value: 2412, unit: "usd" as const, asOf: "2026-08-31" },
+        ],
+      },
+    };
+    const zillow = (r: StressRow | undefined) => r?.evidence.find((e) => e.publisher === "Zillow Research") ?? null;
+    const of = (cls: string, count: string, rent: string) => {
+      const ex: ExtractionResult = { ...APARTMENT, assetClass: cls, metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row(count, "200", "p. 4"), row("Market rent", rent, "p. 20")] };
+      return buildStressTest(apartmentArgs({ extraction: ex, storedAssetClass: cls, market, actuals: null, brokerComps: three })).rows.find((x) => x.key === "market_rent");
+    };
+    expect(zillow(of("manufactured_housing", "Pads", "$525/pad/mo"))).toBeNull();
+    expect(zillow(of("student_housing", "Beds", "$950/bed/mo"))).toBeNull();
+    expect(zillow(of("sfr_btr", "Homes", "$2,600/home/mo"))).toMatchObject({ label: "Asking rent, all home types, metro area", value: 2_412 });
+    expect(zillow(of("multifamily", "Units", "$2,350/unit/mo"))).toMatchObject({ label: "Asking rent, apartments, metro area", value: 2_150 });
+  });
+
+  it("reads a parking space's month as stated, and says the yardstick in the class's own noun", () => {
+    const garage: ExtractionResult = { ...APARTMENT, assetClass: "parking", metrics: [...APARTMENT.metrics.filter((m) => !/Units|Pro forma rent/.test(m.label)), row("Spaces", "400", "p. 4"), row("Market rent", "$95/space/mo", "p. 20")] };
+    const r = rowOf(
+      buildStressTest(
+        apartmentArgs({
+          extraction: garage,
+          storedAssetClass: "parking",
+          actuals: null,
+          brokerComps: comps({ name: "Deck A", detail: "$85/space/mo", support: "supports" }, { name: "Deck B", detail: "$90/space/mo", support: "supports" }, { name: "Deck C", detail: "$100/space/mo", support: "supports" }),
+        }),
+      ),
+      "market_rent",
+    );
+    expect(r.omSays.value).toBe(95);
+    expect(r.evidence[0].text).toMatch(/^3 of 3 state a rent a month a space; graded clean \(supports\): Deck A \$85\/mo; Deck B \$90\/mo; Deck C \$100\/mo — median \$90\/mo over the 3$/);
+    expect(r.evidence[r.decidedBy!].value).toBe(90);
+  });
+
+  it("on a value-add, re-runs the yield on cost with the gap on every unit at the OM's own vacancy, and leaves it out of the headline beside a premium", () => {
+    const metrics = [
+      row("Asking price", "$42,000,000", "p. 5"),
+      row("Units", "153", "p. 4"),
+      row("NOI (in-place)", "$2,400,000", "p. 7"),
+      row("NOI (stabilized, pro forma)", "$3,000,000", "p. 7"),
+      row("Stabilized vacancy", "5.0%", "p. 21"),
+      row("Renovation budget", "$1,800,000", "p. 22"),
+      row("Pro forma rent", "$2,600/mo", "p. 20"),
+    ];
+    const ex: ExtractionResult = { ...APARTMENT, strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" }, metrics };
+    const derived = deriveUnderwriteInputs(ex, "x", undefined, { debtIndex: FIVE });
+    const r = rowOf(buildStressTest(apartmentArgs({ extraction: ex, derived, actuals: null, modelVsMarket: null, brokerComps: three })), "market_rent");
+    // $350 a month over the $2,250 median on 153 units, twelve months, at
+    // the OM's 5.0% vacancy: $610,470 off the stabilized NOI.
+    expect(r.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi", omValue: 3_000_000 });
+    expect(r.impact!.altValue).toBeCloseTo(3_000_000 - 350 * 153 * 12 * 0.95, 0);
+    expect(r.impact!.caveat).toContain("The gap is on the 153 units, twelve months each, at the OM's own 5.0% vacancy");
+    // Beside a renovation premium past its evidence, the market rent is left
+    // out of the split, said so.
+    const withPremium: ExtractionResult = {
+      ...ex,
+      metrics: [...metrics, row("Units to renovate", "120", "p. 22"), row("Renovation cost per unit", "$15,000", "p. 22"), row("Renovation premium", "$250/mo", "p. 22"), row("Achieved renovation premium", "$190/mo", "p. 23")],
+    };
+    const d2 = deriveUnderwriteInputs(withPremium, "x", undefined, { debtIndex: FIVE });
+    const t2 = buildStressTest(apartmentArgs({ extraction: withPremium, derived: d2, actuals: null, modelVsMarket: null, brokerComps: three }));
+    expect(t2.headline!.parts.map((p) => p.key)).toContain("renovation_premium");
+    expect(t2.headline!.omitted.find((o) => o.key === "market_rent")?.why).toBe(PLAN_MARKET_RENT_BESIDE_PREMIUM);
+  });
+
+  it("builds no row on a class that quotes no rent, and none where nothing is stated or found", () => {
+    const hotel: ExtractionResult = { ...APARTMENT, assetClass: "hospitality_str" };
+    expect(buildStressTest(apartmentArgs({ extraction: hotel, storedAssetClass: "hospitality_str", brokerComps: three })).rows.some((x) => x.key === "market_rent")).toBe(false);
+    const bare: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Pro forma rent") };
+    expect(buildStressTest(apartmentArgs({ extraction: bare, actuals: null })).rows.some((x) => x.key === "market_rent")).toBe(false);
+  });
+});
+
+describe("a term sheet on file decides the debt row (the owner's decision of 2026-10-21)", () => {
+  const quote = (ratePct: number | null, stated = ratePct != null ? `${ratePct.toFixed(2)}%` : "SOFR + 2.75%") => ({ ratePct, stated, floating: ratePct == null, filename: "Brixton term sheet.pdf", asOf: "2026-10-03" });
+
+  it("holds the OM's rate to the lender's quote, a document of the deal's own, and re-runs the model's rate one input apart", () => {
+    const args = apartmentArgs({ loanQuote: quote(6.1) });
+    const d = rowOf(buildStressTest(args), "debt");
+    const decider = d.evidence[d.decidedBy!];
+    expect(decider).toMatchObject({ kind: "document", label: "The lender's quote on file", value: 6.1, asOf: "2026-10-03", publisher: "the deal's loan terms", scope: "deal" });
+    expect(decider.text).toBe("6.10% as the deal's loan terms state it (Brixton term sheet.pdf, on file since Oct 3, 2026): a lender's quote, not a screening default");
+    // The OM's 5.25% is 85 bps under it: past the 50, unsupported — no
+    // screening default caps it at stretched.
+    expect(d.gap).toMatchObject({ value: 85, unit: "bps" });
+    expect(d.gap!.text).toBe("The OM's 5.25% is 85 bps under the lender's quote on file, 6.10%.");
+    expect(d.verdict).toBe("unsupported");
+    expect(d.ruleOfThumbOnly).toBeUndefined();
+    expect(d.impact).toMatchObject({ input: "allInRatePct", omValue: 0.0525, altValue: 0.061 });
+    expect(d.impact!.note).toMatch(/^If the all-in rate is the lender's quote on file, 6\.10%, not the OM's 5\.25%, the levered IRR moves from/);
+    // The screening default stands beside it, deciding nothing.
+    expect(d.method).toMatch(/^The OM's debt against the lender's quote on file \(the deal's loan terms\), the one figure that decides; beside it, not deciding: the index the model prices off/);
+  });
+
+  it("holds a rate at or over the quote", () => {
+    expect(rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(5.25) })), "debt").verdict).toBe("holds");
+    expect(rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(5.0) })), "debt").verdict).toBe("holds");
+  });
+
+  it("shows a floating quote as stated, priced on nothing, and the screening default decides", () => {
+    const d = rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(null) })), "debt");
+    const q = d.evidence.find((e) => e.label === "The lender's quote on file")!;
+    expect(q).toMatchObject({ kind: "document", value: null });
+    expect(q.text).toBe("SOFR + 2.75% as the deal's loan terms state it (Brixton term sheet.pdf, on file since Oct 3, 2026): a floating rate, shown as stated and priced on nothing");
+    expect(d.evidence[d.decidedBy!].label).toBe(rowOf(buildStressTest(apartmentArgs()), "debt").evidence[rowOf(buildStressTest(apartmentArgs()), "debt").decidedBy!].label);
+    expect(d.ruleOfThumbOnly).toBe(true);
+  });
+
+  it("keeps a quote-decided debt row that is in the headline out of the brief: no rate, no pairing, no verdict word", () => {
+    const full = buildStressTest(apartmentArgs({ loanQuote: quote(6.5) }));
+    expect(rowOf(full, "debt").evidence[rowOf(full, "debt").decidedBy!].label).toBe("The lender's quote on file");
+    // The quote's row is a player in the full test's headline.
+    expect(full.headline!.parts.some((p) => p.key === "debt")).toBe(true);
+    expect(headlineSentence(full)).toContain("6.50%");
+    // The guard, for a caller that hands the brief the full test anyway.
+    const guarded = stressSection(full).join("\n");
+    expect(guarded).not.toContain("6.50%");
+    expect(guarded).not.toMatch(/the loan rate [\d.]+% \(the model's/);
+    expect(guarded).not.toContain("HEADLINE (the engine's");
+    const debtLine = guarded.split("\n").find((l) => l.startsWith("- Debt (debt)"))!;
+    expect(debtLine).not.toMatch(/\[(UNSUPPORTED|STRETCHED|HOLDS|UNCHECKED)\]/);
+    // What the pipeline hands the brief: the same build with no quote
+    // (lib/anthropic/pipeline `screenStressTest`'s `brief`).
+    const brief = stressSection(buildStressTest(apartmentArgs({ loanQuote: null }))).join("\n");
+    expect(brief).not.toContain("6.50%");
+    expect(brief).not.toContain("The lender's quote on file");
+    expect(brief).toContain("HEADLINE (the engine's");
+    const pipeline = readFileSync("lib/anthropic/pipeline.ts", "utf8");
+    expect(pipeline).toContain("brief: args.loanQuote ? buildStressTest({ ...args, loanQuote: null }) : full");
+    expect(pipeline).toContain("const stressTest = tests?.brief ?? null;");
+    // Every surface names the same sheet: the deal page's oldest-first order.
+    expect(readFileSync("lib/loan-quote-read.ts", "utf8")).toContain('.order("created_at", { ascending: true })');
+  });
+
+  it("decides nothing where the OM states no rate, and is handed no quote on the shared screen", () => {
+    const noRate: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Interest rate") };
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: noRate, loanQuote: quote(6.1) })), "debt");
+    expect(d.verdict).toBe("unchecked");
+    expect(d.unchecked).toBe("The OM states no loan rate.");
+    const share = readFileSync("app/share/[token]/page.tsx", "utf8");
+    expect(share).not.toMatch(/loanQuote|readLoanQuote|loanQuoteOf/);
+    // Every surface that may read the deal's documents hands it in.
+    for (const f of ["app/(app)/deals/[id]/page.tsx", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts", "app/api/deals/[id]/underwrite.xlsx/route.ts", "lib/anthropic/pipeline.ts"]) {
+      expect(readFileSync(f, "utf8"), f).toMatch(/loanQuote: /);
+    }
   });
 });

@@ -40,8 +40,10 @@
 //   - basis: lib/stress-basis-evidence's order — the memorandum's comps
 //     graded clean (the class's yardstick, then per SF alone), then the
 //     recorded sales, then the reader's own past asks;
-//   - debt: today's index plus the class's screening spread, the one figure
-//     (the bare index sets how far under it reads unsupported);
+//   - debt: the lender's quote on file (a term sheet's fixed rate, read off
+//     the model built from it), else today's index plus the class's
+//     screening spread (the bare index sets how far under it reads
+//     unsupported); a floating quote is shown and decides nothing;
 //   - NOI: the deal's T-12, then the OM's own in-place NOI;
 //   - taxes: the bill the OM's own figures imply on the price, then the
 //     stated unabated bill an abatement ends into inside the hold;
@@ -51,6 +53,13 @@
 //     the OM's premium sits under it past SAME_SHARE (the OM against its own
 //     building's history, a working floor and a rule of thumb, never a quote);
 //     at or over it nothing decides;
+//   - operating expenses: the deal's T-12 operating expenses less its taxes
+//     and insurance (the lines the OM states apart, each with its own row),
+//     then the class's expense ratio, a rule of thumb, only where no T-12 is
+//     on file; each T-12 line a unit and the OM's own lines are beside it;
+//   - market rent: the median of the memorandum's lease comps graded clean,
+//     three or more (the comps' own floor); the rent roll's in-place rent
+//     and the metro's asking rent are beside it;
 //   - other: none — the challenger's words are not a figure.
 //
 // Pure: types and the rent-growth order only. A later step that runs the
@@ -81,11 +90,17 @@ export const SEEDED_RATE_LABEL = "The class's screening spread over it, a rule o
 export const SEEDED_RATE_ONLY_LABEL = "The index the model prices off, plus the class's screening spread";
 export const T12_NOI_LABEL = "The deal's T-12 NOI";
 export const T12_INSURANCE_LABEL = "The deal's T-12 insurance line";
+export const T12_TAX_LABEL = "The deal's T-12 tax line";
 export const OM_IN_PLACE_NOI_LABEL = "The OM's in-place NOI against its pro forma";
 export const RESET_BILL_LABEL = "The bill the OM's own figures imply on the price";
 export const ABATEMENT_LABEL = "The stated tax abatement and when it ends";
 export const ACHIEVED_PREMIUM_LABEL = "Achieved premium on the doors already renovated";
 export const PAST_SCREENS_PUBLISHER = "your past screens";
+export const T12_OPEX_LABEL = "The deal's T-12 operating expenses less taxes and insurance";
+export const T12_OPEX_LINES_LABEL = "The deal's T-12 expense lines";
+export const CLASS_OPEX_LABEL = "The class's expense ratio, a rule of thumb";
+export const MARKET_RENT_COMPS_LABEL = "The memorandum's lease comps";
+export const LOAN_QUOTE_LABEL = "The lender's quote on file";
 
 /** One step of a row's order: how a sentence names the figure, why it
  *  decides where it does, and which piece it is. */
@@ -238,6 +253,11 @@ export function basisDecider(candidates: readonly DeciderCandidate[]): DecidingF
 
 export const DEBT_ORDER: readonly DeciderStep[] = [
   {
+    name: "the lender's quote on file",
+    why: "the rate the deal's own loan terms state, read off the model built from them: a quote, not a screening default",
+    is: isLabel(LOAN_QUOTE_LABEL),
+  },
+  {
     name: "today's index plus the class's screening spread",
     why: "the rate a loan priced off today's index would carry, a screening default",
     is: (e) => e.label === SEEDED_RATE_LABEL || e.label === SEEDED_RATE_ONLY_LABEL,
@@ -264,6 +284,15 @@ export function noiDecider(candidates: readonly DeciderCandidate[]): DecidingFig
 export const TAXES_ORDER: readonly DeciderStep[] = [
   { name: "the bill the OM's own figures imply on the price", why: "the bill if the sale resets the assessment to the price", is: isLabel(RESET_BILL_LABEL) },
   { name: "the unabated bill the OM states", why: "where an abatement ends inside the model's hold", is: isLabel(ABATEMENT_LABEL) },
+  // The seller's own bill decides only where the row hands it in as one that
+  // may (lib/stress-test: no reset bill, no abatement ending in the hold, and
+  // the OM's line under it past SAME_SHARE on a building already delivered):
+  // a working floor and a rule of thumb, never the bill a new owner pays.
+  {
+    name: "the deal's T-12 tax line",
+    why: "the seller's own bill, where the OM's sits under it and no reset bill can be struck: a working floor and a rule of thumb, not a new owner's bill",
+    is: isLabel(T12_TAX_LABEL),
+  },
 ];
 
 export function taxesDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
@@ -300,6 +329,36 @@ export function insuranceDecider(candidates: readonly DeciderCandidate[] = []): 
   return pickDecider(INSURANCE_ORDER, candidates);
 }
 
+// — Operating expenses —
+
+/** The deal's T-12, then — only where no T-12 is on file — the class's
+ *  expense ratio struck on the OM's own income, a rule of thumb. The T-12's
+ *  lines a unit and the OM's own lines are words beside it. */
+export const OPEX_ORDER: readonly DeciderStep[] = [
+  {
+    name: "the deal's T-12 operating expenses less taxes and insurance",
+    why: "what the building cost to run over its trailing year, on the OM figure's footing",
+    is: isLabel(T12_OPEX_LABEL),
+  },
+  { name: "the class's expense ratio, a rule of thumb", why: "only where no T-12 is on file", is: isLabel(CLASS_OPEX_LABEL) },
+];
+
+export function opexDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
+  return pickDecider(OPEX_ORDER, candidates);
+}
+
+// — Market rent —
+
+/** The median of the memorandum's lease comps graded clean, three or more;
+ *  the rent roll's in-place rent and the metro's asking rent are beside it. */
+export const MARKET_RENT_ORDER: readonly DeciderStep[] = [
+  { name: "the median of the memorandum's lease comps graded clean", why: "leases of the building's own kind the memorandum names, three or more", is: isLabel(MARKET_RENT_COMPS_LABEL) },
+];
+
+export function marketRentDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
+  return pickDecider(MARKET_RENT_ORDER, candidates);
+}
+
 // — The challenger's rows —
 
 /** Each row's order in words, best first, as /how-we-test and the tests read
@@ -312,9 +371,11 @@ export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   noi: NOI_ORDER.map((s) => s.name),
   vacancy: VACANCY_ORDER.stabilized.map((s) => s.name),
   rent_growth: ["Zillow's apartment asking rents", "Zillow's asking rents across all home types", "the rent sitting tenants pay (CPI rent)", "the national index of rents its kind of lessor charges"],
+  market_rent: MARKET_RENT_ORDER.map((s) => s.name),
   expense_growth: EXPENSE_GROWTH_ORDER.map((s) => s.name),
   taxes: TAXES_ORDER.map((s) => s.name),
   insurance: INSURANCE_ORDER.map((s) => s.name),
+  opex: OPEX_ORDER.map((s) => s.name),
   renovation_premium: PREMIUM_ORDER.map((s) => s.name),
   other: [],
 };

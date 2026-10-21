@@ -142,7 +142,21 @@ tested and whether that is right. So:
   stretched against it, re-run at it as a floor, not a quote; and a growth
   row decided by one trailing year shows the same series' longer average
   beside it where the stored history holds one (`lib/growth-average.ts`,
-  never fetched).
+  never fetched). The model's replacement reserve runs the higher of the
+  OM's stated reserve (`statedReserveOf`, never a hotel's FF&E reserve) and
+  the class default, the source note saying which (the owner's "never more
+  optimistic than the OM", extended to reserves). Three rows the owner
+  approved the same day: `opex` (the OM's operating expenses less its taxes
+  and insurance against the T-12's on one footing, its lines beside, the
+  class ratio a rule of thumb only without a T-12, re-run swapping the
+  expense line), `market_rent` (the OM's rent against the median of three or
+  more lease comps graded `supports`, `lib/lease-comp-rent.ts`, the rent roll
+  and Zillow beside, never scored by a later in-place rent) and a lender's
+  term sheet deciding the debt row (`lib/loan-quote.ts`) — never on the
+  shared screen and never in a Claude step's words: the verdict's brief is
+  built with no quote, and the snapshot kept with the verdict is that test.
+  /how-we-test lists what the test does not check yet (`lib/not-tested.ts`,
+  held to the code by its test).
 
 ## Architecture
 
@@ -444,8 +458,9 @@ tested and whether that is right. So:
 
   On the sample model as a leasehold ending Dec 2071, 40.3 years are left
   at the sale. The term bears 87% of the $82.5M capitalised exit. That is
-  the 5.45% exit cap read as 6.23%, and the levered IRR is 6.2% against
-  11.7%.
+  the 5.45% exit cap read as 6.23%, and the levered IRR on the term falls
+  to about half the model's as it runs (lib/leasehold-exit's tests hold the
+  figures, which move with the model's inputs).
 
   The card is `app/(app)/deals/[id]/leasehold-exit-card.tsx` on the
   Financials tab under the assumable card. It draws the term with the

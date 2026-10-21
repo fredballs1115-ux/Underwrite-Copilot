@@ -262,7 +262,7 @@ describe("the Stress Test tab", () => {
     // not the sample: no plan note; and no re-run said where none is made
     expect(ws.getCell(4, 1).value ?? null).toBeNull();
     expect(String(ws.getCell(2, 1).value)).not.toContain("re-run in code");
-    expect(String(ws.getCell(2, 1).value)).toMatch(/^Each assumption the memorandum makes, set against the one figure that decides it\. Data only/);
+    expect(String(ws.getCell(2, 1).value)).toMatch(/^The memorandum's key assumptions, each set against the one figure that decides it\. Data only/);
     stressTabRows(withheld).forEach((row, i) => {
       const r = STRESS_HEAD_ROW + 1 + i;
       expect(ws.getCell(r, col("At the OM's figure")).value ?? null).toBeNull();

@@ -553,22 +553,27 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const { ANALYST_SYSTEM } = await import("./prompts");
     const test = sampleStressTest("2026-10-19");
     const brief = buildBrief({ extraction: null, ...none, buyBox: ["Target IRR 13%"], stressTest: test });
+    // Each row's move is its own two engine runs, read off the row, never typed.
+    const moves = (key: string) => {
+      const i = test.rows.find((r) => r.key === key)!.impact!;
+      return `the levered IRR moves from ${i.baseIrrPct!.toFixed(1)}% to ${i.altIrrPct!.toFixed(1)}%`;
+    };
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("9 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 2 unchecked");
+    expect(brief).toContain("11 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 4 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
     expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
-    expect(brief).toContain("the levered IRR moves from 9.3% to 5.9%");
+    expect(brief).toContain(moves("taxes"));
     expect(brief).toContain(
       "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll; the deal's own document)",
     );
     // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
-    expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.1%/);
+    expect(brief).toContain(moves("vacancy"));
     expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
-    expect(brief).toContain("the levered IRR moves from 9.3% to 13.6%");
+    expect(brief).toContain(moves("basis"));
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
     expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");
     // The instruction: the moves are the engine's, cited by figure and date.
@@ -576,7 +581,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("cite it by figure and date and name its publisher");
     // The headline, one line under the read line, in the words the memo and
     // the report read, and the instruction that its runs are the engine's.
-    expect(brief).toContain(`2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+    expect(brief).toContain(`4 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
     expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence/);
     expect(brief).toContain("The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
@@ -593,13 +598,25 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED; the metro's figure)");
   });
 
+  it("keeps a lender's quote out of the brief: the row says a quote decided it, never its rate", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const { LOAN_QUOTE_LABEL } = await import("@/lib/stress-deciders");
+    const { LOAN_QUOTE_WITHHELD } = await import("./verdict");
+    const test = sampleStressTest("2026-10-19");
+    const quote = { kind: "document" as const, label: LOAN_QUOTE_LABEL, text: "6.37% fixed, 10-year term", value: 6.37, asOf: "2026-10-01", publisher: "the deal's loan terms", scope: "deal" as const };
+    const brief = buildBrief({ extraction: null, ...none, stressTest: { ...test, rows: test.rows.map((r) => (r.key === "debt" ? { ...r, evidence: [quote, ...r.evidence] } : r)) } });
+    expect(brief).toContain(LOAN_QUOTE_WITHHELD);
+    expect(brief).not.toContain("6.37%");
+    expect(brief).not.toContain(LOAN_QUOTE_LABEL);
+  });
+
   it("says the impacts are withheld, and why, where no model could be built", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const brief = buildBrief({ extraction: null, ...none, stressTest: withheld });
     // One whole sentence, never behind a second "No return re-run".
-    expect(brief).toContain("2 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("4 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
     expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
     expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");

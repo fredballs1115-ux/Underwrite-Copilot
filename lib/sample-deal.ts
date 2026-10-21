@@ -104,8 +104,8 @@ const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.
 export const SAMPLE_EXIT_RERUN = {
   omExitPct: 5.25,
   goingInExitPct: 5.45,
-  omIrrPct: 10.77,
-  goingInIrrPct: 9.28,
+  omIrrPct: 10.75,
+  goingInIrrPct: 9.25,
 } as const;
 
 const modelMetrics: ReconciledMetric[] = [

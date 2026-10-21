@@ -1558,8 +1558,13 @@ describe("the memo leads with the stress test", () => {
     // actuals line still fits beside the key terms.
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
+    // Each row's move is its own two engine runs, read off the row, never typed.
+    const move = (key: string) => {
+      const i = test.rows.find((r) => r.key === key)!.impact!;
+      return `IRR ${i.baseIrrPct!.toFixed(1)}% to ${i.altIrrPct!.toFixed(1)}%`;
+    };
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("11 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 4 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The headline, in the read line's paragraph: the OM's case against the
     // evidence's (lib/stress-test `stressHeadline`); the split is the
     // report's, since the one page has no line to spare for it.
@@ -1568,14 +1573,14 @@ describe("the memo leads with the stress test", () => {
     // The vacancy row: the OM's figure with its page, the rent roll with its
     // date, the gap in points, and the IRR — the engine at the OM's 6.0%
     // against the engine at the rent roll's 9.3% by count, one input apart.
-    expect(text).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.3% (the deal's rent roll, May 31, 2026) · gap 3.3 pts · IRR 12.4% to 9.1%");
+    expect(text).toContain(`UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8) · against 9.3% (the deal's rent roll, May 31, 2026) · gap 3.3 pts · ${move("vacancy")}`);
     // The basis row: the ask against the one comp the comps step graded
     // supports (Parkside leans the seller's way, and is left out), and the
     // engine's move, spelled, since standard Helvetica has no arrow.
-    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the one comp graded clean, OM p. 14) · gap 8.8% · IRR 9.3% to 13.6%");
+    expect(text).toContain(`STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the one comp graded clean, OM p. 14) · gap 8.8% · ${move("basis")}`);
     // Within a verdict the larger move leads: the taxes' reset moves the
     // return more than the exit cap, which is the report's.
-    expect(text).toContain("STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · IRR 9.3% to 5.9%");
+    expect(text).toContain(`STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · ${move("taxes")}`);
     expect(text).not.toContain("UNSUPPORTED Insurance");
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
@@ -1670,7 +1675,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest?.count).toBe("none past the evidence");
     expect(data.dealKillers.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text).toContain("9 of the memorandum's assumptions read in code — 9 tested (9 hold).");
+    expect(text).toContain("11 of the memorandum's assumptions read in code — 11 tested (11 hold).");
     expect(text).not.toContain("Ticks:");
   }, 60000);
 

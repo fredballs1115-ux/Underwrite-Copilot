@@ -18,9 +18,11 @@ export const STRESS_KEYS = [
   "noi",
   "vacancy",
   "rent_growth",
+  "market_rent",
   "expense_growth",
   "taxes",
   "insurance",
+  "opex",
   "renovation_premium",
   "other",
 ] as const;
@@ -196,6 +198,16 @@ export interface StressRow {
    *  where the figure counts doors (a stated occupancy, a vacancy), which the
    *  T-12's economic loss never decides */
   measure?: "economic";
+  /** on the operating-expense row, the lines its figures leave out on both
+   *  sides: the taxes and the insurance where the OM states each (each has a
+   *  row of its own), so the OM's figure and the T-12's are on one footing
+   *  and the track record scores a later T-12 on the same one. Absent
+   *  elsewhere */
+  footing?: { less: ("taxes" | "insurance")[] };
+  /** on the market-rent row, the yardstick its figures stand on: "/mo", a
+   *  month a unit, or "/SF", a square foot a year (the class's own). Absent
+   *  elsewhere */
+  yardstick?: "/mo" | "/SF";
 }
 
 export interface StressTest {
@@ -334,8 +346,9 @@ export interface StressHeadline {
    *  unchecked: the price, NOI and debt rows that stand unchecked (or that
    *  no row could be built for), and a tenant roster's worst year before the
    *  model's sale where it rolls 25% or more (lib/tenant-roster
-   *  `readRoster`). Null where nothing is named; absent on a headline struck
-   *  before it was carried. */
+   *  `readRoster`), and a hold the OM states that is not the model's. Null
+   *  where nothing is named; absent on a headline struck before it was
+   *  carried. */
   untested?: StressUntested | null;
 }
 
@@ -347,6 +360,10 @@ export interface StressUntested {
    *  more: its share, what the share is of (the listed rent, else the listed
    *  area), and the month that year ends ("Oct 2028") */
   roll: { sharePct: number; basis: "rent" | "area"; through: string } | null;
+  /** the hold the OM states where it differs from the model's (every re-run
+   *  sells at the model's): its years and the model's, with the OM's page;
+   *  absent where the OM states none or the model's own */
+  hold?: { omYears: number; modelYears: number; page: number | null } | null;
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -387,7 +404,7 @@ export interface StressAtEvidence {
  *  of it is swapped too: one clause, the omitted row's `why` and the
  *  method's own words. */
 export const HEADLINE_NOI_LEFT_OUT =
-  "the NOI already holds the vacancy, the taxes and the insurance, so swapping it beside one of them would count that line twice";
+  "the NOI already holds the vacancy, the taxes, the insurance and the operating expenses, so swapping it beside one of them would count that line twice";
 
 /** Why the price is in neither side of the headline's split: both cases pay
  *  the price the model runs on, so the headline is what that price earns on
@@ -415,7 +432,7 @@ export const HEADLINE_METHOD = {
   claim: "The return the memorandum's figures make, all of them at once.",
   omCase: [
     "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
-    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium and the NOI; the price is the model's own in both cases, below.",
+    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium, the operating expenses and the NOI; the price is the model's own in both cases, below.",
     "The premium is re-run only where the seller's T-12 premium decides its row; else both cases keep the model's premium.",
     "The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.",
     "It is struck as the rent line that makes that NOI at the OM's own vacancy and expenses.",
@@ -438,10 +455,10 @@ export const HEADLINE_METHOD = {
     "And the insurance part, struck at the seller's own T-12 premium: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote.",
   ],
   overlap: [
-    `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
-    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
+    `The NOI is left out where the vacancy, taxes, insurance or operating-expense row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
+    "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the four past its evidence, the NOI's own swap stands.",
     "What the component swaps leave of the NOI's gap, the NOI row's gap less the year-one NOI they move, is in neither case, and the headline says how much wherever it passes 1% of the OM's NOI.",
-    "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
+    "A tax bill, a premium or the operating expenses the T-12 already carries in the model's expense line are swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
   plan: [
@@ -453,15 +470,17 @@ export const HEADLINE_METHOD = {
     "An insurance premium the T-12's decides moves it only where the OM states the premium as its pro forma's line.",
     "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
     "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
+    "Vacancy and a market rent both past their evidence overlap the same way: the rent's gap is carried at the OM's own vacancy, and the vacancy's gap is struck on a gross carrying the OM's rent, so the two share a cross term the headline does not net out.",
+    "A market rent beside a renovation premium past its evidence would carry the renovated doors' rent twice, so the market rent is left out of the split beside it.",
     "A re-run that moves the stabilized NOI to zero or under, or the yield to 25% or more, is struck nowhere: the figures do not tie.",
     "A row at its evidence whose re-run lowers the yield on cost 0.5 points or more reads stretched, as a 100-bps move in the levered IRR does on a stabilized deal.",
-    "Rent growth, expense growth, the exit cap and the debt have no yield-on-cost meaning, and the NOI row tests today's income: each keeps its verdict and has no re-run.",
+    "Rent growth, expense growth, the exit cap and the debt have no yield-on-cost meaning, and the NOI row tests today's income: each keeps its verdict and has no re-run. A market rent is re-run on a value-add alone.",
     "Both cases pay the total cost, so the price row is left out of the split, which is struck by Shapley values as above, in points of yield on cost.",
     "A yield on cost the OM states in a row of its own is drawn beside the two cases, as the OM's; where it differs from the plan's, the headline says what the plan's is struck on, the price plus the budget, and whether the OM's row names the cost it is struck on.",
     "No plan headline where the OM states no stabilized NOI or no total cost, where the yield is 25% or more, or where the all-in basis is outside the band any market delivers at.",
   ],
   limits: [
-    "On a stabilized deal an assumption with no model input, such as a renovation premium, is not in the headline, and the headline names it.",
+    "On a stabilized deal an assumption with no model input, such as a renovation premium or a market rent, is not in the headline, and the headline names it.",
     "No headline on a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
@@ -531,17 +550,20 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The debt",
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
-      "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default: the one figure that decides, the bare index beside it setting only where a rate reads unsupported",
+      "The lender's quote on file: the rate the deal's own loan terms state, read where its model was built from them, the one figure that decides; a floating quote is shown as stated and priced on nothing",
+      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a screening default, the bare index setting only where a rate reads unsupported",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
       "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],
     // lib/stress-test's debtRow sizes the tests at the OM's stated rate
     // where one is read, else the derived model's `allInRatePct` (the seed,
     // or lib/underwrite/inputs' flat 0.06 where nothing fresh was read).
-    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where it states one, else the model's (index plus spread, or a flat 6.00% placeholder).",
+    engine: "The all-in rate is a direct input: the return is re-run at the quote, else the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where stated, else the model's (index plus spread, or a flat 6.00% placeholder).",
     limits: [
-      "A benchmark is not a quote: only a rate a loan document states is treated as one.",
-      "A floating-rate or supplemental loan is read as stated and priced on nothing.",
+      "A benchmark is not a quote: only a rate a loan document states is treated as one, read off the model built from that term sheet; a model built before it carries none.",
+      "The shared screen never reads the sender's documents, so a quote on file decides nothing there.",
+      "A floating rate the OM states (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
+      "A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested: the row is held to the screening default, the index plus the class's spread, as where no quote is on file.",
     ],
   },
   {
@@ -550,8 +572,9 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The pro forma's net operating income is what the building earns.",
     against: [
       "The deal's own T-12 NOI, the one figure that decides where one is on file, with its period printed beside it and the sign of every deduction read once",
-      "The rent roll's in-place rent against the pro forma's, in words beside it",
+      "The rent roll's in-place rent against the pro forma's, in words beside it, on the class's own yardstick: a month a unit, else per SF a year",
       "The memorandum's own in-place figures against its stabilized ones, deciding only where no T-12 is on file",
+      "The OM's other income against the T-12's, where both state one, in words beside it and never deciding",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
     limits: [
@@ -602,6 +625,25 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     ],
   },
   {
+    key: "market_rent",
+    title: "Market rent",
+    claim: "The pro forma's market rent is what the building's units or space will lease for.",
+    against: [
+      "The memorandum's own lease comps as the comps step grades them: the median of three or more graded as supporting the rent, on the class's yardstick (a month a unit, else a square foot a year), the one figure that decides",
+      "The deal's rent roll: its in-place rent on the same yardstick, the gap the OM claims to close, shown beside it and never deciding",
+      "Zillow's asking rent for the metro, dated, the metro's and never the building's, shown beside it: apartments' beside an apartment building's rent (else all home types), all home types beside a rented house's, none beside a bed's or a pad's",
+    ],
+    engine: "No return is re-run on a stabilized deal: the model runs today's rent, which the NOI row carries. A value-add's yield on cost is re-run with the gap carried to its stabilized NOI on every unit it counts.",
+    limits: [
+      "Under three lease comps graded clean that state a rent, no median is struck and the row stands unchecked, the comps named: the comps' own floor.",
+      "A comp graded favorable or stretched is named and left out of the median; a comp's rent is read only as its line states it, never inferred.",
+      "A comp's rent is for the unit it names, not the building's average mix, and no unit mix is weighted.",
+      "How fast the in-place rent reaches the market rent is not tested.",
+      "On a class quoted by the foot, a comp's lease basis (net, full service, modified gross, gross) is read only as its line states it; comps graded clean on different bases strike no median, and the row stands unchecked.",
+      "A comp that states no basis is read as stated, and the OM's rent's own basis is not checked against the comps'.",
+    ],
+  },
+  {
     key: "expense_growth",
     title: "Expense growth",
     claim: "Expenses grow at the pro forma's rate.",
@@ -620,12 +662,14 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The tax line stays at the seller's bill.",
     against: [
       "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment, the one figure that decides where both are stated",
-      "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck, and the T-12's tax line is shown beside it",
+      "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck",
+      "The deal's T-12 tax line, the seller's own bill: it decides only where nothing above does and the OM's line sits more than 2% under it, a working floor, stretched at most; else it is shown beside it",
     ],
-    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures. A plan's yield on cost is re-run on its pro forma line, reset at today's bill and assessment; not on a development, conversion or forward purchase.",
+    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures, else at the T-12's bill where it decides. A plan's yield on cost is re-run on its pro forma line; not on a development, conversion or forward purchase.",
     limits: [
       "No assessment ratio or millage is assumed: with no bill and assessed value stated, the line says the rate is the assessor's to give.",
       "A bill over its assessed value past 5% is read as a misread or an assessment at a fraction of value, and no reset bill is struck on it.",
+      "The seller's T-12 bill is history, not a new owner's bill: a sale rarely lowers a bill, so a line under it reads stretched at most, and on a development or a conversion it decides nothing.",
     ],
   },
   {
@@ -645,17 +689,36 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     ],
   },
   {
+    key: "opex",
+    title: "Operating expenses",
+    claim: "The pro forma's operating expenses, less the taxes and the insurance, are what the building costs to run.",
+    against: [
+      "The deal's own T-12 operating expenses less its taxes and insurance, the one figure that decides, with its period printed beside it",
+      "Each T-12 expense line a unit (a square foot on a class priced by the foot), the management fee as a share of the T-12's EGI, and the OM's own lines where it states them, shown beside it, never deciding",
+      "The class's expense ratio from the model's screening defaults, a rule of thumb named as one, struck on the OM's own income, deciding only where no T-12 is on file",
+    ],
+    engine: "The expense line is an input: the return is re-run at the deciding figure, swapped into the model's expense line, never added on top. A plan's yield on cost is re-run on its pro forma line.",
+    limits: [
+      "The taxes and the insurance are left out on both sides wherever the OM states them, since each has a row of its own; a T-12 that breaks out neither line cannot be set on that footing.",
+      "Where the OM states only a total or a ratio, that is what is read; a line the OM does not state is never inferred, and its own lines decide nothing.",
+      "The T-12's period is not matched to the OM's figure, and neither is scaled to the other's year.",
+      "A rule of thumb reads stretched at most.",
+      "No row on a development or a conversion: no building runs today to have a T-12, and its pro forma is the finished building's.",
+    ],
+  },
+  {
     key: "renovation_premium",
     title: "The renovation premium",
     claim: "Each renovated unit rents for the stated premium.",
     against: [
       "An achieved premium the memorandum states, against the projected one: the one figure that decides",
       "The memorandum's own classic and renovated rents against its comps' rents, shown beside it",
+      "The program's pace, the memorandum against itself: the turnover its stated period needs against the turnover it states, shown beside it and deciding nothing",
     ],
     engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, the break-even the program needs. On a value-add the gap is carried to the stabilized NOI on the doors to renovate, and the yield on cost is re-run.",
     limits: [
       "The model grows today's rent at one rate, so the premium is in none of its levered returns, said so.",
-      "The program's pace against the building's turnover is not tested here.",
+      "Whether tenants leave at the stated turnover is not tested: the pace is the memorandum against itself, and the rent roll's lease ends are expiries, not move-outs.",
     ],
   },
   {

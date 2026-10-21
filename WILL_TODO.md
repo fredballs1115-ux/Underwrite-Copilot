@@ -309,7 +309,8 @@ The fixes that are ours are being made in this batch. These are yours:
    - a pro forma NOI used for year 1 where it is the only NOI stated (4.7%
      high on the test deal);
    - the 6.00% exit where no cap is stated;
-   - the 0.5% asset-management fee and the $0.25/SF reserves;
+   - the 0.5% asset-management fee (the reserves now run the higher of the
+     OM's stated reserve and the $0.25/SF default, your decision of 2026-10-21);
    - the workbook's live price sensitivity, which steps $1M at a time and
      so cannot reach the max bid.
 6. **Two larger changes every IC template suggests:**

@@ -13,7 +13,10 @@ import {
   CARD_SCOPE,
   DECISION_SCORES,
   NOT_YET_SCORABLE,
+  MARKET_RENT_WHY,
+  recordFigure,
   SCORED_BY,
+  SCORED_BY_TOO,
   OUTCOME_WORD,
   RECORD_FLOOR,
   dealRecordLine,
@@ -1003,9 +1006,11 @@ describe("what can score a row — the words held to the scorer, key by key (the
     noi: 4_000_000,
     vacancy: 6,
     rent_growth: 3,
+    market_rent: 38,
     expense_growth: 3,
     taxes: 1_000_000,
     insurance: 300_000,
+    opex: 1_200_000,
     renovation_premium: 250,
     other: 1,
   };
@@ -1016,7 +1021,8 @@ describe("what can score a row — the words held to the scorer, key by key (the
     om: OM[key],
     page: 3,
     evidence: { value: OM[key] * 1.2, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
-    per: null,
+    // A market rent carries its yardstick: a foot a year here.
+    per: key === "market_rent" ? "/SF" : null,
     threshold: snapshotThreshold(key),
     worse: WORSE_WHEN[key],
   });
@@ -1026,7 +1032,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
   const snapshot: StressSnapshot = { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: keys.map(rowFor) };
   const scoredKeys = (r: DealRecord) => r.rows.filter((x) => x.landing === "right" || x.landing === "wrong").map((x) => x.key);
 
-  it("with every kind of later figure in hand — a T-12, a rent roll, a trade — only the vacancy, the NOI and the price are scored", () => {
+  it("with every kind of later figure in hand — a T-12, a rent roll, a trade — only the vacancy, the NOI, the operating expenses and the price are scored", () => {
     const r = scoreDeal({
       screenedAt: T,
       stressSnapshot: snapshot,
@@ -1037,7 +1043,21 @@ describe("what can score a row — the words held to the scorer, key by key (the
       stage: "dead",
       history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
-    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "basis"]));
+    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
+    // The market rent is named beside the later rent roll's in-place rent and
+    // left unscored: an in-place rent sits under market by its loss to lease.
+    const rent = r.rows.find((x) => x.key === "market_rent")!;
+    expect(rent.landing).toBe("unscored");
+    expect(rent.later?.source).toBe("rent_roll");
+    expect(rent.later?.text).toContain("ran $30.00 a square foot a year in place — an in-place rent, not a market's");
+    expect(rent.why).toBe(MARKET_RENT_WHY);
+    expect(rent.text).toContain("a later rent roll cannot score a market rent, so it is not scored.");
+    expect(SCORED_BY_TOO).toContain("A market rent is not scored: a rent roll shows in-place rent, which sits under market by its loss to lease.");
+    expect(CARD_SCOPE).not.toContain("market rent");
+    // The operating expenses by the later T-12 on the row's own footing.
+    expect(r.rows.find((x) => x.key === "opex")!.later?.source).toBe("t12");
+    expect(SCORED_BY_TOO).toContain("The operating expenses are scored by a later T-12 on the row's own footing");
+    expect(CARD_SCOPE).toContain("or the operating expenses;");
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
     // The vacancy row here counts doors: the rent roll scored it, never the T-12.
     expect(r.rows.find((x) => x.key === "vacancy")!.later?.source).toBe("rent_roll");
@@ -1054,6 +1074,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
       taxes: "taxes",
       insurance: "insurance",
       renovation_premium: "a renovation premium",
+      market_rent: "a market rent",
     };
     // The loan is answered by a decision alone (the next case), so it is
     // neither a figure's row nor one nothing can answer.
@@ -1070,6 +1091,14 @@ describe("what can score a row — the words held to the scorer, key by key (the
     expect(scoredKeys(price)).toEqual(["basis"]);
     expect(price.rows.find((x) => x.key === "basis")).toMatchObject({ decision: true });
     expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, and a Closed deal's own price answers the price, each counted apart.");
+  });
+
+  it("writes a market rent's places by its yardstick, never by its size", () => {
+    // A unit's month in whole dollars, however small; a foot's to the cent, however large.
+    expect(recordFigure("market_rent", 185.4, "/mo")).toBe("$185");
+    expect(recordFigure("market_rent", 2_350.6, "/mo")).toBe("$2,351");
+    expect(recordFigure("market_rent", 38.5, "/SF")).toBe("$38.50");
+    expect(recordFigure("market_rent", 212.25, "/SF")).toBe("$212.25");
   });
 
   it("no surface says every row is scored", () => {
@@ -1316,6 +1345,8 @@ describe("what will score what — the grid is the scorer's own rules, never wri
       expense_growth: [],
       taxes: [],
       insurance: [],
+      opex: ["t12"],
+      market_rent: [],
       renovation_premium: [],
       other: [],
     });
@@ -1350,10 +1381,72 @@ describe("what will score what — the grid is the scorer's own rules, never wri
     // decisions, are exactly the marked cells.
     const grid = marked(scorableGrid());
     const figureKeys = Object.entries(grid).filter(([, s]) => s.some((x) => x !== "outcome")).map(([k]) => k);
-    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "basis"]));
+    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
     expect(Object.entries(grid).filter(([, s]) => s.includes("outcome")).map(([k]) => k).sort()).toEqual(["basis", "debt"]);
     const component = readFileSync(join(process.cwd(), "app/(app)/scorable-grid.tsx"), "utf8");
     const order = [...component.matchAll(/source: "(\w+)"/g)].map((m) => m[1]);
     expect(order).toEqual([...SCORABLE_SOURCES]);
+  });
+});
+
+describe("the operating-expense row is scored by a later T-12 on its own footing (the owner's decision of 2026-10-21)", () => {
+  const later: T12Summary = {
+    ...t12,
+    opex: [...t12.opex, { key: "payroll", label: "Payroll", amount: 700_000, page: "p. 1" }, { key: "rm", label: "Repairs & maintenance", amount: 500_000, page: "p. 1" }],
+    totalOpex: 2_725_000,
+  };
+  const opexRow = (verdict: StressSnapshotRow["verdict"], less: StressSnapshotRow["less"]): StressSnapshotRow => ({
+    key: "opex",
+    title: "Operating expenses",
+    verdict,
+    om: 1_000_000,
+    page: 9,
+    evidence: { value: 1_150_000, label: "The deal's T-12 operating expenses less taxes and insurance", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12" },
+    per: null,
+    threshold: snapshotThreshold("opex"),
+    worse: WORSE_WHEN.opex,
+    ...(less ? { less } : {}),
+  });
+  const score = (row: StressSnapshotRow, summary: T12Summary = later) =>
+    scoreDeal({ screenedAt: T, stressSnapshot: { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [row] }, challenges: [], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary } }).rows[0];
+
+  it("leaves out the taxes and insurance the row left out, and scores the rest by the row's 5% margin", () => {
+    const r = score(opexRow("stretched", ["taxes", "insurance"]));
+    // $2.725M less the $1.14M tax line and the $385k insurance line.
+    expect(r.later?.value).toBe(1_200_000);
+    expect(r.later?.text).toContain("ran $1.20M of operating expenses less its taxes and insurance");
+    expect(r.outcome).toBe("flag_right");
+    // A row that held, the later T-12 20% over the OM's: a false hold.
+    expect(score(opexRow("holds", ["taxes", "insurance"])).outcome).toBe("false_hold");
+    // With no line left out, the whole total.
+    expect(score(opexRow("stretched", [])).later?.value).toBe(2_725_000);
+  });
+
+  it("scores none where the later T-12 breaks out no line the row left out, nor an older screen's challenge, whose figure's footing is not known", () => {
+    const noIns = { ...later, opex: later.opex.filter((l) => l.key !== "insurance"), totalOpex: 2_340_000 };
+    expect(score(opexRow("stretched", ["taxes", "insurance"]), noIns).landing).toBe("unscored");
+    const challenge: Challenge = { assumption: "Payroll of $1,200 per unit", severity: "medium", challenge: "", question: "", key: "opex", omFigure: 1_200, altFigure: 1_900 };
+    const r = scoreDeal({ screenedAt: T, challenges: [challenge], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: later } });
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.rows[0].why).toBe("nothing that arrived after the screen speaks to it.");
+  });
+
+  it("keeps the row's footing with its snapshot, and reads it back", () => {
+    const row: StressRow = {
+      key: "opex",
+      title: "Operating expenses",
+      omSays: { text: "$1M", value: 1_000_000, page: 9 },
+      evidence: [{ kind: "document", label: "The deal's T-12 operating expenses less taxes and insurance", text: "", value: 1_150_000, asOf: "2026-06-30", publisher: "the deal's T-12", scope: "deal" }],
+      gap: { value: 150_000, unit: "usd", text: "" },
+      verdict: "stretched",
+      decidedBy: 0,
+      impact: null,
+      challenge: null,
+      method: "",
+      footing: { less: ["taxes"] },
+    };
+    const snap = stressSnapshotOf({ rows: [row], readOn: "2026-10-01", publishedRead: true, impactsWithheld: null })!;
+    expect(snap.rows[0]).toMatchObject({ key: "opex", less: ["taxes"], threshold: { value: 0.05, unit: "share" }, worse: "higher" });
+    expect(readStressSnapshot(JSON.parse(JSON.stringify(snap)))!.rows[0].less).toEqual(["taxes"]);
   });
 });

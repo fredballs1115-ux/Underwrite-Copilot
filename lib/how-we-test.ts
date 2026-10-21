@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
+import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, SCORED_BY_TOO, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
@@ -37,7 +37,7 @@ import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-mode
 export { STRESS_METHODS };
 
 /** The page's title, its one h1 and its metadata's. */
-export const HOW_WE_TEST_TITLE = "How each assumption is tested";
+export const HOW_WE_TEST_TITLE = "How the stress test is struck";
 
 /**
  * The phrase live-verify greps in the served HTML
@@ -101,7 +101,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // struck, and the row names what it holds the ask to by count.
   basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
   exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
-  debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
+  debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   // lib/stress-deciders' VACANCY_ORDER: one measure decides its own kind —
   // doors by the market, then the rent roll (never on a plan), then the
@@ -110,8 +110,10 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // lib/rent-growth-decider's order, one line.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to all-items CPI's trailing year; to core CPI only where all-items is not fresh. Core, the insurance index, the breakeven and the CPI's own average over the years its history holds are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
-  taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
+  taxes: `Held to the OM's implied reset bill, else its unabated bill, else the T-12's bill where the OM's is over ${pctOf(SAME_SHARE)} under it. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported; the reset bill and the T-12's read stretched at most.`,
   insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a working floor and a rule of thumb, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
+  market_rent: `Held to the median of three or more of the memorandum's lease comps graded clean, on the class's yardstick; under three, unchecked, the comps named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
+  opex: `Held to the T-12's expenses on the OM figure's footing, less the taxes and insurance it states; with no T-12, to the class's ratio, a rule of thumb, stretched at most. Holds within ${pctOf(NOI_IN_LINE_BAND)} under it or over it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} under it.`,
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };
@@ -263,7 +265,7 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
   // price that buys no building (`basisWithheldOf`) re-runs nothing.
   {
     heading: "No levered return on a plan",
-    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and the yield is re-run where the OM states its stabilized NOI and total cost, never a levered return.",
+    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: its key assumptions are set against their evidence, and the yield is re-run where the OM states its stabilized NOI and total cost, never a levered return.",
   },
   {
     heading: "No return is re-run on a figure nobody stated",
@@ -299,6 +301,7 @@ export const TRACK_RECORD = {
     "Each row of the stress test, holds included, is scored where a later figure can speak to it: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
     "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade, the price a Closed deal was bought at.",
     SCORED_BY,
+    SCORED_BY_TOO,
     DECISION_SCORES,
     PURCHASE_IS_DECISION,
     NOT_YET_SCORABLE,
