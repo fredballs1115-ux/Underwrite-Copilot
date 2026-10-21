@@ -115,7 +115,8 @@ describe("/how-we-test draws every method from the table", () => {
       // the T-12 are the deal's own documents.
       basis: ["om_internal", "published", "rule_of_thumb"],
       exit_cap: ["om_internal", "published", "published"],
-      debt: ["published", null, null],
+      // The lender's quote is the deal's own loan terms.
+      debt: ["document", "published", null, null],
       noi: ["document", "document", "om_internal", "document"],
       // A stabilized assumption is the market's to judge first; the
       // documents' vacancy is today's: the rent roll's by its doors, the

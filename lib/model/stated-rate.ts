@@ -63,6 +63,14 @@ const quoted = (m: ReconciledMetric) => {
   return m.sources.some((s) => LOAN_PAPER.test(s.doc) && !NOT_A_QUOTE.test(s.doc));
 };
 
+/** The metric that IS the loan's rate, won by a loan's own paper, whatever
+ *  figure it states — a fixed rate the model runs on, or a floating one (an
+ *  index and a spread) it cannot carry as one: lib/loan-quote reads the
+ *  term sheet's rate off it. Null where no such metric is quoted. */
+export function loanRateMetric(model: Pick<UnderwritingModel, "metrics"> | null | undefined): ReconciledMetric | null {
+  return (model?.metrics ?? []).find((m) => isLoanRate(m) && quoted(m)) ?? null;
+}
+
 /** The model's loan rate where a loan's own paper states it, else null. */
 export function statedModelRate(model: Pick<UnderwritingModel, "inputs" | "metrics"> | null | undefined): number | null {
   const rate = model?.inputs?.loan?.ratePct;

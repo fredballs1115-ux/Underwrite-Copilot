@@ -101,7 +101,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // struck, and the row names what it holds the ask to by count.
   basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
   exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
-  debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
+  debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   // lib/stress-deciders' VACANCY_ORDER: one measure decides its own kind —
   // doors by the market, then the rent roll (never on a plan), then the

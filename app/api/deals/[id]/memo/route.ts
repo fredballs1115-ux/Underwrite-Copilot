@@ -38,6 +38,7 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
 import { buildStressTest } from "@/lib/stress-test";
 import { readStressBasisEvidence } from "@/lib/stress-basis-read";
+import { readLoanQuote } from "@/lib/loan-quote-read";
 import type { StressTest } from "@/lib/stress-test-types";
 import type { BrokerCompsResult, ChallengerResult, MarketResult } from "@/lib/anthropic/types";
 
@@ -336,6 +337,8 @@ export async function GET(
           brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
           recordedSales,
           pastScreens,
+          // The lender's quote on file, as the deal page reads it.
+          loanQuote: await readLoanQuote(supabase, deal),
           sample: !!(deal as { is_sample?: boolean }).is_sample,
           readOn: readerDay,
         });

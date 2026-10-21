@@ -85,6 +85,7 @@ import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { buildStressTest } from "@/lib/stress-test";
 import { stressSnapshotOf } from "@/lib/stress-snapshot";
 import { PAST_SCREENS_IN_BRIEF, compsCallSubjectOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
+import { readLoanQuote } from "@/lib/loan-quote-read";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import type { StressTest } from "@/lib/stress-test-types";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
@@ -599,6 +600,7 @@ async function screenStressTest(
     comps?: unknown;
     market?: unknown;
     public_comps?: unknown;
+    model?: unknown;
   },
   reads: VerdictReads | undefined,
 ): Promise<StressTest | null> {
@@ -677,6 +679,10 @@ async function screenStressTest(
       recordedSales,
       pastScreens: null,
       pastScreensWithheld: PAST_SCREENS_IN_BRIEF,
+      // The lender's quote on file (lib/loan-quote-read): a term sheet the
+      // deal's first-draft model was built from, read as the deal page reads
+      // it; the screen reads the deal's documents, as it reads its T-12.
+      loanQuote: await readLoanQuote(admin, { id: dealId, model: row.model, is_sample: row.is_sample }),
       sample: !!row.is_sample,
       readOn: today,
     });
@@ -991,7 +997,7 @@ async function regenerateVerdict(
 ): Promise<StressTest | null> {
   const { data, error: readErr } = await admin
     .from("deals")
-    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps")
+    .select("name, is_sample, asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id, public_comps, model")
     .eq("id", dealId)
     .single();
   // A verdict synthesized over a read that failed would judge a deal with

@@ -2071,7 +2071,7 @@ describe("the challenger's words ride beside the rows", () => {
 const AGAINST_SOURCES: Record<StressKey, string[]> = {
   basis: ["The memorandum's sale comps", "Recorded sales (", "Other memoranda's asking prices in"],
   exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
-  debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
+  debt: ["The lender's quote on file", "The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma", "The OM's other income against the T-12's"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
@@ -2145,6 +2145,8 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     },
     recordedSales: { count: 4, medianPerSqft: 310, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01", href: "https://example.test/records" },
     pastScreens: { count: 3, perUnitMedian: 255_000, perSfMedian: 290, market: "Washington DC" },
+    // A term sheet on file whose rate the deal's model carries.
+    loanQuote: { ratePct: 5.6, stated: "5.60%", floating: false, filename: "term-sheet.pdf", asOf: "2026-10-03" },
     readOn: "2026-10-05",
   });
   // An office deal in Washington, whose vacancy and exit read the research
@@ -3666,5 +3668,54 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     expect(buildStressTest(apartmentArgs({ extraction: hotel, storedAssetClass: "hospitality_str", brokerComps: three })).rows.some((x) => x.key === "market_rent")).toBe(false);
     const bare: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Pro forma rent") };
     expect(buildStressTest(apartmentArgs({ extraction: bare, actuals: null })).rows.some((x) => x.key === "market_rent")).toBe(false);
+  });
+});
+
+describe("a term sheet on file decides the debt row (the owner's decision of 2026-10-21)", () => {
+  const quote = (ratePct: number | null, stated = ratePct != null ? `${ratePct.toFixed(2)}%` : "SOFR + 2.75%") => ({ ratePct, stated, floating: ratePct == null, filename: "Brixton term sheet.pdf", asOf: "2026-10-03" });
+
+  it("holds the OM's rate to the lender's quote, a document of the deal's own, and re-runs the model's rate one input apart", () => {
+    const args = apartmentArgs({ loanQuote: quote(6.1) });
+    const d = rowOf(buildStressTest(args), "debt");
+    const decider = d.evidence[d.decidedBy!];
+    expect(decider).toMatchObject({ kind: "document", label: "The lender's quote on file", value: 6.1, asOf: "2026-10-03", publisher: "the deal's loan terms", scope: "deal" });
+    expect(decider.text).toBe("6.10% as the deal's loan terms state it (Brixton term sheet.pdf, on file since Oct 3, 2026): a lender's quote, not a screening default");
+    // The OM's 5.25% is 85 bps under it: past the 50, unsupported — no
+    // screening default caps it at stretched.
+    expect(d.gap).toMatchObject({ value: 85, unit: "bps" });
+    expect(d.gap!.text).toBe("The OM's 5.25% is 85 bps under the lender's quote on file, 6.10%.");
+    expect(d.verdict).toBe("unsupported");
+    expect(d.ruleOfThumbOnly).toBeUndefined();
+    expect(d.impact).toMatchObject({ input: "allInRatePct", omValue: 0.0525, altValue: 0.061 });
+    expect(d.impact!.note).toMatch(/^If the all-in rate is the lender's quote on file, 6\.10%, not the OM's 5\.25%, the levered IRR moves from/);
+    // The screening default stands beside it, deciding nothing.
+    expect(d.method).toMatch(/^The OM's debt against the lender's quote on file \(the deal's loan terms\), the one figure that decides; beside it, not deciding: the index the model prices off/);
+  });
+
+  it("holds a rate at or over the quote", () => {
+    expect(rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(5.25) })), "debt").verdict).toBe("holds");
+    expect(rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(5.0) })), "debt").verdict).toBe("holds");
+  });
+
+  it("shows a floating quote as stated, priced on nothing, and the screening default decides", () => {
+    const d = rowOf(buildStressTest(apartmentArgs({ loanQuote: quote(null) })), "debt");
+    const q = d.evidence.find((e) => e.label === "The lender's quote on file")!;
+    expect(q).toMatchObject({ kind: "document", value: null });
+    expect(q.text).toBe("SOFR + 2.75% as the deal's loan terms state it (Brixton term sheet.pdf, on file since Oct 3, 2026): a floating rate, shown as stated and priced on nothing");
+    expect(d.evidence[d.decidedBy!].label).toBe(rowOf(buildStressTest(apartmentArgs()), "debt").evidence[rowOf(buildStressTest(apartmentArgs()), "debt").decidedBy!].label);
+    expect(d.ruleOfThumbOnly).toBe(true);
+  });
+
+  it("decides nothing where the OM states no rate, and is handed no quote on the shared screen", () => {
+    const noRate: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Interest rate") };
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: noRate, loanQuote: quote(6.1) })), "debt");
+    expect(d.verdict).toBe("unchecked");
+    expect(d.unchecked).toBe("The OM states no loan rate.");
+    const share = readFileSync("app/share/[token]/page.tsx", "utf8");
+    expect(share).not.toMatch(/loanQuote|readLoanQuote|loanQuoteOf/);
+    // Every surface that may read the deal's documents hands it in.
+    for (const f of ["app/(app)/deals/[id]/page.tsx", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts", "app/api/deals/[id]/underwrite.xlsx/route.ts", "lib/anthropic/pipeline.ts"]) {
+      expect(readFileSync(f, "utf8"), f).toMatch(/loanQuote: /);
+    }
   });
 });

@@ -549,16 +549,18 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The debt",
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
-      "Today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a screening default: the one figure that decides, the bare index setting only where a rate reads unsupported",
+      "The lender's quote on file: the rate the deal's own loan terms state, read where its model was built from them, the one figure that decides; a floating quote is shown as stated and priced on nothing",
+      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a screening default, the bare index setting only where a rate reads unsupported",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
       "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],
     // lib/stress-test's debtRow sizes the tests at the OM's stated rate
     // where one is read, else the derived model's `allInRatePct` (the seed,
     // or lib/underwrite/inputs' flat 0.06 where nothing fresh was read).
-    engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where it states one, else the model's (index plus spread, or a flat 6.00% placeholder).",
+    engine: "The all-in rate is a direct input: the return is re-run at the quote, else the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where stated, else the model's (index plus spread, or a flat 6.00% placeholder).",
     limits: [
-      "A benchmark is not a quote: only a rate a loan document states is treated as one.",
+      "A benchmark is not a quote: only a rate a loan document states is treated as one, read off the model built from that term sheet; a model built before it carries none.",
+      "The shared screen never reads the sender's documents, so a quote on file decides nothing there.",
       "A floating rate (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
     ],
   },

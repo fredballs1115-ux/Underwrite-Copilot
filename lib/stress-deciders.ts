@@ -40,8 +40,10 @@
 //   - basis: lib/stress-basis-evidence's order — the memorandum's comps
 //     graded clean (the class's yardstick, then per SF alone), then the
 //     recorded sales, then the reader's own past asks;
-//   - debt: today's index plus the class's screening spread, the one figure
-//     (the bare index sets how far under it reads unsupported);
+//   - debt: the lender's quote on file (a term sheet's fixed rate, read off
+//     the model built from it), else today's index plus the class's
+//     screening spread (the bare index sets how far under it reads
+//     unsupported); a floating quote is shown and decides nothing;
 //   - NOI: the deal's T-12, then the OM's own in-place NOI;
 //   - taxes: the bill the OM's own figures imply on the price, then the
 //     stated unabated bill an abatement ends into inside the hold;
@@ -98,6 +100,7 @@ export const T12_OPEX_LABEL = "The deal's T-12 operating expenses less taxes and
 export const T12_OPEX_LINES_LABEL = "The deal's T-12 expense lines";
 export const CLASS_OPEX_LABEL = "The class's expense ratio, a rule of thumb";
 export const MARKET_RENT_COMPS_LABEL = "The memorandum's lease comps";
+export const LOAN_QUOTE_LABEL = "The lender's quote on file";
 
 /** One step of a row's order: how a sentence names the figure, why it
  *  decides where it does, and which piece it is. */
@@ -249,6 +252,11 @@ export function basisDecider(candidates: readonly DeciderCandidate[]): DecidingF
 // — Debt —
 
 export const DEBT_ORDER: readonly DeciderStep[] = [
+  {
+    name: "the lender's quote on file",
+    why: "the rate the deal's own loan terms state, read off the model built from them: a quote, not a screening default",
+    is: isLabel(LOAN_QUOTE_LABEL),
+  },
   {
     name: "today's index plus the class's screening spread",
     why: "the rate a loan priced off today's index would carry, a screening default",

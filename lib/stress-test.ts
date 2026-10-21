@@ -73,7 +73,9 @@
 //                    CPI (core CPI only where all-items is not fresh)
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
 //                    going-in cap (else the tracker cap range's low end)
-//   debt             DEBT_UNSUPPORTED_BPS      50 bps under the seeded rate
+//   debt             DEBT_UNSUPPORTED_BPS      50 bps under the lender's quote
+//                    on file (a term sheet's rate), else under the seeded
+//                    rate (stretched at most unless under the bare index)
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
@@ -117,6 +119,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { avgRentOf, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { statedRent } from "@/lib/lease-comp-rent";
+import type { LoanQuote } from "@/lib/loan-quote";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -186,6 +189,7 @@ import {
   ABATEMENT_LABEL,
   ACHIEVED_PREMIUM_LABEL,
   GOING_IN_CAP_LABEL,
+  LOAN_QUOTE_LABEL,
   OM_IN_PLACE_NOI_LABEL,
   PAST_SCREENS_PUBLISHER,
   RENT_ROLL_VACANCY_LABEL,
@@ -306,6 +310,11 @@ export interface StressTestArgs {
    *  the debt row's evidence, never handed to a model (lib/sample-derive's
    *  guard) */
   indexGiven?: DebtIndex | null;
+  /** the lender's quote on file (lib/loan-quote `loanQuoteOf`): a term sheet
+   *  the deal holds whose rate its first-draft model carries as a loan's own
+   *  paper states it — handed in only where the surface may read the deal's
+   *  documents (never the shared screen) */
+  loanQuote?: LoanQuote | null;
   /** why no model is handed in, where the surface carries none BY DESIGN
    *  (the shared screen) — said ahead of the default "No model was derived
    *  for this deal", which would read as a failure */
@@ -760,6 +769,7 @@ interface Ctx {
   pastScreens: PastScreensEvidence | null;
   pastScreensWithheld: string | null;
   indexGiven: DebtIndex | null;
+  loanQuote: LoanQuote | null;
   readOn: string;
 }
 
@@ -1909,6 +1919,26 @@ function debtRow(ctx: Ctx): StressRow | null {
   const floating = rateRow ? floatingRateOf(rateRow.value) : null;
   const om = floating ? null : statedPct(ctx.rows, DEBT_RATE_ROW, DEBT_RATE_NOT);
   const evidence: StressEvidence[] = [];
+  // The lender's quote on file (lib/loan-quote): the rate the deal's own
+  // loan terms state, read off the model built from them, a document of the
+  // deal's own. It decides first; a floating quote (an index and a spread)
+  // is shown as stated and priced on nothing, as an OM's floating rate is.
+  const quote = ctx.loanQuote;
+  if (quote) {
+    const onFile = `${quote.filename}${quote.asOf ? `, on file since ${datedLong(quote.asOf)}` : ""}`;
+    evidence.push({
+      kind: "document",
+      label: LOAN_QUOTE_LABEL,
+      text:
+        quote.ratePct != null
+          ? `${pct2(quote.ratePct)} as the deal's loan terms state it (${onFile}): a lender's quote, not a screening default`
+          : `${quote.stated} as the deal's loan terms state it (${onFile}): a floating rate, shown as stated and priced on nothing`,
+      value: quote.ratePct,
+      asOf: quote.asOf,
+      publisher: "the deal's loan terms",
+      scope: "deal",
+    });
+  }
   const seed = ctx.derived?.meta.rateSeed ?? null;
   const index = seed ? seedIndex(seed, ctx.indexGiven) : null;
   // The index is the Treasury tenor nearest the OM's own loan term where it
@@ -2062,12 +2092,22 @@ function debtRow(ctx: Ctx): StressRow | null {
       : { text: NO_FIGURE("loan rate"), value: null, page: null };
   if (rateRow && floating) return unchecked("debt", omSays, evidence, floatingRateWhy(rateRow.value.trim(), floating));
   if (!om) return unchecked("debt", omSays, evidence, NO_FIGURE("loan rate"));
-  // ONE figure decides (lib/stress-deciders `debtDecider`): today's index
-  // plus the class's screening spread. The bare index, the 10-year, the
-  // lender tests and the leverage read are shown beside it; the bare index
-  // sets only how far under the decider a rate may read unsupported (below).
-  const decided = seed ? debtDecider(candidatesOf(evidence)) : null;
-  if (!seed || !decided) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
+  // ONE figure decides (lib/stress-deciders `debtDecider`): the lender's
+  // quote on file, else today's index plus the class's screening spread. The
+  // bare index, the 10-year, the lender tests and the leverage read are shown
+  // beside it; the bare index sets only how far under the screening default
+  // a rate may read unsupported (below).
+  const decided = debtDecider(candidatesOf(evidence));
+  if (!decided) {
+    return unchecked(
+      "debt",
+      omSays,
+      evidence,
+      quote?.floating ? "The lender's quote on file floats, priced on nothing, and no index was read today to set the OM's rate against." : "No index was read today to set the OM's rate against.",
+    );
+  }
+  if (evidence[decided.index].label === LOAN_QUOTE_LABEL) return quotedDebtRow(ctx, omSays, evidence, decided.index, om.pct, decided.figure);
+  if (!seed) return unchecked("debt", omSays, evidence, "No index was read today to set the OM's rate against.");
   const allIn = decided.figure;
   const tenorClause = decideOn && decideOn !== index ? `, the ${decideOn.name} for the term` : "";
   // The figures are percent points here; the threshold is in bps.
@@ -2100,6 +2140,36 @@ function debtRow(ctx: Ctx): StressRow | null {
   // The rate is held to the index plus the class's screening spread: the
   // spread is the site's own default, so the verdict is a rule of thumb's.
   return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: seedIndexAt, impact, challenge: null, method: methodSentence("debt", evidence, seedIndexAt), ruleOfThumbOnly: true };
+}
+
+/**
+ * The debt row where the lender's quote on file decides it: the OM's rate
+ * held to the rate the deal's own loan terms state, a document of the deal's
+ * — no screening default, so it may read unsupported past
+ * DEBT_UNSUPPORTED_BPS under it — and the return re-run at the quote, the
+ * model's rate one input apart.
+ */
+function quotedDebtRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEvidence[], at: number, omPct: number, quotePct: number): StressRow {
+  const judged = judge(omPct, quotePct, "low", "bps", DEBT_UNSUPPORTED_BPS / 100 - SAME, SAME, () => {
+    const d = (quotePct - omPct) * 100;
+    return Math.abs(d) < SAME * 100
+      ? `The OM's ${pct2(omPct)} is at the lender's quote on file, ${pct2(quotePct)}.`
+      : d > 0
+        ? `The OM's ${pct2(omPct)} is ${bps(d)} under the lender's quote on file, ${pct2(quotePct)}.`
+        : `The OM's ${pct2(omPct)} is ${bps(d)} over the lender's quote on file, ${pct2(quotePct)} — the conservative side.`;
+  });
+  judged.gap = { ...judged.gap, value: Math.round((quotePct - omPct) * 100), unit: "bps" };
+  const impact =
+    ctx.derived && irrRuns(ctx)
+      ? pctImpact(ctx.derived, "allInRatePct", at, omPct, quotePct, {
+          what: "the all-in rate",
+          om: pct2(omPct),
+          alt: `the lender's quote on file, ${pct2(quotePct)}`,
+          evidence: "",
+          model: pct2(ctx.derived.inputs.allInRatePct * 100),
+        })
+      : null;
+  return { key: "debt", title: TITLES.debt, omSays, evidence, gap: judged.gap, verdict: judged.verdict, decidedBy: at, impact, challenge: null, method: methodSentence("debt", evidence, at) };
 }
 
 // — NOI —
@@ -4094,6 +4164,7 @@ export function buildStressTest(args: StressTestArgs): StressTest {
     pastScreens: args.pastScreens ?? null,
     pastScreensWithheld: args.pastScreensWithheld ?? null,
     indexGiven: args.indexGiven ?? null,
+    loanQuote: args.loanQuote ?? null,
     readOn: args.readOn,
   };
   const built: Partial<Record<StressKey, StressRow>> = {
