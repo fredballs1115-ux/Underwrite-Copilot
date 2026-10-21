@@ -58,7 +58,7 @@ export const SCREENING_GROWTH_EXIT_SAMPLE = "the sample's growth pinned at 3.0% 
 export const SCREENING_BUILT_ON = "Built on the OM's price and terms, and the rent roll and T-12 where the deal has them.";
 
 /** A real deal's growth and exit, short, before its "how it works" link. */
-export const SCREENING_GROWTH_EXIT_LINE = "Growth and the exit run the stress test's deciding figure, never more optimistic than the OM";
+export const SCREENING_GROWTH_EXIT_LINE = "Growth and the exit run the more cautious of the stress test's deciding figure and the OM's, else a default";
 
 /** Where the whole rule is: /how-we-test's "model" section. */
 export const SCREENING_RULE_HREF = "/how-we-test#model";
@@ -76,13 +76,15 @@ export function sampleScreeningPinned(inputs: { rentGrowthPct: number; expenseGr
 /** The whole rule, as /how-we-test's "model" section says it: a line a
  *  thought, each under the page's 260 characters. */
 export const SCREENING_MODEL_LINES: readonly string[] = [
-  "The return a row re-runs is the screening model's: built on the OM's price and terms, and the rent roll's and T-12's figures where the deal has them.",
+  "On a stabilized deal a row re-runs the screening model's return; a plan deal's rows re-run its yield on total cost, not the model.",
+  "The screening model is built on the OM's price and terms, and the rent roll's and T-12's figures where the deal has them.",
   "Rent growth runs at the lower of the OM's stated rate and the published figure the stress test decides it by; expense growth at the higher of the two.",
   "Either only inside −5% to +15% a year, the published one only where it is fresh. Where only one stands, that one; where neither does, 3.0% a year.",
   "The exit runs at the higher of the OM's stated exit and the cap the stress test decides it by: the going-in cap where the price buys the building as it stands.",
   "Else the research tracker's cap range at its low end, where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury.",
   "Where only one of the exits stands, that one; where neither does, the going-in cap the OM states, or 6.0%.",
-  "So the model is never more optimistic than the OM. It is a cautious stance read off a trailing year, not a forecast: nothing here says where rents, caps or rates go.",
+  "So the model is never more optimistic than the OM, and more cautious than it only where the OM's own figure is the more optimistic one.",
+  "Read off a trailing year, it is a stance, not a forecast: nothing here says where rents, caps or rates go.",
   "The sample deal's figures are pinned: it keeps 3.0% growth and its going-in cap, whatever its OM says and whatever today's figures read.",
 ];
 

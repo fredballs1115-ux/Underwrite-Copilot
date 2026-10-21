@@ -11,6 +11,7 @@ import { STRESS_KEYS, type StressEvidence, type StressKey, type StressRow, type 
 import { STRESS_SNAPSHOT_V, WORSE_WHEN, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import {
   CARD_SCOPE,
+  DECISION_SCORES,
   NOT_YET_SCORABLE,
   SCORED_BY,
   OUTCOME_WORD,
@@ -617,6 +618,18 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     expect(plan.rows[0].landing).toBe("unscored");
   });
 
+  it("a plan deal's stated vacancy the survey decided is said as the plan's target, never a deal read as stabilized", () => {
+    const published = row({ key: "vacancy", verdict: "holds", om: 6, evidence: { value: 6.2, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" } });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(published), challenges: [], plan: true, vacancyIsPlanTarget: true, ...laterT12() });
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.rows[0].why).toBe("the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.");
+    expect(r.rows[0].text).not.toContain("a deal read as stabilized");
+    // An older screen's challenge with both flags reads the plan's sentence too.
+    const old = scoreDeal({ screenedAt: T, challenges: [vacancy], plan: true, vacancyIsPlanTarget: true, vacancyHeldToMarket: true, ...laterT12() });
+    expect(old.rows[0].landing).toBe("unscored");
+    expect(old.rows[0].text).not.toContain("a deal read as stabilized");
+  });
+
   it("a decision is a direction: on a flagged row it agrees, against a hold it does not, and either is counted apart", () => {
     const flagged = row({ key: "basis", om: 274_000, evidence: { value: 240_000, label: "The OM's sale comps", asOf: null, kind: "om_internal", publisher: "the memorandum" } });
     const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(flagged), challenges: [], ...dead("price") });
@@ -868,8 +881,9 @@ describe("what can score a row — the words held to the scorer, key by key (the
     });
     expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "basis"]));
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
-    expect(SCORED_BY).toContain("a vacancy by a rent roll or T-12 dated after the verdict");
-    expect(SCORED_BY).toContain("the NOI by a T-12");
+    expect(SCORED_BY).toContain("a vacancy by a rent roll or T-12 dated after the verdict, unless the market's figure decided it");
+    expect(SCORED_BY).toContain("the NOI by a T-12, neither on a plan deal");
+    expect(CARD_SCOPE).toContain("for a vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
     expect(SCORED_BY).toContain("the price by a reported trade");
     const named: Record<string, string> = {
       rent_growth: "Rent growth",
@@ -893,7 +907,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
     const price = scoreDeal({ screenedAt: T, stressSnapshot: snapshot, challenges: [], askingPrice: 50_000_000, ...dead("price") });
     expect(scoredKeys(price)).toEqual(["basis"]);
     expect(price.rows.find((x) => x.key === "basis")).toMatchObject({ decision: true });
-    expect(SCORED_BY).toContain("A Dead decision on price or financing answers the price or the loan, counted apart.");
+    expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, counted apart.");
   });
 
   it("no surface says every row is scored", () => {

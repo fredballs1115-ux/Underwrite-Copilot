@@ -109,7 +109,9 @@ describe("the screening model, as its words say it", () => {
   });
 
   it("the short lines and /how-we-test's whole rule say what the model runs", () => {
-    expect(SCREENING_GROWTH_EXIT_LINE).toContain("never more optimistic than the OM");
+    // The more cautious of the two, never "the deciding figure" alone: the
+    // OM's own figure runs where it is the more cautious (audit of PR #486).
+    expect(SCREENING_GROWTH_EXIT_LINE).toBe("Growth and the exit run the more cautious of the stress test's deciding figure and the OM's, else a default");
     expect(SCREENING_BUILT_ON).toMatch(/^Built on the OM's price and terms/);
     for (const line of SCREENING_MODEL_LINES) expect(line.length, line).toBeLessThanOrEqual(260);
     const all = SCREENING_MODEL_LINES.join(" ");
@@ -123,7 +125,12 @@ describe("the screening model, as its words say it", () => {
     expect(Number(all.match(/the going-in cap the OM states, or (\d+\.\d)%/)![1]) / 100).toBeCloseTo(real(noCap).inputs.exitCapPct, 10);
     expect(all).toContain("higher of the OM's stated exit and the cap the stress test decides it by");
     expect(all).toContain("where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury");
-    expect(all).toContain("a cautious stance read off a trailing year, not a forecast");
+    // Cautious only where the OM's own figure is the more optimistic one.
+    expect(all).toContain("more cautious than it only where the OM's own figure is the more optimistic one");
+    expect(all).toContain("Read off a trailing year, it is a stance, not a forecast");
+    expect(all).not.toContain("a cautious stance");
+    // A plan deal's rows re-run its yield on total cost, never the model.
+    expect(all).toContain("On a stabilized deal a row re-runs the screening model's return; a plan deal's rows re-run its yield on total cost");
     // The sample's line, held to its model.
     const { inputs } = sampleDerivedInputs();
     expect(all).toContain(`it keeps ${(inputs.rentGrowthPct * 100).toFixed(1)}% growth and its going-in cap`);

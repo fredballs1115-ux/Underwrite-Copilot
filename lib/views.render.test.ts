@@ -1536,9 +1536,9 @@ describe("ModelView — the sample model renders every panel", () => {
       // The sample's figures are pinned, read off its own derived model, and
       // no sentence says it runs a published figure.
       expect(text.replace(/\s+/g, " ")).toContain(
-        "The screening model: the one the stress test re-runs and the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. The sample's figures are pinned: 3.0% growth and an exit at its 5.45% going-in cap. See how it works",
+        "The screening model: the one the stress test re-runs on a stabilized deal, and the one the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. The sample's figures are pinned: 3.0% growth and an exit at its 5.45% going-in cap. See how it works",
       );
-      expect(text).not.toContain("Growth and the exit run the stress test's deciding figure");
+      expect(text).not.toContain("Growth and the exit run");
       expect(text).toContain("Levered IRR 9.3%, the base case");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(text)).toEqual([]);

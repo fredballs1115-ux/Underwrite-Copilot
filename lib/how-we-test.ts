@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, marginWords } from "@/lib/track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
@@ -103,7 +103,9 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  vacancy: `A stabilized assumption is held to the market's figure: the metro survey in its margin, else the tracker band's low read, the region, the state; then the rent roll, the T-12 (never on a plan), else shown as today's gap. Unsupported past ${VACANCY_UNSUPPORTED_PTS} points beyond it.`,
+  // lib/stress-deciders' VACANCY_ORDER: the market, then the documents (a
+  // plan's stabilized figure skips them), then the class's norm.
+  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the rent roll, then the T-12 (never on a plan), then the class's norm; beside a market figure the documents show today's gap. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
   // lib/rent-growth-decider's order, one line.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to all-items CPI, the broad price level the expense base moves with; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
@@ -240,7 +242,7 @@ export const CADENCE_RULE = {
  */
 export const SCREENING_MODEL_SECTION = {
   id: SCREENING_RULE_HREF.split("#")[1],
-  heading: "The model the rows re-run from",
+  heading: "The model a stabilized deal's rows re-run from",
   lines: SCREENING_MODEL_LINES,
 } as const;
 
@@ -248,7 +250,7 @@ export const SCREENING_MODEL_SECTION = {
 export const CANNOT: readonly { heading: string; line: string }[] = [
   {
     heading: "Not a forecast",
-    line: "A trailing year is what the assumption is asked to beat, and the screening model's growth and exit are a cautious stance read off one; nothing here says where rents, caps or rates go.",
+    line: "A trailing year is what the assumption is asked to beat, and the screening model's growth and exit are read off one: a stance, more cautious than the OM only where its own figure is the more optimistic; nothing here says where rents, caps or rates go.",
   },
   {
     heading: "Not investment advice",
@@ -282,8 +284,9 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
 
 /** Whether the screen was right: scored, never claimed (lib/track-record's
  *  rules, its floor and its lists of what can score a row imported; the
- *  margins lib/stress-snapshot's `rowThreshold`: the survey's margin of
- *  error where it decided a vacancy, else `snapshotThreshold`). */
+ *  margins lib/stress-snapshot's `snapshotThreshold` — `rowThreshold`'s
+ *  survey margin applies to a vacancy the survey decided, which no later
+ *  document scores, so the page names none). */
 const margin = (key: StressKey) => {
   const t = snapshotThreshold(key);
   return t ? marginWords(t).replace("-point", " points") : "";
@@ -295,10 +298,11 @@ export const TRACK_RECORD = {
     "Each row of the stress test, holds included, is scored where a later figure can speak to it: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
     "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
     SCORED_BY,
+    DECISION_SCORES,
     NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands at or better than the OM's.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
-    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: the survey's margin of error on a vacancy the survey decided, else ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
     "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     "A document the screen itself read is never scored: the challenger was handed it. Nor is one whose year ended before the verdict, only uploaded later.",

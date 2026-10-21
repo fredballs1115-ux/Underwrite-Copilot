@@ -701,6 +701,9 @@ function yocImpact(
       ? `the stabilized NOI ${money(om)} to ${money(alt)} over the ${money(py.totalCost)} total cost`
       : `the stabilized NOI ${money(py.noi)} over a total cost of ${money(om)}, then ${money(alt)}`;
   const how = words.how ? `; ${words.how}` : "";
+  // What the re-run assumes, as a sentence the panel prints under its bars:
+  // "The gap is struck on the $9.8M stabilized gross the OM states."
+  const caveat = words.how && !same ? `${words.how.replace(/^the gap (struck )?on /, (_m, struck) => `The gap is ${struck ? "struck " : ""}on `)}.` : undefined;
   const note = same
     ? `The OM's ${words.what}, ${words.om}, is ${altSaid}, so the yield on cost of ${pct2(basePct)} stands on it.`
     : pct2(basePct) === pct2(altPct)
@@ -719,6 +722,7 @@ function yocImpact(
     baseYocPct: basePct,
     altYocPct: altPct,
     note,
+    ...(caveat ? { caveat } : {}),
   };
 }
 
@@ -1956,6 +1960,9 @@ function taxesRow(ctx: Ctx): StressRow | null {
     );
   }
   const best = evidence[decided.index];
+  // The grade is struck on the reset (or unabated) bill, as its thresholds
+  // are written ("15% under the reset bill"); a sentence that says "over the
+  // OM's line" divides by the OM's line.
   const share = (best.value! - bill) / Math.abs(best.value!);
   // Both figures are the OM's: the bill against the reset its own figures
   // imply, or the abated bill against the unabated one it states.
@@ -1981,7 +1988,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
       : Math.abs(share) <= SAME_SHARE
         ? `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, at the OM's ${money(bill)} line.`
         : share > 0
-          ? `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, ${money(best.value! - bill)} (${pct1(share * 100)}) over the OM's ${money(bill)} line — whether it does is the jurisdiction's to say.`
+          ? `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, ${money(best.value! - bill)} (${pct1(((best.value! - bill) / Math.abs(bill)) * 100)}) over the OM's ${money(bill)} line — whether it does is the jurisdiction's to say.`
           : `If the sale resets the assessment to the price, the bill is ${money(best.value!)}, under the OM's ${money(bill)} line — the conservative side.`,
   };
   const evidenceIndex = evidence.indexOf(best);
@@ -2107,7 +2114,9 @@ function expenseImpact(
   // The T-12's load with no such line broken out: the line is read as
   // carrying the OM's figure, which the note says it may not.
   if (fromT12 && carried == null) {
-    impact.note = `${impact.note} The model's expense line is the T-12's expense load, which breaks out no ${lineWord}, so it is read as carrying the OM's figure and the evidence's run moves it by the gap.`;
+    const caveat = `The model's expense line is the T-12's expense load, which breaks out no ${lineWord}, so it is read as carrying the OM's figure and the evidence's run moves it by the gap.`;
+    impact.note = `${impact.note} ${caveat}`;
+    impact.caveat = caveat;
   }
   return impact;
 }
@@ -2760,13 +2769,22 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
  * a tax bill or a premium), "within the figure's ±1.9-pt margin" (a survey's)
  * — else "at the evidence's figure", the hair every other reader allows.
  */
-function holdsBand(row: StressRow): string {
+export function holdsBand(row: StressRow): string {
   const at = row.decidedBy ?? row.impact?.evidenceIndex ?? null;
   const best = at != null ? row.evidence[at] : null;
   switch (row.key) {
     case "noi": {
+      // The memorandum against itself is its own in-place NOI, never "the
+      // offering memorandum" as a whole.
       const p = best?.publisher ?? "";
-      const against = p.startsWith("the deal's ") ? `the ${p.slice("the deal's ".length)}` : /^the /i.test(p) ? p : "the evidence's figure";
+      const against =
+        best?.kind === "om_internal"
+          ? "the OM's own in-place NOI"
+          : p.startsWith("the deal's ")
+            ? `the ${p.slice("the deal's ".length)}`
+            : /^the /i.test(p)
+              ? p
+              : "the evidence's figure";
       return `within ${Math.round(NOI_IN_LINE_BAND * 100)}% of ${against}`;
     }
     case "basis":
@@ -3544,13 +3562,10 @@ function keptAtOm(
     }
     const tol = s.kind === "scalar" ? 1e-9 : 0.5;
     if (!Number.isFinite(om) || !Number.isFinite(own) || Math.abs(om - own) < tol) continue;
-    const why: StressKept["why"] = passed(s.row)
-      ? omitted.some((o) => o.key === s.row.key)
-        ? "left_out"
-        : "same"
-      : s.row.verdict === "holds"
-        ? "holds"
-        : "unchecked";
+    // An unchecked row carries no re-run, so it has no swap and never
+    // reaches here; a row of any other verdict that is no player holds.
+    if (!passed(s.row) && s.row.verdict !== "holds") continue;
+    const why: StressKept["why"] = passed(s.row) ? (omitted.some((o) => o.key === s.row.key) ? "left_out" : "same") : "holds";
     out.push({ key: s.row.key, label: s.row.title, why, om, model: own, ...(noi != null ? { noi } : {}) });
   }
   return out;

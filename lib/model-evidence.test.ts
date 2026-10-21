@@ -17,7 +17,7 @@ import { cellPct, deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
 import { modelMarketFor } from "./model-market";
 import { modelEvidenceFor, type ModelEvidence } from "./model-evidence";
-import { SET_FROM_WORDS, modelVsMarketFor, type MarketReads } from "./model-vs-market";
+import { SET_FROM_TRAILING_CAUTIOUS, SET_FROM_TRAILING_STANCE, SET_FROM_WORDS, modelVsMarketFor, type MarketReads } from "./model-vs-market";
 import { buildStressTest } from "./stress-test";
 import { decidingFigureOf } from "./stress-deciders";
 import { countyOf, placeDeal } from "./market-county";
@@ -381,6 +381,14 @@ describe("the screening model's growth and exit, never more optimistic than the 
     const expense = check("expense_growth");
     expect(expense.tone).toBe("set_from");
     expect(expense.read).toContain(`${SET_FROM_WORDS}: consumer prices, all items (the CPI), the broad price level the expense base moves with, so it is not checked against it`);
+    // The OM states no expense growth, so the CPI ran alone: a stance, never
+    // called cautious, since there was nothing more optimistic beside it.
+    // The OM's 4.0% rent growth, over Zillow's 2.4%, is what makes Zillow's run cautious.
+    expect(derived.sources.rentGrowthPct?.published?.overOm).toBe(true);
+    expect(derived.sources.expenseGrowthPct?.published?.overOm).toBeUndefined();
+    expect(expense.read).toContain(SET_FROM_TRAILING_STANCE);
+    expect(expense.read).not.toContain("cautious");
+    expect(rent.read).toContain(SET_FROM_TRAILING_CAUTIOUS);
     // The exit runs the OM's own going-in cap: a check of the exit against
     // the entry and the 10-year, as before.
     const exit = check("exit_cap");

@@ -39,12 +39,12 @@ export function PanelHead({ title, tone, children }: { title: string; tone: stri
  * the control is a thumb's height (36px, where it was 16): it is the one a
  * phone reader taps most on the deal page.
  */
-export function PanelFold({ rest }: { rest: readonly string[] }) {
+export function PanelFold({ rest, label }: { rest: readonly string[]; /** the closed control's words, where "Read the rest" is not what is folded */ label?: string }) {
   if (rest.length === 0) return null;
   return (
     <details className={`group mt-1 ${MEASURE} text-sm leading-relaxed`}>
       <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline pointer-coarse:py-2.5">
-        <span className="group-open:hidden">{`Read the rest (${rest.length} more)`}</span>
+        <span className="group-open:hidden">{label ?? `Read the rest (${rest.length} more)`}</span>
         <span className="hidden group-open:inline">Less</span>
       </summary>
       <p className="mt-1">{rest.join(" ")}</p>

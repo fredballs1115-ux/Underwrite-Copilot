@@ -576,7 +576,16 @@ function noiSwapClause(r: NonNullable<StressHeadline["noiRest"]>, test: StressTe
     return !!e && /\breset/i.test(`${e.label} ${e.text}`);
   };
   const names = r.components.map((k) => (k === "taxes" && resetBill(k) ? "the tax reset" : `the ${SWAP_NAME[k] ?? headlineName(k)} swap`));
-  const against = best.publisher.startsWith("the deal's ") ? `the ${best.publisher.slice("the deal's ".length)}` : /^the /i.test(best.publisher) ? best.publisher : "its evidence";
+  // The memorandum against itself is its own in-place NOI, never "the
+  // offering memorandum" as a whole.
+  const against =
+    best.kind === "om_internal"
+      ? "the OM's own in-place NOI"
+      : best.publisher.startsWith("the deal's ")
+        ? `the ${best.publisher.slice("the deal's ".length)}`
+        : /^the /i.test(best.publisher)
+          ? best.publisher
+          : "its evidence";
   return `${joinAnd(names)} take${names.length > 1 ? "" : "s"} ${money(moved)} off year-one NOI, ${money(-r.usd)} more than the OM's NOI sits over ${against}`;
 }
 
@@ -681,11 +690,15 @@ const SAMPLE_PINNED: readonly StressKey[] = ["rent_growth", "expense_growth", "e
 const modelBeside = (test: StressTest, key: StressKey, model: number): string =>
   test.sample && SAMPLE_PINNED.includes(key) ? `(the sample's model is pinned at ${figureText(key, model)})` : `(the model's ${figureText(key, model)})`;
 
+/** The same, as a table's "Screening model" cell says it: a figure the
+ *  sample's model pins is said as pinned, as the sentence says it. */
+export const modelCellText = (test: StressTest, key: StressKey, model: number): string =>
+  test.sample && SAMPLE_PINNED.includes(key) ? `pinned at ${figureText(key, model)}` : figureText(key, model);
+
 const KEPT_LEAD: Record<StressKept["why"], string> = {
   holds: "where a row holds",
   left_out: "where a row is left out",
   same: "where the evidence is the OM's own figure",
-  unchecked: "where a row is unchecked",
 };
 
 /** One kept figure with the model's beside it. The NOI row keeps the rent
@@ -716,7 +729,7 @@ export function keptSentence(test: StressTest): string | null {
   const kept = h.keptAtOm ?? [];
   const atEvidence = h.atEvidence ?? [];
   if (kept.length === 0 && atEvidence.length === 0) return null;
-  const order: StressKept["why"][] = ["holds", "left_out", "same", "unchecked"];
+  const order: StressKept["why"][] = ["holds", "left_out", "same"];
   const clauses = order.flatMap((why) => {
     const items = kept.filter((k) => k.why === why);
     if (items.length === 0) return [];

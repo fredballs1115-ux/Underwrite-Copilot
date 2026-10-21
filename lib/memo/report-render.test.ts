@@ -2983,7 +2983,7 @@ describe("the report's stress-test page", () => {
     // jurisdiction's to say — and the engine's move on the gap.
     expect(page).toContain("STRETCHED Real estate taxes");
     expect(page).toContain("OM says: Real estate taxes (2026): $727,896 (p. 27)");
-    expect(page).toContain("Gap: If the sale resets the assessment to the price, the bill is $952k, $224k (23.5%) over the OM's $728k line — whether it does is the jurisdiction's to say.");
+    expect(page).toContain("Gap: If the sale resets the assessment to the price, the bill is $952k, $224k (30.8%) over the OM's $728k line — whether it does is the jurisdiction's to say.");
     expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If the tax line is the \$952k bill if the sale resets the assessment to the price, not the OM's \$728k, the levered IRR moves from 9\.3% to 5\.9%/);
     // An unchecked row says why, and that no return was re-run.
     expect(page).toContain("Unchecked: The OM states no loan rate.");

@@ -1,4 +1,4 @@
-import { ACCOUNT_VACANCY_NOTE, DOCUMENT_DATE_RULE, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, TAX_INSURANCE_NOT_SCORED, recordCountsLine, recordLine, recordState, type AccountRecord, type KeyRecord } from "@/lib/track-record";
+import { ACCOUNT_VACANCY_NOTE, DECISION_SCORES, DOCUMENT_DATE_RULE, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY, TAX_INSURANCE_NOT_SCORED, recordCountsLine, recordLine, recordState, type AccountRecord, type KeyRecord } from "@/lib/track-record";
 
 /**
  * The account's track record (2026-10-19; every stress-test row since
@@ -62,7 +62,7 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
         </p>
       )}
       <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-scored-by">
-        {`${SCORED_BY} ${NOT_YET_SCORABLE}`}
+        {`${SCORED_BY} ${DECISION_SCORES} ${NOT_YET_SCORABLE}`}
       </p>
       <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-documents">
         {`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`}

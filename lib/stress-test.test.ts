@@ -54,6 +54,7 @@ import {
   planMasterLeaseReason,
   planNoYieldReason,
   buildStressTest,
+  holdsBand,
   challengeKey,
   headlinePrice,
   stabilizedVacancyStated,
@@ -329,9 +330,10 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(t.gap).toMatchObject({ value: 152_000, unit: "usd" });
     // Whether the sale resets the assessment is the jurisdiction's: the
     // reset bill is a conditional re-strike of the OM's own figures, so 28.6%
-    // under it reads stretched at most, and every sentence says the condition.
+    // under it reads stretched at most, and every sentence says the condition;
+    // the sentence says its share over the OM's own line, 40.0%.
     expect(t.verdict).toBe("stretched");
-    expect(t.gap!.text).toBe("If the sale resets the assessment to the price, the bill is $532k, $152k (28.6%) over the OM's $380k line — whether it does is the jurisdiction's to say.");
+    expect(t.gap!.text).toBe("If the sale resets the assessment to the price, the bill is $532k, $152k (40.0%) over the OM's $380k line — whether it does is the jurisdiction's to say.");
     expect(t.impact!.input).toBe("expenseLines");
     expect(t.impact!.altIrrPct!).toBeLessThan(t.impact!.baseIrrPct!);
     expect(t.impact!.note).toMatch(/^If the tax line is the \$532k bill if the sale resets the assessment to the price, not the OM's \$380k, the levered IRR moves from/);
@@ -405,6 +407,23 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(Math.round(tt.omValue)).toBe(Math.round(lineNow - 350_000 + 380_000));
     expect(Math.round(tt.altValue)).toBe(Math.round(lineNow - 350_000 + 532_000));
     expect(tt.note).toContain(`The model itself runs its one expense line at the T-12's ${compactUsd(lineNow, { millions: 2, trim: true })} total, with the T-12's $350k tax line in it.`);
+    expect(tt.caveat).toBeUndefined();
+  });
+
+  it("says under the bars what a re-run on a T-12 load with no such line assumes: the line carries the OM's figure (audit of PR #486)", () => {
+    const noTax = summarizeT12({ periodEndDate: "2026-06-30", collectedRent: 4_400_000, vacancyLoss: -400_400, otherIncome: 100_000, egi: 4_099_600, opex: T12.opex.filter((l) => l.key !== "taxes"), totalOpex: null, noi: null, page: "p. 2" });
+    const actualsIn = { t12: { summary: noTax, periodEnd: "2026-06-30" } };
+    const derived = deriveUnderwriteInputs(APARTMENT, "The Maddox", actualsIn, { debtIndex: FIVE });
+    const actuals = readActuals({ metrics: APARTMENT.metrics, strategy: inferStrategy(APARTMENT), rentRoll: null, t12: actualsIn.t12, assetClass: "multifamily" });
+    const built = buildStressTest(apartmentArgs({ derived, actuals, modelVsMarket: readFor(derived) }));
+    const tax = rowOf(built, "taxes").impact!;
+    expect(tax.caveat).toMatch(/^The model's expense line is the T-12's expense load, which breaks out no tax line, so it is read as carrying the OM's figure and the evidence's run moves it by the gap\.$/);
+    // The note keeps it whole for the report; the panel prints the caveat
+    // alone, muted under the bars, where the note is not printed.
+    expect(tax.note.endsWith(tax.caveat!)).toBe(true);
+    const html = renderToStaticMarkup(createElement(StressTestPanel, { test: built }));
+    const row = html.slice(html.indexOf('data-qa="stress-row-taxes"') + 1);
+    expect(row.slice(0, row.indexOf('data-qa="stress-row-'))).toContain(`data-qa="stress-impact-caveat">${tax.caveat!.replace(/'/g, "&#x27;")}</p>`);
   });
 
   it("sets the exit cap against the going-in cap, the rent growth against the trailing year and the debt against the seeded rate", () => {
@@ -1190,6 +1209,8 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     expect(v.impact!.altValue).toBeCloseTo(3_000_000 - (5_000_000 * (v.evidence[0].value! - 3)) / 100, 6);
     expect(v.impact!.baseYocPct!).toBeCloseTo((3_000_000 / COST) * 100, 9);
     expect(v.impact!.note).toContain("the gap struck on the OM's pro forma gross potential rent of $5M");
+    // The panel prints what the plan's gap is struck on under its bars.
+    expect(v.impact!.caveat).toBe("The gap is struck on the OM's pro forma gross potential rent of $5M.");
     const h = tm.headline!;
     expect(h.measure).toBe("yield_on_cost");
     const moves = { vacancy: v.impact!, taxes: rowOf(tm, "taxes").impact!, renovation_premium: rowOf(tm, "renovation_premium").impact! };
@@ -2454,6 +2475,18 @@ describe("the headline", () => {
     expect(noiRestClause(past, withRows)).toContain(` takes ${takes} off `);
     // No NOI row to read: the clause as before.
     expect(noiRestClause(past, { ...test, rows: [] })).toBe("the tax swap moves the year-one NOI $54k a year past the NOI's own gap");
+    // An NOI decided by the memorandum against itself is its own in-place
+    // NOI, never "the offering memorandum" as a whole (audit of PR #486).
+    const ownNoi = {
+      ...test,
+      rows: test.rows.map((r) =>
+        r.key === "noi"
+          ? { ...r, omSays: { ...r.omSays, value: 2_650_000 }, decidedBy: 0, evidence: [{ kind: "om_internal" as const, label: "The OM's in-place NOI against its pro forma", text: "", value: 2_400_000, asOf: null, publisher: "the offering memorandum", scope: "deal" as const }] }
+          : r,
+      ),
+    };
+    expect(noiRestClause(past, ownNoi)).toMatch(/, \$54k more than the OM's NOI sits over the OM's own in-place NOI$/);
+    expect(holdsBand(ownNoi.rows.find((r) => r.key === "noi")!)).toBe("within 5% of the OM's own in-place NOI");
     // A tax move that carries the NOI's gap to within 1% says nothing.
     const carried = only(["noi", "taxes"]).map((r) => (r.key === "taxes" ? { ...r, impact: { ...r.impact!, altValue: r.impact!.omValue + noiGap } } : r));
     expect(stressHeadline(carried, model)!.noiRest).toBeNull();

@@ -83,6 +83,7 @@ import { RECORD_FLOOR, shareWords, type RowOutcome } from "@/lib/track-record-wo
 
 export {
   CARD_SCOPE,
+  DECISION_SCORES,
   DOCUMENT_DATE_RULE,
   NOT_YET_SCORABLE,
   OUTCOME_WORD,
@@ -599,8 +600,11 @@ function scoreScreen(screenedAt: string | null, subject: ScreenSubject, args: Sc
 function documentCannotSpeak(key: StressKey, later: Later, args: ScoreDealArgs, heldToMarket: boolean): string | null {
   const fromDocument = later.source === "rent_roll" || later.source === "t12";
   if (!fromDocument) return null;
-  if (key === "vacancy" && heldToMarket) return MARKET_VACANCY_WHY;
+  // A plan deal's stated vacancy is the plan's target first, whatever
+  // figure decided its row: the market's sentence speaks of a deal read as
+  // stabilized, which a value-add is not.
   if (key === "vacancy" && args.vacancyIsPlanTarget) return PLAN_VACANCY_WHY;
+  if (key === "vacancy" && heldToMarket) return MARKET_VACANCY_WHY;
   if (key === "noi" && args.plan) return PLAN_NOI_WHY;
   return null;
 }

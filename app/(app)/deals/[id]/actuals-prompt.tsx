@@ -15,10 +15,12 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * this is purely additive.
  *
  * Its words say what the documents do to the stress test, and only that
- * (lib/stress-test): a T-12 is the evidence the NOI, vacancy and insurance
- * rows are judged on (its NOI, its vacancy loss over its rent line, its
- * insurance line), a rent roll the vacancy row's (the occupancy it runs at).
- * The T-12's tax line is shown beside the taxes row and judges nothing, so
+ * (lib/stress-deciders' orders): a T-12's NOI decides the NOI row, and its
+ * insurance line stands beside the insurance row, which nothing decides; on
+ * a vacancy the OM states as today's occupancy the rent roll decides, else
+ * the T-12; beside a stabilized vacancy either is the gap to close, deciding
+ * only where no market figure is fresh, and never on a plan deal. The
+ * T-12's tax line is shown beside the taxes row and judges nothing, so
  * taxes are not named. And a document dated after the screen's verdict (and
  * uploaded after it) is what the track record scores the screen's
  * stress-test rows against (lib/track-record) — never its taxes or insurance,
@@ -46,9 +48,11 @@ export function ActualsPrompt({
         <span className="font-normal text-muted">(optional)</span>
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        A T-12 tests the OM&apos;s NOI, vacancy and insurance against the
-        building&apos;s own year; a rent roll tests its vacancy against the
-        occupancy it runs at. Dated after this screen (the roll&apos;s as-of,
+        A T-12 tests the OM&apos;s NOI and shows its insurance premium beside
+        the OM&apos;s; a rent roll, else the T-12, tests the OM&apos;s
+        occupancy today. Beside a stabilized vacancy they show the gap to
+        close, and test it only where no market figure is fresh, never on a
+        plan. Dated after this screen (the roll&apos;s as-of,
         the T-12&apos;s period end), either one lets the track record score
         the stress test&apos;s rows.
       </p>

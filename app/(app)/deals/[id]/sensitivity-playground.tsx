@@ -113,7 +113,12 @@ const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"
  *  first-draft model's (model-body's `FIRST_DRAFT_MODEL_LINE` is its
  *  other half) — the first of its three lines (screening-model-lines). */
 const PLAYGROUND_MODEL_LEAD =
-  "The screening model: the one the stress test re-runs and the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ.";
+  "The screening model: the one the stress test re-runs on a stabilized deal, and the one the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ.";
+
+/** On a plan deal the stress test's rows re-run the yield on total cost,
+ *  never this model (lib/stress-test `measure: "yield_on_cost"`). */
+const PLAYGROUND_MODEL_LEAD_PLAN =
+  "The screening model: the one the workbook and the full report carry. On a plan deal the stress test's rows re-run its yield on total cost, not this model. A first-draft model sets its own assumptions, so its returns can differ.";
 
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
 
@@ -430,7 +435,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       <ScreeningModelLines
         qa="playground-model"
         className="mt-1 text-xs text-muted"
-        lead={PLAYGROUND_MODEL_LEAD}
+        lead={planDeal ? PLAYGROUND_MODEL_LEAD_PLAN : PLAYGROUND_MODEL_LEAD}
         sample={data.sample === true}
         figures={inputs}
       />

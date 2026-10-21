@@ -170,7 +170,16 @@ export interface InputSource {
    *  column says "Published" — "Research" for a research tracker's range
    *  (`research`), a print rather than a feed — and the model's read
    *  against the market says it is that figure, never a screening default */
-  published?: { label: string; publisher: string; asOf: string | null; research?: boolean };
+  published?: {
+    label: string;
+    publisher: string;
+    asOf: string | null;
+    research?: boolean;
+    /** the OM states its own figure for this input and it is the more
+     *  optimistic one, so this published figure runs as the more cautious
+     *  of the two: a read may call the model's figure cautious only then */
+    overOm?: true;
+  };
   /** on the exit: it is not the going-in cap — the flat default, a research
    *  range's low end, the OM's own stated exit — so the playground sets it
    *  against the model's own entry as the note does (lib/underwrite/
@@ -869,11 +878,14 @@ function growthRun(what: "rent growth" | "expense growth", e: EvidenceFor | null
   if (!e) return { pct: DEFAULT_GROWTH, provenance: "assumption", note: `Default ${(DEFAULT_GROWTH * 100).toFixed(1)}%/yr — set your view` };
   const pub = e.decided && growthRunnable(e.decided.pct) ? e.decided : null;
   const om = e.stated && growthRunnable(e.stated.pct) ? e.stated : null;
+  // Whether the OM's own figure stood and was the more optimistic one: the
+  // only case in which the published figure runs as the cautious side.
+  const omMoreOptimistic = (f: EvidenceFigure): boolean => !!om && (what === "rent growth" ? f.pct < om.pct - 1e-9 : f.pct > om.pct + 1e-9);
   const runPublished = (f: EvidenceFigure): GrowthRun => ({
     pct: f.pct / 100,
     provenance: "derived",
     note: publishedGrowthNote(f, what, om),
-    published: { label: f.label, publisher: f.publisher, asOf: f.asOf },
+    published: { label: f.label, publisher: f.publisher, asOf: f.asOf, ...(omMoreOptimistic(f) ? { overOm: true as const } : {}) },
   });
   const runOm = (f: StatedFigure, beside: { cautious: EvidenceFigure } | { why: string }): GrowthRun => ({
     pct: f.pct / 100,

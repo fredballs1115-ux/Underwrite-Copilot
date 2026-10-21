@@ -98,6 +98,12 @@ export interface StressImpact {
   /** "If vacancy is the T-12's 9.1%, not the OM's 6.0%, the levered IRR
    *  moves from 9.3% to 7.1%." */
   note: string;
+  /** the part of the note that says what the re-run assumes, as a sentence
+   *  of its own, where it assumes something the pair and the bars cannot
+   *  show: the model's expense line read as carrying the OM's figure, or the
+   *  base a plan's gap is struck on — the panel prints it under the bars,
+   *  where the note itself is not printed */
+  caveat?: string;
 }
 
 /** How a row reads once the evidence is set against the OM's figure. Code
@@ -315,7 +321,9 @@ export interface StressKept {
   key: StressKey;
   /** the row's own title */
   label: string;
-  why: "holds" | "unchecked" | "left_out" | "same";
+  /** an unchecked row has no re-run (lib/stress-test), so it is never in
+   *  either case and never kept */
+  why: "holds" | "left_out" | "same";
   /** the OM's figure the two cases run on, in the row's own unit — on the
    *  NOI row, the rent line (`inPlaceRentAnnual`) that makes the OM's NOI at
    *  the OM's own vacancy and expenses, which is what both cases keep (`noi`
@@ -381,7 +389,7 @@ export const HEADLINE_METHOD = {
   ],
   evidenceCase: [
     "The evidence's case: the same model with every assumption read stretched or unsupported at the figure its own row re-runs on.",
-    "One that holds or is unchecked stays at the OM's figure.",
+    "One that holds stays at the OM's figure; an unchecked row has no re-run, so it keeps the model's own figure in both cases.",
     "So the evidence's case is not the model as it runs: the headline draws the model's own levered IRR beside the two cases, and names each figure it keeps at the OM's, and each evidence figure it runs, where the model runs another.",
     "Both cases pay the price the model runs: the ask, a share's price grossed up to the whole, or an auction's floor.",
     "The headline asks what that price earns, and the price row says how far the ask sits from the comps.",
@@ -404,7 +412,8 @@ export const HEADLINE_METHOD = {
   plan: [
     "On a value-add, lease-up, conversion or development deal the headline is the yield on total cost: the stabilized NOI the OM states over the price plus the plan's budget, or on a forward purchase over the price, the buyer's whole cost at delivery.",
     "The OM's case is that yield on the OM's own figures; the evidence's case moves the stabilized NOI by each row past its evidence, the same move the row's own re-run makes.",
-    "Vacancy moves it through the stabilized gross the OM states, at the market's published figure, which decides a plan's stated stabilized vacancy, else the class's norm: a rent roll or T-12 is the building before the plan is done, shown beside it as the gap the plan closes and never deciding.",
+    "Vacancy moves it through the stabilized gross the OM states, at the market's published figure, which decides a plan's stated stabilized vacancy, else the class's norm.",
+    "A rent roll or T-12 is the building before the plan is done: shown beside it as the gap the plan closes, never deciding.",
     "A renovation premium moves it through the doors to renovate, and a tax bill only where the OM states it as its pro forma's line, reset at today's bill over today's assessed value.",
     "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
     "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
@@ -451,13 +460,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps, graded by the comps step, the first of these that carries a figure deciding and the rest shown beside it: a median only over three or more graded as supporting the ask, one or two named, never a median, and those graded favorable (leaning the seller's way) or stretched named and left out",
+      "The memorandum's own sale comps as the comps step grades them, the first of these with a figure deciding: a median over three or more graded as supporting the ask, one or two named, never a median",
       "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
-      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb that decides only where nothing above carries a figure, and never on a shared screen or in the verdict's brief",
+      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb deciding only where nothing above carries a figure",
     ],
     engine: "The price is a direct input: the return is re-run at the evidence's price, each piece judged per unit where the class is, else per SF where it states only that. A plan deal's yield on cost is re-run at the evidence's all-in basis.",
     limits: [
       "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
+      "A comp graded favorable (leaning the seller's way) or stretched is named and left out of the median.",
+      "Your past screens' asks are never read on a shared screen or in the verdict's brief.",
       "Replacement cost only where the memorandum states one.",
       "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
       "A basis outside the band any market trades at is the plausibility check's misread, never judged.",
@@ -517,13 +528,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Stabilized vacancy",
     claim: "The building runs at the pro forma's occupancy.",
     against: [
-      "A stabilized vacancy the OM states is held to the market's published figure, the first present deciding and the rest shown beside it: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
+      "A stabilized vacancy the OM states is held to the market's published figure, the first present deciding: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
       "For a commercial class, the research tracker's vacancy band, with its period, where the market check holds the model to it",
-      "The deal's own rent roll, else its T-12, the occupancy the building runs at today: beside a stabilized assumption it is the gap a lease-up has to close (or support, where the building already runs at or under it), and on a value-add, lease-up, conversion or development deal the gap the plan closes; it decides an occupancy the OM states for today, and on a deal read as stabilized a stabilized assumption no fresh published figure speaks to, said so — never a plan deal's stabilized figure",
+      "The deal's own rent roll, else its T-12, the occupancy the building runs at today: it decides an occupancy the OM states for today, and on a deal read as stabilized a stabilized assumption no fresh published figure speaks to, said so",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above may",
     ],
     engine: "Vacancy is a direct input: the return is re-run at the deciding figure, the market's for a stabilized assumption, else the documents'. A plan's yield on cost moves by its stabilized gross times the gap to the market's figure, else the class's norm.",
     limits: [
+      "Beside a stabilized assumption the rent roll or T-12 is today's gap, the one a lease-up has to close, or support where the building already runs at or under it.",
+      "On a value-add, lease-up, conversion or development deal the documents never decide the stabilized figure: they are the gap the plan closes.",
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
       "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's documents run more than 3 points over the assumption, the row says so.",
@@ -579,7 +592,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Insurance",
     claim: "The premium stays at the seller's expiring policy.",
     against: [
-      "Nothing: a new owner's quote would test the premium, and none is on file. Shown beside it, the producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, as the national move applied to the OM's own premium, not a test of it",
+      "Nothing: a new owner's quote would test the premium, and none is on file. Beside it, the producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's premium as a national move",
       "Shown beside it too: the deal's T-12 premium, the same seller's history, not a test of a new owner's quote",
     ],
     engine: "No figure decides the row and no return is re-run on it: the T-12's premium is shown beside the OM's as the seller's history, and both headline cases keep the model's own premium.",

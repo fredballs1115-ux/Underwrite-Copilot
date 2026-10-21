@@ -10,9 +10,9 @@ import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
+import { METHOD_FOLD_LABEL, StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence } from "./stress-test-words";
+import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence, modelCellText } from "./stress-test-words";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { sampleStressTest } from "./sample-stress";
@@ -240,10 +240,15 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(growth).not.toContain('data-qa="stress-challenge"');
     expect(growth).toContain('href="/how-we-test#rent_growth"');
     // The method is the methodology page's to say: the panel links to it,
-    // the row's sentence the link's title (the report prints it).
+    // and the row's own sentence sits in a fold under the link — never only
+    // in the link's title, which a touch screen or a keyboard cannot reach
+    // (audit of PR #486).
     expect(t).toContain("How we test rent growth");
-    expect(t).not.toContain(GROWTH.method);
-    expect(growth).toContain(`title="${GROWTH.method.replace(/'/g, "&#x27;")}"`);
+    expect(growth).not.toContain(`title="${GROWTH.method.replace(/'/g, "&#x27;")}"`);
+    const method = growth.slice(growth.indexOf('data-qa="stress-method"'));
+    expect(method).toMatch(/^data-qa="stress-method"><p[^>]*><a [^>]*>How we test rent growth<\/a><\/p><details/);
+    expect(visibleText(method).replace(/&#x27;/g, "'")).toContain(`${METHOD_FOLD_LABEL}`);
+    expect(visibleText(method).replace(/&#x27;/g, "'").replace(/\s+/g, " ")).toContain(GROWTH.method);
     // The challenger's own row: no page chip (it states no figure), its
     // title said once, its words folded under it.
     const other = group.slice(group.indexOf('data-qa="stress-row-other"'));
@@ -255,6 +260,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(other).toContain("<details");
     expect(o).toContain("Nothing numerate. Ask the broker: Which comps?");
     expect(other).toContain('href="/how-we-test#other"');
+    // Its section says no reader tests it, and so does its link.
+    expect(o).toContain("Why no reader tests this");
+    expect(o).not.toContain("How we test");
     // Nothing unchecked, no group; nothing tested, no list.
     expect(render({ rows: [EXIT], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null })).not.toContain('data-qa="stress-unchecked-group"');
     const only = render({ rows: [GROWTH], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
@@ -699,7 +707,11 @@ describe("StressTestPanel on the sample — each claim once", () => {
     expect(t).not.toContain("How this was tested");
     for (const r of test.rows) {
       expect(out).toContain(`href="/how-we-test#${r.key}"`);
-      expect(t).not.toContain(r.method);
+      // The method sentence is folded under the link, never in the open.
+      const row = out.slice(out.indexOf(`data-qa="stress-row-${r.key}"`));
+      const fold = row.slice(row.indexOf('data-qa="stress-method"'));
+      expect(fold.slice(0, fold.indexOf("</details>"))).toContain("<details");
+      expect(visibleText(fold.slice(0, fold.indexOf("</details>"))).replace(/&#x27;/g, "'").replace(/\s+/g, " ")).toContain(r.method.replace(/\s+/g, " "));
     }
     // No re-run's "If … the levered IRR moves from …" beside its own bars.
     for (const r of test.rows.filter((x) => x.verdict !== "unchecked" && x.impact)) expect(t).not.toContain(r.impact!.note);
@@ -749,5 +761,11 @@ describe("StressTestPanel on the sample — each claim once", () => {
     expect(out).toContain('data-qa="stress-headline-kept"');
     expect(t).not.toContain("the evidence's case keeps the OM's figure");
     for (const r of rows) expect(t).toContain(`${r.assumption} ${r.evidence} (${r.why}) ${r.model}`);
+    // The sample's pinned growth is said as pinned, as the report's sentence
+    // says it ("the sample's model is pinned at 3.0%/yr"), never a bare figure.
+    expect(modelCellText(test, "rent_growth", 3)).toBe("pinned at 3.0%/yr");
+    expect(modelCellText({ ...test, sample: undefined }, "rent_growth", 3)).toBe("3.0%/yr");
+    // An input the sample does not pin is the model's own figure, bare.
+    expect(rows.find((r) => r.key === "vacancy")?.model).toBe("9.1%");
   });
 });

@@ -129,8 +129,13 @@ export const TONE_LABEL: Record<CheckTone, string> = {
  */
 export const SET_FROM_WORDS = "The model runs this figure (set from it)";
 
-/** A read off a trailing year, said as the stance it is. */
-const SET_FROM_TRAILING = "Read off a trailing year, it is a cautious stance, not a forecast.";
+/** A read off a trailing year, said as the stance it is: cautious only where
+ *  the OM's own figure stood and was the more optimistic one, so the model
+ *  ran the published figure in its place (lib/underwrite/inputs
+ *  `published.overOm`); a published figure run alone is a stance, no more. */
+export const SET_FROM_TRAILING_CAUTIOUS = "Read off a trailing year, it is a cautious stance, not a forecast.";
+export const SET_FROM_TRAILING_STANCE = "Read off a trailing year, it is a stance, not a forecast.";
+const setFromTrailing = (s: InputSource | undefined): string => (s?.published?.overOm ? SET_FROM_TRAILING_CAUTIOUS : SET_FROM_TRAILING_STANCE);
 
 /** The rent-growth and expense-growth checks' chip where ONE figure decides (lib/rent-growth-
  *  decider): set against that figure, never a range the others make. */
@@ -566,7 +571,7 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
   const setFrom = runsFigure(input.sources?.rentGrowthPct, published[0], g);
   const tone: CheckTone = setFrom ? "set_from" : rangeTone(g, [r.value]);
   const clause = setFrom
-    ? `${SET_FROM_WORDS}: the index, so it is not checked against it. ${SET_FROM_TRAILING}`
+    ? `${SET_FROM_WORDS}: the index, so it is not checked against it. ${setFromTrailing(input.sources?.rentGrowthPct)}`
     : tone === "ahead"
       ? `The model runs ahead of the index, ${byPoints(g, [r.value])}.`
       : tone === "behind"
@@ -692,7 +697,7 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
         ? `The model runs behind every published figure, ${byPoints(g, values)}.`
         : "The model sits inside the published range.";
   const toneLabel = decided ? DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone] : TONE_LABEL[tone];
-  const trailing = setFrom ? SET_FROM_TRAILING : "A trailing year is what the assumption is being asked to beat, not a forecast.";
+  const trailing = setFrom ? setFromTrailing(input.sources?.rentGrowthPct) : "A trailing year is what the assumption is being asked to beat, not a forecast.";
   return {
     key: "rent_growth",
     title: "Rent growth",
@@ -742,7 +747,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const tone: CheckTone = setFrom ? "set_from" : rangeTone(e, values);
   const besideCore = core ? "; core CPI is shown beside it, never held to" : "";
   const clause = setFrom
-    ? `${SET_FROM_WORDS}: ${decider.name}, ${decider.why}, so it is not checked against it${besideCore}. ${SET_FROM_TRAILING}`
+    ? `${SET_FROM_WORDS}: ${decider.name}, ${decider.why}, so it is not checked against it${besideCore}. ${setFromTrailing(input.sources?.expenseGrowthPct)}`
     : tone === "ahead"
       ? `Held to ${decider.name}, ${decider.why}, the model runs ahead of it ${byPoints(e, values)}${besideCore}.`
       : tone === "behind"

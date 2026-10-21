@@ -15,6 +15,7 @@ import {
   isYieldImpact,
   keptSentence,
   liveHeadline,
+  modelCellText,
   statedYocSentence,
   modelIrrOf,
   noMoveWhy,
@@ -471,7 +472,13 @@ function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }
       </BarRows>
       {/* The re-run's sentence ("If … the levered IRR moves from …") is the
           pair and the bars above in words: the report and the verdict's
-          brief print it, the panel draws it. */}
+          brief print it, the panel draws it. What the run assumes, which the
+          bars cannot show, is said under them. */}
+      {impact.caveat && (
+        <p className={`mt-1 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-impact-caveat">
+          {impact.caveat}
+        </p>
+      )}
     </div>
   );
 }
@@ -668,16 +675,27 @@ function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challe
   );
 }
 
+/** The words of the way to the methodology page's section for a row's key:
+ *  an \`other\` row's section says no reader tests it, so its link says so. */
+export const methodLinkWords = (row: StressRow): string => (row.key === "other" ? "Why no reader tests this" : `How we test ${uncheckedName(row)}`);
+
+/** The words of the fold that holds the row's own method sentence. */
+export const METHOD_FOLD_LABEL = "This row's method";
+
 /** The way to how the row is tested: the methodology page's own section for
- *  its key. The row's method sentence is the report's to print (and this
- *  link's title); the page says each key's method in full. */
+ *  its key, then the row's own method sentence in a fold — a link's title
+ *  is out of reach on a touch screen and from a keyboard, so the sentence
+ *  is in the page, one tap away. */
 function MethodLine({ row }: { row: StressRow }) {
   return (
-    <p className={`mt-2 ${MEASURE} text-[11px] leading-4`} data-qa="stress-method">
-      <Link href={`/how-we-test#${row.key}`} title={row.method} className={`font-medium text-brand hover:underline ${TAP}`}>
-        {`How we test ${uncheckedName(row)}`}
-      </Link>
-    </p>
+    <div className="mt-2" data-qa="stress-method">
+      <p className={`${MEASURE} text-[11px] leading-4`}>
+        <Link href={`/how-we-test#${row.key}`} className={`font-medium text-brand hover:underline ${TAP}`}>
+          {methodLinkWords(row)}
+        </Link>
+      </p>
+      {row.method ? <PanelFold rest={[row.method]} label={METHOD_FOLD_LABEL} /> : null}
+    </div>
   );
 }
 
@@ -890,20 +908,19 @@ const KEPT_WHY: Record<StressKept["why"], string> = {
   holds: "the OM's; the row holds",
   left_out: "the OM's; left out of the headline",
   same: "the OM's, which is the evidence's",
-  unchecked: "the OM's; the row is unchecked",
 };
 
 /**
  * `keptSentence` as a table's rows, read off the same `keptAtOm` and
  * `atEvidence` in the same order: each input the evidence's case runs at a
  * figure the screening model does not — the OM's where a row holds, is left
- * out, is the evidence's own or is unchecked, else the evidence's — with the
+ * out or is the evidence's own, else the evidence's — with the
  * model's figure beside it. Empty where `keptSentence` is null.
  */
 export function keptRows(test: StressTest): KeptRow[] {
   const h = liveHeadline(test);
   if (!h || h.modelIrrPct === undefined || keptSentence(test) == null) return [];
-  const order: StressKept["why"][] = ["holds", "left_out", "same", "unchecked"];
+  const order: StressKept["why"][] = ["holds", "left_out", "same"];
   const kept = h.keptAtOm ?? [];
   const rows: KeptRow[] = order.flatMap((why) =>
     kept
@@ -913,11 +930,11 @@ export function keptRows(test: StressTest): KeptRow[] {
         assumption: k.key === "noi" && k.noi != null ? `Rent line (makes the OM's ${compactUsd(k.noi, MONEY)} NOI)` : k.label,
         evidence: k.key === "noi" ? compactUsd(k.om, MONEY) : wordsFigure(k.key, k.om),
         why: KEPT_WHY[why],
-        model: k.key === "noi" ? compactUsd(k.model, MONEY) : wordsFigure(k.key, k.model),
+        model: k.key === "noi" ? compactUsd(k.model, MONEY) : modelCellText(test, k.key, k.model),
       })),
   );
   for (const a of h.atEvidence ?? []) {
-    rows.push({ key: a.key, assumption: a.label, evidence: wordsFigure(a.key, a.evidence), why: "the evidence's", model: wordsFigure(a.key, a.model) });
+    rows.push({ key: a.key, assumption: a.label, evidence: wordsFigure(a.key, a.evidence), why: "the evidence's", model: modelCellText(test, a.key, a.model) });
   }
   return rows;
 }

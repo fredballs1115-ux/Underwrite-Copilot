@@ -26,6 +26,7 @@ import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
 import { HOLDS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
 import { stressSection } from "./anthropic/verdict";
+import { keptRows } from "@/app/stress-test-panel";
 
 // The sample's stress test is drawn on three surfaces: the signed-in sample
 // deal's page (app/(app)/deals/[id]/page.tsx), /demo's Overview
@@ -266,7 +267,7 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(row("basis").impact!.baseIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
     expect(row("exit_cap").impact!.altIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
     // The evidence's case sits above it because it keeps the OM's figure
-    // where a row holds, is left out or is unchecked: read off the rows,
+    // where a row holds or is left out: read off the rows,
     // never typed.
     expect(h.keptAtOm!.map((k) => [k.key, k.why])).toEqual([
       ["noi", "left_out"],
@@ -281,6 +282,13 @@ describe("the sample's stress test, one build on every surface", () => {
     const kept =
       "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.41M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
+    // The panel's table says the pinned figure as pinned, as the sentence does.
+    expect(keptRows(page).map((r) => [r.key, r.model])).toEqual([
+      ["vacancy", "9.1%"],
+      ["rent_growth", "pinned at 3.0%/yr"],
+      ["noi", "$7.47M"],
+      ["taxes", "$728k"],
+    ]);
     expect(h.atEvidence!.map((e) => e.key)).toEqual(["taxes"]);
     // Complete: the model with the kept figures and the evidence's figures
     // set, and nothing else, IS the evidence's case, to the engine's figure.

@@ -231,8 +231,9 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(prompt).toBeLessThan(html.indexOf("Risk digest"));
     expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(html.indexOf('data-qa="stress-test-panel"'));
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(words).toContain("A T-12 tests the OM's NOI, vacancy and insurance against the building's own year");
-    expect(words).toContain("a rent roll tests its vacancy against the occupancy it runs at");
+    expect(words).toContain("A T-12 tests the OM's NOI and shows its insurance premium beside the OM's; a rent roll, else the T-12, tests the OM's occupancy today.");
+    expect(words).toContain("Beside a stabilized vacancy they show the gap to close, and test it only where no market figure is fresh, never on a plan.");
+    expect(words).not.toContain("vacancy and insurance against");
     expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows.");
     // The T-12's tax line judges no row, so taxes are never promised.
     expect(words).not.toMatch(/\btax/i);
@@ -1942,7 +1943,7 @@ describe("the sensitivity playground says whose figures it runs", () => {
     const html = playground(null);
     const real = textOf(html).replace(/\s+/g, " ");
     expect(real).toContain(
-      "The screening model: the one the stress test re-runs and the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. Growth and the exit run the stress test's deciding figure, never more optimistic than the OM — how it works",
+      "The screening model: the one the stress test re-runs on a stabilized deal, and the one the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. Growth and the exit run the more cautious of the stress test's deciding figure and the OM's, else a default — how it works",
     );
     expect(real).not.toContain("never more optimistic than the memorandum: rent growth at the lower");
     expect(html).toMatch(/<a [^>]*href="\/how-we-test#model"[^>]*>how it works<\/a>/);
@@ -1957,6 +1958,13 @@ describe("the sensitivity playground says whose figures it runs", () => {
     // The model's cap is named as the model's, never "Going-in cap".
     expect(held).toContain("Cap on Yr-1 NOI (as modelled)");
     expect(held).not.toMatch(/Going-in cap/);
+    // The stress test re-runs a plan deal's yield on total cost, never this
+    // model, and the lead says so; a stabilized deal's lead names the re-run.
+    expect(plan.replace(/\s+/g, " ")).toContain(
+      "The screening model: the one the workbook and the full report carry. On a plan deal the stress test's rows re-run its yield on total cost, not this model.",
+    );
+    expect(plan).not.toContain("the one the stress test re-runs");
+    expect(held.replace(/\s+/g, " ")).toContain("the one the stress test re-runs on a stabilized deal");
   });
 
   // Research pass 34: an unpriced memorandum ("Call for offers", $2M NOI)
