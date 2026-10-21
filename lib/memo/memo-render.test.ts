@@ -1526,16 +1526,15 @@ describe("the memo leads with the stress test", () => {
     const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
     const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
-    // The four rows the memo has room for, unsupported first in the test's
-    // own order, then the first stretched (the basis and the exit); the NOI
-    // and the taxes — stretched, the taxes' reset being the jurisdiction's
-    // to make — are the report's, and so is the insurance row, unchecked
-    // since no quote for a new owner is on file.
+    // The four rows the memo has room for, unsupported first, then the
+    // stretched rows whose re-run moves the return most (the basis and the
+    // taxes); the exit cap and the NOI are the report's, and so is the
+    // insurance row, unchecked since no quote for a new owner is on file.
     expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["vacancy", "unsupported"],
       ["renovation_premium", "unsupported"],
       ["basis", "stretched"],
-      ["exit_cap", "stretched"],
+      ["taxes", "stretched"],
     ]);
     const pdf = await renderMemoPdf(data);
     // One page, every row on it: the block takes the room the screen's
@@ -1557,8 +1556,10 @@ describe("the memo leads with the stress test", () => {
     // The basis row: the ask against the one comp the comps step graded
     // supports (Parkside leans the seller's way, and is left out), and the
     // engine's move, spelled, since standard Helvetica has no arrow.
-    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the offering memorandum) · gap 8.8% · IRR 9.3% to 13.6%");
-    expect(text).toContain("STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (the offering memorandum) · gap 20 bps · IRR 10.8% to 9.3%");
+    expect(text).toContain("STRETCHED Basis OM $274k/unit (p. 3) · against $252k/unit (the one comp graded clean, OM p. 14) · gap 8.8% · IRR 9.3% to 13.6%");
+    // Within a verdict the larger move leads: the taxes' reset moves the
+    // return more than the exit cap, which is the report's.
+    expect(text).toContain("STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · IRR 9.3% to 5.9%");
     expect(text).not.toContain("UNSUPPORTED Insurance");
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
@@ -1566,7 +1567,7 @@ describe("the memo leads with the stress test", () => {
     expect(text).toContain(`Re-runs: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's; the report has every row.`);
     expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
-    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
+    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (OM p. 25) · gap $60");
     expect(text).toContain("Value-add program: 192 doors to renovate; $18,000 a door; $200 a month premium (13% on cost); $140 achieved on renovated units");
     expect(text).not.toMatch(/→|->/);
     // The block sits right after the verdict box and before the buy box.
@@ -1617,7 +1618,7 @@ describe("the memo leads with the stress test", () => {
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
     expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
     // The lead row, unsupported first, is on the page.
-    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (the offering memorandum) · gap $60");
+    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (OM p. 25) · gap $60");
     expect(text).toContain("BUY BOX");
     // It fits whole: the four rows the block has room for and the actuals
     // line beside the key terms, nothing given back.
@@ -1653,7 +1654,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest?.count).toBe("none past the evidence");
     expect(data.dealKillers.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text).toContain("9 of the memorandum's assumptions read in code — 9 tested (9 hold);");
+    expect(text).toContain("9 of the memorandum's assumptions read in code — 9 tested (9 hold).");
     expect(text).not.toContain("Ticks:");
   }, 60000);
 
