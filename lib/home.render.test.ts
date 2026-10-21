@@ -10,6 +10,7 @@ import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { safeNextPath } from "./auth-flow";
 import { ScreenRunStrip, STRIP_STAGES, STRIP_WORDS, screenRunLines } from "@/app/screen-run-strip";
 import { COMP_RATING, LEVER_META, SCENARIO_META, TONE } from "@/app/(app)/deals/[id]/deal-sections";
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
@@ -29,7 +30,7 @@ import { BuyBoxPanel } from "@/app/(app)/deals/[id]/buy-box-panel";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { sampleHeader } from "./sample-header";
 import { sampleMemoData } from "./sample-memo";
-import { SAMPLE_DOWNLOAD_NOTE, SampleHeroTools } from "@/app/sample-hero";
+import { SAMPLE_DOWNLOAD_NOTE, SAMPLE_SIGNUP_HREF, SampleHeroTools } from "@/app/sample-hero";
 import { DEAL_TOOL_TITLE, DealTool, SAMPLE_MODEL_TOOL_TITLE, type DealToolKind } from "@/app/(app)/deals/[id]/header-tools";
 import { compRating, inCompOrder } from "./comp-rating";
 import { SKYLINES, commonsPage, coverWidth, skylineSrcSet } from "./skyline";
@@ -97,19 +98,38 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
+  // The first-hour review: the rent roll and the valuations tools sent a
+  // visitor to the sign-up, said only in a tooltip a phone never shows, and
+  // a new account landed on an empty pipeline with no way on.
+  it("says on the tool that the rent roll and valuations open the sign-up, which carries on to a new deal", () => {
+    const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
+    const text = visibleText(html).replace(/\s+/g, " ");
+    expect(text).toContain("Rent roll (sign up)");
+    expect(text).toContain("Valuations (sign up)");
+    const next = new URL(SAMPLE_SIGNUP_HREF, "https://x.test").searchParams;
+    expect(next.get("mode")).toBe("signup");
+    expect(safeNextPath(next.get("next"))).toBe("/deals?new=1");
+  });
+
   // The tool row had been a hand-drawn copy of the deal page's (its own
   // classes, icons and tooltips); both draw the deal page's DealTool now.
   it("draws the sample's tools with the deal page's own DealTool, in the signed-in sample's order", () => {
     const html = renderToStaticMarkup(React.createElement(SampleHeroTools));
+    const signUp = React.createElement(
+      React.Fragment,
+      null,
+      " ",
+      React.createElement("span", { className: "font-normal text-muted" }, "(sign up)"),
+    );
     const tool = (kind: DealToolKind, href: string, title: string, page = false) =>
-      renderToStaticMarkup(React.createElement(DealTool, { kind, href, title, page }));
+      renderToStaticMarkup(React.createElement(DealTool, { kind, href, title, page }, page ? signUp : undefined));
     expect(html).toBe(
       [
         tool("memo", "/api/demo/memo", `${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`),
         tool("report", "/api/demo/report", `${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`),
         tool("model", "/api/demo/underwrite.xlsx", `${SAMPLE_MODEL_TOOL_TITLE}. ${SAMPLE_DOWNLOAD_NOTE}`),
-        tool("rentRoll", "/login?mode=signup", `${DEAL_TOOL_TITLE.rentRoll} — on a deal of your own`, true),
-        tool("valuations", "/login?mode=signup", `${DEAL_TOOL_TITLE.valuations} — on a deal of your own`, true),
+        tool("rentRoll", SAMPLE_SIGNUP_HREF, `${DEAL_TOOL_TITLE.rentRoll} — on a deal of your own`, true),
+        tool("valuations", SAMPLE_SIGNUP_HREF, `${DEAL_TOOL_TITLE.valuations} — on a deal of your own`, true),
       ].join(""),
     );
     // The deal page draws the same tools, and neither keeps a copy.

@@ -16,6 +16,7 @@ import { sampleDemoDataOnce } from "./demo-data";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
+import { Fold } from "@/app/market/fold";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -25,19 +26,19 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Sample test — one OM, its assumptions tested",
   description:
-    "Browse a full Underwrite Copilot test: each assumption challenged, the broker's comps graded, a market check against dated figures, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
+    "Browse a full Underwrite Copilot test: each assumption set against dated published figures, the deal's own rent roll and T-12, or a rule of thumb named as one, the broker's comps graded, a market check, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
   alternates: { canonical: "/demo" },
   // Child `openGraph`/`twitter` REPLACE the root objects wholesale, so the
   // image and card type must be restated or shares lose their preview.
   openGraph: {
-    title: "A complete CRE test, worked end to end",
+    title: "The sample test: one OM, worked end to end",
     description:
       "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
     images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "A complete CRE test, worked end to end",
+    title: "The sample test: one OM, worked end to end",
     description:
       "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
     images: ["/opengraph-image"],
@@ -108,7 +109,7 @@ export default async function DemoPage() {
         <PlaceBand metro="philadelphia" width="max-w-5xl" eager picture="overhead">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              A complete test, worked end to end
+              The sample test, worked end to end
             </h1>
             <span className="rounded-full bg-caution px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white [text-shadow:none]">
               Illustrative sample
@@ -141,9 +142,9 @@ export default async function DemoPage() {
               public-record-card `SamplePublicRecord`), then the research
               panel, on the sample's address and the checked-in rules and
               benchmarks. */}
-          <section aria-labelledby="behind-this-screen" className="flex flex-col gap-2">
-            <p id="behind-this-screen" className="text-xs font-medium uppercase tracking-wider text-muted">
-              Behind this screen
+          <section aria-labelledby="behind-this-test" className="flex flex-col gap-2">
+            <p id="behind-this-test" className="text-xs font-medium uppercase tracking-wider text-muted">
+              Behind this test
             </p>
             <div className="space-y-4">
               <SamplePublicRecord />
@@ -151,27 +152,31 @@ export default async function DemoPage() {
             </div>
           </section>
 
-          {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS
-              constant the homepage's grid uses, so the sample screen and the
-              marketing page can never describe the product differently. */}
+          {/* What comes after the test. Rendered from the SAME DEEP_TOOLS
+              constant the homepage's grid uses, so the sample test and the
+              marketing page can never describe the product differently. Each
+              tool's blurb is on the tile, its first sentence in view and the
+              rest a tap away (app/market/fold): a `title` tooltip, which a
+              phone never shows, had been its only explanation. */}
           <div className="mt-6 rounded-2xl border border-line bg-faint/60 p-6">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Past the screen
+              Past the test
             </p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight">
-              This sample is the triage. Four more tools pick up where it stops.
+              The test is the start. Four more tools carry a deal of your own further.
             </h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-4">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {DEEP_TOOLS.map((t) => (
-                <div key={t.title} className="rounded-xl border border-line bg-surface p-4" title={t.blurb}>
+                <div key={t.title} className="rounded-xl border border-line bg-surface p-4" data-qa="deep-tool">
                   <h3 className="text-sm font-semibold leading-snug">{t.title}</h3>
                   <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted">{t.where}</p>
+                  <Fold text={t.blurb} className="mt-2 text-xs leading-relaxed text-muted" />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* The conversion moment — after they've seen the whole screen. */}
+          {/* The conversion moment — after they've seen the whole test. */}
           <div className="mt-6 rounded-2xl bg-sidebar p-8 text-center">
             <h2 className="text-xl font-semibold tracking-tight text-white">
               Run this test on your own OM

@@ -823,6 +823,18 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
   );
 }
 
+/** One row of a test, drawn by the panel's own row (`RowView`) in the
+ *  panel's own list, for a page that shows a single row as a worked example
+ *  (the method page, on the sample's one build). The row and the test are
+ *  the builder's, never a copy: its re-run reads the test's own model. */
+export function StressRowExample({ row, test }: { row: StressRow; test: StressTest }) {
+  return (
+    <ol className="divide-y divide-line" data-qa="stress-row-example">
+      <RowView row={row} test={test} />
+    </ol>
+  );
+}
+
 /** The verdicts' dots in the read line, drawn by the count's own element so
  *  the line's words stay one run of text. */
 const DOT: Record<string, string> = {

@@ -10,7 +10,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
-import { HowWeTestView } from "@/app/how-we-test/view";
+import { HowWeTestView, exampleRowOf } from "@/app/how-we-test/view";
+import { StressRowExample } from "@/app/stress-test-panel";
+import { sampleStressTest } from "./sample-stress";
 import { metadata } from "@/app/how-we-test/page";
 import sitemap from "@/app/sitemap";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
@@ -346,5 +348,43 @@ describe("/how-we-test draws every method from the table", () => {
     expect(served).toContain(HOW_WE_TEST_MARKER);
     expect(HOW_WE_TEST_MARKER).not.toMatch(/[{}]/);
     expect(served).toContain(`data-qa="how-we-test-marker">${HOW_WE_TEST_MARKER}</p>`);
+  });
+});
+
+// The first-hour review: the page ran some 5,500 words with no test drawn
+// on it, and its closing card offered no way to start.
+describe("/how-we-test opens on a worked example and closes on the sign-up", () => {
+  const sample = sampleStressTest({ today: "2026-10-20" });
+  const withExample = renderToStaticMarkup(React.createElement(HowWeTestView, { example: sample }));
+
+  it("draws one row of the sample's one build with the panel's own row, before the rules", () => {
+    const row = exampleRowOf(sample);
+    expect(row).not.toBeNull();
+    expect(row!.verdict).not.toBe("unchecked");
+    const at = withExample.indexOf('data-qa="worked-example"');
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(withExample.indexOf('data-qa="who-does-what"'));
+    // The panel's own row, and only the one.
+    const own = renderToStaticMarkup(React.createElement(StressRowExample, { row: row!, test: sample }));
+    expect(withExample).toContain(own);
+    expect(withExample.match(/data-qa="stress-row-(?!example)/g)?.length).toBe(1);
+    expect(withExample).toContain(`data-qa="stress-row-${row!.key}"`);
+    // and the whole test is a link away, on /demo's Overview
+    expect(withExample).toContain('href="/demo#stress-test"');
+    expect(a11yIssues(withExample)).toEqual([]);
+    expect(gluedWords(visibleText(withExample))).toEqual([]);
+    // The page reads the sample's one builder, never a copy of it.
+    const page = readFileSync("app/how-we-test/page.tsx", "utf8");
+    expect(page).toContain("sampleStressTest({ today: readerToday(null), reads: await sampleTodayReads() })");
+  });
+
+  it("draws no example where none is handed in", () => {
+    expect(html).not.toContain('data-qa="worked-example"');
+  });
+
+  it("closes on the homepage's own call to action and names the sample as the sample test", () => {
+    expect(html).toMatch(/<a [^>]*href="\/login\?mode=signup"[^>]*>Get started free<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/demo"[^>]*>Sample test<\/a>/);
+    expect(text).not.toContain("Sample screen");
   });
 });

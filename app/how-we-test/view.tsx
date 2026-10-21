@@ -16,7 +16,10 @@ import {
   engineReruns,
   evidenceKindOf,
 } from "@/lib/how-we-test";
-import type { StressMethod, StressVerdict } from "@/lib/stress-test-types";
+import type { StressMethod, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
+import { drawsRerun } from "@/lib/stress-test-words";
+import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
+import { STRESS_TEST_ANCHOR } from "@/app/(app)/deals/[id]/stress-chip";
 
 /**
  * The methodology page, pure (2026-10-19): one section an assumption the
@@ -211,7 +214,42 @@ function HeadlineSection() {
   );
 }
 
-export function HowWeTestView() {
+/**
+ * The row the page shows as its worked example: the sample's first row, by
+ * the panel's own order (the most severe first), that re-runs the return —
+ * else the first it tested at all. None where the build tested nothing.
+ */
+export function exampleRowOf(test: StressTest | null): StressRow | null {
+  if (!test) return null;
+  const tested = sortStressRows(test.rows).filter((r) => r.verdict !== "unchecked");
+  return tested.find(drawsRerun) ?? tested[0] ?? null;
+}
+
+/** One row of the sample's stress test, as the panel draws it, ahead of
+ *  the rules it follows: a reader sees a test before reading how one is
+ *  struck. The sample's one build (lib/sample-stress), handed in by the
+ *  page; nothing here is typed. */
+function WorkedExample({ test }: { test: StressTest }) {
+  const row = exampleRowOf(test);
+  if (!row) return null;
+  return (
+    <section className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6" data-qa="worked-example" aria-labelledby="worked-example">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted">Illustrative sample</p>
+      <h2 id="worked-example" className="mt-1 text-lg font-semibold tracking-tight">
+        One row of the sample test
+      </h2>
+      <p className="mt-1 text-sm text-muted">An invented deal, struck by the same code as yours.</p>
+      <div className="mt-2">
+        <StressRowExample row={row} test={test} />
+      </div>
+      <Link href={`/demo#${STRESS_TEST_ANCHOR}`} className="mt-3 inline-block text-sm font-medium text-brand hover:text-brand-strong">
+        See the whole sample test
+      </Link>
+    </section>
+  );
+}
+
+export function HowWeTestView({ example = null }: { example?: StressTest | null }) {
   return (
     <div className="mx-auto w-full max-w-3xl" data-qa="how-we-test">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{HOW_WE_TEST_TITLE}</h1>
@@ -227,6 +265,8 @@ export function HowWeTestView() {
       <p className="mt-3 text-sm font-medium text-ink" data-qa="how-we-test-marker">
         {HOW_WE_TEST_MARKER}
       </p>
+
+      {example && <WorkedExample test={example} />}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2" data-qa="who-does-what">
         {[WHO_DOES_WHAT.ai, WHO_DOES_WHAT.code].map((side) => (
@@ -356,10 +396,14 @@ export function HowWeTestView() {
 
       <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
         <h2 className="text-lg font-semibold tracking-tight">See it on the sample deal</h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted">Start with a fully worked sample, or upload an OM and get a verdict.</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">Start with the sample test, or upload an OM of your own and test it.</p>
         <div className="mt-4 flex flex-wrap gap-2.5">
-          <Link href="/demo" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong">
-            Sample screen
+          {/* Where the homepage's own call to action goes (app/page.tsx). */}
+          <Link href="/login?mode=signup" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong">
+            Get started free
+          </Link>
+          <Link href="/demo" className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint">
+            Sample test
           </Link>
           <Link href="/why" className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint">
             Why Underwrite Copilot

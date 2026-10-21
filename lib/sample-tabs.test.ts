@@ -109,7 +109,7 @@ describe("each walkthrough tab draws /demo's parts, in /demo's order, and /demo 
     // By the section's JSX: deal-view also names the section in its handler
     // for the stress-test jump (`const onOverview = section === "overview"`).
     const deal = dealParts(slice(DEAL_VIEW, '{section === "overview" && (', '{section === "financials" && ('));
-    const demo = partsIn(slice(DEMO, 'section === "overview"', 'section === "financials"'));
+    const demo = partsIn(slice(DEMO, '{section === "overview" && (', '{section === "financials" && ('));
     const home = partsIn(drawn(HOME, "OverviewTab")).filter((c) => !loading(c));
     // The call and its stress test lead: nothing the deal holds of its own
     // — its actuals, a re-screen's diff, the documents' reconciliation —
@@ -474,7 +474,7 @@ describe("the deal page's panels past its sections, as the public pages draw the
     for (const name of Object.keys(PAGE_LEFT_OFF)) expect(deal, name).toContain(name);
     const expected = deal.filter((c) => !(c in PAGE_LEFT_OFF)).map((c) => PAGE_AS_SAMPLE[c] ?? c);
     expect(expected).toEqual(["DemoSections", "SamplePublicRecord", "ResearchPanelView"]);
-    const demo = partsIn(slice(DEMO_PAGE, "<DemoSections", "What comes after the screen"));
+    const demo = partsIn(slice(DEMO_PAGE, "<DemoSections", "What comes after the test"));
     expect(demo).toEqual(expected);
     // The sample states one property.
     const { readPortfolio } = await import("./portfolio");

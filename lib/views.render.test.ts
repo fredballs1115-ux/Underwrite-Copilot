@@ -1715,6 +1715,27 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(page).not.toContain("kind is read first");
   });
 
+  // The first-hour review: /demo called itself a "screen", a "complete test"
+  // and "the triage" beside a nav that says "Sample test"; its description
+  // claimed a market check against dated figures the sample's stored check
+  // never read; its four tools explained themselves only in a tooltip; and
+  // its header's stress chip pointed at a panel only the Overview draws.
+  it("/demo names itself the sample test, says what its evidence is, and shows each tool's blurb", () => {
+    const page = readFileSync("app/demo/page.tsx", "utf8");
+    expect(page).not.toMatch(/triage|Behind this screen|Past the screen|A complete test/);
+    expect(page).toContain("The sample test, worked end to end");
+    expect(page).not.toContain("a market check against dated figures");
+    expect(page).toContain("each assumption set against dated published figures, the deal's own rent roll and T-12");
+    // each tool's blurb on its tile (a fold, its whole text in the HTML),
+    // never a title tooltip alone
+    expect(page).toContain("<Fold text={t.blurb}");
+    expect(page).not.toContain("title={t.blurb}");
+    // The chip opens the Overview from another section, as the deal page's does.
+    const sections = readFileSync("app/demo/sections.tsx", "utf8");
+    expect(sections).toContain('e.target.closest(`a[href="#${STRESS_TEST_ANCHOR}"]`)');
+    expect(sections).toMatch(/document\.getElementById\(STRESS_TEST_ANCHOR\);\s*panel\?\.scrollIntoView\(/);
+  });
+
   it("labels its download as the screening model, a separate model from the card's returns", () => {
     const html = render(
       React.createElement(ModelView, {

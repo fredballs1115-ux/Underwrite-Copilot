@@ -17,6 +17,7 @@ import { ModelVsMarketCard } from "../(app)/deals/[id]/model-vs-market-card";
 import { SampleGuide } from "../(app)/deals/[id]/sample-guide";
 import { DemoPanel } from "../landing-interactive";
 import { DealSectionTabs } from "../(app)/deals/[id]/section-tabs";
+import { STRESS_TEST_ANCHOR } from "../(app)/deals/[id]/stress-chip";
 import {
   LEGACY_TABS,
   analysisCounts,
@@ -144,6 +145,37 @@ export function DemoSections({
     );
     if (left != null) strip.scrollLeft = left;
   }, [section]);
+
+  // The header's stress-test chip (app/sample-hero, above these sections)
+  // links to the Overview's panel (`#stress-test`), which is drawn only
+  // while the Overview is open. On the Overview the browser follows the
+  // link itself; from another section the link opens the Overview first and
+  // lands on the panel once it is drawn — the deal page's own rule
+  // (app/(app)/deals/[id]/deal-view), so the chip never points at nothing.
+  const stressJump = useRef(false);
+  const onOverview = section === "overview";
+  useEffect(() => {
+    if (onOverview) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (!(e.target instanceof Element) || !e.target.closest(`a[href="#${STRESS_TEST_ANCHOR}"]`)) return;
+      e.preventDefault();
+      stressJump.current = true;
+      setSection("overview");
+      const url = new URL(window.location.href);
+      url.hash = STRESS_TEST_ANCHOR;
+      window.history.replaceState(null, "", url);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [onOverview]);
+  useEffect(() => {
+    if (!onOverview || !stressJump.current) return;
+    stressJump.current = false;
+    const panel = document.getElementById(STRESS_TEST_ANCHOR);
+    panel?.scrollIntoView({ block: "start" });
+    panel?.focus({ preventScroll: true });
+  }, [onOverview]);
 
   /** A jump from the Overview or the guide, by the deal page's own keys;
    *  focus moves to the tab now open. */

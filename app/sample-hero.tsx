@@ -101,6 +101,25 @@ export const SAMPLE_DOWNLOAD_NOTE = "Free for the sample; Pro on a deal of your 
 /** Said in the tooltip of an engine that works on a deal of your own. */
 const ON_YOUR_OWN = " — on a deal of your own";
 
+/** Where the rent roll and the valuations tools send a visitor: the sign-up,
+ *  carrying `next` to the pipeline with its new-deal form open
+ *  (`/deals?new=1`, the ⌘K "New deal…" action's own link) — both tools work
+ *  on a deal of one's own, so a new account's first step toward either is
+ *  adding that deal. lib/auth-flow `safeNextPath` admits it, and the sign-in
+ *  action and the confirmation link both carry it on. */
+export const SAMPLE_SIGNUP_HREF = `/login?mode=signup&next=${encodeURIComponent("/deals?new=1")}`;
+
+/** Said on the tool itself, not only in its tooltip a phone never shows:
+ *  the tool opens the sign-up, not the sample's own page. */
+function SignUpMark() {
+  return (
+    <>
+      {" "}
+      <span className="font-normal text-muted">(sign up)</span>
+    </>
+  );
+}
+
 /**
  * The deal header's tools on the sample, drawn by the deal page's own
  * `DealTool` (app/(app)/deals/[id]/header-tools) in the signed-in sample's
@@ -108,7 +127,7 @@ const ON_YOUR_OWN = " — on a deal of your own";
  * which are free, so they carry no "Pro" mark (their tooltips say a deal of
  * your own's are Pro, as the signed-in sample's carry none) — then the rent
  * roll engine and the valuations reconciler, which work on a deal of your
- * own, so they open the sign-up.
+ * own, so they open the sign-up, said on the tool ("(sign up)").
  */
 export function SampleHeroTools() {
   return (
@@ -116,8 +135,12 @@ export function SampleHeroTools() {
       <DealTool kind="memo" href="/api/demo/memo" title={`${DEAL_TOOL_TITLE.memo}. ${SAMPLE_DOWNLOAD_NOTE}`} />
       <DealTool kind="report" href="/api/demo/report" title={`${DEAL_TOOL_TITLE.report}. ${SAMPLE_DOWNLOAD_NOTE}`} />
       <DealTool kind="model" href="/api/demo/underwrite.xlsx" title={`${SAMPLE_MODEL_TOOL_TITLE}. ${SAMPLE_DOWNLOAD_NOTE}`} />
-      <DealTool kind="rentRoll" href="/login?mode=signup" title={`${DEAL_TOOL_TITLE.rentRoll}${ON_YOUR_OWN}`} page />
-      <DealTool kind="valuations" href="/login?mode=signup" title={`${DEAL_TOOL_TITLE.valuations}${ON_YOUR_OWN}`} page />
+      <DealTool kind="rentRoll" href={SAMPLE_SIGNUP_HREF} title={`${DEAL_TOOL_TITLE.rentRoll}${ON_YOUR_OWN}`} page>
+        <SignUpMark />
+      </DealTool>
+      <DealTool kind="valuations" href={SAMPLE_SIGNUP_HREF} title={`${DEAL_TOOL_TITLE.valuations}${ON_YOUR_OWN}`} page>
+        <SignUpMark />
+      </DealTool>
     </>
   );
 }
