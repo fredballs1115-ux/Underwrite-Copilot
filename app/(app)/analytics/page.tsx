@@ -40,7 +40,7 @@ import type { RentRollSummary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
-import { planVacancyStated, stabilizedVacancyStated } from "@/lib/stress-test";
+import { planVacancyStated, stabilizedVacancyStated, vacancyEconomicStated } from "@/lib/stress-test";
 import { TrackRecordSection } from "./track-record";
 import { SCREEN_SNAPSHOTS, SCREEN_SNAPSHOT_SELECT, keptScreensByDeal, type KeptScreenRow } from "@/lib/screen-history";
 
@@ -264,9 +264,13 @@ export default async function AnalyticsPage() {
         // The account's record builds no stress test a deal, so it cannot
         // tell whether the market or the documents decided a stabilized
         // vacancy (lib/stress-test `vacancyDecidedBy`, which the deal page
-        // reads): every stated one is held back as the market's, and the
+        // reads): every stated one counted by doors is held back as the
+        // market's (an economic one is the T-12's, `vacancyEconomic`), and the
         // section says so (lib/track-record `ACCOUNT_VACANCY_NOTE`).
         vacancyHeldToMarket: stabilizedVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
+        // A challenge's vacancy in the measure of the OM's own figure: an
+        // economic one is scored by a later T-12, never a rent roll's doors.
+        vacancyEconomic: vacancyEconomicStated(extraction),
         // A plan deal's NOI and stated vacancy are the finished project's,
         // which no document of the building before the plan scores.
         plan: isPlanDeal(inferStrategy(extraction, (r.first_signal as FirstSignal | null) ?? null).kind),

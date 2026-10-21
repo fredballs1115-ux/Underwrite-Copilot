@@ -370,8 +370,8 @@ const extraction: ExtractionResult = {
 
 /** The T-12's insurance line (the statement below carries it): the seller's
  *  own actual premium. The pro forma's $310,000 sits under it, so the stress
- *  test holds the pro forma to it — the floor a new owner can expect, never
- *  a quote; a new owner's quote would decide it, and the sample states none. */
+ *  test holds the pro forma to it — a working floor and a rule of thumb (a
+ *  new owner is rarely quoted under it), never a quote; a new owner's quote would decide it, and the sample states none. */
 const T12_INSURANCE = 385_000;
 
 /** The T-12's collected rent and its vacancy loss (the statement below

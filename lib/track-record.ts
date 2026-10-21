@@ -47,8 +47,9 @@
 //     rent, `StressSnapshotRow.measure`) by a later T-12's economic vacancy,
 //     never the one against the other; a document of the other measure is
 //     named on the row with why it does not score it. An older screen's
-//     challenge carries no measure and is read as counted by doors, so a
-//     T-12 never scores it;
+//     challenge carries no measure of its own and is read in the measure
+//     of the deal's OM vacancy (`vacancyEconomic`): doors by a rent roll,
+//     dollars by a T-12;
 //   - a stabilized vacancy the market's published figure decided is the
 //     market's to judge, and a later rent roll's vacancy is today's: a
 //     stress-test row says which kind decided it, and an older screen's
@@ -307,6 +308,13 @@ export interface ScoreDealArgs {
    *  the row says why. A stress-test row says itself which kind decided it,
    *  and reads that instead */
   vacancyHeldToMarket?: boolean;
+  /** for a challenge scored where no stress test was kept: the OM's vacancy
+   *  is economic, dollars over gross potential rent (lib/stress-test
+   *  `vacancyEconomicStated`), so only a later T-12's economic vacancy scores
+   *  a vacancy challenge, and a rent roll's count of doors is named as the
+   *  other measure; false or absent, a figure counted by doors. A
+   *  stress-test row carries its own measure, and reads that instead */
+  vacancyEconomic?: boolean;
   /** the deal is a plan deal (lib/deal-strategy `isPlanDeal`): the OM's NOI
    *  is the finished project's, which a T-12 of the building before the plan
    *  cannot speak to, so a later T-12 scores no NOI row */
@@ -398,7 +406,9 @@ export function recordFigure(key: StressKey, n: number): string {
 /** A figure as the card's three columns print it: a vacancy row's percents
  *  are each a share vacant ("5.0% vacant"), so an "Occupancy today" row's
  *  OM figure never reads as 5% occupied. */
-const cardFigure = (key: StressKey, figure: string) => (key === "vacancy" ? `${figure} vacant` : figure);
+/** A figure on the card: a vacancy says its measure — "6.0% vacant" counted
+ *  by doors, "6.0% economic vacancy" in dollars over gross potential rent. */
+const cardFigure = (key: StressKey, figure: string, economic = false) => (key === "vacancy" ? (economic ? `${figure} economic vacancy` : `${figure} vacant`) : figure);
 
 /** A stress-test row's margin in words: "0.05-point", "5%". */
 export function marginWords(t: NonNullable<StressSnapshotRow["threshold"]>): string {
@@ -498,10 +508,12 @@ function subjectOf(stressSnapshot: unknown, challenges: readonly Challenge[] | n
  * in `priorScreens`), each earlier screen's rows are scored against what
  * arrived after ITS verdict, and merged newest screen first, one piece of
  * evidence a key at a time: a row an earlier screen scores on evidence a
- * newer screen's row of the same key already scores is dropped (the later
- * figure is counted once, against the newest row made before it); a row it
- * scores on evidence no newer row of its key does — the figure arrived
- * between that screen's verdict and the next, so the newer rows were made
+ * newer screen ADMITTED and has a row of the same key for is dropped,
+ * whether or not that row scored it (the later figure is counted once,
+ * against the latest screen made before it); a row it scores on evidence no
+ * newer screen with a row of its key admitted —
+ * the figure arrived between that screen's verdict and the next, or was
+ * refused by the newer screen for its own date, so the newer rows were made
  * with it in hand — is kept, in the current screen's unscored row's place
  * for the key where there is one, said as the earlier screen's.
  */
@@ -522,8 +534,8 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
     plan: args.plan,
     vacancyIsPlanTarget: args.vacancyIsPlanTarget,
     vacancyHeldToMarket: vacancyRow ? vacancyRow.evidence?.kind === "published" : !!args.vacancyHeldToMarket,
-    // An older screen's challenge carries no measure, read as doors.
-    vacancyEconomic: vacancyRow?.measure === "economic",
+    // A challenge carries no measure of its own: the deal's OM vacancy's.
+    vacancyEconomic: vacancyRow ? vacancyRow.measure === "economic" : !!args.vacancyEconomic,
     titles: Object.fromEntries(testRows.filter((r) => r.key !== "other" && r.title).map((r) => [r.key, r.title])),
   });
   const record = (s: ScreenScore, priorMeta: { screenedAt: string; screenedOn: string }[]): DealRecord => ({
@@ -544,15 +556,25 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
   const earlier = priors.map((p) => ({ ...p, day: statedDay(p.screenedAt), score: scoreScreen(p.screenedAt, p.subject, args) }));
   for (const p of earlier) if (p.subject.kind === "challenges") snapshotNotes.push(notSnapshottedLine(p.day, p.subject.built, false));
 
-  // One piece of evidence scores a key once: claimed by the newest screen
-  // whose row of the key it scores.
-  const claimed = new Set(current.rows.filter((r) => r.landing !== "unscored").map(evidenceKey));
+  // One piece of evidence scores an assumption once, against the latest
+  // screen made before it: a thing a newer screen ADMITTED is that screen's
+  // for every key it has a row of, whether or not that row scored it (a row
+  // left unchecked, or a vacancy of the other measure, keeps its own unscored
+  // reason), so an older screen's row of the key is never scored by it. A
+  // thing a newer screen refused for its own date — a document dated before
+  // that screen's verdict, uploaded after it — was never admitted by it, and
+  // still falls to the earlier screen; so does a key the newer screen has no
+  // row of (a challenge it no longer makes).
+  const claimed = new Set<string>();
+  const claim = (s: ScreenScore) => {
+    const keys = new Set(s.rows.map((r) => r.key));
+    for (const e of s.evidence) for (const k of keys) claimed.add(`${k}|${evidenceId(e)}`);
+  };
+  claim(current);
   const rows = [...current.rows];
   for (const p of earlier) {
-    const mine: string[] = [];
     for (const row of p.score.rows) {
-      if (row.landing === "unscored" || claimed.has(evidenceKey(row))) continue;
-      mine.push(evidenceKey(row));
+      if (row.landing === "unscored" || claimed.has(`${row.key}|${rowEvidenceId(row)}`)) continue;
       const priorRow: ScoredRow = {
         ...row,
         priorScreenedOn: p.day,
@@ -565,7 +587,7 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
       if (at >= 0) rows[at] = priorRow;
       else rows.push(priorRow);
     }
-    for (const k of mine) claimed.add(k);
+    claim(p.score);
   }
 
   // The evidence of every screen, once each; a thing first admitted by an
@@ -619,9 +641,10 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
   );
 }
 
-/** What makes one piece of later evidence one, for a row's key: the key,
- *  the kind of thing and when it arrived. */
-const evidenceKey = (r: ScoredRow) => `${r.key}|${r.later?.source ?? ""}@${r.laterAt ?? ""}`;
+/** What makes one piece of later evidence one: the kind of thing and when
+ *  it arrived — as a screen admitted it, and as a row scored on it. */
+const evidenceId = (e: LaterEvidence) => `${e.source}@${e.at}`;
+const rowEvidenceId = (r: ScoredRow) => `${r.later?.source ?? ""}@${r.laterAt ?? ""}`;
 
 /**
  * How many of a T-12's twelve monthly periods end on or before the verdict's
@@ -894,6 +917,11 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
   const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" };
+  // A snapshot kept before the measure was carried (2026-10-20) has none,
+  // and keeps the row's title and the deciding evidence, never the OM's own
+  // label the measure is read off (lib/stress-test `measureOf`): it is read
+  // as counted by doors, as it was struck.
+  const econ = laterArgs.economic;
   // The market decided a stabilized vacancy where its published figure did.
   const heldToMarket = key === "vacancy" && r.evidence?.kind === "published";
   const later = laterFor(key, laterArgs);
@@ -974,7 +1002,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
     ...base,
     outcome,
     later: { source: later.source, value: v, text: later.text },
-    figures: { om: cardFigure(key, fig(r.om)), alt: r.evidence ? cardFigure(key, fig(r.evidence.value)) : "—", later: cardFigure(key, fig(v)) },
+    figures: { om: cardFigure(key, fig(r.om), econ), alt: r.evidence ? cardFigure(key, fig(r.evidence.value), econ) : "—", later: cardFigure(key, fig(v), econ) },
     landing: outcome === "flag_right" || outcome === "hold_right" ? "right" : "wrong",
     laterAt: later.at,
     // Beside right and wrong, display only: how much of the gap the evidence
@@ -1003,9 +1031,11 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   // document scores these, whatever arrives.
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  // A challenge carries no measure: its vacancy is read as counted by doors,
-  // which a later T-12's economic vacancy never scores.
-  const laterArgs = { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: false };
+  // A challenge carries no measure of its own: its vacancy is read in the
+  // measure of the deal's OM vacancy (`vacancyEconomic`) — doors, scored by a
+  // later rent roll alone, or dollars, by a later T-12's economic vacancy
+  // alone, the other document named as the other measure.
+  const laterArgs = { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: !!args.vacancyEconomic };
   const cannotScore = (l: Later, why: string): ScoredRow => ({
     ...base,
     later: { source: l.source, value: l.value, text: l.text },
@@ -1078,7 +1108,11 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   return {
     ...base,
     later: { source: later.source, value: v, text: later.text },
-    figures: { om: cardFigure(key, recordFigure(key, omFigure)), alt: cardFigure(key, recordFigure(key, altFigure)), later: cardFigure(key, recordFigure(key, v)) },
+    figures: {
+      om: cardFigure(key, recordFigure(key, omFigure), laterArgs.economic),
+      alt: cardFigure(key, recordFigure(key, altFigure), laterArgs.economic),
+      later: cardFigure(key, recordFigure(key, v), laterArgs.economic),
+    },
     landing,
     laterAt: later.at,
     why: null,
@@ -1314,7 +1348,7 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
  * deal, so it holds every stated stabilized vacancy back as the market's.
  */
 export const ACCOUNT_VACANCY_NOTE =
-  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy; its deal's own page scores one where the documents decided it.";
+  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors; one the OM states as economic, dollars, is not the market's to decide, and a later T-12, the same measure, scores it outside a plan deal. Its deal's own page scores a vacancy by doors where the documents decided it.";
 
 export interface KeyRecord {
   key: StressKey;
@@ -1491,7 +1525,7 @@ export function recordState(r: Pick<AccountRecord, "scored"> & { challenges?: { 
 /** What the record is scored against — the homepage's FAQ promises exactly
  *  these three, and this sentence keeps it true. */
 export const RECORD_NONE_LINE =
-  "No track record yet, and none is claimed. A test's rows are scored later where one of three things you supply speaks to them: a T-12 or rent roll dated after the screen, what you decided (dead, and why), and what the building traded for.";
+  "No track record yet, and none is claimed. A test's rows are scored later where one of three things you supply speaks to them: a T-12 or rent roll dated after the screen, what you decided (dead and why, or the price you closed at), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
   // A decision is a direction, not a figure: said apart, never in a share.

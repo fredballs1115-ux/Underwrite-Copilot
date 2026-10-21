@@ -39,8 +39,8 @@ describe("the sample's stress test", () => {
       // The reset is conditional on the jurisdiction: stretched at most.
       ["taxes", "stretched"],
       // The pro forma's premium sits under the seller's own T-12 premium:
-      // the OM against its own building's history, the T-12's the floor a
-      // new owner can expect, never a quote, so stretched at most (the
+      // the OM against its own building's history, the T-12's a working
+      // floor and a rule of thumb, never a quote, so stretched at most (the
       // review of 2026-10-21).
       ["insurance", "stretched"],
       ["renovation_premium", "unsupported"],
@@ -75,7 +75,7 @@ describe("the sample's stress test", () => {
     const { derived } = sampleModelReads({ today: "2026-10-20", reads: null });
     expect(ins.altIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
     expect(ins.baseIrrPct!).toBeGreaterThan(ins.altIrrPct!);
-    expect(ins.note).toContain("the floor a new owner can expect, not a quote");
+    expect(ins.note).toContain("a working floor and a rule of thumb, not a quote");
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
     expect(row("renovation_premium").gap?.text).toBe(

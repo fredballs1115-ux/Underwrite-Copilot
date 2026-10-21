@@ -293,6 +293,45 @@ describe("every screen kept: a row scored against an earlier screen never vanish
     expect(one.rows.map((x) => x.priorScreenedOn ?? null)).toEqual([null]);
   });
 
+  it("a piece of evidence a newer screen admitted never scores an older screen's row of the key, even where the newer row left it unscored", () => {
+    // (a) The current screen's vacancy row unchecked; a rent roll after it.
+    const unchecked = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(row({ key: "vacancy", verdict: "unchecked", evidence: null })),
+      challenges: [],
+      priorScreens: [screen(S2, 5), screen(S1, 7)],
+      ...laterRoll,
+    });
+    expect(unchecked.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "unscored", null]]);
+    expect(accountRecord([unchecked]).scored).toBe(0);
+    // (b) The current row economic, the Sep 1 row by doors; a rent roll after
+    // the current screen: the current screen admitted it, so the Sep 1 row is
+    // not scored by it, and the current row keeps its own unscored reason.
+    const economic = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(row({ key: "vacancy", measure: "economic" })),
+      challenges: [],
+      priorScreens: [screen(S2, 5)],
+      ...laterRoll,
+    });
+    const alone = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", measure: "economic" })), challenges: [], ...laterRoll });
+    expect(economic.rows).toEqual(alone.rows);
+    expect(economic.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "unscored", null]]);
+    expect(economic.rows[0].later?.source).toBe("rent_roll");
+    expect(accountRecord([economic]).scored).toBe(0);
+    // A rent roll uploaded after the current screen but dated before it was
+    // refused by the current screen, never admitted, and still falls to the
+    // Sep 1 screen.
+    const refused = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snap(row({ key: "vacancy", measure: "economic" })),
+      challenges: [],
+      priorScreens: [screen(S2, 5)],
+      rentRoll: { arrivedAt: AFTER, dated: "2026-09-05", summary: roll },
+    });
+    expect(refused.rows.map((x) => [x.key, x.later?.source, x.priorScreenedOn ?? null])).toEqual([["vacancy", "rent_roll", "Sep 1, 2026"]]);
+  });
+
   it("the re-screen rule says every screen is kept", () => {
     expect(RESCREEN_RULE).toContain("each re-screen keeps the screen it replaces, every one");
     expect(RESCREEN_RULE).toContain("against the latest screen made before it");

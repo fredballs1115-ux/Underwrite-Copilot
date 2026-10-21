@@ -541,6 +541,12 @@ const ASSESSED_NOT = /special|ratio|\brate\b|\bper\b|\/|millage|reassess/i;
 const INSURANCE_ROW = /\binsurance\b/i;
 const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|tenant|income|revenue|proceeds|program|\brate\b|\bper\b|\/|psf|increase|growth|claim|\btax/i;
 const INSURANCE_VALUE_NOT = /income|revenue|proceeds|commission/i;
+// A premium stated per unit, door, key, bed, room, pad, space or foot, or by
+// the month, is not the year's premium for the building ("$1,200/unit",
+// "$1,200 per unit", "$32,000/mo", "$650/door"): parsed bare it would read as
+// the year's, so the value is refused, as `taxBillOf` refuses a per-unit bill.
+const INSURANCE_VALUE_PER =
+  /\/\s*(?:unit|door|key|bed|room|pad|space|sf|sq|ft|mo\b|mos\b|month)|\bper\s+(?:unit|door|key|bed|room|pad|space|sf|sq|square|foot|ft|mo\b|month)|\bpsf\b|\bmonthly\b|\b(?:a|each)\s+month\b/i;
 /** A T-12 line that is not the real estate tax line: an abatement, payroll
  *  or transfer tax, or a line combined with insurance. Exported for the
  *  track record's own T-12 reader. */
@@ -1003,6 +1009,17 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
 export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
   const om = omVacancy(rowsOf(extraction));
   return om?.from === "vacancy" && om.measure === "physical" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
+ * Whether the OM's vacancy is economic — dollars over gross potential rent,
+ * not doors (`omVacancy`'s measure, the stress test's own reading). The track
+ * record reads it (lib/track-record `vacancyEconomic`) for a challenge scored
+ * where no stress test was kept: an economic OM figure is scored by a later
+ * T-12's economic vacancy, never by a rent roll's count of doors.
+ */
+export function vacancyEconomicStated(extraction: ExtractionResult | null): boolean {
+  return omVacancy(rowsOf(extraction))?.measure === "economic";
 }
 
 /**
@@ -2354,12 +2371,13 @@ export const INSURANCE_NO_RERUN_NO_T12 = "No return is re-run: nothing on file t
 export const INSURANCE_T12_HISTORY = "the seller's history, not a test of a new owner's quote";
 
 /** What the T-12's premium is where it decides the row: the seller's own
- *  actual, the floor a new owner can expect, never a quote. */
-export const INSURANCE_T12_FLOOR = "the seller's own actual premium, the floor a new owner can expect, not a quote";
+ *  actual, a working floor and a rule of thumb (a new owner is rarely quoted
+ *  under it), never a quote and never a fact about a new owner's premium. */
+export const INSURANCE_T12_FLOOR = "the seller's own premium, a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote";
 
 /** What a re-run at the T-12's premium is, said wherever its part of the
  *  headline is (`StressHeadlinePart.conditional`). */
-export const INSURANCE_FLOOR_CONDITION = "at the seller's own T-12 premium, a floor, not a quote";
+export const INSURANCE_FLOOR_CONDITION = "at the seller's own T-12 premium, a working floor, not a quote";
 
 /** The plan's no-re-run where the premium is not the pro forma's line. */
 export const PLAN_INSURANCE_NOT_PRO_FORMA =
@@ -2371,8 +2389,8 @@ export const PLAN_INSURANCE_NOT_PRO_FORMA =
  * file is (none is read from the documents yet). The deal's T-12 premium is
  * the seller's own actual: where the OM's pro forma premium sits under it by
  * more than SAME_SHARE, the OM is set against its own building's history and
- * the T-12's premium decides — the floor a new owner can expect, never a
- * quote — so the row reads stretched at most, and the return is re-run at the
+ * the T-12's premium decides — a working floor and a rule of thumb (a new
+ * owner is rarely quoted under it), never a quote — so the row reads stretched at most, and the return is re-run at the
  * T-12's premium (the expense line as `expenseImpact` sets it, so a line the
  * T-12 already carries is swapped, never added to), said as the floor. At or
  * over the T-12's premium the seller's history cannot say a new owner pays
@@ -2386,7 +2404,7 @@ export const PLAN_INSURANCE_NOT_PRO_FORMA =
  */
 function insuranceRow(ctx: Ctx): StressRow | null {
   const premiumRow =
-    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
+    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
   const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
   const evidence: StressEvidence[] = [];
   // The T-12's own insurance line: the seller's actual premium. It decides
@@ -2454,10 +2472,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const gap: StressRow["gap"] = {
     value: Math.round(floor - premium),
     unit: "usd",
-    text: `The OM's ${money(premium)} premium is ${money(floor - premium)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is the floor a new owner can expect, not a quote, and the row reads stretched at most.`,
+    text: `The OM's ${money(premium)} premium is ${money(floor - premium)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote, and the row reads stretched at most.`,
   };
   const evidenceIndex = decided.index;
-  const words = { what: "the insurance line", om: money(premium), alt: `the seller's ${money(floor)} T-12 premium, the floor a new owner can expect, not a quote`, evidence: "" };
+  const words = { what: "the insurance line", om: money(premium), alt: `the seller's ${money(floor)} T-12 premium, a working floor and a rule of thumb, not a quote`, evidence: "" };
   const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, premium, floor, floor, "insurance line", evidenceIndex, words) : null;
   // A plan deal re-runs its yield on cost on the premium only where the OM
   // states it as its pro forma's line, the one its stabilized NOI carries,
@@ -3445,8 +3463,8 @@ function noSwapWhy(row: StressRow): string {
  *  to say — never the stated unabated bill an abatement ends into. */
 function conditionOf(row: StressRow): string | null {
   const at = row.decidedBy ?? row.impact?.evidenceIndex ?? null;
-  // The insurance part is struck at the seller's own T-12 premium: a floor a
-  // new owner can expect, never a quote, said beside the part.
+  // The insurance part is struck at the seller's own T-12 premium: a working
+  // floor and a rule of thumb, never a quote, said beside the part.
   if (row.key === "insurance") return at != null && row.evidence[at]?.label === T12_INSURANCE_LABEL ? INSURANCE_FLOOR_CONDITION : null;
   if (row.key !== "taxes") return null;
   return at != null && row.evidence[at]?.label === RESET_BILL_LABEL ? TAX_RESET_CONDITION : null;

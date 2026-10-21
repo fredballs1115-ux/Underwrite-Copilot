@@ -125,7 +125,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(r.notScored).toEqual([]);
   });
 
-  it("a T-12 added after the screen does not score a challenge's vacancy: a challenge carries no measure, read as doors, and the T-12's are dollars — said on the row", () => {
+  it("a T-12 added after the screen does not score a challenge's vacancy: a challenge on an OM vacancy counted by doors is read as doors, and the T-12's are dollars — said on the row", () => {
     const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
     // Still on record as what came after, and its figure still shown.
     expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
@@ -140,6 +140,28 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
       `Stabilized vacancy: the T-12 to Oct 31, 2026 (11 of its 12 months precede the verdict) ran ${T12_VAC.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income), but the T-12's economic vacancy is dollars, not doors, and the OM's figure counts doors, which only a later rent roll can score, so it is not scored.`,
     );
     expect(accountRecord([r]).challenges.scored).toBe(0);
+  });
+
+  it("a challenge on a deal whose OM vacancy is economic is scored by a later T-12, and a rent roll is named as the other measure", () => {
+    const both = scoreDeal({
+      screenedAt: T,
+      challenges: [vacancy],
+      vacancyEconomic: true,
+      rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll },
+      t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+    });
+    expect(both.rows[0].landing).not.toBe("unscored");
+    expect(both.rows[0].later).toMatchObject({ source: "t12", value: T12_VAC });
+    expect(both.rows[0].figures?.om).toBe("6.0% economic vacancy");
+    expect(accountRecord([both]).challenges.scored).toBe(1);
+    // The rent roll alone: its doors are the other measure, said on the row.
+    const roll1 = scoreDeal({ screenedAt: T, challenges: [vacancy], vacancyEconomic: true, rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll } });
+    expect(roll1.rows[0].landing).toBe("unscored");
+    expect(roll1.rows[0].later?.source).toBe("rent_roll");
+    expect(roll1.rows[0].why).toBe(ROLL_NOT_DOLLARS_WHY);
+    expect(accountRecord([roll1]).challenges.scored).toBe(0);
+    // The grid of what can score what says the T-12 for the deal's vacancy.
+    expect(both.scorable?.find((s) => s.key === "vacancy")?.by).toMatchObject({ t12: true, rent_roll: false });
   });
 
   it("only the rent roll scores a challenge's vacancy beside a T-12, and a figure inside the two reads between", () => {
@@ -505,7 +527,7 @@ describe("accountRecord — counts, by key, and the floor", () => {
     expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 0, scored: 0, byKey: [], shares: null });
     expect(recordState(r)).toBe("none");
     expect(recordLine(r)).toBe(RECORD_NONE_LINE);
-    for (const thing of ["a T-12 or rent roll dated after the screen", "what you decided (dead, and why)", "what the building traded for"]) expect(RECORD_NONE_LINE).toContain(thing);
+    for (const thing of ["a T-12 or rent roll dated after the screen", "what you decided (dead and why, or the price you closed at)", "what the building traded for"]) expect(RECORD_NONE_LINE).toContain(thing);
     expect(recordCountsLine(r)).toBe("1 deal tested · 0 with later evidence · 0 rows scored");
   });
 
@@ -620,7 +642,7 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     const economic = row({ key: "vacancy", title: "Economic vacancy", measure: "economic", evidence: { value: 9, label: "Apartment vacancy and credit loss, a rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" } });
     const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterT12() });
     expect(r.rows[0]).toMatchObject({ landing: "right", outcome: "flag_right", later: { source: "t12", value: T12_VAC } });
-    expect(r.rows[0].figures).toEqual({ om: "6.0% vacant", alt: "9.0% vacant", later: `${T12_VAC.toFixed(1)}% vacant` });
+    expect(r.rows[0].figures).toEqual({ om: "6.0% economic vacancy", alt: "9.0% economic vacancy", later: `${T12_VAC.toFixed(1)}% economic vacancy` });
     expect(r.rows[0].text).toContain(`ran ${T12_VAC.toFixed(1)}% economic vacancy`);
     // A rent roll alone does not score it, and the row says why.
     const byRoll = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterRoll() });
@@ -636,7 +658,7 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     // A plan deal's stated economic allowance is the plan's target first.
     const plan = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], plan: true, vacancyIsPlanTarget: true, ...laterRoll() });
     expect(plan.rows[0].why).toBe("the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.");
-    expect(VACANCY_MEASURE_RULE).toBe("A vacancy counted by doors is scored by a later rent roll; an economic vacancy by a later T-12.");
+    expect(VACANCY_MEASURE_RULE).toBe("A vacancy counted by doors is scored by a later rent roll (by area on a class priced by the foot); an economic one by a later T-12.");
   });
 
   it("a stretched row is wrong where the later figure lands within its margin of the OM's, or better for the buyer", () => {
@@ -1019,7 +1041,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
     // The vacancy row here counts doors: the rent roll scored it, never the T-12.
     expect(r.rows.find((x) => x.key === "vacancy")!.later?.source).toBe("rent_roll");
-    expect(SCORED_BY).toContain("a vacancy by a rent roll (doors) or a T-12 (dollars), dated after the verdict, unless the market decided it");
+    expect(SCORED_BY).toContain("a vacancy by a rent roll (doors or area) or T-12 (dollars), dated after the verdict, unless the market decided it");
     expect(SCORED_BY).toContain("the NOI by a T-12, neither on a plan deal");
     expect(CARD_SCOPE).toContain("a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
     // No surface says a T-12 scores a vacancy counted by doors.

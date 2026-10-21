@@ -65,6 +65,7 @@ import {
   challengeKey,
   headlinePrice,
   stabilizedVacancyStated,
+  vacancyEconomicStated,
   vacancyDecidedBy,
   stressHeadline,
   type StressTestArgs,
@@ -289,6 +290,14 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(a.evidence[0].label).toBe("The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)");
     expect(a.verdict).toBe("stretched");
     expect(stabilizedVacancyStated(vcl)).toBe(false);
+    // …and is told the OM's figure counts dollars, so an older screen's
+    // challenge on it is scored by a later T-12, never a rent roll's doors.
+    expect(vacancyEconomicStated(vcl)).toBe(true);
+    expect(vacancyEconomicStated(APARTMENT)).toBe(false);
+    expect(vacancyEconomicStated(null)).toBe(false);
+    for (const page of ["app/(app)/deals/[id]/page.tsx", "app/(app)/analytics/page.tsx"]) {
+      expect(readFileSync(page, "utf8"), page).toContain("vacancyEconomic: vacancyEconomicStated(extraction)");
+    }
   });
 
   it("stands a figure counted by doors unchecked where the T-12's dollars are the only figure on file", () => {
@@ -407,7 +416,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     // review of 2026-10-21). The T-12's premium decides — the floor a new
     // owner can expect, never a quote — so the row reads stretched at most.
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
-    expect(i.evidence[0].text).toMatch(/; the seller's own actual premium, the floor a new owner can expect, not a quote$/);
+    expect(i.evidence[0].text).toMatch(/; the seller's own premium, a working floor and a rule of thumb \(a new owner is rarely quoted under it\), not a quote$/);
     expect(i.decidedBy).toBe(0);
     expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED", value: null });
     // The index's figure is the OM's own premium moved by it, labelled so —
@@ -419,7 +428,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.gap).toEqual({
       value: 30_000,
       unit: "usd",
-      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is the floor a new owner can expect, not a quote, and the row reads stretched at most.",
+      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote, and the row reads stretched at most.",
     });
     expect(i.method).toBe(
       "The OM's insurance against the deal's T-12 insurance line, the one figure that decides; beside it, not deciding: the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED).",
@@ -431,7 +440,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(Math.round(i.impact!.omValue)).toBe(1_720_000);
     expect(Math.round(i.impact!.altValue)).toBe(1_750_000);
     expect(i.impact!.altIrrPct!).toBeLessThan(i.impact!.baseIrrPct!);
-    expect(i.impact!.note).toMatch(/^If the insurance line is the seller's \$150k T-12 premium, the floor a new owner can expect, not a quote, not the OM's \$120k, the levered IRR moves from .*\. The model itself already runs at it\.$/);
+    expect(i.impact!.note).toMatch(/^If the insurance line is the seller's \$150k T-12 premium, a working floor and a rule of thumb, not a quote, not the OM's \$120k, the levered IRR moves from .*\. The model itself already runs at it\.$/);
     expect(i.noRerun ?? null).toBeNull();
     // In the headline it is a player, marked as the floor it is, and the NOI
     // is left out for it (`HEADLINE_NOI_LEFT_OUT`).
@@ -1884,6 +1893,19 @@ describe("the premium the insurance row reads is the building's, never insurance
     const ex = withRows({ label: "Tenant insurance", value: "$45,000 annual income" }, { label: "Insurance", value: "$120,000" });
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance").omSays).toEqual({ text: "Insurance: $120,000", value: 120_000, page: 15 });
   });
+
+  it.each(["$1,200/unit", "$1,200 per unit", "$32,000/mo", "$650/door"])("refuses a premium stated per unit, per door or by the month (%s): it is not the year's", (value) => {
+    const i = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Insurance", value }) })), "insurance");
+    expect(i.verdict).toBe("unchecked");
+    expect(i.unchecked).toBe("The OM states no insurance premium.");
+    expect(i.omSays.value).toBeNull();
+    expect(i.impact ?? null).toBeNull();
+  });
+
+  it("reads the year's premium past a per-unit restatement of it", () => {
+    const ex = withRows({ label: "Insurance", value: "$1,200/unit" }, { label: "Insurance premium", value: "$120,000" });
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance").omSays.value).toBe(120_000);
+  });
 });
 
 describe("the rent roll's vacancy is read by count on a class priced by the unit, by area on one priced by the foot", () => {
@@ -3071,6 +3093,13 @@ describe("a growth row's one trailing year stands beside the average its stored 
     const levelRows: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(k), value: 400 + (HISTORY_ROWS - k) }));
     const rent = readMetroRates("dc", levelRows, FIXTURE_NOW).find((r) => r.meta.id === "CUURS35ASEHA")!;
     expect(compoundYearOverYear(rent)!.years).toBe(3);
+    // A metro series published every other month holds more years in the same
+    // rows, so the sentence says "at least three".
+    expect(GROWTH_HISTORY_HELD).toContain("at least three of a metro's CPI rent");
+    const bimonthly: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(2 * k), value: 400 + (HISTORY_ROWS - k) }));
+    const rent2 = readMetroRates("dc", bimonthly, FIXTURE_NOW).find((r) => r.meta.id === "CUURS35ASEHA")!;
+    expect(compoundYearOverYear(rent2)!.years).toBeGreaterThanOrEqual(3);
+    expect(GROWTH_HISTORY_HELD.length).toBeLessThanOrEqual(260);
   });
 
   it("shows all-items CPI's own average beside the one year that decides the expense growth, deciding nothing", () => {

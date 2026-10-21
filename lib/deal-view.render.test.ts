@@ -233,7 +233,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // Doors and dollars (lib/stress-deciders `VACANCY_ORDER`): the T-12 never
     // decides an occupancy counted by doors.
-    expect(words).toContain("A T-12 tests the OM's NOI and shows its insurance premium beside the OM's; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy, in dollars.");
+    expect(words).toContain("A T-12 tests the OM's NOI, and tests the OM's insurance premium where it sits under the T-12's, a working floor, not a quote; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy, in dollars.");
     expect(words).not.toContain("a rent roll, else the T-12");
     expect(words).toContain("Beside a stabilized vacancy they show the gap to close, and the rent roll tests it only where no market figure is fresh, never on a plan.");
     expect(words).not.toContain("vacancy and insurance against");

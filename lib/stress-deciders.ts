@@ -49,7 +49,7 @@
 //   - insurance: a new owner's quote would decide it, and none is read yet;
 //     the deal's T-12 premium, the seller's own actual, decides only where
 //     the OM's premium sits under it past SAME_SHARE (the OM against its own
-//     building's history, the floor a new owner can expect, never a quote);
+//     building's history, a working floor and a rule of thumb, never a quote);
 //     at or over it nothing decides;
 //   - other: none — the challenger's words are not a figure.
 //
@@ -286,12 +286,12 @@ export function renovationPremiumDecider(candidates: readonly DeciderCandidate[]
  *  documents yet. The deal's T-12 premium — the seller's own actual — decides
  *  only where the row hands it in as one that may (lib/stress-test: the OM's
  *  premium under it past SAME_SHARE, on a building already delivered): the
- *  OM against its own building's history, the floor a new owner can expect,
- *  never a quote. The index moves the OM's own figure and never decides. */
+ *  OM against its own building's history, a working floor and a rule of
+ *  thumb (a new owner is rarely quoted under it), never a quote. The index moves the OM's own figure and never decides. */
 export const INSURANCE_ORDER: readonly DeciderStep[] = [
   {
     name: "the deal's T-12 premium",
-    why: "the seller's own actual, the floor a new owner can expect where the OM's premium sits under it, not a quote",
+    why: "the seller's own premium, where the OM's sits under it: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote",
     is: isLabel(T12_INSURANCE_LABEL),
   },
 ];

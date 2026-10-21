@@ -203,7 +203,7 @@ describe("the sample's stress test, one build on every surface", () => {
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
     // vacancy, its 4.0% rent growth, its tax bill and its $310k premium.
     // The premium sits $75k under the seller's own $385k T-12 premium, so
-    // the T-12's decides it — the floor a new owner can expect, never a
+    // the T-12's decides it — a working floor and a rule of thumb, never a
     // quote — and the evidence's case runs it (the review of 2026-10-21).
     expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
     expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.5]);

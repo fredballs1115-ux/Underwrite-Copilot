@@ -96,7 +96,7 @@ import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy } from "@/lib/stress-test";
+import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy, vacancyEconomicStated } from "@/lib/stress-test";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
@@ -1024,6 +1024,9 @@ export default async function DealPage({
     // where the market's figure decided the row, never where the documents
     // did (audit M5).
     vacancyHeldToMarket,
+    // A challenge's vacancy in the measure of the OM's own figure: an
+    // economic one is scored by a later T-12, never a rent roll's doors.
+    vacancyEconomic: vacancyEconomicStated(extraction),
     // On a plan deal the OM's NOI and its stated vacancy are the finished
     // project's, which a document of the building before the plan cannot
     // speak to.

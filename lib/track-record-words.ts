@@ -51,7 +51,8 @@ export const SAMPLE_NO_RECORD = "Nothing has arrived since the sample's screen, 
  * A vacancy is scored in its own measure, as the stress test decides it
  * (lib/stress-deciders `VACANCY_ORDER`): doors by doors, dollars by dollars.
  */
-export const VACANCY_MEASURE_RULE = "A vacancy counted by doors is scored by a later rent roll; an economic vacancy by a later T-12.";
+export const VACANCY_MEASURE_RULE =
+  "A vacancy counted by doors is scored by a later rent roll (by area on a class priced by the foot); an economic one by a later T-12.";
 
 /**
  * What can score which row, as lib/track-record's `laterFor` reads it: a
@@ -62,7 +63,7 @@ export const VACANCY_MEASURE_RULE = "A vacancy counted by doors is scored by a l
  * holds these lists to what the scorer scores, key by key).
  */
 export const SCORED_BY =
-  "A row is scored only where a later figure can speak to it: a vacancy by a rent roll (doors) or a T-12 (dollars), dated after the verdict, unless the market decided it; the NOI by a T-12, neither on a plan deal; the price by a reported trade on a Dead deal.";
+  "A row is scored only where a later figure speaks to it: a vacancy by a rent roll (doors or area) or T-12 (dollars), dated after the verdict, unless the market decided it; the NOI by a T-12, neither on a plan deal; the price by a reported trade on a Dead deal.";
 
 /** A decision's part in the record, said apart from the figures'. */
 export const DECISION_SCORES =

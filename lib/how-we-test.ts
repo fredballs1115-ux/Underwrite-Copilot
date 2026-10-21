@@ -111,7 +111,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
   expense_growth: `Held to all-items CPI's trailing year; to core CPI only where all-items is not fresh. Core, the insurance index, the breakeven and the CPI's own average over the years its history holds are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
-  insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a floor, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
+  insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a working floor and a rule of thumb, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };
@@ -320,7 +320,7 @@ export const TRACK_RECORD = {
     "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     // lib/track-record `laterFor` / `otherMeasure`: the stress test's own
     // doors-and-dollars rule, scored the same way.
-    `${VACANCY_MEASURE_RULE} A document of the other measure is named on the row, with why; an older screen's challenge carries no measure and is read as doors.`,
+    `${VACANCY_MEASURE_RULE} A document of the other measure is named on the row, with why; an older screen's challenge is read in the OM figure's measure.`,
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
     "A decision is a direction, not a verdict on the OM's figure: it is counted apart and in no share.",
     // lib/track-record `gapCaptured` and `accountRecord`'s base rate: shown,

@@ -6,6 +6,7 @@ import {
   NOT_YET_SCORABLE,
   OUTCOME_WORD,
   PURCHASE_IS_DECISION,
+  SAMPLE_NO_RECORD,
   TAX_INSURANCE_NOT_SCORED,
   capturedAt,
   capturedWords,
@@ -33,14 +34,27 @@ import { ScorableGrid } from "../../scorable-grid";
  * opened its later figure covered (the owner's decision of 2026-10-21,
  * display only): the OM's figure, the evidence's and the later one on one
  * track, said in words. A Closed deal's own price is drawn as a decision.
+ * The sample cannot be re-screened (rerunAnalysis sends the sample back), so
+ * where nothing has arrived it draws /demo's own line (`SAMPLE_NO_RECORD`) in
+ * place of the grid and its "upload, then re-screen".
  */
-export function TrackRecordCard({ record }: { record: DealRecord | null }) {
+export function TrackRecordCard({ record, sample = false }: { record: DealRecord | null; sample?: boolean }) {
   if (!record) return null;
   // Nothing arrived after the screen (and nothing uploaded after it was
   // refused for its own date): what will score what, once there is a
   // verdict to score against.
   if (record.evidence.length === 0 && !record.refusedLater) {
     if (!record.screenedAt || !record.scorable?.length) return null;
+    if (sample) {
+      return (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record" data-state="sample">
+          <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted" data-qa="sample-no-record">
+            {SAMPLE_NO_RECORD}
+          </p>
+        </section>
+      );
+    }
     return (
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record" data-state="waiting">
         <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>

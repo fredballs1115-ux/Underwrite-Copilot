@@ -16,7 +16,9 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  *
  * Its words say what the documents do to the stress test, and only that
  * (lib/stress-deciders' orders): a T-12's NOI decides the NOI row, and its
- * insurance line stands beside the insurance row, which nothing decides; on
+ * insurance line decides the insurance row where the OM's premium sits more
+ * than 2% under it (the seller's own premium, a working floor and a rule of
+ * thumb, not a quote), and stands beside it otherwise; on
  * a vacancy counted by doors the rent roll decides, and the T-12, dollars
  * not doors, decides only one the OM states as economic; beside a
  * stabilized vacancy they are the gap to close, the rent roll deciding only
@@ -49,8 +51,9 @@ export function ActualsPrompt({
         <span className="font-normal text-muted">(optional)</span>
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        A T-12 tests the OM&apos;s NOI and shows its insurance premium beside
-        the OM&apos;s; a rent roll tests the OM&apos;s occupancy today, by
+        A T-12 tests the OM&apos;s NOI, and tests the OM&apos;s insurance
+        premium where it sits under the T-12&apos;s, a working floor, not a
+        quote; a rent roll tests the OM&apos;s occupancy today, by
         its doors, and the T-12 an economic vacancy, in dollars. Beside a
         stabilized vacancy they show the gap to close, and the rent roll
         tests it only where no market figure is fresh, never on a plan.
