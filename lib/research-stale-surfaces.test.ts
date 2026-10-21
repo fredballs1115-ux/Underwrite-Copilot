@@ -77,7 +77,7 @@ describe("the homepage's band and gallery", () => {
     const html = render(React.createElement(MarketsMarquee, { today: "2027-02-22" }));
     expect(text(html)).toContain("covered markets — dated research, read Aug 25, 2026 (181 days old, stale)");
     // The figures stay, each with its house and its own period.
-    expect(text(html)).toContain("% vac (Colliers and CBRE, Q2 2026)");
+    expect(text(html)).toContain("% vac (Newmark, Q1 2026)");
     expect(a11yIssues(html)).toEqual([]);
   });
 

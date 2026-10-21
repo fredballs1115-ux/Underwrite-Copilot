@@ -49,7 +49,6 @@ import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos
 import { photosOnDisk } from "@/lib/photos-fs";
 import { sampleHeader, type HeaderFacts } from "@/lib/sample-header";
 import { SampleDealHero } from "./sample-hero";
-import { ValueAddPanel } from "./value-add-panel";
 import { MemoPreview } from "./memo-preview";
 import { SamplePipelineCard } from "./sample-pipeline-card";
 import { sampleMemoData } from "@/lib/sample-memo";
@@ -167,9 +166,10 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
       </Icon>
     ),
   },
+  // No link: recorded-sales comps run on a deal of your own (lib/public-comps),
+  // and /market shows a signed-out visitor none.
   {
     label: "Comps from public property records",
-    href: "/market",
     icon: (
       <Icon>
         <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
@@ -389,7 +389,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: `Included with every Pro test: the screening model as a live-formula workbook. ${SCREENING_BUILT_ON} ${SCREENING_GROWTH_EXIT_LINE}; /how-we-test has the whole rule. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets each assumption the OM or a default set against them, and names a figure the model was set from as the figure it runs, never as a check.`,
+    a: `On Pro: the screening model as a live-formula workbook. ${SCREENING_BUILT_ON} ${SCREENING_GROWTH_EXIT_LINE}; /how-we-test has the whole rule. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets each assumption the OM or a default set against them, and names a figure the model was set from as the figure it runs, never as a check.`,
   },
   {
     q: "Can my team share one pipeline?",
@@ -769,8 +769,15 @@ export default async function Home() {
                       </svg>
                     </span>
                   </h1>
+                  {/* One line, each claim the code's: the stress test sets each
+                      assumption against the deal's own documents where they
+                      are uploaded (a rent roll or T-12 turns rows into tests,
+                      lib/stress-test), today's published figures read for the
+                      deal's market (lib/model-vs-market-read), and re-runs the
+                      return the gap moves, in code. The model is included,
+                      not the product. */}
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    Upload the OM. Each assumption it makes is set against the deal&apos;s own documents, today&apos;s published figures and the rule of thumb it is asked to beat — named as such — then a Go / Caution / No-go that shows its work. The model comes with it.
+                    Each OM assumption, checked against the rent roll and T-12 you add and today&apos;s published figures — and what each gap does to your return. The model is included.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
@@ -994,14 +1001,21 @@ export default async function Home() {
                     wall /tools' own index hit at twenty-six — which is why
                     `groupedTools()` exists in the catalog rather than in the
                     page. One grouping, read by both, so the homepage cannot
-                    present the page in a shape the page does not use. */}
-                <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                    present the page in a shape the page does not use.
+                    Below sm the shelf is the groups' names alone, two to a
+                    row, and the one link to /tools under them: forty-odd
+                    chips stacked a column deep were several screens of a
+                    phone. The chips stay in the HTML, shown from sm. */}
+                <div
+                  data-qa="tools-shelf"
+                  className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:gap-x-8 sm:gap-y-5 lg:grid-cols-3"
+                >
                   {groupedTools().map(({ group, tools }) => (
                     <div key={group}>
                       <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55">
                         {group}
                       </p>
-                      <ul className="mt-2 flex flex-wrap gap-1.5">
+                      <ul className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
                         {tools.map((t) => (
                           <li key={t.id}>
                             <Link
@@ -1519,15 +1533,12 @@ async function DealPreview({ header }: { header: HeaderFacts }) {
 async function SampleWalkthrough() {
   const reads = await sampleTodayReads();
   const { data } = sampleDemoDataOnce(readerToday(null), reads, NO_DEBT_SEEDS);
+  // The walkthrough opens on its tabs, the call and its stress test first.
   // The renovation program the deal page and /demo draw under the sample's
-  // header, from the same build, at the walkthrough's head: the homepage's
-  // header is the hero's compact preview.
-  return (
-    <div className="flex flex-col gap-4">
-      <ValueAddPanel {...data.valueAdd} />
-      <DemoTabs {...walkthroughData(data)} />
-    </div>
-  );
+  // header is left off here: its figures are the stress test's renovation
+  // premium row, one tab in, and drawn above the tabs they led the section
+  // ahead of the call (lib/sample-tabs.test.ts names it with that reason).
+  return <DemoTabs {...walkthroughData(data)} />;
 }
 
 // ── Footer trust line ────────────────────────────────────────────────────────

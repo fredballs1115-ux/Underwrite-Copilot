@@ -400,6 +400,13 @@ const PAGE_LEFT_OFF: Record<string, string> = {
   SiteFlagsCard: "the flood zone, Opportunity Zone and tract looked up at a reader's row's point; the public pages make no lookup",
   SectorFieldsForm: "the reader's own answers to the class's facts",
 };
+/** What /demo draws under the sample's header that the homepage's
+ *  walkthrough leaves off, each with its reason: the homepage's header is the
+ *  hero's compact preview, and its walkthrough opens on the call. */
+const HOME_LEFT_OFF: Record<string, string> = {
+  ValueAddPanel:
+    "the renovation program: its premium is the stress test's renovation premium row, one tab in, and drawn above the tabs it led the walkthrough ahead of the call",
+};
 /** The deal page's part, as the public pages draw it on the sample. */
 const PAGE_AS_SAMPLE: Record<string, string> = {
   DealView: "DemoSections",
@@ -415,8 +422,22 @@ describe("the deal page's panels past its sections, as the public pages draw the
     expect(drawnOnSample).toEqual(["ValueAddPanel"]);
     const demo = partsIn(slice(DEMO_PAGE, "<SampleDealHero", "</SampleDealHero>")).filter((c) => c !== "SampleDealHero");
     expect(demo).toEqual(drawnOnSample);
+    // The homepage's walkthrough draws /demo's less what it names as left
+    // off, and each part it names is one /demo draws.
+    for (const name of Object.keys(HOME_LEFT_OFF)) expect(drawnOnSample, name).toContain(name);
     const home = partsIn(drawn(HOME_PAGE, "SampleWalkthrough")).filter((c) => c !== "DemoTabs");
-    expect(home).toEqual(drawnOnSample);
+    expect(home).toEqual(drawnOnSample.filter((c) => !(c in HOME_LEFT_OFF)));
+  });
+
+  it("the renovation program the homepage leaves off is the stress test's renovation premium row", () => {
+    const { data } = sampleDemoData({ today: TODAY, reads: READS, debt: NO_DEBT_SEEDS });
+    expect(data.valueAdd.program).not.toBeNull();
+    const keys = (data.stressTest?.rows ?? []).map((r) => r.key);
+    expect(keys).toContain("renovation_premium");
+    // …and the walkthrough's Overview draws that row.
+    const html = renderToStaticMarkup(React.createElement(DemoPanel, { ...walkthroughData(data), tab: "Overview" as never }));
+    expect(html).toContain('data-qa="stress-test-panel"');
+    expect(html).toMatch(/Renovation premium/);
   });
 
   it("each panel named as reading nothing reads nothing on the sample", async () => {

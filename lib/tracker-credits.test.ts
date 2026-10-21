@@ -190,8 +190,11 @@ describe("an asking rent the file states as a band is never a point made of one"
     const pg = block("pg_county", "industrial");
     expect(rentOf(pg)).toEqual({ low: 10, high: 15 });
     expect(String(pg.note)).toContain("~$10-15/SF NNN");
-    // The homepage gallery and the markets band.
-    expect(metroFact({ sector_snapshot: { industrial: pg } }, 0)!.text).toContain("$10–15/SF");
+    // The homepage gallery and the markets band print no figure the sector
+    // leaderboard lists unranked, and Prince George's industrial vacancy is a
+    // spread of two reads: its tile leads with no industrial figure at all.
+    expect(sectorLeaderboard("industrial", "2026-10-21").rows.find((r) => r.id === "pg_county")!.reason).toBe("a spread of two reads");
+    expect(metroFact({ sector_snapshot: { industrial: pg } }, 0, "2026-10-21")).toBeNull();
     // The sector leaderboard's rent column.
     expect(sectorLeaderboard("industrial").rows.find((r) => r.id === "pg_county")!.rent).toEqual({ low: 10, high: 15 });
     // The compare card's cell.
@@ -201,7 +204,7 @@ describe("an asking rent the file states as a band is never a point made of one"
     const row = seedBenchmarks().find((b) => b.metro === "Prince George's County MD" && b.metric === "industrial_asking_rent_psf")!;
     expect([row.low, row.high]).toEqual([10, 15]);
     // Nowhere does the figure the file used to carry come back.
-    for (const text of [metroFact({ sector_snapshot: { industrial: pg } }, 0)!.text, compare.sectors?.industrial?.rent ?? ""]) {
+    for (const text of [metroFact({ sector_snapshot: { industrial: pg } }, 0, "2026-10-21")?.text ?? "", compare.sectors?.industrial?.rent ?? ""]) {
       expect(text).not.toContain("12.5");
     }
   });

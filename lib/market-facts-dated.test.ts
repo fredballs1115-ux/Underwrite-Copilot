@@ -6,6 +6,7 @@ import { MarketsMarquee, metroFact, researchReadOn } from "@/app/markets-marquee
 import { MarketsGallery } from "@/app/markets-gallery";
 import { datedLong } from "@/lib/debt-index";
 import { blockCitations, houseShort } from "@/lib/tracker-read";
+import { sectorStandings } from "@/lib/sector-leaderboard";
 import { readFileSync } from "node:fs";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -22,21 +23,28 @@ type Entry = { id: string; name: string; sector_snapshot?: Record<string, unknow
 const metros = (metrosSeed.metros ?? []) as unknown as Entry[];
 const byId = (id: string) => metros.find((m) => m.id === id)!;
 const readDay = byId("dc").sector_snapshot!.as_of!;
+// The day every fact here is read on: a figure leads a tile only while the
+// sector leaderboard would rank it, and that turns on its age.
+const TODAY = "2026-10-21";
 
 describe("the covered markets' research facts, each figure with its own period", () => {
   it("a sector read carries each figure's own period and credit, and the day read apart", () => {
-    const dc = metroFact(byId("dc"), 0)!;
-    expect(dc.text).toMatch(/^Office 21\.3–22\.2% vac \(Q2 2026\)( · \d+ rules? on file)?$/);
+    // The District's office vacancy is a spread of two reads (Colliers' 21.3%
+    // beside CBRE's 22.2%), which the sector leaderboard lists unranked, so
+    // its tile leads with the first sector it would rank: Newmark's industrial.
+    const dc = metroFact(byId("dc"), 0, TODAY)!;
+    expect(dc.text).toMatch(/^Industrial 7\.4% vac \(Q1 2026\)( · \d+ rules? on file)?$/);
     // Who published each figure, in words a phone shows (research pass 31,
     // C5): beside its period where there is room, as a line where not.
-    expect(dc.credited).toMatch(/^Office 21\.3–22\.2% vac \(Colliers and CBRE, Q2 2026\)( · \d+ rules? on file)?$/);
-    expect(dc.houses).toBe("Vacancy: Colliers and CBRE");
-    expect(dc.cite).toBe("Vacancy: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026");
+    expect(dc.credited).toMatch(/^Industrial 7\.4% vac \(Newmark, Q1 2026\)( · \d+ rules? on file)?$/);
+    expect(dc.houses).toBe("Vacancy: Newmark");
+    expect(dc.cite).toBe("Vacancy: Newmark, the Washington metro, Q1 2026");
     expect(dc.readOn).toBe(readDay);
+    expect(dc.text).not.toContain("21.3–22.2%");
     // Baltimore's industrial vacancy is Newmark's Q1 2026 figure and its rent
     // CBRE's Q2 2026 — two periods, each said beside its own figure.
     const baltimore = byId("baltimore").sector_snapshot!;
-    const industrial = metroFact({ sector_snapshot: { as_of: baltimore.as_of, industrial: baltimore.industrial } }, 0)!;
+    const industrial = metroFact({ sector_snapshot: { as_of: baltimore.as_of, industrial: baltimore.industrial } }, 0, TODAY)!;
     expect(industrial).toEqual({
       text: "Industrial 8.5% vac (Q1 2026) · $11.17/SF (Q2 2026)",
       credited: "Industrial 8.5% vac (Newmark, Q1 2026) · $11.17/SF (CBRE, Q2 2026)",
@@ -46,7 +54,7 @@ describe("the covered markets' research facts, each figure with its own period",
     });
     // One house behind both figures is named once.
     const nyc = byId("nyc").sector_snapshot!;
-    expect(metroFact({ sector_snapshot: { as_of: nyc.as_of, industrial: nyc.industrial } }, 0)?.houses).toBe(
+    expect(metroFact({ sector_snapshot: { as_of: nyc.as_of, industrial: nyc.industrial } }, 0, TODAY)?.houses).toBe(
       "Vacancy and rent: Matthews",
     );
   });
@@ -78,7 +86,7 @@ describe("the covered markets' research facts, each figure with its own period",
     expect(houseShort({ house: null })).toBe("publisher not recorded");
   });
 
-  it("a figure whose period the file does not state is undated; an FMR says its year; no figure, no credit", () => {
+  it("a figure the leaderboard would not rank leads no tile; an FMR says its year; no figure, no credit", () => {
     // Read on a pinned day: a fair market rent is shown only while its year
     // is in force (lib/fmr `fmrWhen`), and metroFact reads today off the
     // clock — FY2027's ends Sep 30, 2027 and FY2028's a year later.
@@ -86,13 +94,18 @@ describe("the covered markets' research facts, each figure with its own period",
     onTestFinished(() => {
       vi.useRealTimers();
     });
+    // Undated, with no publisher recorded: the leaderboard lists it unranked,
+    // so the tile prints no figure and says the rules count alone — never
+    // "(undated)" or "publisher not recorded" beside "Every number carries
+    // its source".
     expect(metroFact({ sector_snapshot: { office: { vacancy_pct: 12.5 } }, rule_ids: ["a"] }, 0)).toEqual({
-      text: "Office 12.5% vac (undated) · 1 rule on file",
-      credited: "Office 12.5% vac (publisher not recorded, undated) · 1 rule on file",
-      houses: "Vacancy: publisher not recorded",
-      cite: "Vacancy: publisher not recorded, undated",
+      text: "1 rule on file",
+      credited: "1 rule on file",
+      houses: null,
+      cite: null,
       readOn: null,
     });
+    expect(metroFact({ sector_snapshot: { office: { vacancy_pct: 12.5 } } }, 0)).toBeNull();
     // The fiscal year is the block's own (lib/fmr), never one typed on the page.
     const block = { fy: 2027, effective: "2026-10-01", area: "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD MSA", "2br": 1860 };
     expect(metroFact({ fmr: block }, 0)).toEqual({
@@ -114,9 +127,28 @@ describe("the covered markets' research facts, each figure with its own period",
     expect(researchReadOn("2026-08-25")).toBe(`read ${datedLong("2026-08-25")}`);
   });
 
+  it("every tile's figure is one the sector leaderboard ranks, on the day it is read", () => {
+    const sectors = ["office", "industrial", "multifamily", "retail"];
+    for (const day of [TODAY, "2027-02-22", "2027-09-01"]) {
+      const standings = sectorStandings(sectors, day);
+      metros.forEach((m, i) => {
+        const fact = metroFact(m, i, day);
+        const lead = fact?.text.match(/^(Office|Industrial|Multifamily|Retail) /)?.[1]?.toLowerCase();
+        if (!lead) {
+          expect(fact?.text ?? "", `${m.id} ${day}`).not.toMatch(/% vac|undated|publisher not recorded/);
+          return;
+        }
+        const standing = standings[lead][m.id];
+        expect(standing === undefined ? "no standing" : standing.reason, `${m.id} ${lead} ${day}`).toBeNull();
+        expect(standing?.rank, `${m.id} ${lead} ${day}`).not.toBeNull();
+        expect(fact!.credited, m.id).not.toMatch(/undated|publisher not recorded/);
+      });
+    }
+  });
+
   it("no market's fact dates a figure by the day the research was read", () => {
     metros.forEach((m, i) => {
-      const fact = metroFact(m, i);
+      const fact = metroFact(m, i, TODAY);
       if (!fact?.cite) return;
       expect(fact.text, m.id).toMatch(/% vac \([^)]+\)/);
       expect(fact.text, m.id).not.toContain(datedLong(readDay));
@@ -125,40 +157,44 @@ describe("the covered markets' research facts, each figure with its own period",
   });
 
   it("the band says the figures are dated research, never live, with the day read said as that", () => {
-    const html = renderToStaticMarkup(React.createElement(MarketsMarquee));
+    const html = renderToStaticMarkup(React.createElement(MarketsMarquee, { today: TODAY }));
     const text = visibleText(html);
     expect(text).not.toMatch(/live from the research layer/i);
     expect(text).toMatch(/covered markets — dated research/);
-    const days = [...new Set(metros.map((m, i) => metroFact(m, i)?.readOn ?? null))];
+    const days = [...new Set(metros.map((m, i) => metroFact(m, i, TODAY)?.readOn ?? null))];
     if (days.length === 1 && days[0]) expect(text).toContain(`dated research, ${researchReadOn(days[0])}`);
     expect(text).not.toContain(`as of ${datedLong(readDay)}`);
     for (const [i, m] of metros.entries()) {
-      const fact = metroFact(m, i);
+      const fact = metroFact(m, i, TODAY);
       // The band prints each figure with its house beside it.
       if (fact) expect(text, m.id).toContain(fact.credited);
     }
-    expect(text).toContain("Office 21.3–22.2% vac (Colliers and CBRE, Q2 2026)");
+    expect(text).toContain("Industrial 7.4% vac (Newmark, Q1 2026)");
+    expect(text).not.toMatch(/undated|publisher not recorded/);
     // Each market's link still carries the whole citation as its title.
-    expect(html).toContain('title="Vacancy: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026"');
+    expect(html).toContain('title="Vacancy: Newmark, the Washington metro, Q1 2026"');
     expect(a11yIssues(html), "markets marquee").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
 
   it("each gallery tile's figures carry their own periods, and the tile names who published them", () => {
-    const html = renderToStaticMarkup(React.createElement(MarketsGallery));
+    const html = renderToStaticMarkup(React.createElement(MarketsGallery, { today: TODAY }));
     const text = visibleText(html);
     const facts = html.match(/data-qa="fact"/g) ?? [];
     expect(facts.length).toBeGreaterThan(0);
     expect(text).not.toContain(`as of ${datedLong(readDay)}`);
     expect(text).toMatch(/% vac \(Q2 2026\)/);
-    expect(html).toContain('title="Vacancy: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026"');
+    // The homepage's "Every number carries its source": no tile prints a
+    // figure the leaderboard would list unranked.
+    expect(text).not.toMatch(/undated|publisher not recorded/);
+    expect(html).toContain('title="Vacancy: Newmark, the Washington metro, Q1 2026"');
     // Who published each tile's figures is said under it, in words a phone
     // shows (research pass 31, C5) — every tile that carries a tracker figure.
     const tiles = html.split("<li").slice(1);
     const withFigures = tiles.filter((t) => /% vac/.test(t));
     expect(withFigures.length).toBeGreaterThan(0);
     for (const tile of withFigures) expect(tile).toContain('data-qa="fact-houses"');
-    expect(text).toContain("Vacancy: Colliers and CBRE");
+    expect(text).toContain("Vacancy: Newmark");
     // live-verify's homepage marker: a tile's figure and its rules count are
     // one run of text.
     expect(html).toMatch(/% vac[^<]*rules? on file/);

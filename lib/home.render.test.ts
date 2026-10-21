@@ -580,6 +580,16 @@ describe("the screen-run trace credits each stage with what it writes", () => {
     expect(l.signal).toBe("reads the headline figures first: the price, the size and the cap");
     expect(l.signal).not.toMatch(/\$|\d/);
     expect(l.challenge).not.toMatch(/stress test/);
+    // The sample's stored market check read no published figures, so its
+    // line says rules of thumb, and says where today's published figures
+    // the hero promises are read: by the stress test (the first-hour review
+    // of 2026-10-21 — the two had read as one claim against the other).
+    expect(SAMPLE_DEAL.market.liveBrief ?? null).toBeNull();
+    expect(l.market).toMatch(/read against rules of thumb: /);
+    expect(l.market).toMatch(/; the stress test reads today's published figures$/);
+    expect(l.market).not.toMatch(/beside the published figures/);
+    const strip = visibleText(renderToStaticMarkup(React.createElement(ScreenRunStrip))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(strip).toContain("the market check against rules of thumb (the stress test reads today's published figures)");
   });
 
   it("speaks the product's own words for a lever, a comp's rating and a market read", () => {

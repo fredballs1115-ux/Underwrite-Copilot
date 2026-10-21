@@ -155,7 +155,13 @@ describe("the free allowance is said as the cap counts it", () => {
 
   it("the plan card and the calls to sign up read one line", () => {
     expect(FREE_DEALS_LINE).toBe(`Up to ${FREE_DEALS} deals free`);
-    expect(FREE_PLAN[0]).toBe(`Up to ${FREE_DEALS} deals, the full six-stage test on each`);
+    // The stress test leads the free plan: the product, and ungated.
+    expect(FREE_PLAN[0]).toMatch(/^The stress test: /);
+    expect(FREE_PLAN[1]).toBe(`Up to ${FREE_DEALS} deals, the full six-stage test on each`);
+    const deal = read("app/(app)/deals/[id]/page.tsx");
+    const build = deal.slice(deal.indexOf("const stressTest = buildStressTest("), deal.indexOf("const stressCounts"));
+    expect(build.length).toBeGreaterThan(0);
+    expect(build).not.toMatch(/\bpro\b|isPro/);
     expect(read("app/page.tsx").match(/\{FREE_DEALS_LINE\}/g) ?? []).toHaveLength(2);
     expect(read("app/demo/page.tsx")).toContain("{FREE_DEALS_LINE}");
   });
