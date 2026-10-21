@@ -466,11 +466,16 @@ export function OverviewView({
             {active ? "Screening in progress…" : "No verdict yet"}
           </p>
           <p className="mt-1 text-sm text-muted">
+            {/* The pipeline's order (lib/anthropic/pipeline): the stress
+                test is struck in code from the OM's figures once they are
+                read, each row's evidence filling in as the challenger, the
+                comps and the market check finish; the verdict is written
+                last, on it. */}
             {active
-              ? "The verdict and risk digest will appear here as the analysis completes."
+              ? "The stress test fills in below as each step finishes; the verdict and the risk digest land last."
               : stopped
                 ? "The screen stopped before its verdict — the reason is at the top of the page."
-                : "Run the analysis to see the verdict and the consolidated risk digest."}
+                : "Run the analysis to see the stress test, the verdict and the consolidated risk digest."}
           </p>
         </div>
       )}

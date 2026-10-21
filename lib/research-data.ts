@@ -325,6 +325,7 @@ export function seedBenchmarks(): Benchmark[] {
           unit: "pct",
           source: read.links[0] ?? "",
           cite: figureNote(read),
+          house: read.house,
         });
       }
       // A rent the file states as a band is a row with both ends, never
@@ -340,6 +341,7 @@ export function seedBenchmarks(): Benchmark[] {
           unit: "usd_sf_yr",
           source: read.links[0] ?? "",
           cite: figureNote(read),
+          house: read.house,
         });
       }
       if (
@@ -355,6 +357,7 @@ export function seedBenchmarks(): Benchmark[] {
           unit: "pct",
           source: read.links[0] ?? "",
           cite: figureNote(read),
+          house: read.house,
         });
       }
     }

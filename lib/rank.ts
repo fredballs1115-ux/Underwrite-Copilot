@@ -9,7 +9,7 @@
 // of it, and the shade drawn from a place is one shade for equal figures.
 //
 // Pure, no imports: the boards, the chips, the demo and the deal page read
-// the same two functions.
+// the same functions.
 
 export interface Place {
   /** one plus the number of figures strictly ahead of this one */
@@ -37,4 +37,26 @@ export function competitionRanks<T>(sorted: readonly T[], same: (a: T, b: T) => 
  *  drops the "#" for a numbered column whose header already says it. */
 export function rankLabel(p: Place, bare = false): string {
   return p.tied ? `=${p.rank}` : bare ? String(p.rank) : `#${p.rank}`;
+}
+
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th, 21st. */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+/**
+ * A place said with what is ranked and which way, for a chip that stands
+ * beside a figure: "lowest of 5 ranked", "=4th lowest of 11 ranked",
+ * "highest of 5 ranked" — where "#1 of 5" left a reader to guess whether
+ * first was the best or the worst. `low` names the end place 1 is (the
+ * vacancy boards rank the tightest first, so "lowest"), `high` the other.
+ * Equal figures share a place, as `competitionRanks` gives it.
+ */
+export function rankWords(p: Place, total: number, low = "lowest", high = "highest"): string {
+  if (total <= 1) return "the only figure ranked";
+  if (p.rank === 1) return `${p.tied ? "joint " : ""}${low} of ${total} ranked`;
+  if (p.rank === total && !p.tied) return `${high} of ${total} ranked`;
+  return `${p.tied ? "=" : ""}${ordinal(p.rank)} ${low} of ${total} ranked`;
 }

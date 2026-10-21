@@ -15,6 +15,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { DealBanner } from "./deal-banner";
 import { GalleryCreditPartsText } from "@/app/credit-parts";
@@ -497,7 +498,7 @@ export const DealTile = memo(function DealTile({
       // figures, the tags under them, the footer), so every card in a row
       // of the grid shares their heights.
       className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 ${
-        preview && !preview.href ? "" : "hover:-translate-y-0.5 hover:shadow-lg"
+        preview && !preview.href && !preview.action ? "" : "hover:-translate-y-0.5 hover:shadow-lg"
       } ${
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "grayscale" : ""}`}
@@ -525,6 +526,16 @@ export const DealTile = memo(function DealTile({
               {STAGE_LABEL[normalizeStage(d.stage)]}
             </span>
           </div>
+          {/* A still card that acts all the same: the empty pipeline's
+              sample card had looked tappable and done nothing. The action
+              beside it ("Try a sample deal") is the one control a keyboard
+              and a screen reader meet; this cover takes a pointer's click
+              anywhere on the card to the same server action. */}
+          {preview.action && !preview.href ? (
+            <form action={preview.action} className="absolute inset-0 z-10" data-qa="tile-action">
+              <PreviewCover title={preview.title} pendingLabel={preview.pendingLabel} />
+            </form>
+          ) : null}
         </>
       ) : compareMode ? (
         <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} data-deal-nav className="row-span-4 grid grid-rows-subgrid text-left">
@@ -570,13 +581,50 @@ export const DealTile = memo(function DealTile({
 type TilePreviewTarget = {
   /** a page the card opens — the public sample's, /demo; with none the
    *  card is still, and the control that acts sits beside it (the empty
-   *  pipeline's "Try a sample deal", a PendingButton) */
+   *  pipeline's "Try a sample deal", a PendingButton), a click on the card
+   *  running the same `action` where one is handed in */
   href?: string;
   /** the card's tooltip: where it goes */
   title?: string;
   /** a word for the card's footer, before its stage */
   note?: string;
+  /** a server action a click anywhere on a still card runs — the empty
+   *  pipeline's `createSampleDeal`, the same action as the control beside
+   *  it, handed in so this module loads none */
+  action?: () => void | Promise<void>;
+  /** said on the card while the action runs */
+  pendingLabel?: string;
 };
+
+/**
+ * The click target over a still card that acts (`TilePreviewTarget.action`):
+ * a submit button filling the card, out of the tab order and the
+ * accessibility tree since the page's own control beside the card does the
+ * same for a keyboard and a screen reader, saying its pending words over the
+ * card once pressed. It holds no content but those words: a button round the
+ * card's picture, name and figures was invalid (block content) and read the
+ * whole card as its name.
+ */
+function PreviewCover({ title, pendingLabel }: { title?: string; pendingLabel?: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      tabIndex={-1}
+      aria-hidden
+      aria-label={title ?? "Open"}
+      title={title}
+      onClick={pending ? (e) => e.preventDefault() : undefined}
+      className={`block h-full w-full rounded-2xl focus:outline-none ${pending ? "cursor-progress bg-surface/40" : "cursor-pointer"}`}
+    >
+      {pending && pendingLabel ? (
+        <span className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-ink/85 px-3 py-1 text-xs font-medium text-white shadow">
+          {pendingLabel}
+        </span>
+      ) : null}
+    </button>
+  );
+}
 
 /**
  * The pipeline's own card, drawn outside the reader's pipeline (the empty
@@ -584,7 +632,8 @@ type TilePreviewTarget = {
  * pipeline-card, so it is the very card the pipeline shows — the picture
  * and its caption, the call on it, the name, the place, the three figures —
  * opening `href` instead of the deal's page, or still where none is given
- * (the control that acts sits beside it, never round it), with no
+ * (the control that acts sits beside it, never round it — a click on the
+ * card runs that control's `action` where one is handed in), with no
  * stage control and no photographs to flip. Under it, the one credit line
  * the pipeline prints under its cards, for the market photograph the card
  * settled on.
@@ -594,6 +643,8 @@ export function DealTilePreview({
   href,
   title,
   note,
+  action,
+  pendingLabel,
   todayIso,
   className = "grid",
   lazy = false,
@@ -624,7 +675,7 @@ export function DealTilePreview({
           onToggle={noop}
           onMarket={onMarket}
           todayIso={todayIso}
-          preview={{ href, title, note }}
+          preview={{ href, title, note, action, pendingLabel }}
           lazy={lazy}
         />
       </ul>

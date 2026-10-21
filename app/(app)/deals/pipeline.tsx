@@ -1233,12 +1233,16 @@ export function Pipeline({
         >
           {/* The sample's own card, as the pipeline draws it the moment the
               reader adds it (lib/pipeline-card): its market's photograph,
-              the call on it, the figures. A still picture: "Try a sample
-              deal" beside it adds it and opens it. */}
+              the call on it, the figures. "Try a sample deal" beside it
+              adds it and opens it, and so does a click on the card — the
+              same action, so the card that looks tappable is. */}
           {sampleCard ? (
             <DealTilePreview
               d={sampleCard}
               note="Sample deal"
+              title="Open the sample deal"
+              action={createSampleDeal}
+              pendingLabel="Setting up your sample…"
               todayIso={todayIso}
               className="grid max-w-[19rem]"
             />

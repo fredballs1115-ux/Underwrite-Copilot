@@ -35,7 +35,7 @@ import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorStandings } from "@/lib/sector-leaderboard";
-import { rankLabel } from "@/lib/rank";
+import { rankWords } from "@/lib/rank";
 import { linkOk } from "@/lib/link-audit";
 import { sourceParts } from "@/lib/source-parts";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
@@ -71,6 +71,13 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   sourced: { label: "sourced", cls: "bg-brand/10 text-brand" },
   unverified_not_found: { label: "unverified", cls: "bg-amber-500/10 text-amber-600" },
 };
+
+/** A figure whose file names no house (lib/tracker-read `figureCitation`'s
+ *  "publisher not recorded"): its link alone, or nothing to check. */
+const UNATTRIBUTED_META = {
+  link: { label: "link only", cls: "bg-amber-500/10 text-amber-600" },
+  none: { label: "no source", cls: "bg-amber-500/10 text-amber-600" },
+} as const;
 
 /** A bedroom count as the panel says it. */
 function bedLabel(bed: FmrBed): string {
@@ -193,10 +200,15 @@ export function SourceLink({
   today,
   yearEnded,
   readOn,
+  unattributed,
 }: {
   source: string | null;
   asOf: string;
   status: string;
+  /** the figure's file names no house for it ("publisher not recorded"):
+   *  never badged "sourced" — a link with no publisher behind it is a
+   *  link only, and one with no link is no source */
+  unattributed?: boolean;
   /** the day the panel is read (an ISO day), for the research rule's age */
   today: string;
   /** a figure that holds for a fiscal year (a fair market rent): its
@@ -208,7 +220,7 @@ export function SourceLink({
    *  research-tracker row, whose own period rides in its citation) */
   readOn?: boolean;
 }) {
-  const meta = STATUS_META[status] ?? STATUS_META.sourced;
+  const statusMeta = STATUS_META[status] ?? STATUS_META.sourced;
   // The research rule (lib/research-age): past its limit the date is shown
   // with its age and marked stale, never hidden. A figure whose file states
   // no date is undated — flagged in the stale tone, but never given a date
@@ -227,6 +239,15 @@ export function SourceLink({
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
   const audited = linkOk(href);
+  // "sourced" beside "publisher not recorded" read as a source a visitor
+  // could check; with no house named, the badge says what there is.
+  const linked = !!source && !!href && audited !== false;
+  const meta =
+    unattributed && status !== "unverified_not_found"
+      ? linked
+        ? UNATTRIBUTED_META.link
+        : UNATTRIBUTED_META.none
+      : statusMeta;
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
@@ -738,9 +759,12 @@ export function ResearchPanelView({
                       // cross-metro ranking — same builder as the market page.
                       const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
                       const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
+                      // Said with its direction — the boards rank the
+                      // tightest vacancy first — so "#1 of 5" is never read
+                      // as the loosest market (lib/rank `rankWords`).
                       const rank =
                         standing && standing.rank !== null
-                          ? { label: rankLabel({ rank: standing.rank, tied: standing.tied }), total: standing.total }
+                          ? rankWords({ rank: standing.rank, tied: standing.tied }, standing.total)
                           : undefined;
                       return (
                         <li
@@ -756,10 +780,10 @@ export function ResearchPanelView({
                             {rank && vac && (
                               <Link
                                 href={`/market?sector=${vac[1]}`}
-                                title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
+                                title={`Vacancy across the covered markets' ranked figures, lowest first (a band by its high end); equal figures share a place${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
                                 className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
                               >
-                                {`${rank.label} of ${rank.total}`}
+                                {rank}
                               </Link>
                             )}
                             {/* A research-tracker figure's own house, area and
@@ -771,7 +795,7 @@ export function ResearchPanelView({
                               </span>
                             )}
                           </span>
-                          <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} />
+                          <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} unattributed={b.house === null} />
                         </li>
                       );
                     })}
