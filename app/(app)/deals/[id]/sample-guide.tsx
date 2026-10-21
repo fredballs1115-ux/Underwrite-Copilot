@@ -15,7 +15,7 @@ type Step = { title: string; hint: string; icon: ReactNode };
 
 const STRESS_STEP: Step = {
   title: "The stress test",
-  hint: "Each assumption against its evidence",
+  hint: "Each key assumption against its evidence",
   icon: (
     <>
       <path d="M4 20V10" />

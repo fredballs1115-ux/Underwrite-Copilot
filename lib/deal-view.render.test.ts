@@ -263,7 +263,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(guide).toMatch(/<button type="button" data-guide-step="stress-test"/);
     expect(guide.indexOf('data-guide-step="stress-test"')).toBeLessThan(guide.indexOf('data-guide-step="verdict"'));
     expect(textOf(guide)).toContain("The stress test");
-    expect(textOf(guide)).toContain("Each assumption against its evidence");
+    expect(textOf(guide)).toContain("Each key assumption against its evidence");
     expect(html).toContain('<div id="stress-test" tabindex="-1"');
     expect(a11yIssues(html)).toEqual([]);
   });

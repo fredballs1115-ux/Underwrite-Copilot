@@ -1509,7 +1509,7 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
   const rerun = rerunsStand(test) ? ", and the return re-run in code with that one input swapped for the evidence's" : "";
   across(
     2,
-    `Each assumption the memorandum makes, set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
+    `The memorandum's key assumptions, each set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
   );
   across(3, stressReadLine(test), { color: INK });
   // The sample's note, where its re-runs stand (the memo's and the report's rule).
