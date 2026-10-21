@@ -2,6 +2,7 @@ import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
 import { ALL_HOMES_RENT_LABEL, APARTMENT_RENT_LABEL, CPI_RENT_LABEL, rentGrowthDecider } from "@/lib/rent-growth-decider";
 import { CORE_CPI_LABEL, CPI_ALL_ITEMS_LABEL, EXPENSE_GROWTH_ORDER } from "@/lib/stress-deciders";
+import { compoundYearOverYear } from "@/lib/growth-average";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -189,6 +190,23 @@ export interface ModelCheck {
   /** Display only, one a published figure in its order: how the picture
    *  draws it (`FigureMark`). Absent with `modelValue`. */
   marks?: FigureMark[];
+  /** A growth row's longer view (lib/growth-average): the compound average a
+   *  year of the deciding series' own published changes over the whole years
+   *  its stored history holds, two or more — beside the trailing year,
+   *  deciding nothing and in no tone. The stress test's growth rows carry it
+   *  as a piece shown beside the one that decides. Absent where the history
+   *  holds under two years, or the deciding series keeps no history
+   *  (Zillow's asking rents keep the newest month alone). */
+  average?: GrowthAverageFigure;
+}
+
+/** A published series' compound average change a year over the whole
+ *  years its stored history holds (`ModelCheck.average`). */
+export interface GrowthAverageFigure extends PublishedFigure {
+  /** how many year-over-year changes, a whole year apart, it compounds */
+  years: number;
+  /** the label of the published figure it is the average of */
+  of: string;
 }
 
 /**
@@ -496,6 +514,37 @@ function fresh(rates: readonly LiveRate[] | undefined, pick: (r: LiveRate) => bo
   return rates?.find((r) => pick(r) && r.fresh && Number.isFinite(r.value)) ?? null;
 }
 
+const COUNT_WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
+/**
+ * The deciding series' compound average a year over the whole years its
+ * stored history holds (lib/growth-average `compoundYearOverYear`), as a
+ * figure of its own: "+3.9% a year over the four years to Aug 2026,
+ * compounded from its four published changes against a year earlier (the
+ * years to Aug 2026, Aug 2025, Aug 2024 and Aug 2023): an average of
+ * published figures, not a forecast". Null under two years.
+ */
+function averageFigure(r: LiveRate, of: string, publisher: string): GrowthAverageFigure | null {
+  const a = compoundYearOverYear(r);
+  if (!a) return null;
+  const ends = a.changes.map((c) => periodLabel(c.obsDate, r.meta.cadence));
+  const n = countWord(a.years);
+  // A negative carries the true minus (U+2212), as the stress test prints it.
+  const value = Math.round(a.pct * 100) / 100;
+  const shown = value.toFixed(1);
+  const figure = Number(shown) > 0 ? `+${shown}` : Number(shown) < 0 ? `−${shown.slice(1)}` : shown.replace(/^-/, "");
+  return {
+    label: `${of}: average a year over ${a.years} years`,
+    text: `${figure}% a year over the ${n} years to ${ends[0]}, compounded from its ${n} published changes against a year earlier (the years to ${joinWords(ends)}): an average of published figures, not a forecast`,
+    value,
+    asOf: r.obsDate,
+    publisher,
+    years: a.years,
+    of,
+  };
+}
+
 type MetroMeta = LiveRate["meta"] & { metric?: string; area?: string; source?: SeriesSource };
 const metricOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).metric;
 const areaOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).area;
@@ -570,6 +619,7 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
   ];
   const setFrom = runsFigure(input.sources?.rentGrowthPct, published[0], g);
   const tone: CheckTone = setFrom ? "set_from" : rangeTone(g, [r.value]);
+  const average = averageFigure(r, published[0].label, "BLS via FRED");
   const clause = setFrom
     ? `${SET_FROM_WORDS}: the index, so it is not checked against it. ${setFromTrailing(input.sources?.rentGrowthPct)}`
     : tone === "ahead"
@@ -590,6 +640,7 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
     read: `The model grows rents ${g.toFixed(1)}%/yr. Over the year to ${when} the rents ${idx.lessor} charge moved ${signed(r.value)}% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. ${clause}${setFrom ? "" : " A trailing year is what the assumption is being asked to beat, not a forecast."}`,
     modelValue: g,
     marks: [mark("range", true)],
+    ...(average ? { average } : {}),
   };
 }
 
@@ -698,6 +749,10 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
         : "The model sits inside the published range.";
   const toneLabel = decided ? DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone] : TONE_LABEL[tone];
   const trailing = setFrom ? setFromTrailing(input.sources?.rentGrowthPct) : "A trailing year is what the assumption is being asked to beat, not a forecast.";
+  // The longer view of the deciding series, where its stored history holds
+  // one: the CPI's rent keeps its months; Zillow's asking rents keep the
+  // newest month alone, so no average is struck on them.
+  const average = decided && cpiRent && published[decided.index].label === CPI_RENT_LABEL ? averageFigure(cpiRent, CPI_RENT_LABEL, publisherOf(cpiRent)) : null;
   return {
     key: "rent_growth",
     title: "Rent growth",
@@ -716,6 +771,7 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     // An allowance is the regime's, drawn apart from the market's range.
     modelValue: g,
     marks: [...(regulated ? regulated.published.map(() => mark("apart")) : []), ...published.map((_, i) => mark(!decided || i === decided.index ? "range" : "beside"))],
+    ...(average ? { average } : {}),
   };
 }
 
@@ -789,6 +845,9 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const breakevenClause = breakeven
     ? ` The bond market expects inflation to average ${breakeven.value.toFixed(2)}% a year over the next ten years (the 10-year breakeven, ${periodLabel(breakeven.obsDate, breakeven.meta.cadence)}; FRED) — its forecast over ten years, not the hold's.`
     : "";
+  // The longer view of all-items CPI, where the stored history holds two
+  // years or more of its published changes: beside it, in no tone.
+  const average = averageFigure(cpi, CPI_ALL_ITEMS_LABEL, "BLS via FRED");
   return {
     key: "expense_growth",
     title: "Expense growth",
@@ -810,6 +869,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
       ...(insurance ? [mark("apart", true)] : []),
       ...(breakeven ? [mark("apart", true)] : []),
     ],
+    ...(average ? { average } : {}),
   };
 }
 

@@ -117,12 +117,14 @@ describe("/how-we-test draws every method from the table", () => {
       debt: ["published", null, null],
       noi: ["document", "document", "om_internal"],
       // A stabilized assumption is the market's to judge first; the
-      // documents' vacancy is today's.
-      vacancy: ["published", "published", "document", "rule_of_thumb"],
+      // documents' vacancy is today's: the rent roll's by its doors, the
+      // T-12's in dollars, each its own measure.
+      vacancy: ["published", "published", "document", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
       expense_growth: ["published", "published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
-      insurance: ["published", "document"],
+      // The seller's own T-12 premium decides where the OM's sits under it.
+      insurance: ["document", "published"],
       // The break-even is said beside the row, never set against it.
       renovation_premium: ["om_internal", "om_internal"],
       other: [null],
@@ -207,10 +209,10 @@ describe("/how-we-test draws every method from the table", () => {
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized vacancy is held to the market/);
-    // lib/stress-deciders' order: the market, the rent roll, the T-12 (not on
-    // a plan), the class's norm; the documents beside a market figure are
-    // today's gap, never "shown" in the norm's place (audit of PR #486).
-    expect(VERDICT_RULES.vacancy).toContain("then the rent roll, then the T-12 (never on a plan), then the class's norm; beside a market figure the documents show today's gap.");
+    // lib/stress-deciders' order: the market, the rent roll (not on a plan),
+    // the class's norm — doors by doors; the T-12's dollars decide only an
+    // economic figure (the review of 2026-10-21).
+    expect(VERDICT_RULES.vacancy).toContain("then the rent roll (never on a plan), then the class's norm; the T-12, dollars not doors, decides only an economic figure.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");

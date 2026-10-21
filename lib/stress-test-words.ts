@@ -396,6 +396,10 @@ export function evidenceShort(row: StressRow, e: StressEvidence | null): string 
   if (isGrowth(row.key) && e.value != null && /\bover the year\b/.test(e.text)) {
     return `${evidenceFigureText(row.key, e.value)} over the year${period ? ` to ${period.said}` : ""} (${e.publisher})`;
   }
+  // A growth series' average over the years its history holds (lib/growth-
+  // average): a rate a year over those years, said as one, never a year's.
+  const years = isGrowth(row.key) && e.value != null ? e.text.match(/ a year (over the \S+ years to [^,]+),/)?.[1] : null;
+  if (years) return `${evidenceFigureText(row.key, e.value)} a year ${years}, an average (${e.publisher})`;
   // The evidence's figure wears the OM's own noun (a basis "/unit"): the
   // reader struck both on one track.
   const figure = e.value != null ? evidenceFigureText(row.key, e.value, row.omSays.text) : e.text;

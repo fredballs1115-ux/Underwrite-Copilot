@@ -85,7 +85,7 @@ export const VERDICT_WORDS: readonly { word: StressVerdict; line: string }[] = [
     line: `Past the deciding figure by less than the row's threshold; or at it, where the re-run lowers the levered IRR by ${IRR_MOVE_STRETCH_BPS} bps or more, or a plan's yield on cost by ${YOC_MOVE_STRETCH_PTS} points or more.`,
   },
   { word: "unsupported", line: "Past the deciding figure by more than the row's threshold, below. Every other piece on the row is shown beside it and decides nothing." },
-  { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium, with no quote for a new owner)." },
+  { word: "unchecked", line: "The OM states no figure, no evidence with a figure could be read for the deal, or nothing on file can test it (an insurance premium at or over the seller's own T-12 premium, with no quote for a new owner)." },
 ];
 
 const pctOf = (share: number) => `${Math.round(share * 100)}%`;
@@ -103,14 +103,15 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to today's index plus the class's screening spread. Under it is stretched; unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and under the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  // lib/stress-deciders' VACANCY_ORDER: the market, then the documents (a
-  // plan's stabilized figure skips them), then the class's norm.
-  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the rent roll, then the T-12 (never on a plan), then the class's norm; beside a market figure the documents show today's gap. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
+  // lib/stress-deciders' VACANCY_ORDER: one measure decides its own kind —
+  // doors by the market, then the rent roll (never on a plan), then the
+  // class's norm; dollars by the T-12, then the class's norm.
+  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the rent roll (never on a plan), then the class's norm; the T-12, dollars not doors, decides only an economic figure. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
   // lib/rent-growth-decider's order, one line.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
-  expense_growth: `Held to all-items CPI, the broad price level the expense base moves with; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
+  expense_growth: `Held to all-items CPI's trailing year; to core CPI only where all-items is not fresh. Core, the insurance index, the breakeven and the CPI's own average over the years its history holds are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the bill the OM's own figures imply, else its stated unabated bill. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported, while the reset bill, a condition, reads stretched at most.`,
-  insurance: "Unchecked: no quote for a new owner is on file. The T-12's premium is shown as the seller's history and the index's move on the OM's own figure beside it, and neither decides.",
+  insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a floor, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
   other: "No verdict is struck: the row carries the challenger's words.",
 };

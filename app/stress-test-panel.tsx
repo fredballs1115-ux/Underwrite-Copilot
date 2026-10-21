@@ -199,10 +199,11 @@ export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
 /**
  * What would test an unchecked row, in plain words — only where the OM
  * states the figure and the document named is one the test reads when it
- * is on the deal (the T-12's NOI and vacancy, the rent roll's occupancy).
- * Null elsewhere: a sentence never promises a test the code does not make —
- * the T-12's insurance line is the seller's history, which tests no premium
- * a new owner will be quoted.
+ * is on the deal (the T-12's NOI, the rent roll's occupancy by its doors,
+ * the T-12's economic vacancy for a figure the OM states as economic). Null
+ * elsewhere: a sentence never promises a test the code does not make — the
+ * T-12's economic vacancy never tests a figure counted by doors, and its
+ * insurance line tests a premium only where the OM's sits under it.
  */
 export function testedByHint(row: StressRow): string | null {
   if (row.verdict !== "unchecked" || row.omSays.value == null) return null;
@@ -210,7 +211,7 @@ export function testedByHint(row: StressRow): string | null {
     case "noi":
       return "Add the T-12 to test this.";
     case "vacancy":
-      return "Add the rent roll or the T-12 to test this.";
+      return row.measure === "economic" ? "Add the T-12 to test this." : "Add the rent roll to test this.";
     default:
       return null;
   }

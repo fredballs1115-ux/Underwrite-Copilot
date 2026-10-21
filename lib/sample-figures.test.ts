@@ -4,7 +4,8 @@
 // quotes the stress test's own re-run of the exit.
 import { describe, expect, it } from "vitest";
 import { SAMPLE_DEAL, SAMPLE_EXIT_RERUN } from "@/lib/sample-deal";
-import { sampleStressTest } from "@/lib/sample-stress";
+import { sampleModelReads, sampleStressTest } from "@/lib/sample-stress";
+import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { readValueAdd } from "@/lib/value-add";
 import { parseUsd } from "@/lib/money";
@@ -24,7 +25,7 @@ describe("the sample's stress test", () => {
     return i ? [Number(i.baseIrrPct!.toFixed(1)), Number(i.altIrrPct!.toFixed(1))] : null;
   };
 
-  it("tests six of its nine assumptions; the three unchecked are the loan rate no document states, a rent growth no figure was read for and a premium no new owner's quote tests", () => {
+  it("tests seven of its nine assumptions; the two unchecked are the loan rate no document states and a rent growth no figure was read for", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["basis", "stretched"],
@@ -37,9 +38,11 @@ describe("the sample's stress test", () => {
       ["rent_growth", "unchecked"],
       // The reset is conditional on the jurisdiction: stretched at most.
       ["taxes", "stretched"],
-      // The T-12's premium is the same seller's history, and no quote for
-      // a new owner is on file: nothing tests the pro forma's $310k.
-      ["insurance", "unchecked"],
+      // The pro forma's premium sits under the seller's own T-12 premium:
+      // the OM against its own building's history, the T-12's the floor a
+      // new owner can expect, never a quote, so stretched at most (the
+      // review of 2026-10-21).
+      ["insurance", "stretched"],
       ["renovation_premium", "unsupported"],
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");
@@ -52,16 +55,27 @@ describe("the sample's stress test", () => {
     expect(irr("exit_cap")).toEqual([10.8, 9.3]);
     expect(irr("noi")).toEqual([11.7, 9.3]);
     // At the rent roll's 9.3% by count (225 of 248 doors): with no published
-    // figure read, the documents decide the stabilized assumption, said so.
+    // figure read, the rent roll decides the stabilized assumption, said so;
+    // the T-12's 9.1% is its vacancy and credit loss, dollars, beside it.
+    const t12 = SAMPLE_DEAL.t12.summary;
+    const t12Pct = ((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 100).toFixed(1);
+    const rollPct = (((SAMPLE_DEAL.rentRoll.summary.unitCount - SAMPLE_DEAL.rentRoll.summary.occupiedUnits) / SAMPLE_DEAL.rentRoll.summary.unitCount) * 100).toFixed(1);
     expect(irr("vacancy")).toEqual([12.4, 9.1]);
     expect(row("vacancy").gap?.text).toBe(
-      "The OM's 6.0% is 3.3 points under the evidence's 9.3%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide.",
+      `The OM's 6.0% is 3.3 points under the evidence's ${rollPct}%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides. The deal's T-12 ran ${t12Pct}% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`,
     );
     expect(irr("taxes")).toEqual([9.3, 5.9]);
-    // The row is unchecked (no quote for a new owner is on file), so it
-    // re-runs nothing: a run at the T-12's $385k would print a move no
-    // evidence makes (the walkthrough of 2026-10-20).
-    expect(irr("insurance")).toBeNull();
+    // The premium is re-run at the seller's own T-12 premium, the floor a new
+    // owner can expect: swapped into the model's expense line, which is the
+    // T-12's and already carries it, so the evidence's run is the model's own.
+    const ins = row("insurance").impact!;
+    const premium = SAMPLE_DEAL.t12.summary.opex.find((l) => l.key === "insurance")!.amount;
+    expect(ins.input).toBe("expenseLines");
+    expect(ins.altValue - ins.omValue).toBeCloseTo(premium - usd("Insurance (pro forma)"), 6);
+    const { derived } = sampleModelReads({ today: "2026-10-20", reads: null });
+    expect(ins.altIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
+    expect(ins.baseIrrPct!).toBeGreaterThan(ins.altIrrPct!);
+    expect(ins.note).toContain("the floor a new owner can expect, not a quote");
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
     expect(row("renovation_premium").gap?.text).toBe(
@@ -88,12 +102,15 @@ describe("the sample's stress test", () => {
     expect(taxes.gap?.text).toMatch(/^If the sale resets the assessment to the price, the bill is/);
   });
 
-  it("shows the T-12's insurance line beside the pro forma's as the seller's history, and holds it to nothing", () => {
+  it("holds the pro forma's premium to the seller's own T-12 premium it sits under, a floor, never a quote", () => {
     const t12 = SAMPLE_DEAL.t12.summary.opex.find((l) => l.key === "insurance")!.amount;
-    expect(row("insurance").omSays.value).toBe(usd("Insurance (pro forma)"));
+    const om = usd("Insurance (pro forma)");
+    expect(row("insurance").omSays.value).toBe(om);
     expect(row("insurance").evidence[0].value).toBe(t12);
-    expect(row("insurance").verdict).toBe("unchecked");
-    expect(row("insurance").gap).toBeNull();
+    expect(row("insurance").decidedBy).toBe(0);
+    expect(row("insurance").verdict).toBe("stretched");
+    expect(row("insurance").gap).toMatchObject({ value: t12 - om, unit: "usd" });
+    expect(row("insurance").gap!.text).toContain("A new owner's quote is what finally decides the premium, and none is on file");
     expect(row("insurance").omSays.page).toBe(28);
   });
 

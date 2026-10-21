@@ -11,16 +11,26 @@
 // The orders, a row each:
 //   - rent growth: lib/rent-growth-decider's, by the kind of rent the class
 //     collects (as it was);
-//   - vacancy: a stabilized assumption on a deal read as stabilized, the
+//   - vacancy: ONE measure decides its own kind (the review of 2026-10-21).
+//     A physical figure — doors, the units or the area empty: a stated
+//     occupancy, a plain vacancy allowance — is decided only by a physical
+//     figure: on a stabilized assumption on a deal read as stabilized, the
 //     market's published figure first (the metro survey, a commercial
 //     class's tracker band at its low read, the Census region, the state),
-//     then the deal's rent roll, then its T-12, then the class's norm; a
-//     plan deal's stated stabilized vacancy, the market's figure in the same
-//     order, then the class's norm — never the rent roll or the T-12, which
-//     are the building before the plan is done (shown beside it as the gap
-//     the plan closes); any other vacancy (today's occupancy), the rent
-//     roll, then the T-12, then the published figures in the same order,
-//     then the class's norm;
+//     then the deal's rent roll, then the class's norm; a plan deal's stated
+//     stabilized vacancy, the market's figure in the same order, then the
+//     class's norm — never the rent roll, which is the building before the
+//     plan is done (shown beside it as the gap the plan closes); today's
+//     occupancy, the rent roll, then the published figures in the same
+//     order, then the class's norm. The T-12's vacancy and credit loss over
+//     gross potential rent is an economic figure — dollars, not doors: what
+//     the statement files in that line (credit loss, and concessions or loss
+//     to lease where it nets them there) rides in it — so it never decides a
+//     physical figure and is shown beside it, labelled economic. An economic
+//     figure the OM states (an economic occupancy, a vacancy and credit loss
+//     allowance) is decided by the T-12, the same measure, then the class's
+//     norm (on a plan deal's stabilized figure, the norm alone); the rent
+//     roll and the published vacancy count doors and are shown beside it;
 //   - expense growth: all-items CPI (the broad price level the expense base
 //     moves with), then core CPI only where all-items is not fresh; the
 //     insurance premium index and the breakeven never decide;
@@ -36,7 +46,11 @@
 //   - taxes: the bill the OM's own figures imply on the price, then the
 //     stated unabated bill an abatement ends into inside the hold;
 //   - renovation premium: the achieved premium the OM states;
-//   - insurance: none — no quote for a new owner is on file;
+//   - insurance: a new owner's quote would decide it, and none is read yet;
+//     the deal's T-12 premium, the seller's own actual, decides only where
+//     the OM's premium sits under it past SAME_SHARE (the OM against its own
+//     building's history, the floor a new owner can expect, never a quote);
+//     at or over it nothing decides;
 //   - other: none — the challenger's words are not a figure.
 //
 // Pure: types and the rent-growth order only. A later step that runs the
@@ -53,7 +67,10 @@ export { BESIDE_TAG, DECIDES_TAG, decidesTag } from "@/lib/stress-test-words";
 
 // The evidence labels lib/stress-test emits that an order names, one copy.
 export const RENT_ROLL_VACANCY_LABEL = "The deal's rent roll: the occupancy it runs at";
-export const T12_VACANCY_LABEL = "The deal's T-12: vacancy loss over gross potential rent";
+/** The T-12's vacancy is economic — dollars, not doors — and its label says
+ *  so wherever it is shown: it decides only a figure the OM states as
+ *  economic. */
+export const T12_VACANCY_LABEL = "The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)";
 export const METRO_VACANCY_LABEL = "Rental vacancy, metro area";
 export const CPI_ALL_ITEMS_LABEL = "Consumer prices (CPI, all items)";
 export const CORE_CPI_LABEL = "Core CPI";
@@ -63,6 +80,7 @@ export const SALE_COMPS_SF_LABEL = "The memorandum's sale comps stating a price 
 export const SEEDED_RATE_LABEL = "The class's screening spread over it, a rule of thumb";
 export const SEEDED_RATE_ONLY_LABEL = "The index the model prices off, plus the class's screening spread";
 export const T12_NOI_LABEL = "The deal's T-12 NOI";
+export const T12_INSURANCE_LABEL = "The deal's T-12 insurance line";
 export const OM_IN_PLACE_NOI_LABEL = "The OM's in-place NOI against its pro forma";
 export const RESET_BILL_LABEL = "The bill the OM's own figures imply on the price";
 export const ABATEMENT_LABEL = "The stated tax abatement and when it ends";
@@ -130,25 +148,41 @@ const MARKET_VACANCY: readonly DeciderStep[] = [
   { name: "the Census region's rental vacancy", why: "where the survey has no metro figure", is: (e) => e.kind === "published" && /census region/i.test(e.label) },
   { name: "the state's annual rental vacancy", why: "where the survey has neither", is: (e) => e.kind === "published" && /^Rental vacancy, /.test(e.label) },
 ];
-const DOCUMENT_VACANCY: readonly DeciderStep[] = [
-  { name: "the deal's rent roll", why: "the occupancy the building runs at today", is: isLabel(RENT_ROLL_VACANCY_LABEL) },
-  { name: "the deal's T-12", why: "the vacancy the building ran at over its trailing year", is: isLabel(T12_VACANCY_LABEL) },
-];
+/** The rent roll's occupancy: physical, by its count of doors (by area
+ *  where the class is priced by the foot). */
+const RENT_ROLL_VACANCY: DeciderStep = { name: "the deal's rent roll", why: "the occupancy the building runs at today, by its doors", is: isLabel(RENT_ROLL_VACANCY_LABEL) };
+/** The T-12's vacancy and credit loss over gross potential rent: economic. */
+const T12_VACANCY: DeciderStep = {
+  name: "the deal's T-12",
+  why: "the economic vacancy the building ran at over its trailing year, the same measure as the OM's",
+  is: isLabel(T12_VACANCY_LABEL),
+};
 const RULE_VACANCY: DeciderStep = { name: "the class's norm, a rule of thumb", why: "where nothing else carries a figure", is: (e) => e.kind === "rule_of_thumb" };
 
+/** Each order holds only figures of the OM figure's own measure: a physical
+ *  figure (doors) is never decided by the T-12's economic loss (dollars), and
+ *  an economic one never by a count of doors. */
 export const VACANCY_ORDER = {
-  /** a stabilized assumption on a deal read as stabilized */
-  stabilized: [...MARKET_VACANCY, ...DOCUMENT_VACANCY, RULE_VACANCY],
+  /** a stabilized physical assumption on a deal read as stabilized */
+  stabilized: [...MARKET_VACANCY, RENT_ROLL_VACANCY, RULE_VACANCY],
   /** a plan deal's stated stabilized figure: the market's, then the class's
    *  norm; the deal's documents are today's building, never its figure */
   plan: [...MARKET_VACANCY, RULE_VACANCY],
-  /** an occupancy for today */
-  today: [...DOCUMENT_VACANCY, ...MARKET_VACANCY, RULE_VACANCY],
+  /** an occupancy for today, by its doors */
+  today: [RENT_ROLL_VACANCY, ...MARKET_VACANCY, RULE_VACANCY],
+  /** a figure the OM states as economic: the T-12, the same measure, then
+   *  the class's norm */
+  economic: [T12_VACANCY, RULE_VACANCY],
+  /** a plan deal's stated economic allowance: the class's norm alone — the
+   *  T-12 is the building before the plan is done */
+  economicPlan: [RULE_VACANCY],
 } as const;
 
 /** `stabilized`: the OM's figure is a stated stabilized vacancy; `plan`: on
- *  a value-add, lease-up, conversion or development deal. */
-export function vacancyDecider(candidates: readonly DeciderCandidate[], opts: { stabilized: boolean; plan?: boolean }): DecidingFigure | null {
+ *  a value-add, lease-up, conversion or development deal; `economic`: the
+ *  OM states its figure as economic (dollars, not doors). */
+export function vacancyDecider(candidates: readonly DeciderCandidate[], opts: { stabilized: boolean; plan?: boolean; economic?: boolean }): DecidingFigure | null {
+  if (opts.economic) return pickDecider(opts.stabilized && opts.plan ? VACANCY_ORDER.economicPlan : VACANCY_ORDER.economic, candidates);
   return pickDecider(opts.stabilized ? (opts.plan ? VACANCY_ORDER.plan : VACANCY_ORDER.stabilized) : VACANCY_ORDER.today, candidates);
 }
 
@@ -246,19 +280,31 @@ export function renovationPremiumDecider(candidates: readonly DeciderCandidate[]
   return pickDecider(PREMIUM_ORDER, candidates);
 }
 
-// — Insurance and the challenger's rows —
+// — Insurance —
 
-/** No figure decides the insurance row: a quote for a new owner would, and
- *  none is on file. The T-12's premium is the seller's history and the
- *  index moves the OM's own figure, so neither is ever handed in. */
-export function insuranceDecider(): DecidingFigure | null {
-  return null;
+/** A new owner's quote would decide the premium, and none is read from the
+ *  documents yet. The deal's T-12 premium — the seller's own actual — decides
+ *  only where the row hands it in as one that may (lib/stress-test: the OM's
+ *  premium under it past SAME_SHARE, on a building already delivered): the
+ *  OM against its own building's history, the floor a new owner can expect,
+ *  never a quote. The index moves the OM's own figure and never decides. */
+export const INSURANCE_ORDER: readonly DeciderStep[] = [
+  {
+    name: "the deal's T-12 premium",
+    why: "the seller's own actual, the floor a new owner can expect where the OM's premium sits under it, not a quote",
+    is: isLabel(T12_INSURANCE_LABEL),
+  },
+];
+
+export function insuranceDecider(candidates: readonly DeciderCandidate[] = []): DecidingFigure | null {
+  return pickDecider(INSURANCE_ORDER, candidates);
 }
+
+// — The challenger's rows —
 
 /** Each row's order in words, best first, as /how-we-test and the tests read
  *  it: the deciding figure and its fallbacks. Rent growth's order is the
- *  class's own (lib/rent-growth-decider); insurance and the challenger's
- *  rows have none. */
+ *  class's own (lib/rent-growth-decider); the challenger's rows have none. */
 export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   basis: BASIS_ORDER.map((s) => s.name),
   exit_cap: EXIT_CAP_ORDER.map((s) => s.name),
@@ -268,7 +314,7 @@ export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   rent_growth: ["Zillow's apartment asking rents", "Zillow's asking rents across all home types", "the rent sitting tenants pay (CPI rent)", "the national index of rents its kind of lessor charges"],
   expense_growth: EXPENSE_GROWTH_ORDER.map((s) => s.name),
   taxes: TAXES_ORDER.map((s) => s.name),
-  insurance: [],
+  insurance: INSURANCE_ORDER.map((s) => s.name),
   renovation_premium: PREMIUM_ORDER.map((s) => s.name),
   other: [],
 };

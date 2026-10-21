@@ -1544,8 +1544,8 @@ describe("the memo leads with the stress test", () => {
     const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
     // The four rows the memo has room for, unsupported first, then the
     // stretched rows whose re-run moves the return most (the basis and the
-    // taxes); the exit cap and the NOI are the report's, and so is the
-    // insurance row, unchecked since no quote for a new owner is on file.
+    // taxes); the exit cap, the NOI and the insurance row, held to the
+    // seller's own T-12 premium, are the report's.
     expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
       ["vacancy", "unsupported"],
       ["renovation_premium", "unsupported"],
@@ -1559,7 +1559,7 @@ describe("the memo leads with the stress test", () => {
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("9 of the memorandum's assumptions read in code — 6 tested (2 unsupported, 4 stretched), 3 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("9 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 2 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The headline, in the read line's paragraph: the OM's case against the
     // evidence's (lib/stress-test `stressHeadline`); the split is the
     // report's, since the one page has no line to spare for it.
@@ -1738,8 +1738,8 @@ describe("the memo leads with the stress test", () => {
     expect(tight.sensitivity).toEqual([]);
     expect(MEMO_FIT_STEPS[3](tight)).toBeNull();
     // The block's count, beside its title.
-    expect(data.stressTest?.count).toBe("2 unsupported · 4 stretched");
+    expect(data.stressTest?.count).toBe("2 unsupported · 5 stretched");
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text.toLowerCase()).toContain("the om's assumptions, tested 2 unsupported · 4 stretched");
+    expect(text.toLowerCase()).toContain("the om's assumptions, tested 2 unsupported · 5 stretched");
   }, 60000);
 });
