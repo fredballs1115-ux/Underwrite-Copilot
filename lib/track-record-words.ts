@@ -48,15 +48,21 @@ export const RESCREEN_LINE = "Upload the document, then re-screen the deal.";
 export const SAMPLE_NO_RECORD = "Nothing has arrived since the sample's screen, so it has no track record.";
 
 /**
+ * A vacancy is scored in its own measure, as the stress test decides it
+ * (lib/stress-deciders `VACANCY_ORDER`): doors by doors, dollars by dollars.
+ */
+export const VACANCY_MEASURE_RULE = "A vacancy counted by doors is scored by a later rent roll; an economic vacancy by a later T-12.";
+
+/**
  * What can score which row, as lib/track-record's `laterFor` reads it: a
- * vacancy by a rent roll or a T-12, the NOI by a T-12, the price by a
- * reported trade; a Dead decision on price or on financing answers the price
- * or the loan as a direction, counted apart. No later figure on the deal
- * speaks to the rest (lib/track-record.test.ts holds these lists to what the
- * scorer scores, key by key).
+ * vacancy counted by doors by a rent roll, an economic one by a T-12, the
+ * NOI by a T-12, the price by a reported trade; a Dead decision on price or
+ * on financing answers the price or the loan as a direction, counted apart.
+ * No later figure on the deal speaks to the rest (lib/track-record.test.ts
+ * holds these lists to what the scorer scores, key by key).
  */
 export const SCORED_BY =
-  "A row is scored only where a later figure can speak to it: a vacancy by a rent roll or T-12 dated after the verdict, unless the market's figure decided it; the NOI by a T-12, neither on a plan deal; the price by a reported trade on a Dead deal.";
+  "A row is scored only where a later figure can speak to it: a vacancy by a rent roll (doors) or a T-12 (dollars), dated after the verdict, unless the market decided it; the NOI by a T-12, neither on a plan deal; the price by a reported trade on a Dead deal.";
 
 /** A decision's part in the record, said apart from the figures'. */
 export const DECISION_SCORES =
@@ -70,7 +76,7 @@ export const NOT_YET_SCORABLE =
 
 /** What the deal page's card scores against, in one sentence. */
 export const CARD_SCOPE =
-  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) for a vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
+  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
 
 /** Under this many scored rows the record is a start, and no share is
  *  printed (the owner's decision of 2026-10-20: five, not the comps' three).

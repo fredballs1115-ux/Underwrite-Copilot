@@ -41,6 +41,14 @@
 //     (`TAX_INSURANCE_NOT_SCORED`). On a plan deal the OM's NOI and its
 //     stated vacancy are the finished project's, and a T-12 or rent roll is
 //     the building before the plan is done, so neither scores them;
+//   - a vacancy is scored in its own measure, as the stress test decides it
+//     (lib/stress-deciders `VACANCY_ORDER`): a figure counted by doors by a
+//     later rent roll's count, an economic one (dollars over gross potential
+//     rent, `StressSnapshotRow.measure`) by a later T-12's economic vacancy,
+//     never the one against the other; a document of the other measure is
+//     named on the row with why it does not score it. An older screen's
+//     challenge carries no measure and is read as counted by doors, so a
+//     T-12 never scores it;
 //   - a stabilized vacancy the market's published figure decided is the
 //     market's to judge, and a later rent roll's vacancy is today's: a
 //     stress-test row says which kind decided it, and an older screen's
@@ -130,6 +138,7 @@ export {
   SAMPLE_NO_RECORD,
   TAX_INSURANCE_NOT_SCORED,
   TRADE_DATE_RULE,
+  VACANCY_MEASURE_RULE,
   dealRecordLine,
   shareWords,
   wholeShares,
@@ -513,6 +522,8 @@ export function scoreDeal(args: ScoreDealArgs): DealRecord {
     plan: args.plan,
     vacancyIsPlanTarget: args.vacancyIsPlanTarget,
     vacancyHeldToMarket: vacancyRow ? vacancyRow.evidence?.kind === "published" : !!args.vacancyHeldToMarket,
+    // An older screen's challenge carries no measure, read as doors.
+    vacancyEconomic: vacancyRow?.measure === "economic",
     titles: Object.fromEntries(testRows.filter((r) => r.key !== "other" && r.title).map((r) => [r.key, r.title])),
   });
   const record = (s: ScreenScore, priorMeta: { screenedAt: string; screenedOn: string }[]): DealRecord => ({
@@ -882,10 +893,17 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" });
-  if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" };
   // The market decided a stabilized vacancy where its published figure did.
-  const cannot = documentCannotSpeak(key, later, args, key === "vacancy" && r.evidence?.kind === "published");
+  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published";
+  const later = laterFor(key, laterArgs);
+  if (!later) {
+    // A vacancy is scored in its own measure: a document of the other one is
+    // named, with why, never passed over in silence.
+    const other = otherMeasure(key, laterArgs, args, heldToMarket);
+    return other ? unscored(other.why, other.later) : unscored("nothing that arrived after the screen speaks to it.");
+  }
+  const cannot = documentCannotSpeak(key, later, args, heldToMarket);
   if (cannot) return unscored(cannot, later);
 
   const flagged = r.verdict === "stretched" || r.verdict === "unsupported";
@@ -985,24 +1003,29 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   // document scores these, whatever arrives.
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: false });
-  if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+  // A challenge carries no measure: its vacancy is read as counted by doors,
+  // which a later T-12's economic vacancy never scores.
+  const laterArgs = { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: false };
+  const cannotScore = (l: Later, why: string): ScoredRow => ({
+    ...base,
+    later: { source: l.source, value: l.value, text: l.text },
+    figures: null,
+    landing: "unscored",
+    why,
+    text: `${title}: ${l.text}, but ${why.replace(/\.$/, "")}, so it is not scored.`,
+  });
+  const later = laterFor(key, laterArgs);
+  if (!later) {
+    const other = otherMeasure(key, laterArgs, args, !!args.vacancyHeldToMarket);
+    return other ? cannotScore(other.later, other.why) : unscored("nothing that arrived after the screen speaks to it.");
+  }
   // The stress test's own rule: a stabilized assumption on a deal read as
   // stabilized is held to the market's published figures, and a
   // document's vacancy is today's — never the test of it. And on a plan
   // deal the OM's NOI and stated vacancy are the finished project's: a
   // document of the building before the plan is done cannot speak to them.
   const why = documentCannotSpeak(key, later, args, !!args.vacancyHeldToMarket);
-  if (why) {
-    return {
-      ...base,
-      later: { source: later.source, value: later.value, text: later.text },
-      figures: null,
-      landing: "unscored",
-      why,
-      text: `${title}: ${later.text}, but ${why.replace(/\.$/, "")}, so it is not scored.`,
-    };
-  }
+  if (why) return cannotScore(later, why);
 
   if (later.decision && !later.purchase) {
     return {
@@ -1080,7 +1103,7 @@ function laterFor(
     economic: boolean;
   },
 ): Later | null {
-  const t12When = `${ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12"}${ev.t12Overlap ? ` (${ev.t12Overlap})` : ""}`;
+  const t12When = t12WhenOf(ev);
   // A price on the OM figure's own basis: the price over the ask, applied to
   // the figure the row carries (per unit, per foot or whole).
   const onBasis = (price: number): { value: number | null; whole: boolean } => {
@@ -1089,30 +1112,8 @@ function laterFor(
     return { value: whole ? price : ev.omFigure * (price / ev.askingPrice), whole };
   };
   switch (key) {
-    case "vacancy": {
-      const rv = !ev.economic && ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
-      if (rv != null) {
-        return {
-          source: "rent_roll",
-          value: rv.pct,
-          at: ev.roll!.arrivedAt,
-          text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}`,
-        };
-      }
-      // Over gross potential rent, the statement's own EGI saying whether
-      // its rent line is gross or net (lib/actuals/analyze, the stress
-      // test's one reading).
-      const tv = ev.economic && ev.t12 ? t12Vacancy(ev.t12.summary) : null;
-      if (tv != null) {
-        return {
-          source: "t12",
-          value: tv.pct,
-          at: ev.t12!.arrivedAt,
-          text: `${t12When} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})`,
-        };
-      }
-      return null;
-    }
+    case "vacancy":
+      return ev.economic ? t12VacancyLater(ev) : rollVacancyLater(ev);
     case "noi": {
       const n = ev.t12?.summary.noi;
       if (n != null && Number.isFinite(n) && n !== 0) {
@@ -1155,6 +1156,58 @@ function laterFor(
   }
 }
 
+type LaterArgs = Parameters<typeof laterFor>[1];
+
+/** "the T-12 to May 31, 2026 (11 of its 12 months precede the verdict)" */
+const t12WhenOf = (ev: LaterArgs) => `${ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12"}${ev.t12Overlap ? ` (${ev.t12Overlap})` : ""}`;
+
+/** A later rent roll's vacancy, by its count of doors (by its area on a
+ *  class priced by the foot): what scores a vacancy counted by doors. */
+function rollVacancyLater(ev: LaterArgs): Later | null {
+  const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
+  if (rv == null) return null;
+  return {
+    source: "rent_roll",
+    value: rv.pct,
+    at: ev.roll!.arrivedAt,
+    text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}`,
+  };
+}
+
+/** A later T-12's economic vacancy, over gross potential rent, the
+ *  statement's own EGI saying whether its rent line is gross or net
+ *  (lib/actuals/analyze, the stress test's one reading): what scores an
+ *  economic vacancy, and nothing else. */
+function t12VacancyLater(ev: LaterArgs): Later | null {
+  const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
+  if (tv == null) return null;
+  return {
+    source: "t12",
+    value: tv.pct,
+    at: ev.t12!.arrivedAt,
+    text: `${t12WhenOf(ev)} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})`,
+  };
+}
+
+/** Why a vacancy row is not scored by a later document of the other
+ *  measure: doors are never scored against dollars. */
+export const T12_NOT_DOORS_WHY =
+  "the T-12's economic vacancy is dollars, not doors, and the OM's figure counts doors, which only a later rent roll can score.";
+export const ROLL_NOT_DOLLARS_WHY =
+  "the rent roll counts doors, not dollars, and the OM's figure is an economic vacancy, which only a later T-12's can score.";
+
+/** A vacancy row nothing of its own measure arrived to score: the later
+ *  document of the other measure, where one arrived with a figure, and why
+ *  it does not score the row — a plan's target or the market's figure first,
+ *  which hold the vacancy back from every document, else the measure — so
+ *  the card says why rather than nothing. */
+function otherMeasure(key: StressKey, ev: LaterArgs, args: ScoreDealArgs, heldToMarket: boolean): { later: Later; why: string } | null {
+  if (key !== "vacancy") return null;
+  const later = ev.economic ? rollVacancyLater(ev) : t12VacancyLater(ev);
+  if (!later) return null;
+  return { later, why: documentCannotSpeak(key, later, args, heldToMarket) ?? (ev.economic ? ROLL_NOT_DOLLARS_WHY : T12_NOT_DOORS_WHY) };
+}
+
 // ── What can score what ─────────────────────────────────────────────────
 
 /** The kinds of later evidence, in the grid's column order. */
@@ -1175,6 +1228,11 @@ export interface ScorableContext {
   plan?: boolean;
   vacancyIsPlanTarget?: boolean;
   vacancyHeldToMarket?: boolean;
+  /** the deal's vacancy row counts dollars (`StressSnapshotRow.measure`
+   *  "economic"), so only a T-12 scores it; false, one counted by doors,
+   *  which only a rent roll scores; absent (the account's grid, no deal),
+   *  either kind of row, so either document is marked */
+  vacancyEconomic?: boolean;
   /** the row titles the deal's own test carries ("Occupancy today") */
   titles?: Partial<Record<StressKey, string>>;
 }
@@ -1193,8 +1251,10 @@ const GRID_FIGURE = 100;
  * on financing), a trade — dated after a screen, and a mark is set where the
  * row comes back scored (a decision's answer included). So a taxes or an
  * insurance row is never marked against a seller's document, a plan deal's
- * NOI or stated vacancy against neither document, and a vacancy the
- * market's figure decided against neither — whatever the scorer does today.
+ * NOI or stated vacancy against neither document, a vacancy the market's
+ * figure decided against neither, and a vacancy counted by doors against
+ * the rent roll alone, an economic one against the T-12 alone — whatever the
+ * scorer does today.
  */
 export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
   const T = Date.parse(GRID_SCREEN);
@@ -1232,8 +1292,12 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
       threshold: snapshotThreshold(key),
       worse: WORSE_WHEN[key],
     };
+    // A vacancy is scored in its own measure: the deal's own row's, else
+    // (the account's grid) a row of either measure.
+    const economic = row.key === "vacancy" ? ctx.vacancyEconomic : false;
+    const rows = economic === undefined ? [row, { ...row, measure: "economic" as const }] : economic ? [{ ...row, measure: "economic" as const }] : [row];
     const by = Object.fromEntries(
-      SCORABLE_SOURCES.map((source) => [source, kinds[source].some((ev) => scoreTestRow(row, T, ev, args).landing !== "unscored")]),
+      SCORABLE_SOURCES.map((source) => [source, rows.some((r) => kinds[source].some((ev) => scoreTestRow(r, T, ev, args).landing !== "unscored"))]),
     ) as Record<LaterSource, boolean>;
     return { key, title: ctx.titles?.[key] ?? TITLES[key], by };
   });

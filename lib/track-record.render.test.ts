@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Challenge } from "@/lib/anthropic/types";
-import type { T12Summary } from "@/lib/actuals/types";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
 import {
@@ -23,6 +23,8 @@ import {
   RESCREEN_RULE,
   TAX_INSURANCE_NOT_SCORED,
   TRADE_DATE_RULE,
+  T12_NOT_DOORS_WHY,
+  VACANCY_MEASURE_RULE,
   accountRecord,
   scorableGrid,
   scoreDeal,
@@ -49,12 +51,31 @@ const t12: T12Summary = {
   noi: 3_706_500,
   noiDerived: false,
 };
+// A vacancy counted by doors is scored by the rent roll alone; the T-12
+// scores the NOI (and only an economic vacancy).
+const roll: RentRollSummary = {
+  unitCount: 240,
+  occupiedUnits: 218,
+  totalSf: 220_720,
+  occupiedSf: 200_000,
+  sfWeightedOccupancy: 0.906,
+  waltYears: 0.6,
+  weightedAvgRentPsf: 30,
+  expiryBuckets: null,
+  expiryCoveredSf: 0,
+  truncated: false,
+};
+// The roll's vacancy with no class, by area: 9.4%.
+const ROLL_VAC = Math.round((1 - roll.sfWeightedOccupancy!) * 1000) / 10;
+const laterRoll = { rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll } };
+const laterT12 = { t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } };
 
 const withLater = (): DealRecord =>
   scoreDeal({
     screenedAt: T,
     challenges: [vacancy, noi, insurance, basis, older],
-    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+    ...laterT12,
+    ...laterRoll,
     stage: "dead",
     history: [{ stage: "dead", at: AFTER, outcome: { reason: "price", trade: null } }],
   });
@@ -91,7 +112,8 @@ const snapDeal = (opts: { only?: "vacancy" } = {}): DealRecord =>
     screenedAt: T,
     stressSnapshot: snapshot(opts.only ? [vacancyRow] : [vacancyRow, noiRow]),
     challenges: [vacancy, noi],
-    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+    ...laterT12,
+    ...laterRoll,
   });
 
 describe("TrackRecordCard — what came after the screen, on the deal page", () => {
@@ -103,6 +125,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(text).toContain("What came after the screen");
     expect(text).toContain("Screened Oct 1, 2026.");
     expect(text).toContain("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(text).toContain("Rent roll as of Oct 31, 2026 (added Nov 5, 2026)");
     expect(text).toContain("Moved to Dead on price (Nov 5, 2026)");
     expect(out).toContain('data-landing="screen_side"');
     expect(out).toContain('data-landing="between"');
@@ -111,7 +134,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     // The three figures of a scored row, in the key's own unit.
     expect(text).toContain("6.0%");
     expect(text).toContain("9.0%");
-    expect(text).toContain("9.1%");
+    expect(text).toContain(`${ROLL_VAC.toFixed(1)}%`);
     expect(text).toContain("$3.71M");
     // The decision row carries no figures but its sentence.
     expect(text).toContain("a decision on the screen's side, not a figure");
@@ -124,7 +147,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(out).toContain('data-qa="track-record-tax-insurance"');
     expect(words).toContain("Insurance: a seller's T-12 cannot show a new owner's premium");
     // …and no tax or insurance line is said where no such challenge is.
-    const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } }) }));
+    const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll }) }));
     expect(noTax).not.toContain('data-qa="track-record-tax-insurance"');
   });
 
@@ -209,7 +232,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
   });
 
   it("draws a flagged row's capture of its gap on a track, said in words, and a Closed deal's own price as a decision in a neutral tone", () => {
-    // The OM's 6.0% against the evidence's 9.0%; the T-12's 9.1% went past it.
+    // The OM's 6.0% against the evidence's 9.0%; the roll's 9.4% went past it.
     const past = html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) }));
     expect(a11yIssues(past)).toEqual([]);
     const text = visibleText(past).replace(/&#x27;/g, "'");
@@ -250,7 +273,27 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     const text = visibleText(html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) })));
     expect(text).toContain("6.0% vacant");
     expect(text).toContain("9.0% vacant");
-    expect(text).toContain("9.1% vacant");
+    expect(text).toContain(`${ROLL_VAC.toFixed(1)}% vacant`);
+  });
+
+  it("says why a later T-12 does not score a vacancy counted by doors, and draws an economic one the T-12 scores", () => {
+    const doors = scoreDeal({ screenedAt: T, stressSnapshot: snapshot([vacancyRow]), challenges: [], ...laterT12 });
+    const out = html(React.createElement(TrackRecordCard, { record: doors }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    // The T-12 is what came after, and the row says why it does not score it.
+    expect(text).toContain("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(text).toContain(T12_NOT_DOORS_WHY.replace(/\.$/, ""));
+    expect(text).toContain("the T-12's economic vacancy is dollars, not doors");
+    expect(out).not.toContain('data-landing="right"');
+    expect(out).not.toContain('data-landing="wrong"');
+    // An economic row, the same T-12: scored, in its own measure.
+    const economic = scoreDeal({ screenedAt: T, stressSnapshot: snapshot([{ ...vacancyRow, title: "Economic vacancy", measure: "economic" }]), challenges: [], ...laterT12 });
+    const eco = html(React.createElement(TrackRecordCard, { record: economic }));
+    expect(a11yIssues(eco)).toEqual([]);
+    expect(eco).toContain('data-landing="right"');
+    expect(visibleText(eco)).toContain("economic vacancy");
   });
 
   it("says no row is scored where the later evidence speaks to no challenge with figures", () => {
@@ -275,6 +318,8 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // market's, which a deal's own page does only where the market decided:
     // said where the record is drawn (audit M5).
     expect(text.replace(/&#x27;/g, "'")).toContain(ACCOUNT_VACANCY_NOTE);
+    // …beside the measure each vacancy is scored in.
+    expect(text.replace(/&#x27;/g, "'")).toContain(`${VACANCY_MEASURE_RULE} ${ACCOUNT_VACANCY_NOTE}`);
     // What a document must be to score, a trade's own date, and what no document scores.
     expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TRADE_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
     expect(text.replace(/&#x27;/g, "'")).toContain(RESCREEN_RULE);
@@ -299,11 +344,16 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect((out.match(/>nothing</g) ?? []).length).toBe(rows.length * 4 - marks);
     expect(out).toContain('data-row="noi"');
     expect(out).toMatch(/data-row="noi">[\s\S]*?data-scores="t12"/);
+    // A vacancy is scored in its own measure, said under the grid.
+    expect(out).toContain('data-qa="scorable-grid-vacancy"');
+    expect(text).toContain(VACANCY_MEASURE_RULE);
+    // A grid whose vacancy no document can score (the market decided it) says nothing of it.
+    expect(html(React.createElement(ScorableGrid, { rows: scorableGrid({ vacancyHeldToMarket: true }) }))).not.toContain('data-qa="scorable-grid-vacancy"');
     expect(html(React.createElement(ScorableGrid, { rows: [] }))).toBe("");
   });
 
   it("few: the counts, a bar a key, and 'a start, not a record' with no share", () => {
-    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
+    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, noi], ...laterT12, ...laterRoll })]);
     const few = html(React.createElement(TrackRecordSection, { record: fewer }));
     expect(a11yIssues(few)).toEqual([]);
     const text = visibleText(few);
@@ -327,7 +377,7 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // Four scored rows is still under the floor: no share.
     const four = html(
       React.createElement(TrackRecordSection, {
-        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]),
+        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy, noi], ...laterT12, ...laterRoll })]),
       }),
     );
     expect(four).toContain('data-state="start"');
@@ -335,7 +385,7 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
   });
 
   it("enough: the shares, said once in the line, each with its count", () => {
-    const record = accountRecord([withLater(), withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
+    const record = accountRecord([withLater(), withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll })]);
     const out = html(React.createElement(TrackRecordSection, { record }));
     expect(a11yIssues(out)).toEqual([]);
     const text = visibleText(out);

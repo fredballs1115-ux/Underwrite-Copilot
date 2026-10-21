@@ -24,7 +24,10 @@ import {
   recordCountsLine,
   recordLine,
   recordState,
+  ROLL_NOT_DOLLARS_WHY,
   SCORABLE_SOURCES,
+  T12_NOT_DOORS_WHY,
+  VACANCY_MEASURE_RULE,
   scorableGrid,
   scoreDeal,
   t12MonthsBefore,
@@ -88,8 +91,15 @@ const roll: RentRollSummary = {
   expiryCoveredSf: 0,
   truncated: false,
 };
+// The roll's vacancy as the scorer reads it with no class (by area, where
+// the roll carries it): 1 − 0.906 is 9.4%. A vacancy counted by doors is
+// scored by a later rent roll alone; the T-12's economic vacancy (650,500
+// over 7,150,000, 9.1%) scores only an economic row.
+const ROLL_VAC = Math.round((1 - roll.sfWeightedOccupancy!) * 1000) / 10;
+const T12_VAC = Math.round((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 1000) / 10;
+const laterRoll = (dated = "2026-10-31", arrivedAt = AFTER) => ({ rentRoll: { arrivedAt, dated, summary: roll } });
 
-const dead = (reason: "price" | "financing", at = AFTER): { stage: string; history: StageChange[] } => ({
+const dead =(reason: "price" | "financing", at = AFTER): { stage: string; history: StageChange[] } => ({
   stage: "dead",
   history: [
     { stage: "screening", at: BEFORE },
@@ -98,23 +108,41 @@ const dead = (reason: "price" | "financing", at = AFTER): { stage: string; histo
 });
 
 describe("scoreDeal — only what arrived after the screen scores a challenge", () => {
-  it("a T-12 added after the screen scores vacancy on the screen's side, by its economic vacancy", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+  it("a rent roll added after the screen scores vacancy on the screen's side, by its count", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll() });
     expect(r.screenedAt).toBe(T);
-    expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
-    expect(r.evidence[0].label).toBe("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(r.evidence.map((e) => e.source)).toEqual(["rent_roll"]);
+    expect(r.evidence[0].label).toBe("Rent roll as of Oct 31, 2026 (added Nov 5, 2026)");
     const row = r.rows[0];
     expect(row.key).toBe("vacancy");
     expect(row.landing).toBe("screen_side");
-    // 650,500 over 7,150,000 is 9.1%: past the screen's 9.0%.
-    expect(row.later?.value).toBe(9.1);
+    // 9.4% vacant by area: past the screen's 9.0%.
+    expect(row.later?.value).toBe(ROLL_VAC);
+    expect(ROLL_VAC).toBeGreaterThan(9);
     expect(row.text).toBe(
-      "Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Oct 31, 2026 (11 of its 12 months precede the verdict) ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
+      `Stabilized vacancy: the OM's 6.0%, the screen's 9.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the rent roll as of Oct 31, 2026 ran ${ROLL_VAC.toFixed(1)}% vacant by area — on the screen's side.`,
     );
     expect(r.notScored).toEqual([]);
   });
 
-  it("a rent roll outranks the T-12 for vacancy, and a figure inside the two reads between", () => {
+  it("a T-12 added after the screen does not score a challenge's vacancy: a challenge carries no measure, read as doors, and the T-12's are dollars — said on the row", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+    // Still on record as what came after, and its figure still shown.
+    expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
+    expect(r.evidence[0].label).toBe("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    const row = r.rows[0];
+    expect(row.landing).toBe("unscored");
+    expect(row.figures).toBeNull();
+    expect(row.later).toMatchObject({ source: "t12", value: T12_VAC });
+    expect(row.why).toBe(T12_NOT_DOORS_WHY);
+    expect(T12_NOT_DOORS_WHY).toContain("the T-12's economic vacancy is dollars, not doors");
+    expect(row.text).toBe(
+      `Stabilized vacancy: the T-12 to Oct 31, 2026 (11 of its 12 months precede the verdict) ran ${T12_VAC.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income), but the T-12's economic vacancy is dollars, not doors, and the OM's figure counts doors, which only a later rent roll can score, so it is not scored.`,
+    );
+    expect(accountRecord([r]).challenges.scored).toBe(0);
+  });
+
+  it("only the rent roll scores a challenge's vacancy beside a T-12, and a figure inside the two reads between", () => {
     const r = scoreDeal({
       screenedAt: T,
       challenges: [vacancy],
@@ -181,10 +209,15 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
     expect(scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-09-30", summary: t12 } }).notScored).toEqual([
       "T-12 to Sep 30, 2026 was added Nov 5, 2026, after the screen, but its period ended on or before the verdict (Oct 1, 2026): it is history the screen could have been handed, only uploaded later, so it is not scored.",
     ]);
-    // The day after the verdict's is after it.
-    const next = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-02", summary: t12 } });
+    // The day after the verdict's is after it: the T-12 scores the NOI
+    // ($3.71M, between the OM's $4.0M and the screen's $3.6M), and a rent
+    // roll dated that day the vacancy.
+    const next = scoreDeal({ screenedAt: T, challenges: [noi], t12: { arrivedAt: AFTER, dated: "2026-10-02", summary: t12 } });
     expect(next.refusedLater).toBe(false);
-    expect(next.rows[0].landing).toBe("screen_side");
+    expect(next.rows[0].landing).toBe("between");
+    const nextRoll = scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll("2026-10-02") });
+    expect(nextRoll.refusedLater).toBe(false);
+    expect(nextRoll.rows[0].landing).toBe("screen_side");
     // A rent roll by its as-of date, the same rule.
     const early = scoreDeal({ screenedAt: T, challenges: [vacancy], rentRoll: { arrivedAt: AFTER, dated: "2026-09-15", summary: roll } });
     expect(early.notScored).toEqual([
@@ -329,7 +362,7 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
   });
 
   it("a screen's figure equal to the OM's has no side to land on", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, altFigure: 6 }], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, altFigure: 6 }], ...laterRoll() });
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.rows[0].why).toContain("the screen's figure is the OM's own");
   });
@@ -356,53 +389,61 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
 });
 
 describe("scoreDeal — the previous screen's challenges, scored against what arrived between the two screens", () => {
-  // The prior screen on Sep 10; the T-12 added Sep 25; the re-screen on Oct 1
-  // read that T-12 and replaced the challenges it would be scored against.
+  // The prior screen on Sep 10; the rent roll added Sep 25; the re-screen on
+  // Oct 1 read that roll and replaced the challenges it would be scored
+  // against.
   const PRIOR_T = "2026-09-10T12:00:00Z";
   const BETWEEN = "2026-09-25T09:00:00Z";
   const priorVacancy: Challenge = { ...vacancy, assumption: "Stabilized vacancy of 5%", omFigure: 5, altFigure: 8 };
   const priorScreen = { verdict: { verdict: "caution", generatedAt: PRIOR_T }, challenges: { challenges: [priorVacancy, basis] } };
 
-  it("a T-12 arriving between the prior and the current verdict scores the prior screen's challenge, not the current one's", () => {
+  it("a rent roll arriving between the prior and the current verdict scores the prior screen's challenge, not the current one's", () => {
     const r = scoreDeal({
       screenedAt: T,
       challenges: [vacancy, insurance],
       priorScreen,
-      t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 },
+      ...laterRoll("2026-09-20", BETWEEN),
     });
     expect(r.prior).toEqual({ screenedAt: PRIOR_T, screenedOn: "Sep 10, 2026" });
     // The evidence is the earlier screen's, said so.
-    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Sep 20, 2026 (added Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)"]);
+    expect(r.evidence.map((e) => e.label)).toEqual(["Rent roll as of Sep 20, 2026 (added Sep 25, 2026, after the screen of Sep 10, 2026 and before this one)"]);
     // One row a key: the prior's vacancy row in the current's unscored one's
     // place, on the prior's own figures (5% and 8%, not 6% and 9%).
     expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([
       ["vacancy", "screen_side", "Sep 10, 2026"],
       ["insurance", "unscored", null],
     ]);
-    expect(r.rows[0].figures).toEqual({ om: "5.0% vacant", alt: "8.0% vacant", later: "9.1% vacant" });
+    expect(r.rows[0].figures).toEqual({ om: "5.0% vacant", alt: "8.0% vacant", later: `${ROLL_VAC.toFixed(1)}% vacant` });
     expect(r.rows[0].text).toBe(
-      "Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the T-12 to Sep 20, 2026 (11 of its 12 months precede the verdict) ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — on the screen's side.",
+      `Stabilized vacancy (the screen of Sep 10, 2026): the OM's 5.0%, the screen's 8.0% (a rule of thumb: a stabilized apartment building runs about 95% occupied); the rent roll as of Sep 20, 2026 ran ${ROLL_VAC.toFixed(1)}% vacant by area — on the screen's side.`,
     );
-    // The current screen's refusal says where the T-12 is scored instead.
+    // The current screen's refusal says where the roll is scored instead.
     expect(r.notScored).toEqual([
-      "T-12 to Sep 20, 2026 was on the deal before this screen (added Sep 25, 2026): this screen read it, so it is scored against the screen of Sep 10, 2026 instead.",
+      "Rent roll as of Sep 20, 2026 was on the deal before this screen (added Sep 25, 2026): this screen read it, so it is scored against the screen of Sep 10, 2026 instead.",
     ]);
     // The prior's basis challenge has nothing after it either, and an
     // unscored prior row is never added.
     expect(r.rows.some((x) => x.key === "basis")).toBe(false);
   });
 
-  it("a T-12 uploaded after both screens but dated between them scores the prior screen's challenge, and says it is dated between", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-09-20", summary: t12 } });
+  it("a rent roll uploaded after both screens but dated between them scores the prior screen's challenge, and says it is dated between", () => {
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, ...laterRoll("2026-09-20") });
     expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "screen_side", "Sep 10, 2026"]]);
-    expect(r.evidence.map((e) => e.label)).toEqual(["T-12 to Sep 20, 2026 (added Nov 5, 2026; dated after the screen of Sep 10, 2026 and before this one)"]);
+    expect(r.evidence.map((e) => e.label)).toEqual(["Rent roll as of Sep 20, 2026 (added Nov 5, 2026; dated after the screen of Sep 10, 2026 and before this one)"]);
     expect(r.notScored).toEqual([
+      "Rent roll as of Sep 20, 2026 was added Nov 5, 2026, but it is dated on or before this screen's verdict (Oct 1, 2026), so it is scored against the screen of Sep 10, 2026 instead.",
+    ]);
+    // A T-12 the same way scores the prior's NOI challenge, its period said.
+    const noiPrior = { verdict: { verdict: "caution", generatedAt: PRIOR_T }, challenges: { challenges: [noi] } };
+    const t = scoreDeal({ screenedAt: T, challenges: [noi], priorScreen: noiPrior, t12: { arrivedAt: AFTER, dated: "2026-09-20", summary: t12 } });
+    expect(t.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["noi", "between", "Sep 10, 2026"]]);
+    expect(t.notScored).toEqual([
       "T-12 to Sep 20, 2026 was added Nov 5, 2026, but its period ended on or before this screen's verdict (Oct 1, 2026), so it is scored against the screen of Sep 10, 2026 instead.",
     ]);
   });
 
   it("a figure that arrived after BOTH screens scores the current challenge once, never the prior's of the same key", () => {
-    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+    const r = scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, ...laterRoll() });
     expect(r.evidence).toHaveLength(1);
     expect(r.rows.map((x) => [x.key, x.landing, x.priorScreenedOn ?? null])).toEqual([["vacancy", "screen_side", null]]);
     expect(r.rows[0].figures?.om).toBe("6.0% vacant");
@@ -449,14 +490,15 @@ describe("scoreDeal — the previous screen's challenges, scored against what ar
   });
 
   it("the account's record counts a prior screen's scored row as the deal's", () => {
-    const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } })]);
+    const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy], priorScreen, ...laterRoll("2026-09-20", BETWEEN) })]);
     expect(r).toMatchObject({ dealsTested: 1, dealsWithLater: 1, scored: 0, challenges: { scored: 1, screenSide: 1 } });
   });
 });
 
 describe("accountRecord — counts, by key, and the floor", () => {
+  // The vacancy by the rent roll's count, the NOI by the T-12.
   const scoredDeal = (...extra: Challenge[]): DealRecord =>
-    scoreDeal({ screenedAt: T, challenges: [vacancy, ...extra], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
+    scoreDeal({ screenedAt: T, challenges: [vacancy, ...extra], ...laterRoll(), t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } });
 
   it("says no record and claims none with nothing scored, and names what it will be scored against", () => {
     const r = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy] }), scoreDeal({ screenedAt: null, challenges: [vacancy] })]);
@@ -542,18 +584,59 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
   });
   const snap = (...rows: StressSnapshotRow[]): StressSnapshot => ({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows });
   const laterT12 = (over: Partial<T12Summary> = {}) => ({ t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: { ...t12, ...over } } });
-  // The T-12's economic vacancy: 650,500 over 7,150,000 is 9.1%.
+  // A vacancy counted by doors is scored by the rent roll (9.4% by area); an
+  // economic one by the T-12 (650,500 over 7,150,000, 9.1%).
 
   it("a stretched row is right where the later figure lands past the OM's on the buyer's bad side, by more than the row's margin", () => {
-    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [vacancy], ...laterT12() });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [vacancy], ...laterRoll() });
     expect(r.snapshotted).toBe(true);
     expect(r.snapshotNotes).toEqual([]);
     const x = r.rows[0];
     expect(x).toMatchObject({ key: "vacancy", fromTest: true, verdict: "stretched", landing: "right", outcome: "flag_right", omFigure: 6, altFigure: 9 });
-    expect(x.figures).toEqual({ om: "6.0% vacant", alt: "9.0% vacant", later: "9.1% vacant" });
+    expect(x.figures).toEqual({ om: "6.0% vacant", alt: "9.0% vacant", later: `${ROLL_VAC.toFixed(1)}% vacant` });
     expect(x.text).toBe(
-      "Stabilized vacancy: the test read the OM's 6.0% as stretched, set against apartment occupancy, a rule of thumb at 9.0%; the T-12 to Oct 31, 2026 (11 of its 12 months precede the verdict) ran 9.1% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income) — past the OM's figure, worse for the buyer by more than the row's 0.05-point margin: the test was right.",
+      `Stabilized vacancy: the test read the OM's 6.0% as stretched, set against apartment occupancy, a rule of thumb at 9.0%; the rent roll as of Oct 31, 2026 ran ${ROLL_VAC.toFixed(1)}% vacant by area — past the OM's figure, worse for the buyer by more than the row's 0.05-point margin: the test was right.`,
     );
+  });
+
+  it("a vacancy counted by doors is never scored by a later T-12: the row names the T-12's economic vacancy and says why", () => {
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], ...laterT12() });
+    expect(r.evidence.map((e) => e.source)).toEqual(["t12"]);
+    const x = r.rows[0];
+    expect(x).toMatchObject({ landing: "unscored", outcome: null, figures: null, why: T12_NOT_DOORS_WHY });
+    expect(x.later).toMatchObject({ source: "t12", value: T12_VAC });
+    expect(x.text).toBe(
+      `Stabilized vacancy: the T-12 to Oct 31, 2026 (11 of its 12 months precede the verdict) ran ${T12_VAC.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: the rent line plus the loss, since the stated EGI is the rent line plus other income), but the T-12's economic vacancy is dollars, not doors, and the OM's figure counts doors, which only a later rent roll can score, so it is not scored.`,
+    );
+    expect(accountRecord([r]).scored).toBe(0);
+    // Beside a rent roll, the roll scores it and the T-12 is not read.
+    const both = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], ...laterT12(), ...laterRoll() });
+    expect(both.rows[0]).toMatchObject({ landing: "right", later: { source: "rent_roll", value: ROLL_VAC } });
+    // Its grid marks the rent roll alone.
+    expect(SCORABLE_SOURCES.filter((s) => r.scorable!.find((g) => g.key === "vacancy")!.by[s])).toEqual(["rent_roll"]);
+  });
+
+  it("an economic vacancy is scored by a later T-12's economic vacancy alone, never by a rent roll's count", () => {
+    const economic = row({ key: "vacancy", title: "Economic vacancy", measure: "economic", evidence: { value: 9, label: "Apartment vacancy and credit loss, a rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" } });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterT12() });
+    expect(r.rows[0]).toMatchObject({ landing: "right", outcome: "flag_right", later: { source: "t12", value: T12_VAC } });
+    expect(r.rows[0].figures).toEqual({ om: "6.0% vacant", alt: "9.0% vacant", later: `${T12_VAC.toFixed(1)}% vacant` });
+    expect(r.rows[0].text).toContain(`ran ${T12_VAC.toFixed(1)}% economic vacancy`);
+    // A rent roll alone does not score it, and the row says why.
+    const byRoll = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterRoll() });
+    expect(byRoll.rows[0]).toMatchObject({ landing: "unscored", why: ROLL_NOT_DOLLARS_WHY, later: { source: "rent_roll", value: ROLL_VAC } });
+    expect(byRoll.rows[0].text).toBe(
+      `Economic vacancy: the rent roll as of Oct 31, 2026 ran ${ROLL_VAC.toFixed(1)}% vacant by area, but the rent roll counts doors, not dollars, and the OM's figure is an economic vacancy, which only a later T-12's can score, so it is not scored.`,
+    );
+    // Beside a rent roll, the T-12 scores it.
+    const both = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterT12(), ...laterRoll() });
+    expect(both.rows[0]).toMatchObject({ landing: "right", later: { source: "t12", value: T12_VAC } });
+    // Its grid marks the T-12 alone.
+    expect(SCORABLE_SOURCES.filter((s) => r.scorable!.find((g) => g.key === "vacancy")!.by[s])).toEqual(["t12"]);
+    // A plan deal's stated economic allowance is the plan's target first.
+    const plan = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], plan: true, vacancyIsPlanTarget: true, ...laterRoll() });
+    expect(plan.rows[0].why).toBe("the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.");
+    expect(VACANCY_MEASURE_RULE).toBe("A vacancy counted by doors is scored by a later rent roll; an economic vacancy by a later T-12.");
   });
 
   it("a stretched row is wrong where the later figure lands within its margin of the OM's, or better for the buyer", () => {
@@ -615,7 +698,7 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.rows[0].text).toContain("which the stress test holds to the market's published figures");
     // The caller's flag is for an older screen's challenge; the row reads its own decider.
-    const ruled = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], vacancyHeldToMarket: true, ...laterT12() });
+    const ruled = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], vacancyHeldToMarket: true, ...laterRoll() });
     expect(ruled.rows[0].landing).toBe("right");
     // A plan deal's NOI is the finished project's, whatever the row read.
     const plan = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "noi", om: 4_000_000, evidence: null, verdict: "holds" })), challenges: [], plan: true, ...laterT12() });
@@ -663,12 +746,13 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
   });
 
   it("the floor: four scored rows are a start with no share; five print each share with its count", () => {
-    const deal = (n: number) => scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om: n })), challenges: [], ...laterT12() });
-    const four = accountRecord([deal(6), deal(6), deal(6), deal(9.1)]);
+    // At the roll's own figure a flag is wrong; at 6.0% it is right.
+    const deal = (n: number) => scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om: n })), challenges: [], ...laterRoll() });
+    const four = accountRecord([deal(6), deal(6), deal(6), deal(ROLL_VAC)]);
     expect(four).toMatchObject({ scored: 4, right: 3, wrong: 1, falseHolds: 0, shares: null });
     expect(recordState(four)).toBe("start");
     expect(recordLine(four)).toBe("4 scored stress-test rows are a start, not a record: no share is printed under 5.");
-    const five = accountRecord([deal(6), deal(6), deal(6), deal(9.1), deal(9.1)]);
+    const five = accountRecord([deal(6), deal(6), deal(6), deal(ROLL_VAC), deal(ROLL_VAC)]);
     expect(five.shares).toEqual({ rightPct: 60, wrongPct: 40 });
     expect(recordState(five)).toBe("record");
     expect(recordLine(five)).toBe("5 stress-test rows from 5 deals scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%).");
@@ -677,15 +761,15 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     // The deal page's own line takes the same floor.
     const many = scoreDeal({
       screenedAt: T,
-      stressSnapshot: snap(row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy", om: 9.1 }), row({ key: "vacancy", om: 9.1 })),
+      stressSnapshot: snap(row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy" }), row({ key: "vacancy", om: ROLL_VAC }), row({ key: "vacancy", om: ROLL_VAC })),
       challenges: [],
-      ...laterT12(),
+      ...laterRoll(),
     });
     expect(dealRecordLine(many)).toBe("5 stress-test rows scored on this deal: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%).");
   });
 
   it("a verdict with no snapshot scores its challenges and says its rows were not snapshotted; one that built no test says so", () => {
-    const older = scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterT12() });
+    const older = scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll() });
     expect(older.snapshotted).toBe(false);
     expect(older.rows[0]).toMatchObject({ landing: "screen_side" });
     expect(older.rows[0].fromTest).toBeUndefined();
@@ -704,9 +788,10 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     const PRIOR_T = "2026-09-10T12:00:00Z";
     const BETWEEN = "2026-09-25T09:00:00Z";
     const priorScreen = { verdict: { generatedAt: PRIOR_T, stressSnapshot: snap(row({ key: "vacancy", verdict: "holds", om: 5 })) }, challenges: { challenges: [vacancy] } };
-    // The T-12 arrived between the two screens, dated Sep 20: the current
-    // screen read it; the prior's hold of 5.0% is scored on it — a false hold.
-    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], priorScreen, t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 } });
+    // The rent roll arrived between the two screens, dated Sep 20: the
+    // current screen read it; the prior's hold of 5.0% is scored on it — a
+    // false hold.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], priorScreen, ...laterRoll("2026-09-20", BETWEEN) });
     expect(r.rows).toHaveLength(1);
     expect(r.rows[0]).toMatchObject({ priorScreenedOn: "Sep 10, 2026", outcome: "false_hold", fromTest: true });
     expect(r.rows[0].text.startsWith("Stabilized vacancy (the screen of Sep 10, 2026): the test read the OM's 5.0% as holding")).toBe(true);
@@ -717,7 +802,7 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
       stressSnapshot: snap(row({ key: "vacancy" })),
       challenges: [],
       priorScreen: { verdict: { generatedAt: PRIOR_T }, challenges: { challenges: [vacancy] } },
-      t12: { arrivedAt: BETWEEN, dated: "2026-09-20", summary: t12 },
+      ...laterRoll("2026-09-20", BETWEEN),
     });
     expect(older.rows[0]).toMatchObject({ landing: "screen_side", priorScreenedOn: "Sep 10, 2026" });
     expect(older.snapshotNotes).toEqual([
@@ -848,6 +933,29 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
     expect(readStressSnapshot(older)!.rows[0]).not.toHaveProperty("rerun");
   });
 
+  it("keeps an economic vacancy's measure, so the record scores it by a T-12; a row counted by doors carries none", () => {
+    const doors: StressRow = { ...base, key: "vacancy", title: "Stabilized vacancy", omSays: { text: "Vacancy 5%", value: 5, page: 9 }, evidence: [ev({ value: 9, label: "The deal's rent roll" })], verdict: "stretched", decidedBy: 0 };
+    const economic: StressRow = { ...doors, title: "Economic vacancy", omSays: { text: "Vacancy and credit loss 5%", value: 5, page: 9 }, evidence: [ev({ value: 9, label: "The deal's T-12" })], measure: "economic" };
+    const s = stressSnapshotOf(test(doors, economic))!;
+    expect(s.rows[0]).not.toHaveProperty("measure");
+    expect(s.rows[1].measure).toBe("economic");
+    // Written and read back, the measure is kept as itself.
+    const back = readStressSnapshot(JSON.parse(JSON.stringify(s)))!;
+    expect(back).toEqual(s);
+    expect(back.rows[1].measure).toBe("economic");
+    // Anything else stored there reads as a row counted by doors.
+    const junk = JSON.parse(JSON.stringify(s));
+    junk.rows[0].measure = "physical";
+    expect(readStressSnapshot(junk)!.rows[0]).not.toHaveProperty("measure");
+    // And the round trip scores the economic row by a later T-12, the doors
+    // row by a later rent roll.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: JSON.parse(JSON.stringify(s)), challenges: [], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 }, ...laterRoll() });
+    expect(r.rows.map((x) => [x.title, x.later?.source ?? null, x.landing])).toEqual([
+      ["Stabilized vacancy", "rent_roll", "right"],
+      ["Economic vacancy", "t12", "right"],
+    ]);
+  });
+
   it("a piece judged on its own yardstick is kept on it, the OM's figure with it", () => {
     const basisRow: StressRow = {
       ...base,
@@ -909,9 +1017,13 @@ describe("what can score a row — the words held to the scorer, key by key (the
     });
     expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "basis"]));
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
-    expect(SCORED_BY).toContain("a vacancy by a rent roll or T-12 dated after the verdict, unless the market's figure decided it");
+    // The vacancy row here counts doors: the rent roll scored it, never the T-12.
+    expect(r.rows.find((x) => x.key === "vacancy")!.later?.source).toBe("rent_roll");
+    expect(SCORED_BY).toContain("a vacancy by a rent roll (doors) or a T-12 (dollars), dated after the verdict, unless the market decided it");
     expect(SCORED_BY).toContain("the NOI by a T-12, neither on a plan deal");
-    expect(CARD_SCOPE).toContain("for a vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
+    expect(CARD_SCOPE).toContain("a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
+    // No surface says a T-12 scores a vacancy counted by doors.
+    for (const s of [CARD_SCOPE, SCORED_BY]) expect(s).not.toMatch(/a vacancy by a rent roll or (?:a )?T-12/);
     expect(SCORED_BY).toContain("the price by a reported trade");
     const named: Record<string, string> = {
       rent_growth: "Rent growth",
@@ -1129,12 +1241,12 @@ describe("the vacancy row is named one way on both surfaces, its figures a share
   });
   const stab: StressSnapshotRow = { ...occ(6), title: "Stabilized vacancy", evidence: { value: 9, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" } };
   const deal = (row: StressSnapshotRow) =>
-    scoreDeal({ screenedAt: T, stressSnapshot: { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [row] }, challenges: [], t12: { arrivedAt: AFTER, dated: "2027-03-31", summary: t12 } });
+    scoreDeal({ screenedAt: T, stressSnapshot: { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [row] }, challenges: [], ...laterRoll("2027-03-31") });
 
   it("prints each figure as a share vacant, never a bare percent an occupancy row would read as occupied", () => {
     const r = deal(occ(5)).rows[0];
     expect(r.title).toBe("Occupancy today");
-    expect(r.figures).toEqual({ om: "5.0% vacant", alt: "9.0% vacant", later: "9.1% vacant" });
+    expect(r.figures).toEqual({ om: "5.0% vacant", alt: "9.0% vacant", later: `${ROLL_VAC.toFixed(1)}% vacant` });
   });
 
   it("files a row under the title the card prints, so the account record never calls today's occupancy a stabilized vacancy", () => {
@@ -1156,9 +1268,12 @@ describe("shares sum to 100, and the account's share names its deals", () => {
   });
 
   it("prints the three-way challenge shares summing to 100, with the rows' count and their deals", () => {
-    const side = (alt: number, om = 6) => scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, omFigure: om, altFigure: alt }], t12: { arrivedAt: AFTER, dated: "2027-03-31", summary: t12 } });
-    // 9.1% later: past 9 is the screen's side, between 8 and 10 between, past 9.1 from the OM's 9.5 the OM's side.
-    const r = accountRecord([side(9), side(9), side(10), side(10), side(10), side(9.5, 9.2)]);
+    const side = (alt: number, om = 6) => scoreDeal({ screenedAt: T, challenges: [{ ...vacancy, omFigure: om, altFigure: alt }], ...laterRoll("2027-03-31") });
+    // The roll's 9.4% later: past 9 is the screen's side, between 6 and 10
+    // between, under both an OM's figure 0.1 over it and a screen's 0.4 over
+    // it the OM's side.
+    const r = accountRecord([side(9), side(9), side(10), side(10), side(10), side(ROLL_VAC + 0.4, ROLL_VAC + 0.1)]);
+    expect(r.challenges).toMatchObject({ screenSide: 2, between: 3, omSide: 1 });
     const s = r.challenges.shares!;
     expect(s.screenSidePct + s.omSidePct + s.betweenPct).toBe(100);
     expect(recordLine(r)).toContain(`${r.challenges.scored} challenges from ${r.challenges.deals} deals scored, from screens whose stress test was not kept:`);
@@ -1183,6 +1298,13 @@ describe("what will score what — the grid is the scorer's own rules, never wri
       other: [],
     });
     expect(scorableGrid().map((r) => r.key)).toEqual([...STRESS_KEYS]);
+    // The account's grid speaks for a row of either measure; a deal's own
+    // grid for its row's: doors by the rent roll, dollars by the T-12.
+    expect(marked(scorableGrid({ vacancyEconomic: false })).vacancy).toEqual(["rent_roll"]);
+    expect(marked(scorableGrid({ vacancyEconomic: true })).vacancy).toEqual(["t12"]);
+    // A deal whose screen kept no test reads its challenge as doors.
+    const older = scoreDeal({ screenedAt: T, challenges: [vacancy] });
+    expect(SCORABLE_SOURCES.filter((s) => older.scorable!.find((g) => g.key === "vacancy")!.by[s])).toEqual(["rent_roll"]);
   });
 
   it("follows the deal's own conditions: a plan deal, a vacancy the market decided", () => {

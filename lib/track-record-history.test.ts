@@ -38,7 +38,8 @@ const t12: T12Summary = {
   noi: 3_706_500,
   noiDerived: false,
 };
-// The T-12's economic vacancy: 650,500 over 7,150,000 is 9.1%.
+// The T-12's economic vacancy, 650,500 over 7,150,000, scores only an
+// economic row; a vacancy counted by doors is scored by the rent roll.
 const roll: RentRollSummary = {
   unitCount: 240,
   occupiedUnits: 218,
@@ -65,6 +66,9 @@ const row = (over: Partial<StressSnapshotRow> & Pick<StressSnapshotRow, "key">):
 });
 const snap = (...rows: StressSnapshotRow[]): StressSnapshot => ({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows });
 const laterT12 = { t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } };
+const laterRoll = { rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll } };
+// The roll's vacancy as the scorer reads it with no class, by area: 9.4%.
+const ROLL_VAC = Math.round((1 - roll.sfWeightedOccupancy!) * 1000) / 10;
 
 // ── 1. Calibration, beside right and wrong ──────────────────────────────
 
@@ -100,13 +104,13 @@ describe("calibration: how much of the gap the evidence opened the later figure 
   });
 
   it("a scored flagged row carries it; a hold, a decision and an unscored row carry none — and the score is unchanged", () => {
-    // The OM's 6.0% against the evidence's 11.0%; the T-12's 9.1% covers 62% of the gap.
-    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], ...laterT12 });
-    expect(r.rows[0]).toMatchObject({ outcome: "flag_right", landing: "right", captured: { pct: 62, place: "between" } });
+    // The OM's 6.0% against the evidence's 11.0%; the roll's 9.4% covers 68% of the gap.
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], ...laterRoll });
+    expect(r.rows[0]).toMatchObject({ outcome: "flag_right", landing: "right", captured: { pct: Math.round(((ROLL_VAC - 6) / (11 - 6)) * 100), place: "between" } });
     // A flag scored wrong still says how far the later figure went.
-    const wrong = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om: 9.1, evidence: { value: 12, label: "x", asOf: null, kind: "rule_of_thumb", publisher: "" } })), challenges: [], ...laterT12 });
+    const wrong = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om: ROLL_VAC, evidence: { value: 12, label: "x", asOf: null, kind: "rule_of_thumb", publisher: "" } })), challenges: [], ...laterRoll });
     expect(wrong.rows[0]).toMatchObject({ outcome: "flag_wrong", captured: { pct: 0, place: "between" } });
-    const held = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", verdict: "holds" })), challenges: [], ...laterT12 });
+    const held = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", verdict: "holds" })), challenges: [], ...laterRoll });
     expect(held.rows[0].outcome).toBe("false_hold");
     expect(held.rows[0].captured ?? null).toBeNull();
     const decided = scoreDeal({
@@ -121,7 +125,7 @@ describe("calibration: how much of the gap the evidence opened the later figure 
 
   it("the account lists each flagged row's capture by where it landed — counts, never a share or an average", () => {
     const deal = (om: number, value: number) =>
-      scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om, evidence: { value, label: "x", asOf: null, kind: "rule_of_thumb", publisher: "" } })), challenges: [], ...laterT12 });
+      scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", om, evidence: { value, label: "x", asOf: null, kind: "rule_of_thumb", publisher: "" } })), challenges: [], ...laterRoll });
     const r = accountRecord([deal(6, 11), deal(6, 8), deal(4, 3)]);
     expect(r.calibration.map((c) => c.captured.place)).toEqual(["between", "past", "om_side"]);
     expect(r.capturedCounts).toEqual({ between: 1, past: 1, omSide: 1 });
@@ -133,14 +137,14 @@ describe("calibration: how much of the gap the evidence opened the later figure 
 
   it("the base rate: every scored row whose later figure landed past the OM's on the buyer's bad side, whatever its verdict — a share only from five, with its count", () => {
     const deal = (verdict: StressSnapshotRow["verdict"], om: number) =>
-      scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", verdict, om })), challenges: [], ...laterT12 });
+      scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", verdict, om })), challenges: [], ...laterRoll });
     // Past the 6.0% by more than the margin: a flag borne out and a false hold alike.
-    const four = accountRecord([deal("stretched", 6), deal("holds", 6), deal("stretched", 9.1), deal("holds", 9.1)]);
+    const four = accountRecord([deal("stretched", 6), deal("holds", 6), deal("stretched", ROLL_VAC), deal("holds", ROLL_VAC)]);
     expect(four).toMatchObject({ scored: 4, pastOm: 2, pastOmPct: null });
     expect(baseRateLine(four)).toBe(
       "Base rate: 2 of 4 scored rows, whatever the test's verdict, landed past the OM's figure on the buyer's bad side by more than the row's margin. No share is printed under 5 scored rows.",
     );
-    const five = accountRecord([deal("stretched", 6), deal("holds", 6), deal("stretched", 9.1), deal("holds", 9.1), deal("stretched", 6)]);
+    const five = accountRecord([deal("stretched", 6), deal("holds", 6), deal("stretched", ROLL_VAC), deal("holds", ROLL_VAC), deal("stretched", 6)]);
     expect(five).toMatchObject({ scored: 5, pastOm: 3, pastOmPct: 60 });
     expect(baseRateLine(five)).toBe(
       "Base rate: 3 of 5 scored rows landed past the OM's figure on the buyer's bad side by more than the row's margin (60%), whatever the test's verdict.",
@@ -225,7 +229,7 @@ describe("every screen kept: a row scored against an earlier screen never vanish
   const S2 = "2026-09-01T12:00:00Z";
   const S1 = "2026-09-15T12:00:00Z";
   const ROLL_AT = "2026-09-10T09:00:00Z";
-  const screen = (at: string, om: number): PriorScreenLike => ({ verdict: { generatedAt: at, stressSnapshot: snap(row({ key: "vacancy", om })) } });
+  const screen = (at: string, om: number, measure?: "economic"): PriorScreenLike => ({ verdict: { generatedAt: at, stressSnapshot: snap(row({ key: "vacancy", om, ...(measure ? { measure } : {}) })) } });
   const rollBetween = { rentRoll: { arrivedAt: ROLL_AT, dated: "2026-09-05", summary: roll } };
 
   it("with only the last screen kept (deals.prior_screen), the first screen's scored row is lost; with every screen kept it stays", () => {
@@ -265,12 +269,15 @@ describe("every screen kept: a row scored against an earlier screen never vanish
   });
 
   it("one piece of evidence scores a key once, by the latest screen made before it; two pieces score two screens' rows", () => {
-    // The T-12 arrived after every screen; the rent roll between the first two.
+    // The T-12 arrived after every screen; the rent roll between the first
+    // two. The Sep 15 screen and this one read the OM's vacancy as economic,
+    // which only a T-12 scores; the Sep 1 screen read it by doors, which only
+    // a rent roll does.
     const r = scoreDeal({
       screenedAt: T,
-      stressSnapshot: snap(row({ key: "vacancy" })),
+      stressSnapshot: snap(row({ key: "vacancy", measure: "economic" })),
       challenges: [],
-      priorScreens: [screen(S2, 5), screen(S1, 7)],
+      priorScreens: [screen(S2, 5), screen(S1, 7, "economic")],
       ...rollBetween,
       ...laterT12,
     });
@@ -282,7 +289,7 @@ describe("every screen kept: a row scored against an earlier screen never vanish
     ]);
     expect(accountRecord([r]).scored).toBe(2);
     // Without the roll, the T-12 is the current screen's alone.
-    const one = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy" })), challenges: [], priorScreens: [screen(S2, 5), screen(S1, 7)], ...laterT12 });
+    const one = scoreDeal({ screenedAt: T, stressSnapshot: snap(row({ key: "vacancy", measure: "economic" })), challenges: [], priorScreens: [screen(S2, 5), screen(S1, 7, "economic")], ...laterT12 });
     expect(one.rows.map((x) => x.priorScreenedOn ?? null)).toEqual([null]);
   });
 

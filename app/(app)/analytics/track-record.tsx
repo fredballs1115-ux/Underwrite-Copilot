@@ -12,6 +12,7 @@ import {
   SCORED_BY,
   TAX_INSURANCE_NOT_SCORED,
   TRADE_DATE_RULE,
+  VACANCY_MEASURE_RULE,
   baseRateLine,
   calibrationCountsLine,
   capturedAt,
@@ -151,7 +152,7 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
         {RESCREEN_RULE}
       </p>
       <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-vacancy">
-        {ACCOUNT_VACANCY_NOTE}
+        {`${VACANCY_MEASURE_RULE} ${ACCOUNT_VACANCY_NOTE}`}
       </p>
     </section>
   );

@@ -1,5 +1,5 @@
 import type { LaterSource, ScorableRow } from "@/lib/track-record";
-import { RESCREEN_LINE } from "@/lib/track-record-words";
+import { RESCREEN_LINE, VACANCY_MEASURE_RULE } from "@/lib/track-record-words";
 
 /**
  * What will score what (the track record's empty state): a row a
@@ -23,6 +23,10 @@ const COLUMNS: readonly { source: LaterSource; label: string }[] = [
 
 export function ScorableGrid({ rows, className = "mt-3" }: { rows: readonly ScorableRow[]; className?: string }) {
   if (rows.length === 0) return null;
+  // A vacancy a document can score is scored in its own measure, said under
+  // the grid: a mark in the T-12's column is an economic vacancy's alone.
+  const vacancy = rows.find((r) => r.key === "vacancy");
+  const vacancyByDocument = !!vacancy && (vacancy.by.t12 || vacancy.by.rent_roll);
   return (
     <div className={className} data-qa="scorable-grid">
       <table className="w-full max-w-md border-collapse text-xs">
@@ -61,6 +65,11 @@ export function ScorableGrid({ rows, className = "mt-3" }: { rows: readonly Scor
           ))}
         </tbody>
       </table>
+      {vacancyByDocument && (
+        <p className="mt-2 text-xs text-muted" data-qa="scorable-grid-vacancy">
+          {VACANCY_MEASURE_RULE}
+        </p>
+      )}
       <p className="mt-2 text-xs font-medium" data-qa="scorable-grid-line">
         {RESCREEN_LINE}
       </p>

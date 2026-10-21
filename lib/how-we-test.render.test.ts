@@ -46,7 +46,7 @@ import {
   RENT_GROWTH_UNSUPPORTED_PTS,
   VACANCY_UNSUPPORTED_PTS,
 } from "./stress-test";
-import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE } from "./track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, VACANCY_MEASURE_RULE } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -241,6 +241,9 @@ describe("/how-we-test draws every method from the table", () => {
     expect(record).toContain("Each row of the stress test, holds included, is scored where a later figure can speak to it");
     expect(record).not.toMatch(/every row/i);
     expect(TRACK_RECORD.lines).toContain(SCORED_BY);
+    // A vacancy is scored in its own measure: doors by a rent roll, dollars by a T-12.
+    expect(record).toContain(VACANCY_MEASURE_RULE);
+    expect(record).not.toMatch(/a vacancy by a rent roll or (?:a )?T-12/);
     expect(TRACK_RECORD.lines).toContain(DECISION_SCORES);
     expect(TRACK_RECORD.lines).toContain(NOT_YET_SCORABLE);
     expect(record).toContain("a false hold");
