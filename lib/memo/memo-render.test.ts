@@ -1328,18 +1328,34 @@ describe("MemoDocument (redesigned)", () => {
       market: SAMPLE_DEAL.market,
       verdict: SAMPLE_DEAL.verdict,
       prior_screen: null,
+      is_sample: true,
     } as unknown as DealRow;
-    const buf = await renderToBuffer(
-      React.createElement(MemoDocument, { data: buildMemoData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
-    );
-    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    // The sample's exit killer quotes the stress test's own re-run, so the
-    // card takes the shared screen's label and its sentence says whose
-    // figure it is — never "the screen's estimate" over the engine's.
+    const render = async (d: DealRow) =>
+      (
+        await pdfTextOf(
+          await renderToBuffer(React.createElement(MemoDocument, { data: buildMemoData(d, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+        )
+      ).replace(/\s+/g, " ");
+    const text = await render(deal);
+    // The sample's exit killer quotes the stress test's own re-run (its call
+    // is written on its own test), so the card takes the plain label — never
+    // "the screen's estimate" over the engine's.
     expect(text).toMatch(/Breaks if: At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
-    expect(text).not.toContain("Breaks if (screen's estimate)");
+    expect(text).not.toContain("Breaks if (the screen's estimate)");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
-  }, 30000);
+    // Any other deal's call is the verdict step's words: "Breaks if:" plain
+    // only where its snapshot shows the call reached on the engine's
+    // re-runs; a verdict saved before the stress test is the screen's
+    // estimate.
+    const other = { ...deal, is_sample: false } as unknown as DealRow;
+    expect(await render(other)).toContain("Breaks if (the screen's estimate): No renovation premium yet justifies the spread.");
+    const { stressSnapshotOf } = await import("@/lib/stress-snapshot");
+    const { sampleStressTest } = await import("@/lib/sample-stress");
+    const cited = { ...other, verdict: { ...SAMPLE_DEAL.verdict, stressSnapshot: stressSnapshotOf(sampleStressTest({ today: "2026-09-30" })) } } as unknown as DealRow;
+    const citedText = await render(cited);
+    expect(citedText).toContain("Breaks if: No renovation premium yet justifies the spread.");
+    expect(citedText).not.toContain("Breaks if (the screen's estimate)");
+  }, 45000);
 
   it("clamps a line to its box at a word boundary, never inside a figure or on a word that leaves the clause hanging", () => {
     const reason =
@@ -1587,8 +1603,8 @@ describe("the memo leads with the stress test", () => {
     // The sample is read as stabilized: its re-runs say so under the read
     // line, as the deal page says it under the panel.
     expect(text).toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
-    expect(text.indexOf("in code. Levered IRR on the OM's figures")).toBeLessThan(text.indexOf("Read as stabilized, the sample re-runs"));
-    expect(text.indexOf("Read as stabilized, the sample re-runs")).toBeLessThan(text.indexOf("UNSUPPORTED Stabilized vacancy"));
+    expect(text.indexOf("in code. Levered IRR on the OM's figures")).toBeLessThan(text.indexOf("Read as stabilized, the sample's re-runs"));
+    expect(text.indexOf("Read as stabilized, the sample's re-runs")).toBeLessThan(text.indexOf("UNSUPPORTED Stabilized vacancy"));
     expect(text).toContain("T-12 NOI");
   }, 60000);
 
@@ -1671,7 +1687,7 @@ describe("the memo leads with the stress test", () => {
     expect(text).toContain(why);
     expect(text).toContain("Ticks: the OM's figure in the row's tone, the evidence's in ink; the report has every row.");
     expect(text).not.toContain("Re-runs:");
-    expect(text).not.toContain("Read as stabilized, the sample re-runs");
+    expect(text).not.toContain("Read as stabilized, the sample's re-runs");
     // Not withheld, but no printed row carries a re-run: the key says none.
     const live = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test);
     const none = { ...live, stressTest: { ...live.stressTest!, rows: live.stressTest!.rows.map((r) => ({ ...r, rerun: false })) } };

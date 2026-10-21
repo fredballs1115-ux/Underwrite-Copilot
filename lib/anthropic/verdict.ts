@@ -33,7 +33,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
 import type { StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rowMoveText, stressReadLine, evidenceWhen } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rowMoveText, stressReadLine, evidenceWhen, sourceWithPage } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -164,7 +164,9 @@ export function stressSection(test: StressTest): string[] {
             // ONE figure decided the row (lib/stress-deciders): it is named
             // so, and every other piece as beside it, deciding nothing.
             const tag = decidesTag(r, i);
-            return `${tag ? `[${tag.toUpperCase()}] ` : ""}${e.label}: ${e.text} (${e.publisher}${when}${kind === e.publisher ? "" : `; ${kind}`})`;
+            // The memorandum's own page where one is validated, as the
+            // panel and the report print it (`sourceWithPage`).
+            return `${tag ? `[${tag.toUpperCase()}] ` : ""}${e.label}: ${e.text} (${sourceWithPage(e)}${when}${kind === e.publisher ? "" : `; ${kind}`})`;
           })
           .join("; ")
       : "no evidence with a figure or words could be read";

@@ -3176,6 +3176,12 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
       if (r.evidence?.kind === "document") expect(lead).not.toContain(String(r.evidence.value));
     }
     expect(lead).not.toMatch(/\d+\.\d+%|\$\d/);
+    // The call was reached on the engine's re-runs (a row past its evidence
+    // carried one), so the deal-killer cards take the plain label.
+    expect(snapshot.rows.some((r) => r.rerun != null && (r.verdict === "stretched" || r.verdict === "unsupported"))).toBe(true);
+    const all = visibleText(html).replace(/&#x27;/g, "'");
+    expect(all).toContain("Breaks if: ");
+    expect(all).not.toContain("Breaks if (the screen's estimate)");
     // A stored snapshot that does not read is no snapshot: nothing new drawn.
     expect(callStressLine({ v: 99, rows: [] }, "Oct 12, 2026")).toBeNull();
     expect(callStressLine(undefined, null)).toBeNull();
@@ -3241,7 +3247,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // `bg-caution/10` is the confidence, not the position).
     expect(html).not.toMatch(/class="[^"]*\bbg-caution\b(?!\/)[^"]*"\s+style="left:/);
     expect(text).toContain("Basis");
-    expect(text).toContain("Breaks if:");
+    // The verdict kept no stress snapshot, so the call's cards are the
+    // screen's estimate, said so (lib/stress-snapshot `breaksIfLabel`).
+    expect(text.replace(/&#x27;/g, "'")).toContain("Breaks if (the screen's estimate):");
+    expect(text).not.toContain("Breaks if:");
     expect(text).toContain("Key terms");
     expect(text).toContain("pro forma");
     // The comp and market reads: first sentence in the open, the rest folded

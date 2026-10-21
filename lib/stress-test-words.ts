@@ -237,11 +237,25 @@ export function evidenceFigureText(key: StressKey, value: number | null, rowText
   return Number(value.toFixed(1)) > 0 ? `+${t}` : t;
 }
 
-/** An ISO day in words ("May 31, 2026"); any other stated period as it
- *  stands ("Q2 2026"); "undated" with none. A piece of evidence is dated by
- *  its own period (`evidencePeriod`), never by this alone. */
-export function whenWords(asOf: string | null | undefined): string {
+/** A full ISO timestamp ("2026-10-12T15:04:05.123Z", a recorded-sales pull's
+ *  `retrievedAt`) as its UTC day ("2026-10-12"); any other text as it
+ *  stands, trimmed. A day is what every surface prints for a piece read at a
+ *  moment, never the moment's raw string. */
+export function isoDayOf(asOf: string | null | undefined): string {
   const s = (asOf ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(s)) {
+    const t = Date.parse(s);
+    if (Number.isFinite(t)) return new Date(t).toISOString().slice(0, 10);
+  }
+  return s;
+}
+
+/** An ISO day in words ("May 31, 2026"), a full timestamp by its UTC day;
+ *  any other stated period as it stands ("Q2 2026"); "undated" with none. A
+ *  piece of evidence is dated by its own period (`evidencePeriod`), never by
+ *  this alone. */
+export function whenWords(asOf: string | null | undefined): string {
+  const s = isoDayOf(asOf);
   if (!s) return "undated";
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const t = Date.parse(`${s}T00:00:00Z`);
@@ -262,11 +276,12 @@ const TEXT_CADENCES = ["daily", "monthly", "quarterly"] as const;
  * Zillow month, "Q2 2026" for the survey's quarter, a day only for a day's
  * figure), with `inText` true where the text already says it, so no surface
  * prints it twice. A stored ISO day the text does not date is a day (a
- * T-12's period end, the day records were read); any other stated period
- * stands as written. Null with no date.
+ * T-12's period end, the day records were read — a full timestamp by its
+ * UTC day, `isoDayOf`); any other stated period stands as written. Null with
+ * no date.
  */
 export function evidencePeriod(e: Pick<StressEvidence, "asOf" | "text">): { said: string; inText: boolean } | null {
-  const s = (e.asOf ?? "").trim();
+  const s = isoDayOf(e.asOf);
   if (!s) return null;
   const text = e.text ?? "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(`${s}T00:00:00Z`))) {
@@ -280,6 +295,18 @@ export function evidencePeriod(e: Pick<StressEvidence, "asOf" | "text">): { said
     return { said: whenWords(s), inText: false };
   }
   return { said: s, inText: text.includes(s) };
+}
+
+/** The ISO day a piece is dated, only where its own period IS a day
+ *  (`evidencePeriod` says it as one): "2026-05-31" for a rent roll's day, a
+ *  recorded-sales pull's UTC day; null for a month's or a quarter's figure
+ *  stored under its first day, a stated period, or no date. A table cell
+ *  holds a date only then, so a monthly figure never reads as its first. */
+export function evidenceDay(e: Pick<StressEvidence, "asOf" | "text">): string | null {
+  const s = isoDayOf(e.asOf);
+  const p = evidencePeriod(e);
+  if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return p.said === whenWords(s) ? s : null;
 }
 
 /**
@@ -300,19 +327,58 @@ export function evidenceWhen(e: Pick<StressEvidence, "asOf" | "text" | "kind">):
  *  count, read off the reader's own sentence (lib/stress-test `basisRow`):
  *  "the one comp graded clean", "the midpoint of the two comps graded
  *  clean", "the median of the 4 comps graded clean"; null on any other
- *  piece, or a sentence that strikes no figure. */
-export function compsStruckOver(e: Pick<StressEvidence, "label" | "text" | "value">): string | null {
+ *  piece, or a sentence that strikes no figure. `ofTheOm` names whose comps
+ *  they are where no page beside them says so: "the OM's one comp graded
+ *  clean". */
+export function compsStruckOver(e: Pick<StressEvidence, "label" | "text" | "value">, ofTheOm = false): string | null {
   if (e.value == null || !/^The memorandum's sale comps\b/.test(e.label)) return null;
-  if (/ — the one comp graded clean\b/.test(e.text)) return "the one comp graded clean";
-  if (/ — the two graded clean, midpoint\b/.test(e.text)) return "the midpoint of the two comps graded clean";
+  const the = ofTheOm ? "the OM's" : "the";
+  if (/ — the one comp graded clean\b/.test(e.text)) return `${the} one comp graded clean`;
+  if (/ — the two graded clean, midpoint\b/.test(e.text)) return `the midpoint of ${the} two comps graded clean`;
   const m = e.text.match(/ — median .*? over the (\d+)\b/);
-  return m ? `the median of the ${m[1]} comps graded clean` : null;
+  return m ? `the median of ${the} ${m[1]} comps graded clean` : null;
+}
+
+/** The memorandum's own page a piece is read off, as a whole page number,
+ *  where the engine holds a validated one (`StressEvidence.page`); null
+ *  with none. */
+export function evidencePage(e: Pick<StressEvidence, "page">): number | null {
+  return e.page != null && Number.isInteger(e.page) && e.page > 0 ? e.page : null;
 }
 
 /** "OM p. 14" — the memorandum's own page a piece is read off, where the
  *  engine holds a validated one (`StressEvidence.page`); "" with none. */
 export function evidencePageText(e: Pick<StressEvidence, "page">): string {
-  return e.page != null && Number.isInteger(e.page) && e.page > 0 ? `OM p. ${e.page}` : "";
+  const p = evidencePage(e);
+  return p != null ? `OM p. ${p}` : "";
+}
+
+/** A piece's publisher with its validated OM page, as the report's evidence
+ *  line and the verdict's brief print it after the piece's own words: "the
+ *  rent roll", "the offering memorandum, OM p. 14" — the page alone, "OM p.
+ *  14", where the publisher is the memorandum itself. */
+export function sourceWithPage(e: Pick<StressEvidence, "publisher" | "page">): string {
+  const page = evidencePageText(e);
+  if (!page) return e.publisher;
+  return e.publisher === "the offering memorandum" ? page : `${e.publisher}, ${page}`;
+}
+
+/**
+ * The `dateTime` a page's `<time>` carries for a piece's period, matching
+ * the words beside it (`evidencePeriod`): the day ("2026-05-31") where the
+ * period is a day, the month ("2026-08") where it is a month, the year
+ * ("2026") where a year; null for a quarter or a period stated in words,
+ * which no valid HTML date string names.
+ */
+export function evidenceDateTime(e: Pick<StressEvidence, "asOf" | "text">): string | null {
+  const day = evidenceDay(e);
+  if (day) return day;
+  const s = isoDayOf(e.asOf);
+  const p = evidencePeriod(e);
+  if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (p.said === periodLabel(s, "monthly")) return s.slice(0, 7);
+  if (p.said === s.slice(0, 4)) return s.slice(0, 4);
+  return null;
 }
 
 /** "9.1% (the deal's rent roll, May 31, 2026)" — the evidence's figure in
@@ -321,7 +387,8 @@ export function evidencePageText(e: Pick<StressEvidence, "page">): string {
  *  trailing year it is ("+1.1% over the year to Aug 2026 (Zillow
  *  Research)"), never as a rate a year; the memorandum's own figure carries
  *  its page ("(OM p. 14)") and, on a price struck over comps, their count
- *  ("(the one comp graded clean, OM p. 14)"). */
+ *  ("(the one comp graded clean, OM p. 14)"; with no validated page, "(the
+ *  OM's one comp graded clean)"). */
 export function evidenceShort(row: StressRow, e: StressEvidence | null): string {
   if (!e) return "no evidence with a figure";
   const period = evidencePeriod(e);
@@ -333,9 +400,10 @@ export function evidenceShort(row: StressRow, e: StressEvidence | null): string 
   // reader struck both on one track.
   const figure = e.value != null ? evidenceFigureText(row.key, e.value, row.omSays.text) : e.text;
   // The memorandum's own figure is the memorandum's page where one is
-  // validated, and a price struck over its comps says over how many.
+  // validated, and a price struck over its comps says over how many — whose
+  // comps they are, where no page beside them says so.
   const page = evidencePageText(e);
-  const comps = compsStruckOver(e);
+  const comps = compsStruckOver(e, !page);
   const omBase = comps ?? (e.publisher === "the offering memorandum" && page ? "" : e.publisher);
   const source = page ? (omBase ? `${omBase}, ${page}` : page) : comps ?? e.publisher;
   // A published figure with no date is said undated; the deal's own
@@ -400,6 +468,10 @@ export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run
  *  file tests it; lib/stress-test drops any), and a row with no impact has
  *  none to draw. */
 export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
+
+/** Whether a surface may say the return is re-run in code: the re-runs
+ *  stand (nothing withheld) and some row draws one (`drawsRerun`). */
+export const rerunsStand = (test: StressTest): boolean => !test.impactsWithheld && test.rows.some(drawsRerun);
 
 /**
  * The row's return in one line, for the report and the verdict's brief: the
@@ -903,12 +975,13 @@ export function keptSentence(test: StressTest): string | null {
 export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.";
 
 /** Under the sample's panel (/demo, the homepage's walkthrough and the
- *  signed-in sample): the sample is read as stabilized, so its rows re-run
- *  the levered return, and a plan deal's re-run its yield on total cost — in
+ *  signed-in sample): the sample is read as stabilized, so the rows it
+ *  re-runs move the levered return (a row that holds or is unchecked draws
+ *  none, `drawsRerun`), and a plan deal's re-run its yield on total cost — in
  *  the plan rule's own words (lib/stress-test `PLAN_YIELD_LEAD`;
  *  lib/sample-stress.test.ts holds the two to one another). */
 export const SAMPLE_PLAN_NOTE =
-  "Read as stabilized, the sample re-runs each row's levered return. A value-add, lease-up, conversion or development OM is re-run on its yield on total cost instead, where it states its stabilized NOI and total cost: the model runs today's income, not the business plan.";
+  "Read as stabilized, the sample's re-runs move its levered return. A value-add, lease-up, conversion or development OM is re-run on its yield on total cost instead, where it states its stabilized NOI and total cost: the model runs today's income, not the business plan.";
 
 /**
  * The headline in whole sentences, for the memo, the report and the

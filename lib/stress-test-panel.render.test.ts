@@ -461,6 +461,22 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).not.toContain("Aug 31, 2026");
   });
 
+  it("gives a piece's period a machine-readable date that matches its words: a day for a day, a recorded-sales pull by its UTC day", () => {
+    const piece = (asOf: string, text: string): StressRow => ({ ...EXIT, evidence: [{ ...EXIT.evidence[0], kind: "published", asOf, text, publisher: "Philadelphia OPA", scope: "metro" }] });
+    const html = (row: StressRow) => renderToStaticMarkup(h(StressTestPanel, { test: { ...TEST, rows: [row], headline: null } }));
+    const day = html(piece("2026-06-30", "$2.2M"));
+    expect(day).toMatch(/<time datetime="2026-06-30"[^>]*>Jun 30, 2026<\/time>/i);
+    // A full timestamp is its UTC day, in the words and the dateTime alike.
+    const stamp = html(piece("2026-10-12T23:41:07.512Z", "Median $240k/unit over 4 recorded sales"));
+    expect(stamp).toMatch(/<time datetime="2026-10-12"[^>]*>Oct 12, 2026<\/time>/i);
+    expect(stamp).not.toContain("T23:41");
+    // A period stated in words carries no dateTime of its own.
+    const quarter = html(piece("Q2 2026", "6.2%"));
+    expect(quarter).toContain("Q2 2026");
+    expect(quarter).not.toMatch(/datetime="Q2/i);
+    expect(a11yIssues(stamp)).toEqual([]);
+  });
+
   it("draws a basis piece judged on its own yardstick in the list, never on the track shared with the OM's per-unit figure", () => {
     const basis: StressRow = {
       key: "basis",

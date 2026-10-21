@@ -117,7 +117,6 @@ import {
   SAMPLE_PLAN_NOTE,
   VERDICT_WORD,
   decidesTag,
-  drawsRerun,
   headlineName,
   headlinePlaces,
   headlineSentence,
@@ -140,7 +139,10 @@ import {
   verdictCounts,
   whenWords,
   evidenceWhen,
+  rerunsStand,
+  sourceWithPage,
 } from "@/lib/stress-test-words";
+import { BREAKS_IF_ESTIMATE } from "@/lib/stress-snapshot";
 
 const C = {
   brand: "#114e54",
@@ -464,7 +466,7 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
         const tag = decidesTag(row, i);
         return (
           <Text key={i} style={{ fontSize: 8, color: tag === DECIDES_TAG ? C.ink : C.muted, marginTop: 1, marginLeft: 8 }}>
-            {str(`${tag ? `${tag}: ` : ""}${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${evidenceWhen(e)})`)}
+            {str(`${tag ? `${tag}: ` : ""}${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${sourceWithPage(e)}${evidenceWhen(e)})`)}
           </Text>
         );
       })}
@@ -603,9 +605,11 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
   // What each row's return line is: the engine's own re-run where a row
   // carries one, else why none is — never a re-run beside a read line that
   // says no return is re-run.
-  const reruns = !test.impactsWithheld && test.rows.some(drawsRerun);
+  // The list ends on "and the challenger's question", so this clause takes
+  // no "and" of its own.
+  const reruns = rerunsStand(test);
   const returnClause = !reruns
-    ? "and why no return is re-run"
+    ? "why no return is re-run"
     : test.measure === "yield_on_cost"
       ? "the yield on cost's move, the plan's stabilized NOI over its total cost struck again in code with one figure moved, never an estimate"
       : "the return's move, the engine's own run of the model with that one input swapped, never an estimate";
@@ -1257,7 +1261,9 @@ function CallInFullPage({
                 {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
               </Text>
               {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
-              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if: ${str(k?.risk)}`)}</Text> : null}
+              {/* "Breaks if:" only where the call cites the engine's re-runs
+                  (lib/stress-snapshot `breaksIfLabel`, the memo's own). */}
+              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`${memo.breaksIf ?? BREAKS_IF_ESTIMATE} ${str(k?.risk)}`)}</Text> : null}
             </View>
           ))}
         </View>

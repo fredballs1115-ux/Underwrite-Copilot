@@ -64,6 +64,7 @@ import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { StressTest } from "@/lib/stress-test-types";
+import { BREAKS_IF_ESTIMATE, breaksIfLabel } from "@/lib/stress-snapshot";
 import { SAMPLE_PLAN_NOTE, drawsRerun, headlineShort, leadRows, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
@@ -527,6 +528,11 @@ export type MemoData = {
     confidence: "high" | "medium" | "low" | "";
   }[];
   dealKillers: { label: string; read: string; risk: string }[];
+  /** the deal-killer card's label (lib/stress-snapshot `breaksIfLabel`):
+   *  "Breaks if:" only where the call cites the engine's re-runs, else
+   *  "Breaks if (the screen's estimate):", which is also the label where a
+   *  caller set none */
+  breaksIf?: string;
   sensitivity: { scenario: string; call: string; note: string }[];
   /** the deal-killer cards and the flips strip the stress block's rows took
    *  the room of (emptied above where the block has a row): the fit loop
@@ -931,6 +937,7 @@ export function buildMemoData(
     flags: hasScreen ? [] : flags.slice(0, 4),
     ranges,
     dealKillers: hasStress ? [] : dealKillers,
+    breaksIf: breaksIfLabel(verdict?.stressSnapshot, (deal as { is_sample?: boolean }).is_sample === true),
     sensitivity: hasStress ? [] : sensitivity,
     stressDisplaced: hasStress ? { dealKillers, sensitivity } : null,
     nextSteps: list(verdict?.nextSteps).map(str).slice(0, hasScreen ? 2 : 4),
@@ -1792,11 +1799,13 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                       {i + 1}. {k.label}
                     </Text>
                     <Text style={s.killerRead}>{k.read}</Text>
-                    {/* The shared screen's label: the sentence says whose
-                        figure it is (the sample's quotes the stress test's
-                        own re-run, which no "estimate" label may cover). */}
+                    {/* "Breaks if:" only where the call cites the engine's
+                        re-runs; else the card is the screen's estimate
+                        (lib/stress-snapshot `breaksIfLabel`). */}
                     {k.risk ? (
-                      <Text style={s.killerRisk}>Breaks if: {k.risk}</Text>
+                      <Text style={s.killerRisk}>
+                        {data.breaksIf ?? BREAKS_IF_ESTIMATE} {k.risk}
+                      </Text>
                     ) : null}
                   </View>
                 ))}

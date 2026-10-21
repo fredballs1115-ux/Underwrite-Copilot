@@ -505,15 +505,35 @@ describe("ReportDocument (full report)", () => {
       expect(text).toContain(`Source: ${r.source}`);
       expect(text).toContain(`What drives the spread: ${r.basis}`);
     }
-    // The shared screen's label: the sentence says whose figure it is.
-    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if: ${k.risk}`);
-    expect(text).not.toContain("Breaks if (screen's estimate)");
+    // The verdict kept no stress snapshot, and this row is not the sample:
+    // its cards are the verdict step's words, the screen's estimate.
+    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if (the screen's estimate): ${k.risk}`);
+    expect(text).not.toContain("Breaks if:");
+    // Where the call was reached on the engine's re-runs (its snapshot has a
+    // row past its evidence that carried one), and on the sample, whose call
+    // is written on its own test, the plain label.
+    const { stressSnapshotOf } = await import("@/lib/stress-snapshot");
+    const { sampleStressTest } = await import("@/lib/sample-stress");
+    const callPage = async (d: DealRow) => {
+      const ps = pdfPageTextsOf(
+        await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(d, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+      ).map((p) => p.replace(/\s+/g, " "));
+      return ps.slice(ps.findIndex((p) => p.includes("The call, in full"))).join(" ");
+    };
+    for (const d of [
+      { ...deal, verdict: { ...verdict, stressSnapshot: stressSnapshotOf(sampleStressTest({ today: "2026-09-30" })) } },
+      { ...deal, is_sample: true },
+    ]) {
+      const t = await callPage(d as unknown as DealRow);
+      for (const k of verdict.screen!.dealKillers) expect(t).toContain(`Breaks if: ${k.risk}`);
+      expect(t).not.toContain("Breaks if (the screen's estimate)");
+    }
     for (const f of verdict.screen!.sensitivity) expect(text).toContain(f.note);
     // No verdict, no page.
     const bare = buildReportData({ ...deal, verdict: null } as unknown as DealRow, "September 30, 2026", []);
     const bareText = pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: bare }) as unknown as Parameters<typeof renderToBuffer>[0]));
     expect(bareText).not.toContain("The call, in full");
-  }, 60000);
+  }, 120000);
 
   it("prints the deal page's max bid — solved on the buy box's every floor, the binding one named — never the IRR floor's alone", async () => {
     // The demo report route's own chain, beside the demo page's playground.
@@ -2992,6 +3012,11 @@ describe("the report's stress-test page", () => {
     expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
+    // The memorandum's own pieces carry their validated page, as the panel's
+    // page chip and the memo's evidence cell do.
+    const clean = test.rows.find((r) => r.key === "basis")!.evidence.find((e) => e.page != null)!;
+    expect(clean.page).toBe(14);
+    expect(page).toContain(flat(`${clean.label}: ${clean.text} (OM p. 14)`));
     // The basis row's move is the engine's, spelled.
     expect(page).toContain(
       "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
@@ -3044,7 +3069,7 @@ describe("the report's stress-test page", () => {
     // The page's own key never follows "no return is re-run" with a re-run,
     // and the sample's stabilized note goes with the re-runs.
     expect(text).not.toContain("the return's move, the engine's own run of the model");
-    expect(text).toContain("the gap in the assumption's own unit; and why no return is re-run; the method;");
+    expect(text).toContain("the gap in the assumption's own unit; why no return is re-run; the method;");
     expect(text).not.toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
   }, 90000);
 });

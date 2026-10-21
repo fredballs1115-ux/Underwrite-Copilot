@@ -9,6 +9,7 @@ import {
   decidesTag,
   drawsRerun,
   evidenceFigureText,
+  evidenceDateTime,
   evidencePeriod,
   figureText,
   headlineLine,
@@ -599,8 +600,11 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                   period.inText ? null : (
                     <>
                       {", "}
-                      {/^\d{4}-\d{2}-\d{2}$/.test(e.asOf ?? "") ? (
-                        <time dateTime={e.asOf!} className="whitespace-nowrap">
+                      {/* The machine-readable date matches the words: a day
+                          for a day, a month for a month, none for a quarter
+                          (lib/stress-test-words `evidenceDateTime`). */}
+                      {evidenceDateTime(e) ? (
+                        <time dateTime={evidenceDateTime(e)!} className="whitespace-nowrap">
                           {period.said}
                         </time>
                       ) : (

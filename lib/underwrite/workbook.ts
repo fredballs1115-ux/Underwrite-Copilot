@@ -24,7 +24,11 @@ import {
   SAMPLE_PLAN_NOTE,
   VERDICT_WORD,
   bestEvidence,
+  compsStruckOver,
   drawsRerun,
+  evidenceDay,
+  evidencePage,
+  evidencePeriod,
   headlineSentence,
   headlinePlaces,
   isYieldHeadline,
@@ -33,6 +37,7 @@ import {
   measureName,
   noMoveWhy,
   partNote,
+  rerunsStand,
   rowMoveText,
   shownHeadline,
   stressReadLine,
@@ -296,7 +301,13 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead, stressTest: !!wsStress, omFacts: !!wsFacts }, builtAt);
+  buildCover(
+    wsCover,
+    model,
+    branding,
+    { portfolio: !!wsPortfolio, marketRead: !!wsRead, stressTest: !!wsStress, stressRerun: !!wsStress && !!stressTest && rerunsStand(stressTest), omFacts: !!wsFacts },
+    builtAt,
+  );
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
@@ -349,7 +360,9 @@ function buildCover(
   model: DerivedModel,
   branding?: ExportBranding | null,
   /** which of the optional tabs this workbook carries, for the Contents */
-  optional: { portfolio: boolean; marketRead: boolean; stressTest?: boolean; omFacts?: boolean } = { portfolio: false, marketRead: false },
+  /** `stressRerun`: the Stress Test tab draws a re-run (lib/stress-test-words
+   *  `rerunsStand`), so its line may say the return is re-run */
+  optional: { portfolio: boolean; marketRead: boolean; stressTest?: boolean; stressRerun?: boolean; omFacts?: boolean } = { portfolio: false, marketRead: false },
   /** when it was built: the day "years from today" on this cover counts from */
   builtAt: Date = new Date(),
 ) {
@@ -824,7 +837,12 @@ function buildCover(
       ? ([["Market Read", "The model's assumptions against the published figures, as read the day this was built"]] as [string, string][])
       : []),
     ...(optional.stressTest
-      ? ([["Stress Test", "The memorandum's assumptions, each set against the one figure that decides it, and the return re-run in code"]] as [string, string][])
+      ? ([
+          [
+            "Stress Test",
+            `The memorandum's assumptions, each set against the one figure that decides it${optional.stressRerun ? ", and the return re-run in code" : ""}`,
+          ],
+        ] as [string, string][])
       : []),
     ...(optional.omFacts
       ? ([["OM Facts", "Every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged"]] as [string, string][])
@@ -1350,6 +1368,7 @@ export const STRESS_COLUMNS = [
   "Kind",
   "Figure",
   "Publisher or source",
+  "Its OM page",
   "As of",
   "Gap (+ = the OM is more optimistic)",
   "The gap, in words",
@@ -1395,14 +1414,17 @@ const signedFmt = (body: string) => `+${body};"${MINUS}"${body};${body}`;
 /** A figure in its row's own unit as a cell holds it: a percent as Excel's
  *  percent (the stored 6.0 is 6.0%), a dollar as a dollar with the basis's
  *  noun or a premium's month in its format, so the value stays raw and sorts.
- *  `per` is the yardstick a basis figure is on ("/unit", "/SF"). */
-function stressFigure(key: StressKey, value: number, per: string): { value: number; numFmt: string } {
+ *  `per` is the yardstick a basis figure is on ("/unit", "/SF"). A growth
+ *  row's OM figure is a rate a year ("4.0%/yr"); its evidence is a trailing
+ *  year's change, signed with no "/yr" ("+1.1%"), the words module's
+ *  `evidenceFigureText` rule. */
+function stressFigure(key: StressKey, value: number, per: string, evidence = false): { value: number; numFmt: string } {
   switch (key) {
     case "vacancy":
       return { value: value / 100, numFmt: FMT.pct1 };
     case "rent_growth":
     case "expense_growth":
-      return { value: value / 100, numFmt: '0.0%"/yr"' };
+      return { value: value / 100, numFmt: evidence ? signedFmt("0.0%") : '0.0%"/yr"' };
     case "exit_cap":
     case "debt":
       return { value: value / 100, numFmt: FMT.pct2 };
@@ -1455,7 +1477,7 @@ const basisPer = (row: StressRow): string => {
  * so the model's own tabs stay as live as they were.
  */
 function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
-  const widths = [22, 11, 12, 7, 30, 18, 12, 18, 12, 12, 30, 11, 10, 10, 9, 44, 44];
+  const widths = [22, 11, 12, 7, 30, 18, 12, 18, 7, 12, 12, 30, 11, 10, 10, 9, 44, 44];
   widths.forEach((w, i) => {
     ws.getColumn(i + 1).width = w;
   });
@@ -1482,12 +1504,16 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
       ? ` Published figures read ${whenWords(test.readOn)}.`
       : " Published figures as of the screen's market check."
     : "";
+  // A re-run is said only where one stands (lib/stress-test-words
+  // `rerunsStand`: nothing withheld, and a row that draws one).
+  const rerun = rerunsStand(test) ? ", and the return re-run in code with that one input swapped for the evidence's" : "";
   across(
     2,
-    `Each assumption the memorandum makes, set against the one figure that decides it, and the return re-run in code with that one input swapped for the evidence's. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
+    `Each assumption the memorandum makes, set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
   );
   across(3, stressReadLine(test), { color: INK });
-  if (test.sample) across(4, SAMPLE_PLAN_NOTE);
+  // The sample's note, where its re-runs stand (the memo's and the report's rule).
+  if (test.sample && !test.impactsWithheld) across(4, SAMPLE_PLAN_NOTE);
 
   sectionHeader(ws, STRESS_HEAD_ROW, STRESS_COLUMNS[0], 1, lastCol);
   STRESS_COLUMNS.forEach((h, i) => {
@@ -1539,19 +1565,32 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
       wrapped(C("The figure that decides"), `${e.label}: ${e.text}`, 9);
       const grain = e.kind === "published" ? STRESS_GRAIN[e.scope] : undefined;
       wrapped(C("Kind"), grain ? `${STRESS_KIND_WORD[e.kind]} (${grain})` : STRESS_KIND_WORD[e.kind], 9);
-      if (e.value != null && Number.isFinite(e.value)) number(C("Figure"), stressFigure(row.key, e.value, e.ownYardstick?.per ?? basisPer(row)));
-      wrapped(C("Publisher or source"), e.publisher, 9, MUTED);
-      // An ISO day as a date, so the column sorts, printed as the words
-      // module prints it ("May 31, 2026"); a period as published; a
-      // published figure with no date "undated", any other piece blank.
+      // A growth row's published figure is a trailing year's change, signed
+      // and never a rate a year (lib/stress-test-words `evidenceFigureText`).
+      if (e.value != null && Number.isFinite(e.value)) number(C("Figure"), stressFigure(row.key, e.value, e.ownYardstick?.per ?? basisPer(row), true));
+      // The memorandum's comps a price is struck over, in their count, as
+      // the panel and `evidenceShort` say it ("the OM's one comp graded
+      // clean"); else the publisher.
+      wrapped(C("Publisher or source"), compsStruckOver(e, true) ?? e.publisher, 9, MUTED);
+      // The memorandum's own page the piece is read off, where validated.
+      const evPage = evidencePage(e);
+      if (evPage != null) number(C("Its OM page"), { value: evPage, numFmt: "0" });
+      // By the piece's own period (lib/stress-test-words `evidencePeriod`):
+      // a date cell, so the column sorts, only where the period is a day
+      // ("May 31, 2026"); a month's or a quarter's figure in its own words
+      // ("Aug 2026", "Q2 2026"), never its first day; a published figure
+      // with no date "undated", any other piece blank.
       const asOf = ws.getCell(r, C("As of"));
-      const day = e.asOf && /^\d{4}-\d{2}-\d{2}$/.test(e.asOf) ? Date.parse(`${e.asOf}T00:00:00Z`) : NaN;
-      if (Number.isFinite(day) && new Date(day).toISOString().slice(0, 10) === e.asOf) {
-        asOf.value = new Date(day);
+      const day = evidenceDay(e);
+      const period = evidencePeriod(e);
+      if (day) {
+        asOf.value = new Date(`${day}T00:00:00Z`);
         asOf.numFmt = "mmm d, yyyy";
         asOf.font = { name: ARIAL, size: 9, color: INK };
         asOf.alignment = { horizontal: "left", vertical: "top" };
-      } else if (e.asOf || e.kind === "published") {
+      } else if (period) {
+        wrapped(C("As of"), period.said, 9);
+      } else if (e.kind === "published") {
         wrapped(C("As of"), whenWords(e.asOf), 9);
       }
     }
@@ -1569,8 +1608,13 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
     if (impact) {
       const yoc = isYieldImpact(impact);
       wrapped(C("Re-run of"), yoc ? "Yield on cost" : "Levered IRR", 9);
-      const base = yoc ? (impact.baseYocPct ?? null) : impact.baseIrrPct;
-      const alt = yoc ? (impact.altYocPct ?? null) : impact.altIrrPct;
+      // Each case stored at the place it prints (a levered IRR at one, a
+      // yield on cost at two, as the headline's `shownHeadline` does), so the
+      // move's formula over them is the difference of the two figures shown.
+      const places = yoc ? 2 : 1;
+      const shownAt = (n: number | null | undefined): number | null => (n == null || !Number.isFinite(n) ? null : Number(n.toFixed(places)));
+      const base = shownAt(yoc ? impact.baseYocPct : impact.baseIrrPct);
+      const alt = shownAt(yoc ? impact.altYocPct : impact.altIrrPct);
       const fmt = yoc ? FMT.pct2 : FMT.pct1;
       const ok = (n: number | null): n is number => n != null && Number.isFinite(n);
       if (ok(base)) number(C("At the OM's figure"), { value: base / 100, numFmt: fmt });
@@ -1579,7 +1623,7 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
         // A formula over the two cells beside it, the move in points.
         const at = (name: (typeof STRESS_COLUMNS)[number]) => cellA1(r, C(name));
         const move = ws.getCell(r, C("Move (pts)"));
-        move.value = { formula: `(${at("At the evidence's")}-${at("At the OM's figure")})*100`, result: alt - base } as ExcelJS.CellFormulaValue;
+        move.value = { formula: `(${at("At the evidence's")}-${at("At the OM's figure")})*100`, result: Number((alt - base).toFixed(places)) } as ExcelJS.CellFormulaValue;
         styleFormula(move, signedFmt(yoc ? '0.00" pts"' : '0.0" pts"'));
         move.alignment = { vertical: "top" };
       }

@@ -139,7 +139,7 @@ import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engin
 import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
-import { readValueAdd, valueAddTermRows } from "@/lib/value-add";
+import { achievedPremiumRow, readValueAdd } from "@/lib/value-add";
 import { readRoster } from "@/lib/tenant-roster";
 import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex } from "@/lib/rent-growth-decider";
 import {
@@ -161,7 +161,7 @@ import {
   TRAILING_YEAR_NOT_FORECAST,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
-import { evidenceFigureText, evidencePeriod } from "@/lib/stress-test-words";
+import { evidenceFigureText, evidencePeriod, isoDayOf } from "@/lib/stress-test-words";
 import {
   ABATEMENT_LABEL,
   ACHIEVED_PREMIUM_LABEL,
@@ -2415,7 +2415,9 @@ function basisRow(ctx: Ctx): StressRow | null {
                 ? `${sales}; no per-${nounOne} median is struck on recorded sales`
                 : `${sales}, too few of them stating an area for a median /SF`,
         value: v != null ? Math.round(v) : null,
-        asOf: rs.retrievedAt,
+        // The day the records were read (lib/public-comps/run stores the
+        // moment, a full timestamp), by its UTC day.
+        asOf: rs.retrievedAt ? isoDayOf(rs.retrievedAt) || null : null,
         publisher: rs.providerName,
         scope: "metro",
         href: rs.href ?? null,
@@ -2676,12 +2678,10 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
   const evidence: StressEvidence[] = [];
   const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
   if (r.achievedPremium != null) {
-    // The achieved premium's own row, as lib/value-add finds it: its key
-    // terms list ends on that row wherever an achieved premium was read
-    // (`valueAddTermRows`, the reader's own pick), its page validated
-    // against the deck.
-    const terms = valueAddTermRows(ctx.rows);
-    const page = locatedPage(terms[terms.length - 1]?.page, ctx.ex?.totalPages);
+    // The achieved premium's own row, picked by the reader's own ACHIEVED
+    // pattern (lib/value-add `achievedPremiumRow`), never by its place in a
+    // list; its page validated against the deck.
+    const page = locatedPage(achievedPremiumRow(ctx.rows)?.page, ctx.ex?.totalPages);
     evidence.push({
       kind: "om_internal",
       label: ACHIEVED_PREMIUM_LABEL,

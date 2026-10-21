@@ -63,7 +63,7 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { evidencePeriod, evidenceWhen, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
+import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
 import { METRO_VACANCY_LABEL } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
@@ -2139,14 +2139,18 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // left-out comp's page is no page of the figure.
     expect(b.evidence[0]).toMatchObject({ kind: "om_internal", value: 252_000, page: 14 });
     expect(rowWords(b).against).toBe("$252k/unit (the one comp graded clean, OM p. 14)");
+    // The verdict's brief cites the same page on the piece's own line.
+    const briefLine = stressSection(t).find((l) => l.startsWith("- ") && l.includes("(basis)"))!;
+    expect(briefLine).toContain(`${b.evidence[0].label}: ${b.evidence[0].text} (OM p. 14; the memorandum's own figure)`);
     // A page past the deck's length is no page: nothing new is printed.
     const past = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [{ ...one.saleComps[0], page: "p. 99" }] } })), "basis");
     expect(past.evidence[0].page).toBeUndefined();
-    expect(rowWords(past).against).toBe("$252k/unit (the one comp graded clean)");
+    expect(rowWords(past).against).toBe("$252k/unit (the OM's one comp graded clean)");
     // Two clean comps on two pages: their midpoint, no one page.
     const two = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [one.saleComps[0], { ...one.saleComps[1], support: "supports" as const }] } })), "basis");
     expect(two.evidence[0].page).toBeUndefined();
-    expect(rowWords(two).against).toMatch(/\(the midpoint of the two comps graded clean\)$/);
+    // With no page beside them, whose comps they are is said.
+    expect(rowWords(two).against).toMatch(/\(the midpoint of the OM's two comps graded clean\)$/);
     // The going-in cap's own row's page.
     const x = rowOf(t, "exit_cap");
     expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", page: 6 });
@@ -2172,6 +2176,49 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(evidenceWhen({ asOf: null, text: "x", kind: "om_internal" })).toBe("");
     // No growth evidence anywhere is cited as a rate a year.
     for (const k of ["rent_growth", "expense_growth"] as const) expect(rowWords(rowOf(t, k)).against).not.toMatch(/\/yr/);
+  });
+
+  it("dates a piece read at a moment by its UTC day, and gives a table a date, and a page a dateTime, only for the period its words say", () => {
+    // A recorded-sales pull stores the moment it read the records (lib/
+    // public-comps/run `retrievedAt: new Date().toISOString()`).
+    const stamp = new Date(Date.UTC(2026, 9, 12, 23, 41, 7, 512)).toISOString();
+    expect(stamp).toBe("2026-10-12T23:41:07.512Z");
+    expect(isoDayOf(stamp)).toBe("2026-10-12");
+    expect(isoDayOf("2026-10-12T19:41:07-04:00")).toBe("2026-10-12");
+    expect(isoDayOf("2026-10-12T22:41:07-04:00")).toBe("2026-10-13");
+    expect(isoDayOf("Q2 2026")).toBe("Q2 2026");
+    const sale = { asOf: stamp, text: "Median $250k/unit over 4 recorded sales, thin" };
+    expect(evidencePeriod(sale)).toEqual({ said: "Oct 12, 2026", inText: false });
+    expect(whenWords(stamp)).toBe("Oct 12, 2026");
+    expect(evidenceDay(sale)).toBe("2026-10-12");
+    expect(evidenceDateTime(sale)).toBe("2026-10-12");
+    // At the source too: a recorded-sales piece is dated its day.
+    const t = buildStressTest(
+      apartmentArgs({ recordedSales: { count: 4, medianPerSqft: 310, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: stamp, href: null } }),
+    );
+    const recorded = rowOf(t, "basis").evidence.find((e) => e.label.startsWith("Recorded sales"))!;
+    expect(recorded).toBeDefined();
+    expect(recorded.asOf).toBe("2026-10-12");
+    expect(evidenceShort(rowOf(t, "basis"), recorded)).not.toContain("T23:41");
+    // A month's figure stored under its first day is a month, never a day.
+    const cpi = { asOf: "2026-08-01", text: "+2.9% over the year to Aug 2026" };
+    expect(evidenceDay(cpi)).toBeNull();
+    expect(evidenceDateTime(cpi)).toBe("2026-08");
+    // A quarter has no valid HTML date string: no dateTime.
+    const survey = { asOf: "2026-04-01", text: "6.2% ±2.2 pts (Q2 2026)" };
+    expect(evidencePeriod(survey)).toEqual({ said: "Q2 2026", inText: true });
+    expect(evidenceDay(survey)).toBeNull();
+    expect(evidenceDateTime(survey)).toBeNull();
+    // A day's figure is a day.
+    expect(evidenceDay({ asOf: "2026-06-30", text: "$2.2M" })).toBe("2026-06-30");
+    expect(evidenceDay({ asOf: null, text: "x" })).toBeNull();
+  });
+
+  it("prints the memorandum's own page beside the publisher, as the report and the brief say it", () => {
+    expect(sourceWithPage({ publisher: "the offering memorandum", page: 14 })).toBe("OM p. 14");
+    expect(sourceWithPage({ publisher: "the deal's T-12", page: 3 })).toBe("the deal's T-12, OM p. 3");
+    expect(sourceWithPage({ publisher: "the offering memorandum" })).toBe("the offering memorandum");
+    expect(sourceWithPage({ publisher: "Zillow Research", page: 0 })).toBe("Zillow Research");
   });
 
   it("says the levered return was re-run only where a row draws a re-run", () => {

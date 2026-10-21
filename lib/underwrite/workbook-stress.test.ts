@@ -17,13 +17,17 @@ import {
   HOLDS_NO_RERUN,
   SAMPLE_PLAN_NOTE,
   bestEvidence,
+  compsStruckOver,
   drawsRerun,
+  evidenceDay,
+  evidencePage,
+  evidencePeriod,
+  rerunsStand,
   headlineSentence,
   liveHeadline,
   partNote,
   shownHeadline,
   stressReadLine,
-  whenWords,
 } from "@/lib/stress-test-words";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { StressRow, StressTest } from "@/lib/stress-test-types";
@@ -60,19 +64,33 @@ describe("the Stress Test tab", () => {
     const names = wb.worksheets.map((w) => w.name);
     expect(names.indexOf("Stress Test")).toBe(names.indexOf("Assumptions") + 1);
     expect(names.indexOf("OM Facts")).toBe(names.indexOf("Stress Test") + 1);
-    let listed = false;
-    wb.getWorksheet("Cover")!.eachRow((r) => {
-      if (r.getCell(2).value === "Stress Test") listed = true;
-    });
-    expect(listed).toBe(true);
+    const contentsLine = (w: ExcelJS.Workbook) => {
+      let desc: unknown = null;
+      w.getWorksheet("Cover")!.eachRow((r) => {
+        if (r.getCell(2).value === "Stress Test") desc = r.getCell(3).value;
+      });
+      return desc as string | null;
+    };
+    // The sample's re-runs stand, so its line says the return is re-run.
+    expect(rerunsStand(sample)).toBe(true);
+    expect(contentsLine(wb)).toBe("The memorandum's assumptions, each set against the one figure that decides it, and the return re-run in code");
+    // Where no row draws one, the line says no re-run.
+    const none = { ...sample, rows: sample.rows.map((r) => ({ ...r, impact: null })) };
+    expect(rerunsStand(none)).toBe(false);
+    expect(contentsLine(await load(await build(none)))).toBe("The memorandum's assumptions, each set against the one figure that decides it");
   });
 
   it("says what it is, the test's own read line and, on the sample, the sample's plan note", async () => {
     const ws = (await load(await build(sample))).getWorksheet("Stress Test")!;
     expect(ws.getCell(1, 1).value).toBe("The stress test, struck in code");
     expect(String(ws.getCell(2, 1).value)).toContain("Data only: no formula on the model's own tabs reads this tab, and they stay live");
+    expect(String(ws.getCell(2, 1).value)).toContain("and the return re-run in code with that one input swapped for the evidence's.");
     expect(ws.getCell(3, 1).value).toBe(stressReadLine(sample));
     expect(ws.getCell(4, 1).value).toBe(SAMPLE_PLAN_NOTE);
+    // The sample's note goes with its re-runs (the memo's and report's rule).
+    const withheldSample = (await load(await build({ ...sample, rows: sample.rows.map((r) => ({ ...r, impact: null })), headline: null, impactsWithheld: "No model was derived for this deal, so no return is re-run." }))).getWorksheet("Stress Test")!;
+    expect(withheldSample.getCell(4, 1).value ?? null).toBeNull();
+    expect(String(withheldSample.getCell(2, 1).value)).not.toContain("re-run in code");
     const head = STRESS_COLUMNS.slice(1).map((_, i) => ws.getCell(STRESS_HEAD_ROW, i + 2).value);
     expect(head).toEqual(STRESS_COLUMNS.slice(1).map((h) => h.toUpperCase()));
   });
@@ -97,19 +115,34 @@ describe("the Stress Test tab", () => {
       if (e) {
         expect(at("The figure that decides")).toBe(`${e.label}: ${e.text}`);
         expect(String(at("Kind"))).toMatch(/^(The deal's own document|A published figure|A rule of thumb|The OM against itself)/);
-        expect(at("Publisher or source")).toBe(e.publisher);
-        if (e.value != null) expect(at("Figure")).toBeCloseTo(stored(row, e.value), 10);
-        else expect(at("Figure")).toBeNull();
+        // The memorandum's comps in their count, else the publisher.
+        expect(at("Publisher or source")).toBe(compsStruckOver(e, true) ?? e.publisher);
+        expect(at("Its OM page")).toBe(evidencePage(e));
+        if (e.value != null) {
+          expect(at("Figure")).toBeCloseTo(stored(row, e.value), 10);
+          // A growth row's evidence is a trailing year's change, signed, never
+          // a rate a year; the OM's figure is the rate a year.
+          if (row.key === "rent_growth" || row.key === "expense_growth") {
+            expect(ws.getCell(r, col("Figure")).numFmt).not.toContain("/yr");
+            expect(ws.getCell(r, col("Figure")).numFmt.startsWith("+")).toBe(true);
+            expect(ws.getCell(r, col("OM's figure")).numFmt).toContain("/yr");
+          }
+        } else expect(at("Figure")).toBeNull();
+        // By the piece's own period: a date only where the period is a day.
         const asOf = at("As of");
+        const period = evidencePeriod(e);
         if (asOf instanceof Date) {
-          expect(asOf.toISOString().slice(0, 10)).toBe(e.asOf);
+          expect(asOf.toISOString().slice(0, 10)).toBe(evidenceDay(e));
           expect(ws.getCell(r, col("As of")).numFmt).toBe("mmm d, yyyy");
-          expect(whenWords(e.asOf)).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
-        } else if (e.asOf) expect(asOf).toBe(whenWords(e.asOf));
-        else if (e.kind !== "published") expect(asOf).toBeNull();
+          expect(period!.said).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
+        } else if (period) {
+          expect(evidenceDay(e)).toBeNull();
+          expect(asOf).toBe(period.said);
+        } else if (e.kind === "published") expect(asOf).toBe("undated");
+        else expect(asOf).toBeNull();
       } else {
         // An unchecked row was decided by nothing: no evidence, no gap, no move.
-        for (const name of ["The figure that decides", "Kind", "Figure", "Publisher or source", "As of"] as const) expect(at(name), `${row.key} ${name}`).toBeNull();
+        for (const name of ["The figure that decides", "Kind", "Figure", "Publisher or source", "Its OM page", "As of"] as const) expect(at(name), `${row.key} ${name}`).toBeNull();
       }
       if (row.gap) {
         expect(at("Gap (+ = the OM is more optimistic)")).toBeCloseTo(row.gap.unit === "pct" ? row.gap.value / 100 : row.gap.value, 10);
@@ -121,12 +154,16 @@ describe("the Stress Test tab", () => {
       if (drawsRerun(row)) {
         const imp = row.impact!;
         expect(at("Re-run of")).toBe("Levered IRR");
-        expect(at("At the OM's figure")).toBeCloseTo(imp.baseIrrPct! / 100, 10);
-        expect(at("At the evidence's")).toBeCloseTo(imp.altIrrPct! / 100, 10);
+        // Each case at the place it prints, so the move over them is the
+        // difference of the two figures shown.
+        const base = Number(imp.baseIrrPct!.toFixed(1));
+        const alt = Number(imp.altIrrPct!.toFixed(1));
+        expect(at("At the OM's figure")).toBeCloseTo(base / 100, 10);
+        expect(at("At the evidence's")).toBeCloseTo(alt / 100, 10);
         // The move is a formula over the two cells beside it, its result cached.
         const move = ws.getCell(r, col("Move (pts)"));
         expect(isFormula(move)).toBe(true);
-        expect(valueOf(move)).toBeCloseTo(imp.altIrrPct! - imp.baseIrrPct!, 10);
+        expect(valueOf(move)).toBeCloseTo(alt - base, 10);
         expect(String(at("The re-run, or why none"))).toContain(imp.note);
       } else {
         // A blank is null, never zero: no re-run drawn, no figure printed.
@@ -222,8 +259,10 @@ describe("the Stress Test tab", () => {
     expect(withheld.impactsWithheld).toBeTruthy();
     expect(withheld.rows.length).toBeGreaterThan(0);
     const ws = (await load(await build(withheld))).getWorksheet("Stress Test")!;
-    // not the sample: no plan note
+    // not the sample: no plan note; and no re-run said where none is made
     expect(ws.getCell(4, 1).value ?? null).toBeNull();
+    expect(String(ws.getCell(2, 1).value)).not.toContain("re-run in code");
+    expect(String(ws.getCell(2, 1).value)).toMatch(/^Each assumption the memorandum makes, set against the one figure that decides it\. Data only/);
     stressTabRows(withheld).forEach((row, i) => {
       const r = STRESS_HEAD_ROW + 1 + i;
       expect(ws.getCell(r, col("At the OM's figure")).value ?? null).toBeNull();
@@ -279,6 +318,40 @@ describe("the Stress Test tab", () => {
     expect(headRow).toBeGreaterThan(r);
     expect(ws.getCell(headRow + 1, 2).value).toBeCloseTo(0.0685, 10);
     expect(ws.getCell(headRow + 1, 2).numFmt).toBe("0.00%");
+  });
+
+  it("stores each case at the place it prints, so the move's formula is the difference of the two figures shown", async () => {
+    const base = sampleStressTest({ today: TODAY });
+    const row = base.rows.find((r) => drawsRerun(r))!;
+    // Unrounded, 16.74 and 11.46 move 5.28 pts, which prints "−5.3" beside
+    // the cases' "16.7%" and "11.5%", a 5.2-point move.
+    const test: StressTest = { ...base, rows: [{ ...row, impact: { ...row.impact!, baseIrrPct: 16.74, altIrrPct: 11.46 } }] };
+    const ws = (await load(await build(test))).getWorksheet("Stress Test")!;
+    const r = STRESS_HEAD_ROW + 1;
+    expect(ws.getCell(r, col("At the OM's figure")).value).toBeCloseTo(0.167, 12);
+    expect(ws.getCell(r, col("At the evidence's")).value).toBeCloseTo(0.115, 12);
+    const move = ws.getCell(r, col("Move (pts)"));
+    expect(isFormula(move)).toBe(true);
+    expect(valueOf(move)).toBe(-5.2);
+  });
+
+  it("dates a month's figure by its month and a recorded-sales pull by its UTC day", async () => {
+    const base = sampleStressTest({ today: TODAY });
+    const row = base.rows.find((r) => r.key === "rent_growth" && r.verdict !== "unchecked") ?? base.rows.find((r) => r.verdict !== "unchecked")!;
+    const e = bestEvidence(row)!;
+    const at = row.evidence.indexOf(e);
+    const withAsOf = (asOf: string, text: string): StressTest => ({
+      ...base,
+      rows: [{ ...row, evidence: row.evidence.map((x, i) => (i === at ? { ...x, asOf, text } : x)) }],
+    });
+    const cell = async (t: StressTest) => (await load(await build(t))).getWorksheet("Stress Test")!.getCell(STRESS_HEAD_ROW + 1, col("As of"));
+    // A monthly index stored under its first day reads as its month, never a day.
+    const month = await cell(withAsOf("2026-08-01", "+2.9% over the year to Aug 2026"));
+    expect(month.value).toBe("Aug 2026");
+    // A full timestamp is its UTC day, a date cell.
+    const day = await cell(withAsOf("2026-10-12T23:41:07.512Z", "Median $240k/unit over 4 recorded sales"));
+    expect(day.value).toBeInstanceOf(Date);
+    expect((day.value as Date).toISOString().slice(0, 10)).toBe("2026-10-12");
   });
 
   it("is absent with no stress test, or one with no rows — never an empty tab", async () => {
