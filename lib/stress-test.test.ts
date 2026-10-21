@@ -9,7 +9,8 @@ vi.mock("@/lib/underwrite/engine", async (importOriginal) => {
 });
 
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
-import { readMetroRates, readRates, type RateRow } from "./live-rates";
+import { HISTORY_ROWS, readMetroRates, readRates, type RateRow } from "./live-rates";
+import { GROWTH_AVERAGE_MIN_YEARS, compoundYearOverYear } from "./growth-average";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { modelVsMarket, type ModelVsMarket, type ModelVsMarketInput } from "./model-vs-market";
 import { trackerFor } from "./tracker-read";
@@ -26,15 +27,21 @@ import { compactUsd } from "./money";
 import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
-import { STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
+import { GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
   HEADLINE_NOI_REST_SHARE,
   HEADLINE_UNTESTED_KEYS,
   ROSTER_UNTESTED_PCT,
+  INSURANCE_AT_HISTORY,
+  INSURANCE_FLOOR_CONDITION,
   INSURANCE_NO_QUOTE,
   INSURANCE_NO_RERUN,
+  INSURANCE_NO_RERUN_NO_T12,
+  INSURANCE_NOT_DELIVERED,
+  VACANCY_ECONOMIC_ONLY,
+  SAME_SHARE,
   IRR_MOVE_STRETCH_BPS,
   leaseUpNotModelled,
   VACANCY_UNSUPPORTED_PTS,
@@ -58,6 +65,7 @@ import {
   challengeKey,
   headlinePrice,
   stabilizedVacancyStated,
+  vacancyEconomicStated,
   vacancyDecidedBy,
   stressHeadline,
   type StressTestArgs,
@@ -128,6 +136,13 @@ const T12 = summarizeT12({
   noi: null,
   page: "p. 2",
 });
+
+/** A rent roll beside the T-12: 139 of 153 units occupied, 9.2% vacant by
+ *  its doors. */
+const ROLL = {
+  asOf: "2026-07-01",
+  summary: { unitCount: 153, occupiedUnits: 139, totalSf: 140_000, occupiedSf: 127_000, sfWeightedOccupancy: 127_000 / 140_000, waltYears: null, weightedAvgRentPsf: null, avgRentMonthly: 2_190, rentUnits: 139, expiryBuckets: null, expiryCoveredSf: 0, truncated: false },
+};
 
 const FIVE: DebtIndex = { id: "DGS5", short: "5-yr", pct: 4.78, asOf: "2026-09-17", kind: "treasury" };
 
@@ -206,37 +221,94 @@ const rowOf = (t: { rows: StressRow[] }, key: StressKey): StressRow => {
 describe("a stabilized apartment deal with a T-12", () => {
   const test = buildStressTest(apartmentArgs());
 
-  it("sets the OM's 6% vacancy against the T-12's 9.1% first, and the impact's IRR drops", () => {
+  it("holds today's occupancy, counted by doors, to the market's survey, and never to the T-12's economic vacancy (the review of 2026-10-21)", () => {
     const v = rowOf(test, "vacancy");
     // The OM states no vacancy allowance: its figure is today's occupancy,
     // titled and worded so, never a pro forma assumption.
     expect(v.title).toBe("Occupancy today");
     expect(v.omSays).toEqual({ text: "Occupancy: 94% as stated — today's occupancy, not a pro forma assumption — which leaves 6.0% vacant", value: 6, page: 8 });
-    expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", scope: "deal", value: 9.1, asOf: "2026-06-30" });
+    // The occupancy counts doors; the T-12's 9.1% is its vacancy and credit
+    // loss over gross potential rent — dollars, with credit loss in it — so
+    // it is shown beside the OM's figure and never decides it. With no rent
+    // roll on file, the metro's survey (doors too) decides, inside its margin.
+    expect(v.evidence.map((e) => e.kind)).toEqual(["published", "document", "published", "rule_of_thumb"]);
+    expect(v.evidence[0]).toMatchObject({ label: "Rental vacancy, metro area", publisher: "Census Bureau", scope: "metro", asOf: "2026-04-01", value: 6.2 });
+    expect(v.evidence[1]).toMatchObject({ kind: "document", publisher: "the deal's T-12", scope: "deal", value: 9.1, asOf: "2026-06-30" });
     // The share is over gross potential rent: here the rent line itself,
     // since the statement's stated EGI nets the vacancy from it — and the
-    // sentence says what the loss was divided by.
-    expect(v.evidence[0].label).toBe("The deal's T-12: vacancy loss over gross potential rent");
-    expect(v.evidence[0].text).toBe("9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026)");
-    expect(v.evidence.map((e) => e.kind)).toEqual(["document", "published", "published", "rule_of_thumb"]);
-    expect(v.evidence[1]).toMatchObject({ label: "Rental vacancy, metro area", publisher: "Census Bureau", scope: "metro", asOf: "2026-04-01" });
+    // sentence says what the loss was divided by, and that it is dollars.
+    expect(v.evidence[1].label).toBe("The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)");
+    expect(v.evidence[1].text).toBe(
+      "9.1% economic ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it",
+    );
     // The region's figure is the region's, never passed off as the metro's.
     expect(v.evidence[2]).toMatchObject({ label: "Rental vacancy, South Census region", scope: "region", value: 9.5 });
     expect(v.evidence[3]).toMatchObject({ label: "Multifamily vacancy, a rule of thumb", publisher: "a rule of thumb", scope: "class", value: 5, asOf: null });
-    expect(v.gap).toEqual({ value: 3.1, unit: "pts", text: "The OM's 6.0% is 3.1 points under the evidence's 9.1%." });
-    // 3.1 points past the T-12: past the 3-point threshold, unsupported.
-    expect(v.verdict).toBe("unsupported");
-    expect(v.impact).not.toBeNull();
+    expect(v.decidedBy).toBe(0);
+    expect(v.gap).toEqual({
+      value: 0.2,
+      unit: "pts",
+      text: "The OM's 6.0% is 0.2 points under the evidence's 6.2%, inside its ±2.2-pt margin. The deal's T-12 ran 9.1% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.",
+    });
+    expect(v.verdict).toBe("holds");
+    expect(v.measure).toBeUndefined();
+    // The re-run is at the figure that decided, never at the T-12's dollars.
     expect(v.impact!.input).toBe("vacancyPct");
     expect(v.impact!.evidenceIndex).toBe(0);
-    expect(v.impact!.omValue).toBeCloseTo(0.06, 6);
-    expect(v.impact!.altValue).toBeCloseTo(0.091, 6);
-    expect(v.impact!.altIrrPct!).toBeLessThan(v.impact!.baseIrrPct!);
-    expect(v.impact!.note).toMatch(/^If vacancy is the deal's T-12's 9\.1%, not the OM's 6\.0%, the levered IRR moves from \d+\.\d% to -?\d+\.\d% \(\d\.\d\dx to \d\.\d\dx equity multiple\)\.$/);
+    expect(v.impact!.altValue).toBeCloseTo(0.062, 6);
     // A publisher the label already names is not said twice.
     expect(v.method).toBe(
-      "The OM's occupancy today against the deal's T-12: vacancy loss over gross potential rent, the one figure that decides; beside it, not deciding: rental vacancy, metro area (Census Bureau), rental vacancy, South Census region (Census Bureau via FRED) and multifamily vacancy, a rule of thumb.",
+      "The OM's occupancy today against rental vacancy, metro area (Census Bureau), the one figure that decides; beside it, not deciding: the deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent), rental vacancy, South Census region (Census Bureau via FRED) and multifamily vacancy, a rule of thumb.",
     );
+  });
+
+  it("decides a figure the OM states as economic by the T-12, the same measure, and shows the counts of doors beside it", () => {
+    const econ: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.filter((m) => m.label !== "Occupancy").concat(row("Economic occupancy", "88%", "p. 8")) };
+    const v = rowOf(buildStressTest(apartmentArgs({ extraction: econ })), "vacancy");
+    expect(v.title).toBe("Economic occupancy today");
+    expect(v.measure).toBe("economic");
+    expect(v.omSays).toEqual({ text: "Economic occupancy: 88% as stated — today's economic occupancy, not a pro forma assumption — which leaves 12.0% economic vacancy", value: 12, page: 8 });
+    expect(v.evidence[0]).toMatchObject({ label: "The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)", value: 9.1 });
+    expect(v.evidence[0].text).not.toContain("never deciding");
+    // 12.0% against the T-12's 9.1%: the conservative side, holds.
+    expect(v.verdict).toBe("holds");
+    expect(v.gap!.text).toBe(
+      "The OM's 12.0% is 2.9 points over the evidence's 9.1% — the conservative side. The OM states its figure as economic, dollars, not doors, so it is held to the deal's T-12, the same measure. The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it.",
+    );
+    // With no T-12, the counts of doors still never decide it: the class's
+    // norm does, named a rule of thumb.
+    const noT12 = rowOf(buildStressTest(apartmentArgs({ extraction: econ, actuals: null })), "vacancy");
+    expect(noT12.evidence[0].kind).toBe("rule_of_thumb");
+    expect(noT12.ruleOfThumbOnly).toBe(true);
+    expect(noT12.gap!.text).toContain("no T-12 is on file to hold it to, so the class's norm decides");
+    // "Vacancy & credit loss" is an economic allowance: held to the T-12, and
+    // the track record is told the market does not hold it.
+    const vcl: ExtractionResult = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy & credit loss", "7.0%", "p. 21")] };
+    const a = rowOf(buildStressTest(apartmentArgs({ extraction: vcl })), "vacancy");
+    expect(a.title).toBe("Stabilized vacancy");
+    expect(a.measure).toBe("economic");
+    expect(a.evidence[0].label).toBe("The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)");
+    expect(a.verdict).toBe("stretched");
+    expect(stabilizedVacancyStated(vcl)).toBe(false);
+    // …and is told the OM's figure counts dollars, so an older screen's
+    // challenge on it is scored by a later T-12, never a rent roll's doors.
+    expect(vacancyEconomicStated(vcl)).toBe(true);
+    expect(vacancyEconomicStated(APARTMENT)).toBe(false);
+    expect(vacancyEconomicStated(null)).toBe(false);
+    for (const page of ["app/(app)/deals/[id]/page.tsx", "app/(app)/analytics/page.tsx"]) {
+      expect(readFileSync(page, "utf8"), page).toContain("vacancyEconomic: vacancyEconomicStated(extraction)");
+    }
+  });
+
+  it("stands a figure counted by doors unchecked where the T-12's dollars are the only figure on file", () => {
+    // Land carries no class norm; with no published read either, the T-12 is
+    // all there is, and dollars do not decide doors.
+    const land: ExtractionResult = { ...APARTMENT, assetClass: "land" };
+    const v = rowOf(buildStressTest(apartmentArgs({ extraction: land, storedAssetClass: "land", modelVsMarket: null })), "vacancy");
+    expect(v.verdict).toBe("unchecked");
+    expect(v.decidedBy ?? null).toBeNull();
+    expect(v.unchecked).toBe(VACANCY_ECONOMIC_ONLY);
+    expect(v.impact).toBeNull();
   });
 
   it("says 'against' for the one figure the verdict is struck on and 'beside it, not deciding' for the rest", () => {
@@ -339,32 +411,79 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(t.impact!.note).toMatch(/^If the tax line is the \$532k bill if the sale resets the assessment to the price, not the OM's \$380k, the levered IRR moves from/);
     const i = rowOf(test, "insurance");
     expect(i.omSays.value).toBe(120_000);
-    // The T-12's premium is the same seller's policy: shown as its history,
-    // never the figure that decides.
+    // The OM's $120k pro forma premium sits $30k under the seller's own
+    // $150k T-12 premium: the OM against its own building's history (the
+    // review of 2026-10-21). The T-12's premium decides — the floor a new
+    // owner can expect, never a quote — so the row reads stretched at most.
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
-    expect(i.evidence[0].text).toMatch(/; the seller's history, not a test of a new owner's quote$/);
+    expect(i.evidence[0].text).toMatch(/; the seller's own premium, a working floor and a rule of thumb \(a new owner is rarely quoted under it\), not a quote$/);
+    expect(i.decidedBy).toBe(0);
     expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED", value: null });
     // The index's figure is the OM's own premium moved by it, labelled so —
     // never set out as a premium of its own, and carrying no figure any
     // surface could hold the OM's to.
     expect(i.evidence[1].label).toBe("The OM's $120k moved by the national premium index (PPI, commercial multiple peril)");
     expect(i.evidence[1].text).toMatch(/^\$\d+k \(the index [+-−]?\d+\.\d% over the year to .+\); the national move applied to the OM's own figure, not a test of this premium$/);
-    // No quote for a new owner is on file, so nothing tests the premium.
-    expect(i.verdict).toBe("unchecked");
-    expect(i.gap).toBeNull();
-    expect(i.unchecked).toBe(INSURANCE_NO_QUOTE);
+    expect(i.verdict).toBe("stretched");
+    expect(i.gap).toEqual({
+      value: 30_000,
+      unit: "usd",
+      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote, and the row reads stretched at most.",
+    });
     expect(i.method).toBe(
-      "The OM's insurance beside the deal's T-12 insurance line and the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED): no figure decides it.",
+      "The OM's insurance against the deal's T-12 insurance line, the one figure that decides; beside it, not deciding: the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED).",
     );
-    // An unchecked row re-runs nothing (the walkthrough of 2026-10-20: a
-    // re-run at the seller's own premium printed a move no evidence makes),
-    // the T-12's premium shown beside the OM's, and it is in neither case.
-    expect(i.impact).toBeNull();
-    expect(i.noRerun).toBe(INSURANCE_NO_RERUN);
-    expect(i.noRerunShort).toBe("no re-run: nothing tests the premium");
-    expect(noMoveWhy(test, i)).toBe(INSURANCE_NO_RERUN);
-    expect(test.headline!.omKeys).not.toContain("insurance");
+    // The re-run swaps the premium in the model's one expense line, which is
+    // the T-12's load and already carries the T-12's $150k: the OM's run
+    // carries $120k in its place, the evidence's the model's own line.
+    expect(i.impact!.input).toBe("expenseLines");
+    expect(Math.round(i.impact!.omValue)).toBe(1_720_000);
+    expect(Math.round(i.impact!.altValue)).toBe(1_750_000);
+    expect(i.impact!.altIrrPct!).toBeLessThan(i.impact!.baseIrrPct!);
+    expect(i.impact!.note).toMatch(/^If the insurance line is the seller's \$150k T-12 premium, a working floor and a rule of thumb, not a quote, not the OM's \$120k, the levered IRR moves from .*\. The model itself already runs at it\.$/);
+    expect(i.noRerun ?? null).toBeNull();
+    // In the headline it is a player, marked as the floor it is, and the NOI
+    // is left out for it (`HEADLINE_NOI_LEFT_OUT`).
+    expect(test.headline!.omKeys).toContain("insurance");
+    const part = test.headline!.parts.find((p) => p.key === "insurance")!;
+    expect(part.conditional).toBe(INSURANCE_FLOOR_CONDITION);
+    expect(part.pts).toBeLessThan(0);
+    expect(test.headline!.omitted.find((o) => o.key === "noi")?.why).toBe(HEADLINE_NOI_LEFT_OUT);
     expect(test.rows.filter((r) => r.verdict === "unchecked").every((r) => r.impact == null)).toBe(true);
+  });
+
+  it("leaves a premium at or over the seller's own T-12 premium unchecked: history cannot say a new owner pays less", () => {
+    for (const premium of ["$150,000", "$148,000", "$180,000"]) {
+      const ex: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Insurance" ? { ...m, value: premium } : m)) };
+      const t = buildStressTest(apartmentArgs({ extraction: ex }));
+      const i = rowOf(t, "insurance");
+      // $148k is within SAME_SHARE (2%) of $150k: at it.
+      expect(i.verdict, premium).toBe("unchecked");
+      expect(i.unchecked).toBe(INSURANCE_AT_HISTORY);
+      expect(i.evidence[0].text).toMatch(/; the seller's history, not a test of a new owner's quote$/);
+      expect(i.method).toBe(
+        "The OM's insurance beside the deal's T-12 insurance line and the OM's " +
+          compactUsd(Number(premium.replace(/\D/g, "")), { millions: 2, trim: true }) +
+          " moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED): no figure decides it.",
+      );
+      // An unchecked row re-runs nothing (the walkthrough of 2026-10-20: a
+      // re-run at the seller's own premium printed a move no evidence makes),
+      // and it is in neither case.
+      expect(i.impact).toBeNull();
+      expect(i.noRerun).toBe(INSURANCE_NO_RERUN);
+      expect(i.noRerunShort).toBe("no re-run: nothing tests the premium");
+      expect(noMoveWhy(t, i)).toBe(INSURANCE_NO_RERUN);
+      expect(t.headline!.omKeys).not.toContain("insurance");
+    }
+    // Just past the margin, the T-12 decides.
+    const under: ExtractionResult = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Insurance" ? { ...m, value: "$146,000" } : m)) };
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: under })), "insurance").verdict).toBe("stretched");
+    // On a building the plan has yet to deliver the T-12 insures another
+    // building, and decides nothing.
+    const dev: ExtractionResult = { ...APARTMENT, strategy: { kind: "development", summary: "", capitalBudget: "", timeline: "" } };
+    const d = rowOf(buildStressTest(apartmentArgs({ extraction: dev })), "insurance");
+    expect(d.verdict).toBe("unchecked");
+    expect(d.unchecked).toBe(INSURANCE_NOT_DELIVERED);
   });
 
   it("re-runs no insurance line without a T-12: the index only moves the OM's own premium", () => {
@@ -373,6 +492,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     const i = rowOf(t, "insurance");
     expect(i.verdict).toBe("unchecked");
     expect(i.unchecked).toBe(INSURANCE_NO_QUOTE);
+    expect(i.noRerun).toBe(INSURANCE_NO_RERUN_NO_T12);
     expect(i.evidence.map((e) => [e.kind, e.value])).toEqual([["published", null]]);
     expect(i.impact).toBeNull();
     expect(t.headline!.omKeys).not.toContain("insurance");
@@ -449,7 +569,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(g.gap).toEqual({
       value: 2.9,
       unit: "pts",
-      text: `Held to Zillow's apartment asking rents, the figure for this kind of rent: +1.1% over the year to Aug 2026 (Zillow Research). The OM's 4.0%/yr is 2.9 points over it. ${TRAILING_YEAR_NOT_FORECAST}`,
+      text: `Held to Zillow's apartment asking rents, the figure for this kind of rent: +1.1% over the year to Aug 2026 (Zillow Research), a single year's change. The OM's 4.0%/yr is 2.9 points over it. ${TRAILING_YEAR_NOT_FORECAST}`,
     });
     // The trailing year is said as one in the re-run's own words, never as a
     // rate a year the publisher states, and the memo's cell says it too.
@@ -476,7 +596,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(e.gap).toEqual({
       value: 0.9,
       unit: "pts",
-      text: "Held to consumer prices, all items (the CPI), the broad price level the expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED). The OM's 2.5%/yr is 0.9 points under it. A trailing year is what the assumption is asked to beat, not a forecast.",
+      text: "Held to consumer prices, all items (the CPI), the broad price level the expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED), a single year's change. The OM's 2.5%/yr is 0.9 points under it. A trailing year is what the assumption is asked to beat, not a forecast.",
     });
     expect(e.impact!.note).toMatch(/^If expense growth is \+3\.4% over the year to Aug 2026 \(BLS via FRED\), run each year of the hold, not the OM's 2\.5%\/yr, /);
     expect(e.verdict).toBe("stretched");
@@ -687,16 +807,19 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     strategy: { kind, summary: "", capitalBudget: kind === "value_add" ? "$1,800,000" : "", timeline: "" },
     metrics: [...APARTMENT.metrics, row("Vacancy (pro forma)", pct, "p. 21")],
   });
-  const argsFor = (ex: ExtractionResult, overrides: Partial<StressTestArgs> = {}): StressTestArgs => {
+  const argsFor = (ex: ExtractionResult, overrides: Partial<StressTestArgs> = {}, opts: { roll?: boolean } = {}): StressTestArgs => {
     const plan = ex.strategy?.kind !== "stabilized";
     const actualsIn = { t12: { summary: T12, periodEnd: "2026-06-30" } };
     const derived = deriveUnderwriteInputs(ex, "The Maddox", actualsIn, { debtIndex: FIVE });
-    const actuals = readActuals({ metrics: ex.metrics, strategy: inferStrategy(ex), rentRoll: null, t12: actualsIn.t12, assetClass: "multifamily" });
+    const actuals = readActuals({ metrics: ex.metrics, strategy: inferStrategy(ex), rentRoll: opts.roll ? ROLL : null, t12: actualsIn.t12, assetClass: "multifamily" });
     return { ...apartmentArgs({ extraction: ex, derived, actuals, modelVsMarket: readFor(derived, { plan }) }), ...overrides };
   };
+  /** What the gap says of the T-12 beside a figure counted by doors. */
+  const T12_BESIDE =
+    " The deal's T-12 ran 9.1% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.";
 
-  it("holds it to the metro's survey inside its margin, and shows the T-12's vacancy beside it as today's", () => {
-    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"))), "vacancy");
+  it("holds it to the metro's survey inside its margin, the rent roll beside it as today's gap and the T-12's dollars beside it as dollars", () => {
+    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), {}, { roll: true })), "vacancy");
     expect(v.title).toBe("Stabilized vacancy");
     expect(v.omSays).toEqual({ text: "Vacancy (pro forma): 6.0%", value: 6, page: 21 });
     // The figure that decides first; the region's, the documents' and the
@@ -704,29 +827,37 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(v.evidence.map((e) => [e.kind, e.label])).toEqual([
       ["published", "Rental vacancy, metro area"],
       ["published", "Rental vacancy, South Census region"],
-      ["document", "The deal's T-12: vacancy loss over gross potential rent"],
+      ["document", "The deal's rent roll: the occupancy it runs at"],
+      ["document", "The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)"],
       ["rule_of_thumb", "Multifamily vacancy, a rule of thumb"],
     ]);
-    expect(v.evidence[2].text).toBe(
-      "9.1% ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close",
+    // The rent roll counts doors, as the OM's figure does: today's gap. The
+    // T-12 counts dollars: said so, never a gap to close.
+    expect(v.evidence[2].text).toBe("9.2% vacant (by count, 139 of 153 units occupied, as of Jul 1, 2026); today's, 3.2 points over the stabilized assumption — the gap a lease-up has to close");
+    expect(v.evidence[3].text).toBe(
+      "9.1% economic ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it",
     );
     // 6.0% against 6.2% ±2.2: inside the margin, so it holds.
     expect(v.gap).toEqual({
       value: 0.2,
       unit: "pts",
-      text: "The OM's 6.0% is a stabilized assumption, so it is held to the market's published figure: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. The deal's T-12 ran 9.1% vacant over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. The lease-up from today's 9.1% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one.",
+      text: `The OM's 6.0% is a stabilized assumption, so it is held to the market's published figure: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. Today the deal's rent roll runs 9.2% vacant, 3.2 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.2, 6)}${T12_BESIDE}`,
     });
-    // The note rides only past the row's own threshold: 3.1 points over.
-    expect(v.gap!.text.endsWith(leaseUpNotModelled(9.1, 6))).toBe(true);
+    // The lease-up note rides only past the row's own threshold, and only on
+    // the rent roll's doors: 3.2 points over.
+    expect(v.gap!.text).toContain(leaseUpNotModelled(9.2, 6));
     expect(STRESS_METHODS.find((m) => m.key === "vacancy")!.limits.join(" ")).toContain(`more than ${VACANCY_UNSUPPORTED_PTS} points over the assumption`);
     expect(v.verdict).toBe("holds");
     expect(v.method).toBe(
-      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau), the one figure that decides; beside it, not deciding: rental vacancy, South Census region (Census Bureau via FRED), the deal's T-12: vacancy loss over gross potential rent and multifamily vacancy, a rule of thumb.",
+      "The OM's stabilized vacancy against rental vacancy, metro area (Census Bureau), the one figure that decides; beside it, not deciding: rental vacancy, South Census region (Census Bureau via FRED), the deal's rent roll: the occupancy it runs at, the deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent) and multifamily vacancy, a rule of thumb.",
     );
     // The engine is re-run at the figure that decided.
     expect(v.impact!.evidenceIndex).toBe(0);
     expect(v.impact!.altValue).toBeCloseTo(0.062, 6);
     expect(v.impact!.note).toMatch(/^If vacancy is Census Bureau's 6\.2%, not the OM's 6\.0%/);
+    // With the T-12 alone beside it, no lease-up is read off its dollars.
+    const t12Only = rowOf(buildStressTest(argsFor(withVacancy("6.0%"))), "vacancy");
+    expect(t12Only.gap!.text).toBe(`The OM's 6.0% is a stabilized assumption, so it is held to the market's published figure: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin.${T12_BESIDE}`);
   });
 
   it("reads past the survey's margin stretched, and a building already at or under the assumption as support", () => {
@@ -735,43 +866,52 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(tight.gap).toMatchObject({ value: 3.2, unit: "pts" });
     expect(tight.gap!.text).toContain("The OM is 3.2 points under it, 1.0 point past its margin.");
     expect(tight.verdict).toBe("stretched");
-    const loose = rowOf(buildStressTest(argsFor(withVacancy("9.5%"))), "vacancy");
+    const loose = rowOf(buildStressTest(argsFor(withVacancy("9.5%"), {}, { roll: true })), "vacancy");
     expect(loose.verdict).toBe("holds");
-    expect(loose.gap!.text).toContain("The OM is 3.3 points over it — the conservative side. The deal's T-12 ran 9.1% vacant over its trailing year, 0.4 points under the assumption — support for it.");
-    expect(loose.evidence[2].text).toMatch(/; today's, 0\.4 points under the stabilized assumption — support for it$/);
+    expect(loose.gap!.text).toContain("The OM is 3.3 points over it — the conservative side. Today the deal's rent roll runs 9.2% vacant, 0.3 points under the assumption — support for it.");
+    expect(loose.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/; today's, 0\.3 points under the stabilized assumption — support for it$/);
   });
 
-  it("with no fresh published figure, the documents decide, and the row says so", () => {
-    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null })), "vacancy");
-    expect(v.evidence.map((e) => e.kind)).toEqual(["document", "rule_of_thumb"]);
+  it("with no fresh published figure, the rent roll decides, and the row says so; the T-12's dollars never do", () => {
+    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })), "vacancy");
+    expect(v.evidence.map((e) => e.kind)).toEqual(["document", "document", "rule_of_thumb"]);
+    expect(v.evidence[0].publisher).toBe("the deal's rent roll");
     expect(v.gap!.text).toBe(
-      "The OM's 6.0% is 3.1 points under the evidence's 9.1%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide.",
+      `The OM's 6.0% is 3.2 points under the evidence's 9.2%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides.${T12_BESIDE}`,
     );
     expect(v.verdict).toBe("unsupported");
-    expect(v.impact!.altValue).toBeCloseTo(0.091, 6);
+    expect(v.impact!.altValue).toBeCloseTo(0.092, 6);
+    // With no rent roll either, the class's norm decides — never the T-12,
+    // whose 9.1% carries credit loss the OM's 6.0% does not count.
+    const bare = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null })), "vacancy");
+    expect(bare.evidence.map((e) => e.kind)).toEqual(["rule_of_thumb", "document"]);
+    expect(bare.ruleOfThumbOnly).toBe(true);
+    expect(bare.gap!.text).toBe(
+      `The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side. No fresh published vacancy figure for this market could be held to the stabilized assumption and no rent roll is on file, so the class's norm decides.${T12_BESIDE} Against a rule of thumb only.`,
+    );
   });
 
   it("on a plan deal the market decides a stated stabilized vacancy too, the documents beside it as the gap the plan closes (the walkthrough of 2026-10-20)", () => {
     // The T-12 had decided a plan's stabilized 6.0% (unsupported) while the
     // same row said today's vacancy is not evidence of the stabilized figure.
-    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%", "value_add"))), "vacancy");
+    const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%", "value_add"), {}, { roll: true })), "vacancy");
     expect(v.evidence[0]).toMatchObject({ kind: "published", label: METRO_VACANCY_LABEL });
     expect(v.decidedBy).toBe(0);
-    const t12 = v.evidence.find((e) => e.publisher === "the deal's T-12")!;
-    expect(t12.text).toMatch(/; today's, 3\.1 points over the stabilized assumption — the gap the plan closes$/);
+    const roll = v.evidence.find((e) => e.publisher === "the deal's rent roll")!;
+    expect(roll.text).toMatch(/; today's, 3\.2 points over the stabilized assumption — the gap the plan closes$/);
     expect(v.gap!.text).toMatch(/^The OM's 6\.0% is a stabilized assumption, so it is held to the market's published figure: /);
-    expect(v.gap!.text).toContain("The deal's T-12 ran 9.1% vacant over its trailing year, 3.1 points over the assumption — the gap the plan closes.");
+    expect(v.gap!.text).toContain("Today the deal's rent roll runs 9.2% vacant, 3.2 points over the assumption — the gap the plan closes.");
     // A plan's yield is struck on the building stabilized: the lease-up is
     // the plan, not a run's omission.
     expect(v.gap!.text).not.toContain("not modelled in either case");
     expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%", "value_add"))))).toBe("published");
     // With no fresh published figure the class's norm decides, never the
     // documents, which stay beside it as today's.
-    const bare = rowOf(buildStressTest(argsFor(withVacancy("6.0%", "value_add"), { modelVsMarket: null })), "vacancy");
+    const bare = rowOf(buildStressTest(argsFor(withVacancy("6.0%", "value_add"), { modelVsMarket: null }, { roll: true })), "vacancy");
     expect(bare.evidence[0].kind).toBe("rule_of_thumb");
     expect(bare.ruleOfThumbOnly).toBe(true);
     expect(bare.gap!.text).toContain(
-      "No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides; the deal's T-12 ran 9.1% vacant over its trailing year, 3.1 points over the assumption — the gap the plan closes, never the figure the plan's NOI runs at.",
+      "No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides; today the deal's rent roll runs 9.2% vacant, 3.2 points over the assumption — the gap the plan closes, never the figure the plan's NOI runs at.",
     );
   });
 
@@ -785,18 +925,22 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
   it("says which kind decided the vacancy row, so the track record holds back a later document only where the market decided (audit M5)", () => {
     // The survey held the stabilized 6.0%: the market decided.
     expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"))))).toBe("published");
-    // No fresh published figure: the documents decided, and a later rent roll
+    // No fresh published figure: the rent roll decided, and a later rent roll
     // or T-12 scores the challenge.
-    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null })))).toBe("document");
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })))).toBe("document");
     expect(vacancyDecidedBy(null)).toBeNull();
     // The deal page asks it of its own built test, never of the extraction alone.
     const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
     expect(page).toContain('stabilizedVacancyStated(extraction, firstSignal) && vacancyDecidedBy(stressTest) === "published"');
   });
 
-  it("an occupancy the OM states for today is held to the documents, today's figures too", () => {
+  it("an occupancy the OM states for today is held to the rent roll, today's doors too", () => {
     // The Maddox states no allowance: its 94% is today's (the first describe).
-    expect(rowOf(buildStressTest(apartmentArgs()), "vacancy").evidence[0]).toMatchObject({ kind: "document" });
+    const v = rowOf(buildStressTest(argsFor(APARTMENT, {}, { roll: true })), "vacancy");
+    expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's rent roll", value: 9.2 });
+    expect(v.verdict).toBe("unsupported");
+    // With the T-12 alone, its dollars stand beside, and the market's doors decide.
+    expect(rowOf(buildStressTest(apartmentArgs()), "vacancy").evidence[0]).toMatchObject({ kind: "published" });
   });
 
   it("a commercial deal's stabilized vacancy is held to the research tracker's band", () => {
@@ -828,7 +972,7 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: null }) }), "rent_growth");
     expect(g.evidence.map((e) => e.label)).toEqual(["Rent paid by sitting tenants (CPI rent)"]);
     expect(g.gap!.text).toBe(
-      "Held to the rent sitting tenants pay (CPI rent), the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at: +5.0% over the year to Aug 2026 (BLS). The OM's 4.0%/yr is 1.0 point under it — the conservative side. A trailing year is what the assumption is asked to beat, not a forecast.",
+      "Held to the rent sitting tenants pay (CPI rent), the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at: +5.0% over the year to Aug 2026 (BLS), a single year's change. The OM's 4.0%/yr is 1.0 point under it — the conservative side. A trailing year is what the assumption is asked to beat, not a forecast.",
     );
     expect(g.verdict).toBe("holds");
     // The evidence lifts the return: the conservative side's cushion.
@@ -839,7 +983,7 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     const args = apartmentArgs();
     const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: { ...zori, mfrRent: null, mfrYoyPct: null } }) }), "rent_growth");
     expect(g.evidence.map((e) => e.label)).toEqual(["Asking rent, all home types", "Rent paid by sitting tenants (CPI rent)"]);
-    expect(g.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month: \+2\.3% over the year to Aug 2026 \(Zillow Research\)\. The OM's 4\.0%\/yr is 1\.7 points over it\. A trailing year is what the assumption is asked to beat, not a forecast\.$/);
+    expect(g.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month: \+2\.3% over the year to Aug 2026 \(Zillow Research\), a single year's change\. The OM's 4\.0%\/yr is 1\.7 points over it\. A trailing year is what the assumption is asked to beat, not a forecast\.$/);
     expect(g.verdict).toBe("stretched");
   });
 
@@ -847,11 +991,16 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     for (const label of ["Current vacancy", "In-place vacancy", "Actual vacancy", "T-12 vacancy", "Vacancy today"]) {
       const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics.filter((m) => m.label !== "Occupancy"), row("Units", "153"), row(label, "9.0%", "p. 8")] };
       expect(stabilizedVacancyStated(ex), label).toBe(false);
-      const v = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "vacancy");
-      expect(v.title, label).toBe("Occupancy today");
-      expect(v.omSays.text, label).toBe(`${label}: 9.0% as stated — today's vacancy, not a pro forma assumption`);
-      // Today's documents decide, never the market's survey.
-      expect(v.evidence[0].kind, label).toBe("document");
+      const actuals = readActuals({ metrics: ex.metrics, strategy: inferStrategy(ex), rentRoll: ROLL, t12: { summary: T12, periodEnd: "2026-06-30" }, assetClass: "multifamily" });
+      const v = rowOf(buildStressTest(apartmentArgs({ extraction: ex, actuals })), "vacancy");
+      // A vacancy read off the trailing statement is the statement's loss
+      // over its gross potential rent, dollars: the T-12 decides it, the same
+      // measure. Any other is counted by doors: the rent roll decides it,
+      // never the market's survey and never the T-12's dollars beside it.
+      const trailing = label === "T-12 vacancy";
+      expect(v.title, label).toBe(trailing ? "Economic vacancy today" : "Occupancy today");
+      expect(v.omSays.text, label).toBe(`${label}: 9.0% as stated — today's ${trailing ? "economic " : ""}vacancy, not a pro forma assumption`);
+      expect(v.evidence[0].publisher, label).toBe(trailing ? "the deal's T-12" : "the deal's rent roll");
     }
     // Beside a stabilized allowance, the stabilized one is the assumption.
     const both = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Current vacancy", "9.0%", "p. 8"), row("Stabilized vacancy", "5.0%", "p. 21")] };
@@ -1170,7 +1319,9 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     expect(v.verdict).toBe("holds");
     expect(v.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi" });
     expect(v.noRerun).toBeUndefined();
-    expect(v.evidence.find((e) => e.publisher === "the deal's T-12")!.text).toMatch(/the gap the plan closes$/);
+    // The T-12's 9.1% is dollars, not doors: shown beside the stabilized
+    // figure as that, never as a gap the plan closes in doors.
+    expect(v.evidence.find((e) => e.publisher === "the deal's T-12")!.text).toMatch(/dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it$/);
     expect(PLAN_VACANCY_DOCUMENT).toBe("Today's vacancy is the gap the plan closes, not evidence of the stabilized figure, so no yield on cost is re-run on it.");
     // Taxes: the rate is today's bill over today's assessment, $380k / $30M,
     // and its reset on the price, $532k, is set against the pro forma's line
@@ -1379,12 +1530,12 @@ describe("the plan re-runs strike no yield on a figure the plan does not reach",
     const t = build(ex, { t12: t12Vacant(3_080_000) });
     expect(t.measure).toBe("yield_on_cost");
     const v = rowOf(t, "vacancy");
-    // The T-12's 70% is the gap the lease-up closes, shown beside the
-    // class's norm, which decides the stated stabilized 5.0% with no
-    // published figure read (the walkthrough of 2026-10-20)…
+    // The T-12's 70% economic vacancy is shown beside the class's norm,
+    // which decides the stated stabilized 5.0% with no published figure read
+    // (the walkthrough of 2026-10-20): dollars, never deciding doors…
     expect(v.evidence[0].kind).toBe("rule_of_thumb");
     expect(v.evidence.find((e) => e.kind === "document")).toMatchObject({ value: 70 });
-    expect(v.evidence.find((e) => e.kind === "document")!.text).toMatch(/the gap the plan closes$/);
+    expect(v.evidence.find((e) => e.kind === "document")!.text).toMatch(/never deciding it$/);
     expect(v.verdict).toBe("holds");
     // …and no yield on cost is struck at the T-12's: it had read "7.88% to -0.79%".
     expect(v.impact?.altValue ?? 2_600_000).toBe(2_600_000);
@@ -1742,6 +1893,19 @@ describe("the premium the insurance row reads is the building's, never insurance
     const ex = withRows({ label: "Tenant insurance", value: "$45,000 annual income" }, { label: "Insurance", value: "$120,000" });
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance").omSays).toEqual({ text: "Insurance: $120,000", value: 120_000, page: 15 });
   });
+
+  it.each(["$1,200/unit", "$1,200 per unit", "$32,000/mo", "$650/door"])("refuses a premium stated per unit, per door or by the month (%s): it is not the year's", (value) => {
+    const i = rowOf(buildStressTest(apartmentArgs({ extraction: withRows({ label: "Insurance", value }) })), "insurance");
+    expect(i.verdict).toBe("unchecked");
+    expect(i.unchecked).toBe("The OM states no insurance premium.");
+    expect(i.omSays.value).toBeNull();
+    expect(i.impact ?? null).toBeNull();
+  });
+
+  it("reads the year's premium past a per-unit restatement of it", () => {
+    const ex = withRows({ label: "Insurance", value: "$1,200/unit" }, { label: "Insurance premium", value: "$120,000" });
+    expect(rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "insurance").omSays.value).toBe(120_000);
+  });
 });
 
 describe("the rent roll's vacancy is read by count on a class priced by the unit, by area on one priced by the foot", () => {
@@ -1889,7 +2053,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
   debt: ["The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma"],
-  vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "a rule of thumb"],
+  vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "Core CPI", "insurance premiums", "breakeven"],
   taxes: ["The bill the OM's own figures imply", "The stated tax abatement"],
@@ -2014,7 +2178,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
   it("holds a commercial rent growth to its lessors' national index, and never to a regulation's allowance", () => {
     const office = rowOf(officeTest, "rent_growth");
     expect(office.gap!.text).toMatch(
-      /^Held to the national index of rents charged by lessors of professional and office buildings, the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's: [+-]\d+\.\d% over the year to [A-Z][a-z]{2} \d{4} \(BLS via FRED\)\. The OM's 4\.0%\/yr is /,
+      /^Held to the national index of rents charged by lessors of professional and office buildings, the figure for this kind of rent, the nation's lessors of this kind of building rather than the metro's: [+-]\d+\.\d% over the year to [A-Z][a-z]{2} \d{4} \(BLS via FRED\), a single year's change\. The OM's 4\.0%\/yr is /,
     );
     // The Brooklyn regime's allowance is shown first, beside the figure
     // that decides — Zillow's apartment asking rents — and never held to.
@@ -2547,8 +2711,9 @@ describe("the headline", () => {
 
   it("with one row past its evidence and no other re-run in the OM's case, is that row's own re-run, for every row that re-runs", () => {
     const rerun = test.rows.filter((r) => r.impact && Math.abs(r.impact.altValue - r.impact.omValue) > 1e-9);
-    // Insurance is unchecked, so it carries no re-run at all.
-    expect(rerun.map((r) => r.key).sort()).toEqual(["debt", "exit_cap", "expense_growth", "noi", "rent_growth", "taxes", "vacancy"]);
+    // Insurance re-runs at the seller's own T-12 premium, the OM's $120k
+    // under its $150k.
+    expect(rerun.map((r) => r.key).sort()).toEqual(["debt", "exit_cap", "expense_growth", "insurance", "noi", "rent_growth", "taxes", "vacancy"]);
     for (const r of rerun) {
       const one = stressHeadline(only([r.key]), model)!;
       const i = r.impact!;
@@ -2885,5 +3050,105 @@ describe("a negative figure carries the true minus (U+2212) on every surface (th
     for (const s of texts) expect(s, s).not.toMatch(HYPHEN_MINUS);
     expect("moves from 1.5% to -0.2%").toMatch(HYPHEN_MINUS);
     expect("the deal's T-12, Jun 30, 2026-06-30").not.toMatch(HYPHEN_MINUS);
+  });
+});
+
+// ── A growth row's one year, beside the longer average its history holds ──
+
+describe("a growth row's one trailing year stands beside the average its stored history holds (the review of 2026-10-21)", () => {
+  /** All-items CPI's published year-over-year changes a whole year apart,
+   *  stored beside the fixture's newest (Aug 2026). */
+  const CPI_BACK: RateRow[] = [
+    { series_id: "CPIAUCSL_YOY", obs_date: "2025-08-01", value: 2.9 },
+    { series_id: "CPIAUCSL_YOY", obs_date: "2024-08-01", value: 2.5 },
+    { series_id: "CPIAUCSL_YOY", obs_date: "2023-08-01", value: 3.7 },
+  ];
+  const newestCpi = REAL_ROWS.find((r) => r.series_id === "CPIAUCSL_YOY")!;
+  const compound = (vals: number[]) => (vals.reduce((p, v) => p * (1 + v / 100), 1) ** (1 / vals.length) - 1) * 100;
+  /** The average as the figure carries it, to two places, and said to one. */
+  const said = (vals: number[]) => (Math.round(compound(vals) * 100) / 100).toFixed(1);
+
+  it("compounds a series' own changes a whole year apart, newest back, and stops at the first year it does not hold", () => {
+    const history = [newestCpi, ...CPI_BACK].map((r) => ({ obsDate: r.obs_date, value: r.value }));
+    const a = compoundYearOverYear({ obsDate: newestCpi.obs_date, history })!;
+    expect(a.years).toBe(4);
+    expect(a.pct).toBeCloseTo(compound([newestCpi.value, 2.9, 2.5, 3.7]), 9);
+    expect(a.changes.map((c) => c.obsDate)).toEqual(["2026-08-01", "2025-08-01", "2024-08-01", "2023-08-01"]);
+    // A gap ends the run: no year is skipped, none taken from a neighbouring month.
+    const gapped = history.filter((h) => h.obsDate !== "2024-08-01").concat({ obsDate: "2024-07-01", value: 9 });
+    expect(compoundYearOverYear({ obsDate: newestCpi.obs_date, history: gapped })!.years).toBe(2);
+    // One year is the deciding figure itself: no average.
+    expect(compoundYearOverYear({ obsDate: newestCpi.obs_date, history: history.slice(0, 1) })).toBeNull();
+    expect(GROWTH_AVERAGE_MIN_YEARS).toBe(2);
+  });
+
+  it("says what the stored history holds, read through the readers the page reads it with", () => {
+    // HISTORY_ROWS observations a series: a transformed change from a year
+    // ago holds four whole years; a level derived on read, three.
+    expect(GROWTH_HISTORY_HELD.startsWith(`${HISTORY_ROWS} observations a series are kept: four years`)).toBe(true);
+    const month = (k: number) => new Date(Date.UTC(2026, 7 - k, 1)).toISOString().slice(0, 10);
+    const yoyRows: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CPIAUCSL_YOY", obs_date: month(k), value: 3 }));
+    const cpi = readRates(yoyRows, FIXTURE_NOW).find((r) => r.meta.id === "CPIAUCSL_YOY")!;
+    expect(compoundYearOverYear(cpi)!.years).toBe(4);
+    const levelRows: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(k), value: 400 + (HISTORY_ROWS - k) }));
+    const rent = readMetroRates("dc", levelRows, FIXTURE_NOW).find((r) => r.meta.id === "CUURS35ASEHA")!;
+    expect(compoundYearOverYear(rent)!.years).toBe(3);
+    // A metro series published every other month holds more years in the same
+    // rows, so the sentence says "at least three".
+    expect(GROWTH_HISTORY_HELD).toContain("at least three of a metro's CPI rent");
+    const bimonthly: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(2 * k), value: 400 + (HISTORY_ROWS - k) }));
+    const rent2 = readMetroRates("dc", bimonthly, FIXTURE_NOW).find((r) => r.meta.id === "CUURS35ASEHA")!;
+    expect(compoundYearOverYear(rent2)!.years).toBeGreaterThanOrEqual(3);
+    expect(GROWTH_HISTORY_HELD.length).toBeLessThanOrEqual(260);
+  });
+
+  it("shows all-items CPI's own average beside the one year that decides the expense growth, deciding nothing", () => {
+    const args = apartmentArgs();
+    const withHistory = readRates([...REAL_ROWS, ...CPI_BACK], FIXTURE_NOW);
+    const e = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { national: withHistory }) }), "expense_growth");
+    const avg = e.evidence[e.evidence.length - 1];
+    expect(avg).toMatchObject({ kind: "published", label: "Consumer prices (CPI, all items): average a year over 4 years", publisher: "BLS via FRED", scope: "nation", asOf: "2026-08-01" });
+    expect(avg.value).toBeCloseTo(compound([newestCpi.value, 2.9, 2.5, 3.7]), 2);
+    expect(avg.text).toBe(
+      `+${said([newestCpi.value, 2.9, 2.5, 3.7])}% a year over the four years to Aug 2026, compounded from its four published changes against a year earlier (the years to Aug 2026, Aug 2025, Aug 2024 and Aug 2023): an average of published figures, not a forecast`,
+    );
+    // The one year still decides: the same verdict and the same re-run.
+    expect(e.evidence[e.decidedBy!].label).toBe("Consumer prices (CPI, all items)");
+    expect(e.impact!.altValue).toBeCloseTo(newestCpi.value / 100, 9);
+    const without = rowOf(buildStressTest(args), "expense_growth");
+    expect(e.verdict).toBe(without.verdict);
+    expect(without.evidence.some((x) => /average a year/.test(x.label))).toBe(false);
+    // The gap says the decider is one year, and names the longer average.
+    expect(e.gap!.text).toContain("(BLS via FRED), a single year's change. The OM's 2.5%/yr is 0.9 points under it.");
+    expect(e.gap!.text).toContain(
+      ` Beside it, not deciding: the same series averaged +${said([newestCpi.value, 2.9, 2.5, 3.7])}% a year over the four years to Aug 2026, compounded from its published changes against a year earlier — an average of published figures, not a forecast. ${TRAILING_YEAR_NOT_FORECAST}`,
+    );
+    expect(e.method).toContain("beside it, not deciding: ");
+    expect(e.method).toContain("consumer prices (CPI, all items): average a year over 4 years (BLS via FRED)");
+    expect(evidenceShort(e, avg)).toBe(`+${said([newestCpi.value, 2.9, 2.5, 3.7])}% a year over the four years to Aug 2026, an average (BLS via FRED)`);
+  });
+
+  it("shows the CPI rent's own average where it decides, and none beside Zillow's, which keeps no history", () => {
+    const month = (k: number) => new Date(Date.UTC(2026, 7 - k, 1)).toISOString().slice(0, 10);
+    // 40 monthly levels: three whole years of changes against a year earlier.
+    const levels: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(k), value: Math.round(400 * 1.03 ** ((HISTORY_ROWS - k) / 12) * 10) / 10 }));
+    const metro = readMetroRates("dc", [...METRO_ROWS.filter((r) => r.series_id !== "CUURS35ASEHA"), ...levels], FIXTURE_NOW);
+    const args = apartmentArgs();
+    const cpiRent = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: null, rates: metro }) }), "rent_growth");
+    expect(cpiRent.evidence[cpiRent.decidedBy!].label).toBe("Rent paid by sitting tenants (CPI rent)");
+    const avg = cpiRent.evidence.find((e) => /: average a year over \d+ years$/.test(e.label))!;
+    expect(avg.label).toBe("Rent paid by sitting tenants (CPI rent): average a year over 3 years");
+    expect(avg.scope).toBe("metro");
+    expect(cpiRent.gap!.text).toContain("Beside it, not deciding: the same series averaged ");
+    // Zillow's apartment asking rents decide on the same read: no average,
+    // since its stored rows keep the newest month alone.
+    const zillow = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { rates: metro }) }), "rent_growth");
+    expect(zillow.evidence[zillow.decidedBy!].label).toBe("Asking rent, apartments");
+    expect(zillow.evidence.some((e) => /average a year/.test(e.label))).toBe(false);
+    expect(zillow.gap!.text).not.toContain("Beside it, not deciding");
+  });
+
+  it("holds the insurance margin the methodology prints to the reader's own", () => {
+    expect(STRESS_METHODS.find((m) => m.key === "insurance")!.against[0]).toContain(`more than ${SAME_SHARE * 100}% under it`);
   });
 });

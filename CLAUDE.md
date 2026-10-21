@@ -91,7 +91,9 @@ tested and whether that is right. So:
   most lenient piece. Expense growth is all-items CPI (core only where it
   is not fresh); the exit cap the going-in cap, else the tracker range's
   low end. A row that holds draws no re-run; the insurance row is unchecked
-  until a new owner's quote exists (the T-12's premium is the seller's).
+  until a new owner's quote exists (the T-12's premium is the seller's),
+  except where the OM's premium sits under the seller's own (2026-10-21,
+  below).
   The headline draws the screening model's own levered IRR beside its two
   cases, names what the evidence's case keeps at the OM's, what of the
   NOI's gap neither case carries, and what it does not test.
@@ -124,6 +126,23 @@ tested and whether that is right. So:
   after the verdict by its own period, by the row's own margin; taxes and
   insurance never by a seller's document; a share prints from five scored
   rows, always with its count.
+- **The owner's decisions of 2026-10-21**: the track record shows
+  calibration beside right and wrong, display only (`gapCaptured`: how much
+  of the gap the later figure covered, and the base rate on /analytics, the
+  floor applying); a Closed deal's own purchase price is a decision, never a
+  trade that scores the price row (a Dead deal's third-party trade still
+  does); every screen is kept (`lib/screen-history.ts`, migration 0038's
+  `screen_snapshots`, best-effort, falling back to `prior_screen` until it
+  runs), one later piece of evidence scoring a row key once, against the
+  latest screen made before it. And three methods, the owner's "if it was
+  questioned keep working so it won't be": doors are never held to dollars
+  (a vacancy counted by doors is decided, and scored, by a rent roll's count
+  or a published rate; an economic one by a T-12, `StressRow.measure`); an
+  OM premium more than `SAME_SHARE` under the seller's own T-12 premium is
+  stretched against it, re-run at it as a floor, not a quote; and a growth
+  row decided by one trailing year shows the same series' longer average
+  beside it where the stored history holds one (`lib/growth-average.ts`,
+  never fetched).
 
 ## Architecture
 

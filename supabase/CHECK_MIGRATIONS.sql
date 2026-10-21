@@ -84,6 +84,10 @@
 -- holding its radius and its rows to the app's own asks. A lookup that does
 -- not exist is named too, as on 0036's grants row: run 0028 and
 -- 0030_public_data_layer, then 0036 and 0037 again.
+--
+-- 0038 (a draft until the owner runs it, after 0037) is read by the table it
+-- creates, screen_snapshots: every screen a re-screen replaces, kept. Until
+-- it runs the app writes nothing there and reads deals.prior_screen alone.
 -- ============================================================================
 
 with
@@ -135,7 +139,10 @@ with
             array['rent_roll_imports', 'rent_roll_mappings', 'market_leasing_profiles']),
       (330, '0033_submarkets.sql',
             'Submarkets + the deal-page supply card',
-            array['submarkets', 'submarket_periods', 'pipeline_properties', 'deal_submarkets'])
+            array['submarkets', 'submarket_periods', 'pipeline_properties', 'deal_submarkets']),
+      (380, '0038_screen_history.sql  ← a draft until the owner runs it',
+            'Every screen kept, so a row the track record scored never vanishes on a later re-screen (until it runs, deals.prior_screen alone is read)',
+            array['screen_snapshots'])
   ),
 
   -- Migrations that only add columns, identified by table.column.

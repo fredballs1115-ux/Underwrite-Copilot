@@ -10,9 +10,10 @@
 // Its rules:
 //   - a row read stretched or unsupported is RIGHT where the later figure
 //     lands past the OM's on the buyer's bad side by more than the row's own
-//     margin (`StressSnapshotRow.threshold`), WRONG where it lands at or
-//     better than the OM's; a row that HELD is right where the later figure
-//     lands within that margin of the OM's, or better for the buyer, and
+//     margin (`StressSnapshotRow.threshold`), WRONG where it lands within
+//     that margin of the OM's, or better for the buyer; a row that HELD is
+//     right where the later figure lands within that margin of the OM's, or
+//     better for the buyer, and
 //     WRONG — a false hold — where it lands past it on the buyer's bad side;
 //     an unchecked row is not scored;
 //   - a screen whose verdict carries no snapshot (made before the snapshot
@@ -40,6 +41,15 @@
 //     (`TAX_INSURANCE_NOT_SCORED`). On a plan deal the OM's NOI and its
 //     stated vacancy are the finished project's, and a T-12 or rent roll is
 //     the building before the plan is done, so neither scores them;
+//   - a vacancy is scored in its own measure, as the stress test decides it
+//     (lib/stress-deciders `VACANCY_ORDER`): a figure counted by doors by a
+//     later rent roll's count, an economic one (dollars over gross potential
+//     rent, `StressSnapshotRow.measure`) by a later T-12's economic vacancy,
+//     never the one against the other; a document of the other measure is
+//     named on the row with why it does not score it. An older screen's
+//     challenge carries no measure of its own and is read in the measure
+//     of the deal's OM vacancy (`vacancyEconomic`): doors by a rent roll,
+//     dollars by a T-12;
 //   - a stabilized vacancy the market's published figure decided is the
 //     market's to judge, and a later rent roll's vacancy is today's: a
 //     stress-test row says which kind decided it, and an older screen's
@@ -55,19 +65,43 @@
 //   - a trade is put on the OM figure's own basis (the trade over the ask,
 //     applied to the OM's figure), since the row's basis figure may be per
 //     unit or per foot while a trade is the whole price;
+//   - a Closed deal's price is the buyer's own (the owner's decision of
+//     2026-10-21), negotiated with the screen in hand, so it is a decision,
+//     never a trade: put on the OM figure's basis as a trade is, it says
+//     which way it points against the row (past the margin under the ask or
+//     not) and is counted apart, in no share; only a third party's trade,
+//     reported on a deal moved to Dead, scores the price as a figure;
+//   - a trade counts only where it was reported after the verdict and, where
+//     its own date is stated, traded on a day after the verdict's: one dated
+//     on or before it is a sale the screen could have been told of, only
+//     reported later, refused as a document dated before it is;
+//   - a T-12 whose period ends after the verdict's day is admitted, and
+//     where most of its months still end on or before that day the rows it
+//     scores say so ("11 of its 12 months precede the verdict") — words
+//     only, the rule unchanged;
 //   - under RECORD_FLOOR (5) scored rows the account's record is "a start,
 //     not a record", and no share is printed; a share is always printed with
 //     its count beside it ("3 of 5 rows");
-//   - the previous screen's rows are scored too (`priorScreen`, the snapshot
+//   - every earlier screen's rows are scored too (`priorScreen`, the snapshot
 //     a re-screen writes to deals.prior_screen with the verdict — its stress
-//     test's snapshot inside it — and the challenges it replaced): the
-//     pipeline reads a T-12 added after a screen only on the re-screen that
-//     also replaces the test it would be scored against, so a document that
-//     arrived between the two verdicts scores the row made before it. One
-//     later figure scores one row a key: where the current screen's row of a
-//     key is scored, the prior's of the same key is dropped, never counted
-//     twice; a snapshot written before the challenges were kept reads as
-//     before.
+//     test's snapshot inside it — and the challenges it replaced; and since
+//     2026-10-21 `priorScreens`, every such snapshot kept in screen_snapshots,
+//     migration 0038, so a third re-screen never drops a row already scored):
+//     the pipeline reads a T-12 added after a screen only on the re-screen
+//     that also replaces the test it would be scored against, so a document
+//     that arrived between two verdicts scores the row made before it. One
+//     piece of later evidence scores a row of a key once a deal: by the
+//     latest screen made before it whose row of that key it scores — a newer
+//     screen's row of the key, scored on the same evidence, drops every older
+//     one's, never counted twice; a snapshot written before the challenges
+//     were kept reads as before;
+//   - beside right and wrong, display only (the owner's decision of
+//     2026-10-21): a flagged row scored on figures says how much of the gap
+//     between the OM's figure and the evidence's the later figure covered
+//     (`gapCaptured`), and the account says the base rate — how many scored
+//     rows, whatever their verdict, landed past the OM's on the buyer's bad
+//     side by more than the row's margin, a share only from RECORD_FLOOR.
+//     Neither changes a score.
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { statedDay } from "@/lib/actuals/actuals-read";
@@ -75,23 +109,40 @@ import { t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { assetWords } from "@/lib/asset-words";
 import { compactUsd } from "@/lib/money";
 import { OUTCOME_REASON_LABEL, type OutcomeReason, type StageChange } from "@/lib/stages";
-import { readStressSnapshot, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
+import { WORSE_WHEN, readStressSnapshot, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import { challengeKey } from "@/lib/stress-test";
 import { STRESS_KEYS, type StressKey, type StressVerdict } from "@/lib/stress-test-types";
 
-import { RECORD_FLOOR, shareWords, type RowOutcome } from "@/lib/track-record-words";
+import { RECORD_FLOOR, shareWords, wholeShares, type CapturedPlace, type GapCapturedLike, type RowOutcome } from "@/lib/track-record-words";
 
 export {
+  BASE_RATE_WHY,
+  CALIBRATION_NOTE,
+  CAPTURE_TRACK,
   CARD_SCOPE,
   DECISION_SCORES,
   DOCUMENT_DATE_RULE,
   NOT_YET_SCORABLE,
   OUTCOME_WORD,
+  PURCHASE_IS_DECISION,
   RECORD_FLOOR,
+  baseRateLine,
+  calibrationCountsLine,
+  capturedAt,
+  capturedWords,
+  decisionBadge,
+  type CapturedPlace,
+  type GapCapturedLike,
   SCORED_BY,
+  RESCREEN_LINE,
+  RESCREEN_RULE,
+  SAMPLE_NO_RECORD,
   TAX_INSURANCE_NOT_SCORED,
+  TRADE_DATE_RULE,
+  VACANCY_MEASURE_RULE,
   dealRecordLine,
   shareWords,
+  wholeShares,
   type RowOutcome,
 } from "@/lib/track-record-words";
 
@@ -110,6 +161,8 @@ export interface LaterEvidence {
   label: string;
   /** ISO: when it arrived on the deal */
   at: string;
+  /** a Closed deal's own price, a decision (source "outcome") */
+  purchase?: boolean;
 }
 
 export interface ScoredRow {
@@ -140,11 +193,22 @@ export interface ScoredRow {
    *  the challenger's figure, or on a stress-test row the evidence's */
   figures: { om: string; alt: string; later: string } | null;
   landing: Landing;
-  /** the later thing is the reader's decision (Dead, and why), a direction
-   *  with no figure: the row says which side it agrees with, and the
-   *  account's record counts it apart from the scored rows, never in the
-   *  shares */
+  /** the later thing is the reader's decision (Dead, and why, or a Closed
+   *  deal's own price), a direction: the row says which side it agrees with,
+   *  and the account's record counts it apart from the scored rows, never in
+   *  the shares */
   decision?: boolean;
+  /** the decision is a Closed deal's own price: the buyer's, negotiated with
+   *  the screen in hand, never a trade */
+  purchase?: boolean;
+  /** when the later thing arrived on the deal (ISO): with the key and its
+   *  source, what makes one piece of evidence one, so it scores a key once
+   *  across a deal's screens */
+  laterAt?: string | null;
+  /** a flagged row scored on figures: how much of the gap between the OM's
+   *  figure and the evidence's the later figure covered — shown beside right
+   *  and wrong, never scored (`gapCaptured`) */
+  captured?: GapCaptured | null;
   /** why the row is unscored, where it is */
   why: string | null;
   /** one sentence: what was set against what, and where it landed */
@@ -170,20 +234,28 @@ export interface DealRecord {
    *  screen read, one with no arrival time, an outcome recorded before it */
   notScored: string[];
   /** a rent roll or T-12 was uploaded after the verdict and refused for its
-   *  own date (none on record, or one on or before the verdict's day): the
-   *  deal page still draws the card, so the refusal is said where the reader
-   *  looks for the score */
+   *  own date (none on record, or one on or before the verdict's day), or a
+   *  trade reported after it traded on or before its day: the deal page
+   *  still draws the card, so the refusal is said where the reader looks for
+   *  the score */
   refusedLater?: boolean;
   /** the earlier screen whose rows were scored beside the current one's
    *  (deals.prior_screen with its verdict and challenges), where the
    *  snapshot holds them and a stamp */
   prior?: { screenedAt: string; screenedOn: string } | null;
+  /** every earlier screen scored beside the current one, newest first (the
+   *  first is `prior`); empty where none */
+  priors?: { screenedAt: string; screenedOn: string }[];
   /** whether the current screen's stress test was kept with its verdict, so
    *  its rows are what is scored; false where its challenges stand in */
   snapshotted?: boolean;
   /** the screens whose stress test was not kept, said: their challenges
    *  stand in for the rows */
   snapshotNotes?: string[];
+  /** what kind of later evidence can score which row on this deal
+   *  (`scorableGrid`, on the deal's own conditions): the card draws it while
+   *  nothing has arrived, so the reader sees what will score what */
+  scorable?: ScorableRow[];
 }
 
 /** The previous screen's snapshot as the pipeline writes it to
@@ -236,6 +308,13 @@ export interface ScoreDealArgs {
    *  the row says why. A stress-test row says itself which kind decided it,
    *  and reads that instead */
   vacancyHeldToMarket?: boolean;
+  /** for a challenge scored where no stress test was kept: the OM's vacancy
+   *  is economic, dollars over gross potential rent (lib/stress-test
+   *  `vacancyEconomicStated`), so only a later T-12's economic vacancy scores
+   *  a vacancy challenge, and a rent roll's count of doors is named as the
+   *  other measure; false or absent, a figure counted by doors. A
+   *  stress-test row carries its own measure, and reads that instead */
+  vacancyEconomic?: boolean;
   /** the deal is a plan deal (lib/deal-strategy `isPlanDeal`): the OM's NOI
    *  is the finished project's, which a T-12 of the building before the plan
    *  cannot speak to, so a later T-12 scores no NOI row */
@@ -249,13 +328,46 @@ export interface ScoreDealArgs {
    *  that arrived between the two screens scores the row made before it,
    *  which the re-screen's own test was made with */
   priorScreen?: PriorScreenLike | null;
+  /** every earlier screen kept (screen_snapshots, migration 0038), in any
+   *  order: each is scored against what arrived after ITS verdict, beside
+   *  `priorScreen` — the same screen in both is read once, by its verdict's
+   *  stamp. Absent or empty (the table not yet made, or not readable),
+   *  `priorScreen` alone is read, as before */
+  priorScreens?: readonly PriorScreenLike[] | null;
+}
+
+/** How much of the gap between the OM's figure and the evidence's a later
+ *  figure covered (lib/track-record-words `GapCapturedLike`). */
+export type GapCaptured = GapCapturedLike;
+
+/**
+ * How much of the gap the evidence opened the later figure covered: (later −
+ * OM) / (evidence − OM), as a whole percent — 0 at the OM's figure, 100 at
+ * the evidence's — with where that is: short of the OM's figure (under 0),
+ * between the two, or past the evidence's (over 100). Null where a figure is
+ * missing or the evidence's figure is the OM's own, which opens no gap.
+ * Display only: the row's score is struck by its margin, never by this.
+ */
+export function gapCaptured(om: number | null | undefined, evidence: number | null | undefined, later: number | null | undefined): GapCaptured | null {
+  if (om == null || evidence == null || later == null) return null;
+  if (![om, evidence, later].every(Number.isFinite)) return null;
+  const gap = evidence - om;
+  if (Math.abs(gap) <= 1e-9 * Math.max(1, Math.abs(om))) return null;
+  const share = (later - om) / gap;
+  const pct = Math.round(share * 100);
+  const place: CapturedPlace = share < 0 ? "om_side" : share > 1 ? "past" : "between";
+  return { pct, place };
 }
 
 /**
  * When a stored rent roll or T-12 arrived on the deal: its source
  * document's upload where the document is on record, else the extraction
- * row's own write — the screen's, which is later than the upload and so the
- * side that scores LESS, never more. Null where neither is known.
+ * row's own write — the screen's. That write is LATER than the upload, so
+ * the fallback can only admit more, never less: a document uploaded before
+ * an earlier screen's verdict and read on the re-screen reads as arriving
+ * after that verdict, and only its own date (the roll's as-of, the T-12's
+ * period end, `scoreScreen`'s second gate) still holds it back. Null where
+ * neither is known.
  */
 export function arrivalOf(
   row: { created_at?: string | null; source_document_id?: string | null } | null | undefined,
@@ -291,6 +403,13 @@ export function recordFigure(key: StressKey, n: number): string {
   return compactUsd(n, { millions: 2 });
 }
 
+/** A figure as the card's three columns print it: a vacancy row's percents
+ *  are each a share vacant ("5.0% vacant"), so an "Occupancy today" row's
+ *  OM figure never reads as 5% occupied. */
+/** A figure on the card: a vacancy says its measure — "6.0% vacant" counted
+ *  by doors, "6.0% economic vacancy" in dollars over gross potential rent. */
+const cardFigure = (key: StressKey, figure: string, economic = false) => (key === "vacancy" ? (economic ? `${figure} economic vacancy` : `${figure} vacant`) : figure);
+
 /** A stress-test row's margin in words: "0.05-point", "5%". */
 export function marginWords(t: NonNullable<StressSnapshotRow["threshold"]>): string {
   if (t.unit === "pts") return `${Number(t.value.toFixed(2))}-point`;
@@ -307,8 +426,13 @@ interface Later {
   source: LaterSource;
   value: number | null;
   text: string;
-  /** a decision agrees with the challenge's direction; it has no figure */
+  /** when it arrived on the deal (ISO), null where unknown */
+  at: string | null;
+  /** a decision is a direction: a Dead decision has no figure; a Closed
+   *  deal's own price has one, and points by it */
   decision?: boolean;
+  /** a Closed deal's own price */
+  purchase?: boolean;
 }
 
 /** The row's own why, a key at a time (the record's one line is
@@ -380,104 +504,206 @@ function subjectOf(stressSnapshot: unknown, challenges: readonly Challenge[] | n
  * screen to score it on says so. A deal with no verdict stamp scores
  * nothing: there is no "after" without a "when".
  *
- * With the previous screen's snapshot (`priorScreen`), that screen's rows
- * are scored against what arrived after ITS verdict, and the two are merged
- * a key at a time: a key the current screen's row scores is the current's
- * (the later figure arrived after both screens, and is counted once,
- * against the newer row); a key only the prior's row scores — the figure
- * arrived between the two verdicts, so the re-screen's row was made with it
- * in hand — is the prior's, in the current's unscored row's place, said as
- * the earlier screen's.
+ * With the earlier screens' snapshots (`priorScreen`, and every screen kept
+ * in `priorScreens`), each earlier screen's rows are scored against what
+ * arrived after ITS verdict, and merged newest screen first, one piece of
+ * evidence a key at a time: a row an earlier screen scores on evidence a
+ * newer screen ADMITTED and has a row of the same key for is dropped,
+ * whether or not that row scored it (the later figure is counted once,
+ * against the latest screen made before it); a row it scores on evidence no
+ * newer screen with a row of its key admitted —
+ * the figure arrived between that screen's verdict and the next, or was
+ * refused by the newer screen for its own date, so the newer rows were made
+ * with it in hand — is kept, in the current screen's unscored row's place
+ * for the key where there is one, said as the earlier screen's.
  */
 export function scoreDeal(args: ScoreDealArgs): DealRecord {
   const screenedAt = args.screenedAt && parseTime(args.screenedAt) != null ? args.screenedAt : null;
   const screenedOn = screenedAt ? statedDay(screenedAt) : null;
   const subject = subjectOf(args.stressSnapshot, args.challenges);
   const current = scoreScreen(screenedAt, subject, args);
-  const prior = priorOf(args.priorScreen, parseTime(screenedAt));
+  const currentT = parseTime(screenedAt);
+  const priors = priorsOf([...(args.priorScreens ?? []), ...(args.priorScreen ? [args.priorScreen] : [])], currentT);
   const snapshotNotes: string[] = [];
   if (subject.kind === "challenges" && screenedAt) snapshotNotes.push(notSnapshottedLine(screenedOn, subject.built, true));
-  const record = (s: ScreenScore, priorMeta: DealRecord["prior"]): DealRecord => ({
+  // What can score what on this deal: its own test's titles, and the vacancy
+  // held back where the market's figure decided its row.
+  const testRows = subject.kind === "test" ? subject.snapshot.rows : [];
+  const vacancyRow = testRows.find((r) => r.key === "vacancy");
+  const scorable = scorableGrid({
+    plan: args.plan,
+    vacancyIsPlanTarget: args.vacancyIsPlanTarget,
+    vacancyHeldToMarket: vacancyRow ? vacancyRow.evidence?.kind === "published" : !!args.vacancyHeldToMarket,
+    // A challenge carries no measure of its own: the deal's OM vacancy's.
+    vacancyEconomic: vacancyRow ? vacancyRow.measure === "economic" : !!args.vacancyEconomic,
+    titles: Object.fromEntries(testRows.filter((r) => r.key !== "other" && r.title).map((r) => [r.key, r.title])),
+  });
+  const record = (s: ScreenScore, priorMeta: { screenedAt: string; screenedOn: string }[]): DealRecord => ({
     screenedAt,
     screenedOn,
     evidence: s.evidence,
     rows: s.rows,
     notScored: s.notScored.map((n) => n.text),
     refusedLater: s.refusedLater,
-    prior: priorMeta,
+    prior: priorMeta[0] ?? null,
+    priors: priorMeta,
     snapshotted: subject.kind === "test",
     snapshotNotes,
+    scorable,
   });
-  if (!prior) return record(current, null);
+  if (priors.length === 0) return record(current, []);
 
-  const earlier = scoreScreen(prior.screenedAt, prior.subject, args);
-  const priorDay = statedDay(prior.screenedAt);
-  if (prior.subject.kind === "challenges") snapshotNotes.push(notSnapshottedLine(priorDay, prior.subject.built, false));
-  const scoredNow = new Set(current.rows.filter((r) => r.landing !== "unscored").map((r) => r.key));
+  const earlier = priors.map((p) => ({ ...p, day: statedDay(p.screenedAt), score: scoreScreen(p.screenedAt, p.subject, args) }));
+  for (const p of earlier) if (p.subject.kind === "challenges") snapshotNotes.push(notSnapshottedLine(p.day, p.subject.built, false));
+
+  // One piece of evidence scores an assumption once, against the latest
+  // screen made before it: a thing a newer screen ADMITTED is that screen's
+  // for every key it has a row of, whether or not that row scored it (a row
+  // left unchecked, or a vacancy of the other measure, keeps its own unscored
+  // reason), so an older screen's row of the key is never scored by it. A
+  // thing a newer screen refused for its own date — a document dated before
+  // that screen's verdict, uploaded after it — was never admitted by it, and
+  // still falls to the earlier screen; so does a key the newer screen has no
+  // row of (a challenge it no longer makes).
+  const claimed = new Set<string>();
+  const claim = (s: ScreenScore) => {
+    const keys = new Set(s.rows.map((r) => r.key));
+    for (const e of s.evidence) for (const k of keys) claimed.add(`${k}|${evidenceId(e)}`);
+  };
+  claim(current);
   const rows = [...current.rows];
-  for (const row of earlier.rows) {
-    if (row.landing === "unscored" || scoredNow.has(row.key)) continue;
-    const priorRow: ScoredRow = {
-      ...row,
-      priorScreenedOn: priorDay,
-      text: `${row.title} (the screen of ${priorDay}):${row.text.slice(row.title.length + 1)}`,
-    };
-    // In the current screen's unscored row's place for the same key — the
-    // re-screen's row was made with the later figure in hand, so the
-    // prediction to score is the earlier one — else after the rest.
-    const at = rows.findIndex((r) => r.key === row.key && r.landing === "unscored");
-    if (at >= 0) rows[at] = priorRow;
-    else rows.push(priorRow);
-    scoredNow.add(row.key);
+  for (const p of earlier) {
+    for (const row of p.score.rows) {
+      if (row.landing === "unscored" || claimed.has(`${row.key}|${rowEvidenceId(row)}`)) continue;
+      const priorRow: ScoredRow = {
+        ...row,
+        priorScreenedOn: p.day,
+        text: `${row.title} (the screen of ${p.day}):${row.text.slice(row.title.length + 1)}`,
+      };
+      // In the current screen's unscored row's place for the same key — the
+      // newer rows were made with the later figure in hand, so the
+      // prediction to score is the earlier one — else after the rest.
+      const at = rows.findIndex((r) => r.key === row.key && r.landing === "unscored");
+      if (at >= 0) rows[at] = priorRow;
+      else rows.push(priorRow);
+    }
+    claim(p.score);
   }
-  // The evidence of both screens, once each; a thing admitted only by the
-  // earlier screen is said to have arrived between the two.
+
+  // The evidence of every screen, once each; a thing first admitted by an
+  // earlier screen is said to have arrived between it and the next one.
   const seen = new Set(current.evidence.map((e) => `${e.source}@${e.at}`));
   const evidence = [...current.evidence];
-  const betweenSources = new Set<LaterSource>();
-  const currentT = parseTime(screenedAt);
-  for (const e of earlier.evidence) {
-    if (seen.has(`${e.source}@${e.at}`)) continue;
-    betweenSources.add(e.source);
-    // A document uploaded after both screens, which the current one refused
-    // for its own date, is DATED between the two; anything else arrived
-    // between them.
-    const uploadedAfterBoth = (e.source === "t12" || e.source === "rent_roll") && currentT != null && (parseTime(e.at) ?? 0) > currentT;
-    const between = uploadedAfterBoth ? `; dated after the screen of ${priorDay} and before this one)` : `, after the screen of ${priorDay} and before this one)`;
-    evidence.push({ ...e, label: `${e.label.replace(/\)$/, "")}${between}` });
-  }
+  // The day of the newest earlier screen that admitted each kind of thing.
+  const scoredBy = new Map<LaterSource, string>();
+  earlier.forEach((p, i) => {
+    const newerT = i === 0 ? currentT : parseTime(earlier[i - 1].screenedAt);
+    const before = i === 0 ? "this one" : `the screen of ${earlier[i - 1].day}`;
+    for (const e of p.score.evidence) {
+      const id = `${e.source}@${e.at}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (!scoredBy.has(e.source)) scoredBy.set(e.source, p.day);
+      // A document uploaded after the newer screen, which that screen refused
+      // for its own date, is DATED between the two, a trade recorded after it
+      // TRADED between them, a purchase CLOSED between them; anything else
+      // arrived between them.
+      const afterNewer = newerT != null && (parseTime(e.at) ?? 0) > newerT;
+      const verb = e.purchase ? "closed" : e.source === "trade" ? "traded" : "dated";
+      const between = afterNewer ? `; ${verb} after the screen of ${p.day} and before ${before})` : `, after the screen of ${p.day} and before ${before})`;
+      evidence.push({ ...e, label: `${e.label.replace(/\)$/, "")}${between}` });
+    }
+  });
   evidence.sort((a, b) => a.at.localeCompare(b.at));
-  // A thing the current screen refused as read by it, and the earlier
-  // screen scored, is said to be scored against the earlier screen instead.
+  // A thing the current screen refused as read by it, and an earlier screen
+  // scored, is said to be scored against that screen instead; an earlier
+  // screen's own refusals are said once, as the screen's.
+  const said = new Set<string>();
   const notScored = [
-    ...current.notScored.map((n) => (n.source && n.instead && betweenSources.has(n.source) ? n.instead(priorDay) : n.text)),
-    ...earlier.notScored.filter((n) => !n.instead).map((n) => `The screen of ${priorDay}: ${n.text}`),
+    ...current.notScored.map((n) => {
+      const day = n.source ? scoredBy.get(n.source) : undefined;
+      return n.instead && day ? n.instead(day) : n.text;
+    }),
+    ...earlier.flatMap((p) =>
+      p.score.notScored
+        .filter((n) => !n.instead && !said.has(n.text) && said.add(n.text))
+        .map((n) => `The screen of ${p.day}: ${n.text}`),
+    ),
   ];
   return record(
-    { evidence, rows, notScored: notScored.map((text) => ({ source: null, text })), refusedLater: current.refusedLater || earlier.refusedLater },
-    { screenedAt: prior.screenedAt, screenedOn: priorDay },
+    {
+      evidence,
+      rows,
+      notScored: notScored.map((text) => ({ source: null, text })),
+      refusedLater: current.refusedLater || earlier.some((p) => p.score.refusedLater),
+    },
+    earlier.map((p) => ({ screenedAt: p.screenedAt, screenedOn: p.day })),
   );
 }
 
-/** The prior screen's stamp and what it is scored on, where the snapshot
- *  holds a stamp and rows or challenges — and its stamp is before the
- *  current screen's, where that has one. */
-function priorOf(prior: PriorScreenLike | null | undefined, currentT: number | null): { screenedAt: string; subject: ScreenSubject } | null {
-  const stamp = prior?.verdict?.generatedAt ?? null;
-  if (!stamp) return null;
-  const subject = subjectOf(prior?.verdict?.stressSnapshot, Array.isArray(prior?.challenges?.challenges) ? prior.challenges.challenges : null);
-  if (subject.kind === "challenges" && subject.challenges.length === 0) return null;
-  const P = parseTime(stamp);
-  if (P == null || (currentT != null && P >= currentT)) return null;
-  return { screenedAt: stamp, subject };
+/** What makes one piece of later evidence one: the kind of thing and when
+ *  it arrived — as a screen admitted it, and as a row scored on it. */
+const evidenceId = (e: LaterEvidence) => `${e.source}@${e.at}`;
+const rowEvidenceId = (r: ScoredRow) => `${r.later?.source ?? ""}@${r.laterAt ?? ""}`;
+
+/**
+ * How many of a T-12's twelve monthly periods end on or before the verdict's
+ * day (both yyyy-mm-dd): the months a period ending `periodEnd` runs back
+ * over, each ending on the period end's day of its month (a month's last day
+ * where the period ends on one). A T-12 dated a day after the verdict is
+ * admitted, and eleven of its months are still the screen's history.
+ */
+export function t12MonthsBefore(periodEnd: string, verdictDay: string): number {
+  const [y, m, d] = periodEnd.slice(0, 10).split("-").map(Number);
+  if (![y, m, d].every(Number.isFinite)) return 0;
+  const lastDay = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const monthEnd = d === lastDay(y, m);
+  let n = 0;
+  for (let k = 0; k < 12; k++) {
+    let mm = m - k;
+    let yy = y;
+    while (mm < 1) {
+      mm += 12;
+      yy--;
+    }
+    const dd = monthEnd ? lastDay(yy, mm) : Math.min(d, lastDay(yy, mm));
+    const iso = `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+    if (iso <= verdictDay) n++;
+  }
+  return n;
+}
+
+/** The earlier screens' stamps and what each is scored on, newest first:
+ *  each snapshot that holds a stamp and rows or challenges, stamped before
+ *  the current screen where that has one — the same screen kept twice (in
+ *  deals.prior_screen and screen_snapshots) read once, by its stamp. */
+function priorsOf(list: readonly (PriorScreenLike | null | undefined)[], currentT: number | null): { screenedAt: string; subject: ScreenSubject }[] {
+  const out = new Map<number, { screenedAt: string; subject: ScreenSubject }>();
+  for (const prior of list) {
+    const stamp = prior?.verdict?.generatedAt ?? null;
+    if (!stamp) continue;
+    const P = parseTime(stamp);
+    if (P == null || (currentT != null && P >= currentT) || out.has(P)) continue;
+    const subject = subjectOf(prior?.verdict?.stressSnapshot, Array.isArray(prior?.challenges?.challenges) ? prior.challenges.challenges : null);
+    if (subject.kind === "challenges" && subject.challenges.length === 0) continue;
+    out.set(P, { screenedAt: stamp, subject });
+  }
+  return [...out.entries()].sort((a, b) => b[0] - a[0]).map(([, v]) => v);
 }
 
 /** What arrived after one screen, admitted by the rules above. */
 interface Admitted {
   t12: LaterDocument<T12Summary> | null;
+  /** "11 of its 12 months precede the verdict", where most of an admitted
+   *  T-12's months end on or before the verdict's day (`t12MonthsBefore`);
+   *  null otherwise. Words only: the T-12 is scored as before. */
+  t12Overlap: string | null;
   roll: LaterDocument<RentRollSummary> | null;
   decision: { reason: OutcomeReason; at: string } | null;
+  /** a third party's trade, reported on a deal moved to Dead */
   trade: { price: number; at: string; text: string } | null;
+  /** a Closed deal's own price: the buyer's, a decision */
+  purchase: { price: number; at: string; text: string } | null;
 }
 
 function scoreScreen(screenedAt: string | null, subject: ScreenSubject, args: ScoreDealArgs): ScreenScore {
@@ -540,6 +766,10 @@ function scoreScreen(screenedAt: string | null, subject: ScreenSubject, args: Sc
   };
   const t12 = admit(args.t12, "T-12", "to");
   const roll = admit(args.rentRoll, "Rent roll", "as of");
+  // A period ending a day after the verdict is admitted, and is still
+  // mostly the months before it: said on every row it scores.
+  const before = t12?.dated && verdictDay ? t12MonthsBefore(t12.dated, verdictDay) : 0;
+  const t12Overlap = before > 6 ? `${before} of its 12 months precede the verdict` : null;
 
   // The decision and the trade, off the move that ended the deal.
   const history = args.history ?? [];
@@ -548,6 +778,7 @@ function scoreScreen(screenedAt: string | null, subject: ScreenSubject, args: Sc
   const ended = last && (stage === "dead" || stage === "closed") && last.stage === stage ? last : null;
   let decision: Admitted["decision"] = null;
   let trade: Admitted["trade"] = null;
+  let purchase: Admitted["purchase"] = null;
   if (ended?.outcome) {
     const endedAt = parseTime(ended.at);
     const reasonLabel = ended.outcome.reason ? OUTCOME_REASON_LABEL[ended.outcome.reason].toLowerCase() : null;
@@ -566,27 +797,56 @@ function scoreScreen(screenedAt: string | null, subject: ScreenSubject, args: Sc
       }
     }
     const t = ended.outcome.trade;
+    // On a Closed deal the price is the buyer's own, negotiated with the
+    // screen in hand: a decision, admitted by the same dates as a trade and
+    // said as the buyer's, never a market's verdict on the OM's figure.
+    const bought = ended.stage === "closed";
     if (t) {
       const reportedAt = parseTime(t.reportedAt);
       const who = t.reportedBy ? `, reported by ${t.reportedBy}` : "";
-      const text = `traded at ${compactUsd(t.price, { millions: 2 })}${t.date ? ` on ${statedDay(t.date)}` : ""}${who}`;
-      if (T != null && reportedAt != null && reportedAt > T) {
-        trade = { price: t.price, at: t.reportedAt, text };
-        evidence.push({ source: "trade", label: `The building ${text} (recorded ${statedDay(t.reportedAt)})`, at: t.reportedAt });
+      const when = t.date ? ` on ${statedDay(t.date)}` : "";
+      const text = bought ? `bought it at ${compactUsd(t.price, { millions: 2 })}${when}` : `traded at ${compactUsd(t.price, { millions: 2 })}${when}${who}`;
+      const source: LaterSource = bought ? "outcome" : "trade";
+      const what = bought ? `The purchase (you ${text})` : `The trade (${text})`;
+      // The trade's own day, where stated, as a document's own date is read:
+      // one reported after the verdict but traded on or before its day is a
+      // sale the screen could have been told of, only reported later.
+      const tradedT = parseTime(t.date);
+      const tradedDay = tradedT != null ? new Date(tradedT).toISOString().slice(0, 10) : null;
+      if (T != null && reportedAt != null && reportedAt > T && verdictDay != null && tradedDay != null && tradedDay <= verdictDay) {
+        refusedLater = true;
+        const onDay = statedDay(verdictDay);
+        const recorded = statedDay(t.reportedAt);
+        const verb = bought ? "closed" : "traded";
+        notScored.push({
+          source,
+          text: bought
+            ? `${what} was recorded ${recorded}, after the screen, but it closed on or before the verdict's day (${onDay}): a price agreed before the screen's call, only recorded later, so it is not counted.`
+            : `${what} was recorded ${recorded}, after the screen, but it traded on or before the verdict's day (${onDay}): a sale the screen could have been told of, only reported later, so it is not scored.`,
+          instead: (priorDay) => `${what} was recorded ${recorded}, but it ${verb} on or before this screen's verdict (${onDay}), so it is ${bought ? "counted" : "scored"} against the screen of ${priorDay} instead.`,
+        });
+      } else if (T != null && reportedAt != null && reportedAt > T) {
+        if (bought) {
+          purchase = { price: t.price, at: t.reportedAt, text };
+          evidence.push({ source, label: `You ${text}: your own price, a decision (recorded ${statedDay(t.reportedAt)})`, at: t.reportedAt, purchase: true });
+        } else {
+          trade = { price: t.price, at: t.reportedAt, text };
+          evidence.push({ source, label: `The building ${text} (recorded ${statedDay(t.reportedAt)})`, at: t.reportedAt });
+        }
       } else if (T == null) {
-        notScored.push({ source: "trade", text: `A trade is recorded (${text}), but the verdict carries no screen time to set it after.` });
+        notScored.push({ source, text: bought ? `${what} is recorded, but the verdict carries no screen time to set it after.` : `A trade is recorded (${text}), but the verdict carries no screen time to set it after.` });
       } else {
         notScored.push({
-          source: "trade",
-          text: `The trade (${text}) was recorded before the screen's verdict, so it is not scored.`,
-          instead: (priorDay) => `The trade (${text}) was recorded before this screen's verdict, so it is scored against the screen of ${priorDay} instead.`,
+          source,
+          text: `${what} was recorded before the screen's verdict, so it is not ${bought ? "counted" : "scored"}.`,
+          instead: (priorDay) => `${what} was recorded before this screen's verdict, so it is ${bought ? "counted" : "scored"} against the screen of ${priorDay} instead.`,
         });
       }
     }
   }
   evidence.sort((a, b) => a.at.localeCompare(b.at));
 
-  const admitted: Admitted = { t12, roll, decision, trade };
+  const admitted: Admitted = { t12, t12Overlap, roll, decision, trade, purchase };
   const rows =
     subject.kind === "test"
       ? subject.snapshot.rows.map((r) => scoreTestRow(r, T, admitted, args))
@@ -656,10 +916,22 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   if (r.verdict === "unchecked") return unscored(UNCHECKED_WHY);
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args) });
-  if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+  const laterArgs = { ...ev, omFigure: r.om, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: r.measure === "economic" };
+  // A snapshot kept before the measure was carried (2026-10-20) has none,
+  // and keeps the row's title and the deciding evidence, never the OM's own
+  // label the measure is read off (lib/stress-test `measureOf`): it is read
+  // as counted by doors, as it was struck.
+  const econ = laterArgs.economic;
   // The market decided a stabilized vacancy where its published figure did.
-  const cannot = documentCannotSpeak(key, later, args, key === "vacancy" && r.evidence?.kind === "published");
+  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published";
+  const later = laterFor(key, laterArgs);
+  if (!later) {
+    // A vacancy is scored in its own measure: a document of the other one is
+    // named, with why, never passed over in silence.
+    const other = otherMeasure(key, laterArgs, args, heldToMarket);
+    return other ? unscored(other.why, other.later) : unscored("nothing that arrived after the screen speaks to it.");
+  }
+  const cannot = documentCannotSpeak(key, later, args, heldToMarket);
   if (cannot) return unscored(cannot, later);
 
   const flagged = r.verdict === "stretched" || r.verdict === "unsupported";
@@ -669,7 +941,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
     : "";
   const readAs = `the test read ${omWords} as ${r.verdict === "holds" ? "holding" : r.verdict}${against}`;
 
-  if (later.decision) {
+  if (later.decision && !later.purchase) {
     // A direction, not a figure: no outcome of the four, counted apart.
     return {
       ...base,
@@ -678,6 +950,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
       figures: null,
       landing: flagged ? "right" : "wrong",
       decision: true,
+      laterAt: later.at,
       why: null,
       text: `${title}: ${readAs}, and you ${later.text} — ${flagged ? "a decision on the test's side" : "a decision against the hold"}, not a figure.`,
     };
@@ -692,17 +965,49 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   const past = move > r.threshold.value + 1e-9;
   const outcome: RowOutcome = flagged ? (past ? "flag_right" : "flag_wrong") : past ? "false_hold" : "hold_right";
   const margin = `the row's ${marginWords(r.threshold)} margin`;
-  const where = past
-    ? `past the OM's figure, worse for the buyer by more than ${margin}: ${flagged ? "the test was right" : "a false hold"}`
-    : flagged
-      ? `at or better than the OM's figure for the buyer: the test was wrong`
-      : `within ${margin} of the OM's figure, or better for the buyer: the hold was right`;
+  if (later.purchase) {
+    // A Closed deal's own price: the buyer's, negotiated with the screen in
+    // hand — a decision that points by its figure, never a market's verdict
+    // on the OM's, counted apart and in no share.
+    const agrees = flagged ? past : !past;
+    const side = agrees ? "on the test's side" : flagged ? "against the flag" : "against the hold";
+    const at = past ? `more than ${margin} under the OM's figure` : `within ${margin} of the OM's figure, or over it`;
+    return {
+      ...base,
+      outcome: null,
+      later: { source: later.source, value: v, text: later.text },
+      figures: null,
+      landing: agrees ? "right" : "wrong",
+      decision: true,
+      purchase: true,
+      laterAt: later.at,
+      why: null,
+      text: `${title}: ${readAs}; ${later.text} — ${at}: your own price, negotiated with the screen in hand, so a decision ${side}, counted apart and in no share.`,
+    };
+  }
+  // A price is the one row where the later figure is the market's verdict on
+  // the OM's, not a figure that is better or worse for the buyer: a trade
+  // under the ask says the market priced it under the OM's figure.
+  const where =
+    key === "basis"
+      ? past
+        ? `more than ${margin} under the OM's figure, the market pricing it under the ask: ${flagged ? "the test was right" : "a false hold"}`
+        : `within ${margin} of the OM's figure, or over it, the market paying about the ask or more: ${flagged ? "the test was wrong" : "the hold was right"}`
+      : past
+        ? `past the OM's figure, worse for the buyer by more than ${margin}: ${flagged ? "the test was right" : "a false hold"}`
+        : flagged
+          ? `within ${margin} of the OM's figure, or better for the buyer: the test was wrong`
+          : `within ${margin} of the OM's figure, or better for the buyer: the hold was right`;
   return {
     ...base,
     outcome,
     later: { source: later.source, value: v, text: later.text },
-    figures: { om: fig(r.om), alt: r.evidence ? fig(r.evidence.value) : "—", later: fig(v) },
+    figures: { om: cardFigure(key, fig(r.om), econ), alt: r.evidence ? cardFigure(key, fig(r.evidence.value), econ) : "—", later: cardFigure(key, fig(v), econ) },
     landing: outcome === "flag_right" || outcome === "hold_right" ? "right" : "wrong",
+    laterAt: later.at,
+    // Beside right and wrong, display only: how much of the gap the evidence
+    // opened the later figure covered.
+    captured: flagged ? gapCaptured(r.om, r.evidence?.value, v) : null,
     why: null,
     text: `${title}: ${readAs}; ${later.text} — ${where}.`,
   };
@@ -726,32 +1031,40 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   // document scores these, whatever arrives.
   if (key === "taxes" || key === "insurance") return unscored(DOCUMENTS_CANNOT_SCORE[key]);
 
-  const later = laterFor(key, { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args) });
-  if (!later) return unscored("nothing that arrived after the screen speaks to it.");
+  // A challenge carries no measure of its own: its vacancy is read in the
+  // measure of the deal's OM vacancy (`vacancyEconomic`) — doors, scored by a
+  // later rent roll alone, or dollars, by a later T-12's economic vacancy
+  // alone, the other document named as the other measure.
+  const laterArgs = { ...ev, omFigure, askingPrice: args.askingPrice ?? null, perUnit: perUnitFor(args), economic: !!args.vacancyEconomic };
+  const cannotScore = (l: Later, why: string): ScoredRow => ({
+    ...base,
+    later: { source: l.source, value: l.value, text: l.text },
+    figures: null,
+    landing: "unscored",
+    why,
+    text: `${title}: ${l.text}, but ${why.replace(/\.$/, "")}, so it is not scored.`,
+  });
+  const later = laterFor(key, laterArgs);
+  if (!later) {
+    const other = otherMeasure(key, laterArgs, args, !!args.vacancyHeldToMarket);
+    return other ? cannotScore(other.later, other.why) : unscored("nothing that arrived after the screen speaks to it.");
+  }
   // The stress test's own rule: a stabilized assumption on a deal read as
   // stabilized is held to the market's published figures, and a
   // document's vacancy is today's — never the test of it. And on a plan
   // deal the OM's NOI and stated vacancy are the finished project's: a
   // document of the building before the plan is done cannot speak to them.
   const why = documentCannotSpeak(key, later, args, !!args.vacancyHeldToMarket);
-  if (why) {
-    return {
-      ...base,
-      later: { source: later.source, value: later.value, text: later.text },
-      figures: null,
-      landing: "unscored",
-      why,
-      text: `${title}: ${later.text}, but ${why.replace(/\.$/, "")}, so it is not scored.`,
-    };
-  }
+  if (why) return cannotScore(later, why);
 
-  if (later.decision) {
+  if (later.decision && !later.purchase) {
     return {
       ...base,
       later: { source: later.source, value: null, text: later.text },
       figures: null,
       landing: "screen_side",
       decision: true,
+      laterAt: later.at,
       why: null,
       text: `${title}: the screen challenged it ("${c.assumption}"), and you ${later.text} — a decision on the screen's side, not a figure.`,
     };
@@ -777,72 +1090,251 @@ function scoreChallenge(c: Challenge, T: number | null, ev: Admitted, args: Scor
   const hi = Math.max(omFigure, altFigure);
   const landing: Landing = v > lo && v < hi ? "between" : Math.abs(v - omFigure) <= Math.abs(v - altFigure) ? "om_side" : "screen_side";
   const where = landing === "between" ? "between the two" : landing === "om_side" ? "on the OM's side" : "on the screen's side";
+  if (later.purchase) {
+    // A Closed deal's own price: which side it landed on, said as a
+    // decision, counted apart and in no share.
+    return {
+      ...base,
+      later: { source: later.source, value: v, text: later.text },
+      figures: null,
+      landing,
+      decision: true,
+      purchase: true,
+      laterAt: later.at,
+      why: null,
+      text: `${title}: the OM's ${recordFigure(key, omFigure)}, the screen's ${recordFigure(key, altFigure)}${altBasis ? ` (${altBasis})` : ""}; ${later.text} — ${where}: your own price, negotiated with the screen in hand, so a decision, counted apart and in no share.`,
+    };
+  }
   return {
     ...base,
     later: { source: later.source, value: v, text: later.text },
-    figures: { om: recordFigure(key, omFigure), alt: recordFigure(key, altFigure), later: recordFigure(key, v) },
+    figures: {
+      om: cardFigure(key, recordFigure(key, omFigure), laterArgs.economic),
+      alt: cardFigure(key, recordFigure(key, altFigure), laterArgs.economic),
+      later: cardFigure(key, recordFigure(key, v), laterArgs.economic),
+    },
     landing,
+    laterAt: later.at,
     why: null,
     text: `${title}: the OM's ${recordFigure(key, omFigure)}, the screen's ${recordFigure(key, altFigure)}${altBasis ? ` (${altBasis})` : ""}; ${later.text} — ${where}.`,
   };
 }
 
 /** The later figure that speaks to a key, where one arrived. A figure beats
- *  a decision; the roll's occupancy beats the T-12's economic vacancy. */
+ *  a decision. A vacancy is scored in its own measure: a figure counted by
+ *  doors by the rent roll's count alone, an economic one (dollars over gross
+ *  potential rent) by the T-12 alone — the stress test's own rule
+ *  (lib/stress-deciders `VACANCY_ORDER`), so doors are never scored against
+ *  dollars. Each carries when it arrived (`at`), which makes it one piece of
+ *  evidence. */
 function laterFor(
   key: StressKey,
   ev: Admitted & {
     omFigure: number | null;
     askingPrice: number | null;
     perUnit: boolean;
+    /** the row's OM figure is an economic vacancy, not one counted by doors */
+    economic: boolean;
   },
 ): Later | null {
-  const t12When = ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12";
+  const t12When = t12WhenOf(ev);
+  // A price on the OM figure's own basis: the price over the ask, applied to
+  // the figure the row carries (per unit, per foot or whole).
+  const onBasis = (price: number): { value: number | null; whole: boolean } => {
+    if (ev.omFigure == null || ev.askingPrice == null || !(ev.askingPrice > 0)) return { value: null, whole: false };
+    const whole = Math.abs(ev.omFigure - ev.askingPrice) / ev.askingPrice < 0.01;
+    return { value: whole ? price : ev.omFigure * (price / ev.askingPrice), whole };
+  };
   switch (key) {
-    case "vacancy": {
-      const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
-      if (rv != null) {
-        return { source: "rent_roll", value: rv.pct, text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}` };
-      }
-      // Over gross potential rent, the statement's own EGI saying whether
-      // its rent line is gross or net (lib/actuals/analyze, the stress
-      // test's one reading).
-      const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
-      if (tv != null) return { source: "t12", value: tv.pct, text: `${t12When} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})` };
-      return null;
-    }
+    case "vacancy":
+      return ev.economic ? t12VacancyLater(ev) : rollVacancyLater(ev);
     case "noi": {
       const n = ev.t12?.summary.noi;
-      if (n != null && Number.isFinite(n) && n !== 0) return { source: "t12", value: n, text: `${t12When} earned ${compactUsd(n, { millions: 2 })}${ev.t12!.summary.noiDerived ? " (derived)" : ""}` };
+      if (n != null && Number.isFinite(n) && n !== 0) {
+        return { source: "t12", value: n, at: ev.t12!.arrivedAt, text: `${t12When} earned ${compactUsd(n, { millions: 2 })}${ev.t12!.summary.noiDerived ? " (derived)" : ""}` };
+      }
       return null;
     }
     // Taxes and insurance are never here: a seller's T-12 cannot show a new
     // owner's bill or premium (`DOCUMENTS_CANNOT_SCORE`).
     case "basis": {
       if (ev.trade) {
-        // On the OM figure's own basis: the trade over the ask, applied to
-        // the figure the row carries (per unit, per foot or whole).
-        if (ev.omFigure != null && ev.askingPrice != null && ev.askingPrice > 0) {
-          const ratio = ev.trade.price / ev.askingPrice;
-          const whole = Math.abs(ev.omFigure - ev.askingPrice) / ev.askingPrice < 0.01;
-          const value = whole ? ev.trade.price : ev.omFigure * ratio;
-          return {
-            source: "trade",
-            value,
-            text: `the building ${ev.trade.text}${whole ? "" : `, ${recordFigure("basis", value)} on the OM figure's basis`}`,
-          };
-        }
-        return { source: "trade", value: null, text: `the building ${ev.trade.text}` };
+        const { value, whole } = onBasis(ev.trade.price);
+        return {
+          source: "trade",
+          value,
+          at: ev.trade.at,
+          text: `the building ${ev.trade.text}${value == null || whole ? "" : `, ${recordFigure("basis", value)} on the OM figure's basis`}`,
+        };
       }
-      if (ev.decision?.reason === "price") return { source: "outcome", value: null, text: "walked away on price", decision: true };
+      // A Closed deal's own price: the buyer's, a decision with a figure.
+      if (ev.purchase) {
+        const { value, whole } = onBasis(ev.purchase.price);
+        return {
+          source: "outcome",
+          value,
+          at: ev.purchase.at,
+          text: `you ${ev.purchase.text}${value == null || whole ? "" : `, ${recordFigure("basis", value)} on the OM figure's basis`}`,
+          decision: true,
+          purchase: true,
+        };
+      }
+      if (ev.decision?.reason === "price") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on price", decision: true };
       return null;
     }
     case "debt":
-      if (ev.decision?.reason === "financing") return { source: "outcome", value: null, text: "walked away on financing", decision: true };
+      if (ev.decision?.reason === "financing") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on financing", decision: true };
       return null;
     default:
       return null;
   }
+}
+
+type LaterArgs = Parameters<typeof laterFor>[1];
+
+/** "the T-12 to May 31, 2026 (11 of its 12 months precede the verdict)" */
+const t12WhenOf = (ev: LaterArgs) => `${ev.t12?.dated ? `the T-12 to ${statedDay(ev.t12.dated)}` : "the T-12"}${ev.t12Overlap ? ` (${ev.t12Overlap})` : ""}`;
+
+/** A later rent roll's vacancy, by its count of doors (by its area on a
+ *  class priced by the foot): what scores a vacancy counted by doors. */
+function rollVacancyLater(ev: LaterArgs): Later | null {
+  const rv = ev.roll ? rollVacancy(ev.roll.summary, ev.perUnit) : null;
+  if (rv == null) return null;
+  return {
+    source: "rent_roll",
+    value: rv.pct,
+    at: ev.roll!.arrivedAt,
+    text: `the rent roll${ev.roll!.dated ? ` as of ${statedDay(ev.roll!.dated)}` : ""} ran ${rv.pct.toFixed(1)}% vacant ${rv.by}`,
+  };
+}
+
+/** A later T-12's economic vacancy, over gross potential rent, the
+ *  statement's own EGI saying whether its rent line is gross or net
+ *  (lib/actuals/analyze, the stress test's one reading): what scores an
+ *  economic vacancy, and nothing else. */
+function t12VacancyLater(ev: LaterArgs): Later | null {
+  const tv = ev.t12 ? t12Vacancy(ev.t12.summary) : null;
+  if (tv == null) return null;
+  return {
+    source: "t12",
+    value: tv.pct,
+    at: ev.t12!.arrivedAt,
+    text: `${t12WhenOf(ev)} ran ${tv.pct.toFixed(1)}% economic vacancy (its vacancy loss over gross potential rent: ${t12VacancyOverWords(tv)})`,
+  };
+}
+
+/** Why a vacancy row is not scored by a later document of the other
+ *  measure: doors are never scored against dollars. */
+export const T12_NOT_DOORS_WHY =
+  "the T-12's economic vacancy is dollars, not doors, and the OM's figure counts doors, which only a later rent roll can score.";
+export const ROLL_NOT_DOLLARS_WHY =
+  "the rent roll counts doors, not dollars, and the OM's figure is an economic vacancy, which only a later T-12's can score.";
+
+/** A vacancy row nothing of its own measure arrived to score: the later
+ *  document of the other measure, where one arrived with a figure, and why
+ *  it does not score the row — a plan's target or the market's figure first,
+ *  which hold the vacancy back from every document, else the measure — so
+ *  the card says why rather than nothing. */
+function otherMeasure(key: StressKey, ev: LaterArgs, args: ScoreDealArgs, heldToMarket: boolean): { later: Later; why: string } | null {
+  if (key !== "vacancy") return null;
+  const later = ev.economic ? rollVacancyLater(ev) : t12VacancyLater(ev);
+  if (!later) return null;
+  return { later, why: documentCannotSpeak(key, later, args, heldToMarket) ?? (ev.economic ? ROLL_NOT_DOLLARS_WHY : T12_NOT_DOORS_WHY) };
+}
+
+// ── What can score what ─────────────────────────────────────────────────
+
+/** The kinds of later evidence, in the grid's column order. */
+export const SCORABLE_SOURCES: readonly LaterSource[] = ["t12", "rent_roll", "outcome", "trade"];
+
+/** One row of the grid of what kind of later evidence can score which
+ *  stress-test row: plain data, so the deal page's client card draws it. */
+export interface ScorableRow {
+  key: StressKey;
+  title: string;
+  /** a kind of later evidence that can score (or, a decision, answer) it */
+  by: Record<LaterSource, boolean>;
+}
+
+/** The deal's own conditions the scorer reads: a plan deal's NOI and stated
+ *  vacancy, a stabilized vacancy the market's figure decided. */
+export interface ScorableContext {
+  plan?: boolean;
+  vacancyIsPlanTarget?: boolean;
+  vacancyHeldToMarket?: boolean;
+  /** the deal's vacancy row counts dollars (`StressSnapshotRow.measure`
+   *  "economic"), so only a T-12 scores it; false, one counted by doors,
+   *  which only a rent roll scores; absent (the account's grid, no deal),
+   *  either kind of row, so either document is marked */
+  vacancyEconomic?: boolean;
+  /** the row titles the deal's own test carries ("Occupancy today") */
+  titles?: Partial<Record<StressKey, string>>;
+}
+
+// A synthetic screen the grid is struck on: never printed, only run.
+const GRID_SCREEN = "2026-01-01T12:00:00Z";
+const GRID_LATER = "2026-03-01T12:00:00Z";
+const GRID_LATER_DAY = "2026-03-01";
+const GRID_FIGURE = 100;
+
+/**
+ * Which kind of later evidence can score which row, read off the scorer
+ * itself rather than written by hand: each key's row, read stretched with a
+ * figure and its margin, is run through `scoreTestRow` against one kind of
+ * evidence at a time — a T-12, a rent roll, a Dead decision (on price, then
+ * on financing), a trade — dated after a screen, and a mark is set where the
+ * row comes back scored (a decision's answer included). So a taxes or an
+ * insurance row is never marked against a seller's document, a plan deal's
+ * NOI or stated vacancy against neither document, a vacancy the market's
+ * figure decided against neither, and a vacancy counted by doors against
+ * the rent roll alone, an economic one against the T-12 alone — whatever the
+ * scorer does today.
+ */
+export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
+  const T = Date.parse(GRID_SCREEN);
+  const args: ScoreDealArgs = {
+    screenedAt: GRID_SCREEN,
+    challenges: [],
+    askingPrice: GRID_FIGURE,
+    plan: ctx.plan,
+    vacancyIsPlanTarget: ctx.vacancyIsPlanTarget,
+  };
+  const none: Admitted = { t12: null, t12Overlap: null, roll: null, decision: null, trade: null, purchase: null };
+  const t12: T12Summary = { collectedRent: 1_000, vacancyLoss: 100, otherIncome: 0, egi: 900, opex: [], totalOpex: 400, noi: 500, noiDerived: false };
+  const roll = { unitCount: 10, occupiedUnits: 9, totalSf: 1_000, occupiedSf: 900, sfWeightedOccupancy: 0.9 } as RentRollSummary;
+  const kinds: Record<LaterSource, Admitted[]> = {
+    t12: [{ ...none, t12: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: t12 } }],
+    rent_roll: [{ ...none, roll: { arrivedAt: GRID_LATER, dated: GRID_LATER_DAY, summary: roll } }],
+    outcome: (["price", "financing"] as const).map((reason) => ({ ...none, decision: { reason, at: GRID_LATER } })),
+    trade: [{ ...none, trade: { price: GRID_FIGURE * 0.8, at: GRID_LATER, text: "traded" } }],
+  };
+  return STRESS_KEYS.map((key) => {
+    const row: StressSnapshotRow = {
+      key,
+      title: TITLES[key],
+      verdict: "stretched",
+      om: GRID_FIGURE,
+      page: null,
+      evidence: {
+        value: GRID_FIGURE * 0.9,
+        label: "the deciding figure",
+        asOf: null,
+        kind: key === "vacancy" && ctx.vacancyHeldToMarket ? "published" : "document",
+        publisher: "",
+      },
+      per: null,
+      threshold: snapshotThreshold(key),
+      worse: WORSE_WHEN[key],
+    };
+    // A vacancy is scored in its own measure: the deal's own row's, else
+    // (the account's grid) a row of either measure.
+    const economic = row.key === "vacancy" ? ctx.vacancyEconomic : false;
+    const rows = economic === undefined ? [row, { ...row, measure: "economic" as const }] : economic ? [{ ...row, measure: "economic" as const }] : [row];
+    const by = Object.fromEntries(
+      SCORABLE_SOURCES.map((source) => [source, rows.some((r) => kinds[source].some((ev) => scoreTestRow(r, T, ev, args).landing !== "unscored"))]),
+    ) as Record<LaterSource, boolean>;
+    return { key, title: ctx.titles?.[key] ?? TITLES[key], by };
+  });
 }
 
 // ── The account's record ────────────────────────────────────────────────
@@ -856,7 +1348,7 @@ function laterFor(
  * deal, so it holds every stated stabilized vacancy back as the market's.
  */
 export const ACCOUNT_VACANCY_NOTE =
-  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy; its deal's own page scores one where the documents decided it.";
+  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors; one the OM states as economic, dollars, is not the market's to decide, and a later T-12, the same measure, scores it outside a plan deal. Its deal's own page scores a vacancy by doors where the documents decided it.";
 
 export interface KeyRecord {
   key: StressKey;
@@ -877,6 +1369,9 @@ export interface AccountRecord {
   dealsWithLater: number;
   /** stress-test rows scored on figures, right or wrong; never a decision */
   scored: number;
+  /** the deals those scored rows come from: the floor counts rows, and a
+   *  share is said beside how many deals its rows are from */
+  scoredDeals: number;
   right: number;
   wrong: number;
   /** of the wrong rows, the holds a later figure landed past */
@@ -888,15 +1383,32 @@ export interface AccountRecord {
    *  rows' shares */
   challenges: {
     scored: number;
+    /** the deals those challenges come from */
+    deals: number;
     screenSide: number;
     omSide: number;
     between: number;
     /** only at RECORD_FLOOR scored challenges or more */
     shares: { screenSidePct: number; omSidePct: number; betweenPct: number } | null;
   };
-  /** rows a decision answered (Dead, and why): counted apart, in no share
-   *  and no key's bar, since a direction is not a figure */
+  /** rows a decision answered (Dead, and why, or a Closed deal's own
+   *  price): counted apart, in no share and no key's bar, since a direction
+   *  is not a figure */
   decisions: number;
+  /** of those, the rows a Closed deal's own price answered */
+  purchases: number;
+  /** of the scored stress-test rows, whatever their verdict, those whose
+   *  later figure landed past the OM's on the buyer's bad side by more than
+   *  the row's margin (a flag borne out, or a false hold): the base rate a
+   *  flag's being right is read beside */
+  pastOm: number;
+  /** that count's share, only at RECORD_FLOOR scored rows or more */
+  pastOmPct: number | null;
+  /** each scored flagged row's capture of its gap, display only: never a
+   *  share, an average or a score */
+  calibration: { key: StressKey; title: string; captured: GapCaptured }[];
+  /** the calibration's rows by where their later figure landed */
+  capturedCounts: { between: number; past: number; omSide: number };
   /** the keys with a scored row or challenge, most scored first */
   byKey: KeyRecord[];
 }
@@ -904,24 +1416,48 @@ export interface AccountRecord {
 const keyTotal = (k: KeyRecord) => k.right + k.wrong + k.screenSide + k.omSide + k.between;
 
 export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
-  const byKey = new Map<StressKey, KeyRecord>();
+  const byKey = new Map<string, KeyRecord>();
   let dealsTested = 0;
   let dealsWithLater = 0;
   let decisions = 0;
+  let purchases = 0;
+  let pastOm = 0;
+  const calibration: AccountRecord["calibration"] = [];
+  const capturedCounts = { between: 0, past: 0, omSide: 0 };
   let right = 0;
   let wrong = 0;
   let falseHolds = 0;
   const ch = { screenSide: 0, omSide: 0, between: 0 };
+  let scoredDeals = 0;
+  let challengeDeals = 0;
   for (const d of deals) {
     if (d.screenedAt && d.rows.length > 0) dealsTested++;
     if (d.evidence.length > 0) dealsWithLater++;
+    const figured = d.rows.filter((r) => r.landing !== "unscored" && !r.decision);
+    if (figured.some((r) => r.landing === "right" || r.landing === "wrong")) scoredDeals++;
+    if (figured.some((r) => r.landing === "screen_side" || r.landing === "om_side" || r.landing === "between")) challengeDeals++;
     for (const r of d.rows) {
       if (r.landing === "unscored") continue;
       if (r.decision) {
         decisions++;
+        if (r.purchase) purchases++;
         continue;
       }
-      const k = byKey.get(r.key) ?? { key: r.key, title: TITLES[r.key], right: 0, wrong: 0, screenSide: 0, omSide: 0, between: 0 };
+      // The base rate: a flag borne out and a false hold are the rows whose
+      // later figure landed past the OM's on the buyer's bad side.
+      if (r.outcome === "flag_right" || r.outcome === "false_hold") pastOm++;
+      if (r.captured) {
+        calibration.push({ key: r.key, title: r.title || TITLES[r.key], captured: r.captured });
+        if (r.captured.place === "between") capturedCounts.between++;
+        else if (r.captured.place === "past") capturedCounts.past++;
+        else capturedCounts.omSide++;
+      }
+      // A row is filed under the title the deal's card prints for it, so a
+      // vacancy struck on today's occupancy ("Occupancy today") is never
+      // counted under "Stabilized vacancy": the two are different claims.
+      const title = r.title || TITLES[r.key];
+      const at = `${r.key}|${title}`;
+      const k = byKey.get(at) ?? { key: r.key, title, right: 0, wrong: 0, screenSide: 0, omSide: 0, between: 0 };
       if (r.landing === "right") {
         right++;
         k.right++;
@@ -939,28 +1475,39 @@ export function accountRecord(deals: readonly DealRecord[]): AccountRecord {
         ch.between++;
         k.between++;
       }
-      byKey.set(r.key, k);
+      byKey.set(at, k);
     }
   }
-  const keys = [...byKey.values()].sort((a, b) => keyTotal(b) - keyTotal(a) || STRESS_KEYS.indexOf(a.key) - STRESS_KEYS.indexOf(b.key));
+  const keys = [...byKey.values()].sort(
+    (a, b) => keyTotal(b) - keyTotal(a) || STRESS_KEYS.indexOf(a.key) - STRESS_KEYS.indexOf(b.key) || a.title.localeCompare(b.title),
+  );
   const scored = right + wrong;
   const chScored = ch.screenSide + ch.omSide + ch.between;
-  const pct = (n: number, of: number) => Math.round((n / of) * 100);
+  // Whole percents by the largest remainder, so a set of shares sums to
+  // 100: rounded each on its own, thirds read 33, 33 and 33.
+  const [rightPct, wrongPct] = wholeShares([right, wrong]);
+  const [screenSidePct, omSidePct, betweenPct] = wholeShares([ch.screenSide, ch.omSide, ch.between]);
   return {
     dealsTested,
     dealsWithLater,
     scored,
+    scoredDeals,
     right,
     wrong,
     falseHolds,
-    shares: scored >= RECORD_FLOOR ? { rightPct: pct(right, scored), wrongPct: pct(wrong, scored) } : null,
+    shares: scored >= RECORD_FLOOR ? { rightPct, wrongPct } : null,
     challenges: {
       scored: chScored,
+      deals: challengeDeals,
       ...ch,
-      shares:
-        chScored >= RECORD_FLOOR ? { screenSidePct: pct(ch.screenSide, chScored), omSidePct: pct(ch.omSide, chScored), betweenPct: pct(ch.between, chScored) } : null,
+      shares: chScored >= RECORD_FLOOR ? { screenSidePct, omSidePct, betweenPct } : null,
     },
     decisions,
+    purchases,
+    pastOm,
+    pastOmPct: scored >= RECORD_FLOOR ? Math.round((pastOm / scored) * 100) : null,
+    calibration,
+    capturedCounts,
     byKey: keys,
   };
 }
@@ -978,25 +1525,30 @@ export function recordState(r: Pick<AccountRecord, "scored"> & { challenges?: { 
 /** What the record is scored against — the homepage's FAQ promises exactly
  *  these three, and this sentence keeps it true. */
 export const RECORD_NONE_LINE =
-  "No track record yet, and none is claimed. A test's rows are scored later where one of three things you supply speaks to them: a T-12 or rent roll dated after the screen, what you decided (dead, and why), and what the building traded for.";
+  "No track record yet, and none is claimed. A test's rows are scored later where one of three things you supply speaks to them: a T-12 or rent roll dated after the screen, what you decided (dead and why, or the price you closed at), and what the building traded for.";
 
 export function recordLine(r: AccountRecord): string {
   // A decision is a direction, not a figure: said apart, never in a share.
   const d = r.decisions;
-  const apart = d > 0 ? ` ${d} more ${d === 1 ? "row was a decision" : "rows were decisions"} (Dead, and why), counted apart and in no share.` : "";
+  const p = r.purchases ?? 0;
+  const which = p === 0 ? "Dead, and why" : p === d ? "a Closed deal's own price" : "Dead and why, or a Closed deal's own price";
+  const apart = d > 0 ? ` ${d} more ${d === 1 ? "row was a decision" : "rows were decisions"} (${which}), counted apart and in no share.` : "";
   if (recordState(r) === "none") return `${RECORD_NONE_LINE}${apart}`;
   const parts: string[] = [];
   const n = r.scored;
-  if (n >= RECORD_FLOOR) {
+  const fromDeals = (m: number | undefined) => (m != null && m > 0 ? ` from ${m} ${m === 1 ? "deal" : "deals"}` : "");
+  if (n >= RECORD_FLOOR && r.shares) {
     const fh = r.falseHolds > 0 ? `, ${r.falseHolds} of them ${r.falseHolds === 1 ? "a false hold" : "false holds"}` : "";
-    parts.push(`${n} stress-test rows scored: ${shareWords(r.right, n, "rows", "right")}, ${shareWords(r.wrong, n, "rows", "wrong")}${fh}.`);
+    parts.push(
+      `${n} stress-test rows${fromDeals(r.scoredDeals)} scored: ${shareWords(r.right, n, "rows", "right", r.shares.rightPct)}, ${shareWords(r.wrong, n, "rows", "wrong", r.shares.wrongPct)}${fh}.`,
+    );
   } else if (n > 0) {
     parts.push(`${n} scored stress-test row${n === 1 ? " is" : "s are"} a start, not a record: no share is printed under ${RECORD_FLOOR}.`);
   }
   const c = r.challenges;
-  if (c.scored >= RECORD_FLOOR) {
+  if (c.scored >= RECORD_FLOOR && c.shares) {
     parts.push(
-      `${c.scored} challenges scored from screens whose stress test was not kept: ${shareWords(c.screenSide, c.scored, "challenges", "on the screen's side")}, ${shareWords(c.omSide, c.scored, "challenges", "on the OM's")}, ${shareWords(c.between, c.scored, "challenges", "between")}.`,
+      `${c.scored} challenges${fromDeals(c.deals)} scored, from screens whose stress test was not kept: ${shareWords(c.screenSide, c.scored, "challenges", "on the screen's side", c.shares.screenSidePct)}, ${shareWords(c.omSide, c.scored, "challenges", "on the OM's", c.shares.omSidePct)}, ${shareWords(c.between, c.scored, "challenges", "between", c.shares.betweenPct)}.`,
     );
   } else if (c.scored > 0) {
     parts.push(

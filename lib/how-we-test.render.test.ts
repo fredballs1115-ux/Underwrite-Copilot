@@ -27,6 +27,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCORING_RULE,
   SCREENING_MODEL_SECTION,
   TRACK_RECORD,
   VERDICT_RULES,
@@ -45,7 +46,7 @@ import {
   RENT_GROWTH_UNSUPPORTED_PTS,
   VACANCY_UNSUPPORTED_PTS,
 } from "./stress-test";
-import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY } from "./track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, VACANCY_MEASURE_RULE } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -116,12 +117,14 @@ describe("/how-we-test draws every method from the table", () => {
       debt: ["published", null, null],
       noi: ["document", "document", "om_internal"],
       // A stabilized assumption is the market's to judge first; the
-      // documents' vacancy is today's.
-      vacancy: ["published", "published", "document", "rule_of_thumb"],
+      // documents' vacancy is today's: the rent roll's by its doors, the
+      // T-12's in dollars, each its own measure.
+      vacancy: ["published", "published", "document", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
       expense_growth: ["published", "published", "published", "published"],
       taxes: ["om_internal", "om_internal"],
-      insurance: ["published", "document"],
+      // The seller's own T-12 premium decides where the OM's sits under it.
+      insurance: ["document", "published"],
       // The break-even is said beside the row, never set against it.
       renovation_premium: ["om_internal", "om_internal"],
       other: [null],
@@ -206,10 +209,10 @@ describe("/how-we-test draws every method from the table", () => {
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized vacancy is held to the market/);
-    // lib/stress-deciders' order: the market, the rent roll, the T-12 (not on
-    // a plan), the class's norm; the documents beside a market figure are
-    // today's gap, never "shown" in the norm's place (audit of PR #486).
-    expect(VERDICT_RULES.vacancy).toContain("then the rent roll, then the T-12 (never on a plan), then the class's norm; beside a market figure the documents show today's gap.");
+    // lib/stress-deciders' order: the market, the rent roll (not on a plan),
+    // the class's norm — doors by doors; the T-12's dollars decide only an
+    // economic figure (the review of 2026-10-21).
+    expect(VERDICT_RULES.vacancy).toContain("then the rent roll (never on a plan), then the class's norm; the T-12, dollars not doors, decides only an economic figure.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
@@ -238,6 +241,9 @@ describe("/how-we-test draws every method from the table", () => {
     expect(record).toContain("Each row of the stress test, holds included, is scored where a later figure can speak to it");
     expect(record).not.toMatch(/every row/i);
     expect(TRACK_RECORD.lines).toContain(SCORED_BY);
+    // A vacancy is scored in its own measure: doors by a rent roll, dollars by a T-12.
+    expect(record).toContain(VACANCY_MEASURE_RULE);
+    expect(record).not.toMatch(/a vacancy by a rent roll or (?:a )?T-12/);
     expect(TRACK_RECORD.lines).toContain(DECISION_SCORES);
     expect(TRACK_RECORD.lines).toContain(NOT_YET_SCORABLE);
     expect(record).toContain("a false hold");
@@ -263,6 +269,34 @@ describe("/how-we-test draws every method from the table", () => {
     // The closing card names the sample for what it is.
     expect(text).toContain("See it on the sample deal");
     expect(text).not.toContain("real deal");
+  });
+
+  it("states the record's date rules as the scorer's own, and draws the scoring rule as the rule, with no figure in it", () => {
+    const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+    // The documents' rule is the code's: on or before the verdict's day, a
+    // T-12 by its period end and a rent roll by its as-of; the trade's own
+    // date; and how a document reaches the record — on the re-screen.
+    expect(TRACK_RECORD.lines).toContain(TRADE_DATE_RULE);
+    expect(TRACK_RECORD.lines).toContain(RESCREEN_RULE);
+    expect(flat).toContain("Nor is a T-12 whose period ended, or a rent roll dated, on or before the verdict's day, only uploaded later.");
+    expect(flat).not.toContain("whose year ended before the verdict");
+    expect(RESCREEN_RULE).toContain("each re-screen keeps the screen it replaces, every one");
+    // The picture: under the record's heading, its marks the panels' own parts.
+    const at = html.indexOf('data-qa="scoring-rule"');
+    expect(at).toBeGreaterThan(html.indexOf('id="track-record"'));
+    const picture = html.slice(at, html.indexOf("</figure>", at));
+    for (const bar of ["rule-om", "rule-margin", "rule-later", "rule-flag-right", "rule-flag-wrong", "rule-hold-right", "rule-hold-wrong"]) {
+      expect(picture, bar).toContain(`data-bar="${bar}"`);
+    }
+    // A flag is right past the margin and wrong short of it; a hold the other way.
+    const left = (bar: string) => Number(picture.match(new RegExp(`left:(\\d+)%[^"]*"[^>]*data-bar="${bar}"`))?.[1]);
+    expect(left("rule-flag-right")).toBe(left("rule-hold-wrong"));
+    expect(left("rule-flag-wrong")).toBe(0);
+    expect(left("rule-hold-right")).toBe(0);
+    for (const words of Object.values(SCORING_RULE).flatMap((v) => (typeof v === "string" ? [v] : Object.values(v)))) expect(flat).toContain(words);
+    expect(visibleText(picture).replace(/&#x27;/g, "'")).toContain("The rule, drawn: no deal's figures.");
+    expect(visibleText(picture)).not.toMatch(/\d/);
+    expect(a11yIssues(picture)).toEqual([]);
   });
 
   it("says how the headline is struck, in HEADLINE_METHOD's own words, before the assumptions' sections", () => {

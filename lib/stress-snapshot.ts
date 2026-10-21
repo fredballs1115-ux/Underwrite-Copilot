@@ -76,6 +76,11 @@ export interface StressSnapshotRow {
    *  carried none. Absent on a snapshot kept before it was carried, read as
    *  unknown, never as a levered IRR */
   rerun?: "levered_irr" | "yield_on_cost" | null;
+  /** "economic" where the OM's figure is an economic vacancy (dollars over
+   *  gross potential rent), which only a T-12 of the same measure can score;
+   *  absent, a figure counted by doors (lib/stress-test-types
+   *  `StressRow.measure`) */
+  measure?: "economic";
 }
 
 export interface StressSnapshot {
@@ -184,6 +189,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       threshold: rowThreshold(r.key, decider),
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
+      ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
     };
   });
   return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows };
@@ -227,6 +233,7 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       // Kept only as one of its two words or a stored null; anything else,
       // or a snapshot kept before it was carried, is left absent (unknown).
       ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
+      ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
     });
   }
   if (rows.length === 0) return null;

@@ -70,6 +70,19 @@ export interface StressEvidence {
  *  forecast of the hold. */
 export const TRAILING_YEAR_NOT_FORECAST = "A trailing year is what the assumption is asked to beat, not a forecast.";
 
+/** What a growth row's one year stands beside (lib/growth-average), said on
+ *  the methodology page: the deciding figure is a single year's change, run
+ *  every year of the hold; where the site's stored history of that series
+ *  holds two years or more, their compound average a year is shown beside
+ *  it and decides nothing. */
+export const GROWTH_HISTORY_LIMIT =
+  "The deciding figure is one year's change, run every year of the hold: where the stored history of that series holds two years or more, their compound average a year is shown beside it, an average of published figures, not a forecast, deciding nothing.";
+
+/** What history is held for it (lib/growth-average; held to HISTORY_ROWS by
+ *  lib/stress-test.test.ts). */
+export const GROWTH_HISTORY_HELD =
+  "40 observations a series are kept: four years of the CPI's or a lessor index's published changes, at least three of a metro's CPI rent. Zillow's asking rents keep the newest month alone, so no average is struck on them.";
+
 /** The return's move when the OM's figure is replaced by the evidence's,
  *  computed with lib/underwrite/engine's `computeUnderwrite` on the deal's
  *  derived model. Null where the model's reads are withheld (a placeholder
@@ -177,6 +190,12 @@ export interface StressRow {
    *  screening default, no figure of the deal's, the market's or the OM's):
    *  the gap says so, and no surface draws such a row as a green "holds" */
   ruleOfThumbOnly?: boolean;
+  /** on the vacancy row, "economic" where the OM states its figure as
+   *  economic — dollars, not doors: a vacancy and credit loss, an economic
+   *  occupancy — so only the T-12, the same measure, may decide it; absent
+   *  where the figure counts doors (a stated occupancy, a vacancy), which the
+   *  T-12's economic loss never decides */
+  measure?: "economic";
 }
 
 export interface StressTest {
@@ -232,7 +251,9 @@ export interface StressHeadlinePart {
   ruleOfThumb?: boolean;
   /** the condition the part's evidence rests on, where its figure holds only
    *  if something the screen cannot know comes true — the taxes' reset bill,
-   *  "if the sale resets the assessment" — said beside the part on every
+   *  "if the sale resets the assessment" — or what it is where it is a floor
+   *  rather than the figure itself — the insurance premium "at the seller's
+   *  own T-12 premium, a working floor, not a quote" — said beside the part on every
    *  surface, as a rule-of-thumb part is marked; absent where it rests on none */
   conditional?: string;
 }
@@ -394,7 +415,8 @@ export const HEADLINE_METHOD = {
   claim: "The return the memorandum's figures make, all of them at once.",
   omCase: [
     "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
-    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes and the NOI; the price is the model's own in both cases, below, and insurance is never re-run, so both cases keep the model's premium.",
+    "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium and the NOI; the price is the model's own in both cases, below.",
+    "The premium is re-run only where the seller's T-12 premium decides its row; else both cases keep the model's premium.",
     "The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.",
     "It is struck as the rent line that makes that NOI at the OM's own vacancy and expenses.",
     "An assumption with no re-run keeps the model's own figure.",
@@ -413,12 +435,13 @@ export const HEADLINE_METHOD = {
     "That can differ from the row's own re-run, which starts from the model's own figures rather than the OM's.",
     "A part struck against a rule of thumb alone, such as the loan rate against a screening default, is marked so.",
     "So is a part whose evidence holds only on a condition: the taxes' reset bill, struck if the sale resets the assessment to the price, which is the jurisdiction's to say.",
+    "And the insurance part, struck at the seller's own T-12 premium: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote.",
   ],
   overlap: [
     `The NOI is left out where the vacancy, taxes or insurance row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
     "The NOI then stays at the OM's figure in both cases and the component swaps move it; with none of the three past its evidence, the NOI's own swap stands.",
     "What the component swaps leave of the NOI's gap, the NOI row's gap less the year-one NOI they move, is in neither case, and the headline says how much wherever it passes 1% of the OM's NOI.",
-    "A tax bill the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
+    "A tax bill or a premium the T-12 already carries in the model's expense line is swapped for the case's own figure, never added on top of it.",
     "A reset tax bill is struck on the building's price, which both cases pay.",
   ],
   plan: [
@@ -427,6 +450,7 @@ export const HEADLINE_METHOD = {
     "Vacancy moves it through the stabilized gross the OM states, at the market's published figure, which decides a plan's stated stabilized vacancy, else the class's norm.",
     "A rent roll or T-12 is the building before the plan is done: shown beside it as the gap the plan closes, never deciding.",
     "A renovation premium moves it through the doors to renovate, and a tax bill only where the OM states it as its pro forma's line, reset at today's bill over today's assessed value.",
+    "An insurance premium the T-12's decides moves it only where the OM states the premium as its pro forma's line.",
     "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
     "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
     "A re-run that moves the stabilized NOI to zero or under, or the yield to 25% or more, is struck nowhere: the figures do not tie.",
@@ -542,16 +566,19 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "A stabilized vacancy the OM states is held to the market's published figure, the first present deciding: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
       "For a commercial class, the research tracker's vacancy band, with its period, where the market check holds the model to it",
-      "The deal's own rent roll, else its T-12, the occupancy the building runs at today: it decides an occupancy the OM states for today, and on a deal read as stabilized a stabilized assumption no fresh published figure speaks to, said so",
+      "The deal's own rent roll, by its occupied doors (by area on a class priced by the foot): the building's occupancy today. It decides today's occupancy, and on a deal read as stabilized a stabilized assumption no fresh published figure speaks to, said so",
+      "The deal's T-12: its vacancy and credit loss over gross potential rent, an economic figure, dollars not doors. It decides only a figure the OM states as economic; beside one counted by doors it is shown, labelled economic, and never decides",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above may",
     ],
-    engine: "Vacancy is a direct input: the return is re-run at the deciding figure, the market's for a stabilized assumption, else the documents'. A plan's yield on cost moves by its stabilized gross times the gap to the market's figure, else the class's norm.",
+    engine: "Vacancy is a direct input: the return is re-run at the deciding figure, of the OM's own measure. A plan's yield on cost moves by its stabilized gross times the gap to the market's figure, else the class's norm.",
     limits: [
-      "Beside a stabilized assumption the rent roll or T-12 is today's gap, the one a lease-up has to close, or support where the building already runs at or under it.",
+      "Doors and dollars are two measures: an occupancy or a vacancy counted by doors is decided only by a count of doors, the rent roll or a published vacancy rate, and an economic figure only by the T-12.",
+      "The T-12's economic vacancy runs over the physical one wherever rent is lost to credit loss, concessions or loss to lease, so holding one to the other would call a sound occupancy unsupported.",
+      "Beside a stabilized assumption the rent roll is today's gap, the one a lease-up has to close, or support where the building already runs at or under it.",
       "On a value-add, lease-up, conversion or development deal the documents never decide the stabilized figure: they are the gap the plan closes.",
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
-      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's documents run more than 3 points over the assumption, the row says so.",
+      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's rent roll runs more than 3 points over the assumption, the row says so.",
     ],
   },
   {
@@ -568,6 +595,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     engine: "Rent growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
     limits: [
       TRAILING_YEAR_NOT_FORECAST,
+      GROWTH_HISTORY_LIMIT,
+      GROWTH_HISTORY_HELD,
       "The highest figure is not the test: where Zillow's asking rents are read, a sitting-tenant index running ahead of them is shown beside them, never held to.",
       "Lodging and licensed care read no rent index: they sell nights and care, not leases.",
     ],
@@ -577,13 +606,13 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Expense growth",
     claim: "Expenses grow at the pro forma's rate.",
     against: [
-      "Consumer prices, all items, against a year ago (BLS via FRED): the one figure that decides, the broad price level the expense base moves with",
+      "Consumer prices, all items, against a year ago (BLS via FRED): the one figure that decides, the broad price level the expense base moves with; beside it, the same series' compound average a year over the years its history holds",
       "Core CPI against a year ago, deciding only where the all-items figure is not fresh, else shown beside it and never the lower figure held to",
       "The producer price index for commercial property insurance premiums, shown beside the price indexes and never averaged into them",
       "The bond market's ten-year expected inflation (the breakeven), shown apart",
     ],
     engine: "Expense growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
-    limits: [TRAILING_YEAR_NOT_FORECAST, "The insurance line's own repricing is read apart (below), not through the growth rate."],
+    limits: [TRAILING_YEAR_NOT_FORECAST, GROWTH_HISTORY_LIMIT, GROWTH_HISTORY_HELD, "The insurance line's own repricing is read apart (below), not through the growth rate."],
   },
   {
     key: "taxes",
@@ -604,13 +633,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Insurance",
     claim: "The premium stays at the seller's expiring policy.",
     against: [
-      "Nothing: a new owner's quote would test the premium, and none is on file. Beside it, the producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's premium as a national move",
-      "Shown beside it too: the deal's T-12 premium, the same seller's history, not a test of a new owner's quote",
+      "The deal's T-12 premium, the seller's own actual: it decides where the OM's premium sits more than 2% under it, the OM against its own building's history, stretched at most; at or over it, it is shown as the seller's history and nothing decides",
+      "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's premium as a national move, shown beside it and never deciding",
     ],
-    engine: "No figure decides the row and no return is re-run on it: the T-12's premium is shown beside the OM's as the seller's history, and both headline cases keep the model's own premium.",
+    engine: "Where the T-12's premium decides, the return is re-run at it, a working floor and a rule of thumb, not a quote, swapped into the model's expense line, never added on top; where nothing decides, no return is re-run.",
     limits: [
-      "A quote is the carrier's: neither the seller's T-12 nor the national index says what this building will be quoted.",
-      "No quote, binder or carrier's indication is read from the documents yet, so the row has nothing to test the premium against.",
+      "A new owner's quote is what finally decides the premium: no quote, binder or carrier's indication is read from the documents yet.",
+      "The seller's T-12 premium is history, not a quote: a rule of thumb says a new owner is rarely quoted under it, so a premium under it reads stretched at most, and the re-run at it is a working floor, not the premium a new owner will pay.",
+      "A premium at or over the T-12's stays unchecked: the seller's history cannot say a new owner will pay less, and the national index says nothing of this building.",
+      "On a development or a conversion the T-12 insures the building before the plan delivers a new one, so it decides nothing.",
     ],
   },
   {

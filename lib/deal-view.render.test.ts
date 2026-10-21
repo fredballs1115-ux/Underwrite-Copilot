@@ -231,10 +231,13 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(prompt).toBeLessThan(html.indexOf("Risk digest"));
     expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(html.indexOf('data-qa="stress-test-panel"'));
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(words).toContain("A T-12 tests the OM's NOI and shows its insurance premium beside the OM's; a rent roll, else the T-12, tests the OM's occupancy today.");
-    expect(words).toContain("Beside a stabilized vacancy they show the gap to close, and test it only where no market figure is fresh, never on a plan.");
+    // Doors and dollars (lib/stress-deciders `VACANCY_ORDER`): the T-12 never
+    // decides an occupancy counted by doors.
+    expect(words).toContain("A T-12 tests the OM's NOI, and tests the OM's insurance premium where it sits under the T-12's, a working floor, not a quote; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy, in dollars.");
+    expect(words).not.toContain("a rent roll, else the T-12");
+    expect(words).toContain("Beside a stabilized vacancy they show the gap to close, and the rent roll tests it only where no market figure is fresh, never on a plan.");
     expect(words).not.toContain("vacancy and insurance against");
-    expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows.");
+    expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows, each in its own measure.");
     // The T-12's tax line judges no row, so taxes are never promised.
     expect(words).not.toMatch(/\btax/i);
     expect(html).toContain('href="/deals/sample?tab=analyses&amp;a=reconciler"');

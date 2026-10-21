@@ -1509,21 +1509,20 @@ describe("ModelView — the sample model renders every panel", () => {
       // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
       // by count (225 of 248 doors).
       expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.1%");
-      // The sample's three unchecked rows are one folded group at the end:
-      // the memorandum states no loan rate, no figure was read today for rent
-      // growth, and no quote for a new owner tests the premium. Its taxes and
-      // renovation premium are tested.
-      expect(visibleText(html)).toContain("3 could not be checked: debt, rent growth, insurance");
-      expect(visibleText(html)).toContain("Read why (3)");
-      // The insurance row is unchecked and re-runs nothing (the walkthrough
-      // of 2026-10-20): the T-12's premium is shown beside it, no move.
+      // The sample's two unchecked rows are one folded group at the end:
+      // the memorandum states no loan rate, and no figure was read today for
+      // rent growth. Its taxes, insurance and renovation premium are tested.
+      expect(visibleText(html)).toContain("2 could not be checked: debt, rent growth");
+      expect(visibleText(html)).toContain("Read why (2)");
+      // The insurance row is held to the seller's own T-12 premium, $385k,
+      // which the pro forma's $310k sits under: stretched, re-run at it.
       const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));
-      expect(ins).toContain('data-verdict="unchecked"');
+      expect(ins).toContain('data-verdict="stretched"');
       const insRow = ins.slice(0, ins.indexOf('data-qa="stress-row-', 10));
-      expect(insRow).not.toContain('data-qa="stress-unchecked-rerun"');
       expect(visibleText(insRow)).toContain("$385k");
-      // The taxes' reset is the jurisdiction's to make: stretched at most.
-      for (const [k, v] of [["taxes", "stretched"], ["renovation_premium", "unsupported"]]) {
+      // The taxes' reset is the jurisdiction's to make, the premium's floor
+      // is the seller's: each stretched at most.
+      for (const [k, v] of [["taxes", "stretched"], ["insurance", "stretched"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);
         expect(at, k).toBeGreaterThan(0);
         expect(at, k).toBeLessThan(html.indexOf('data-qa="stress-unchecked-group"'));

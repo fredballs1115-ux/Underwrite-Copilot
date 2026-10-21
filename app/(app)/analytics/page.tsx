@@ -40,8 +40,9 @@ import type { RentRollSummary } from "@/lib/actuals/types";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
-import { planVacancyStated, stabilizedVacancyStated } from "@/lib/stress-test";
+import { planVacancyStated, stabilizedVacancyStated, vacancyEconomicStated } from "@/lib/stress-test";
 import { TrackRecordSection } from "./track-record";
+import { SCREEN_SNAPSHOTS, SCREEN_SNAPSHOT_SELECT, keptScreensByDeal, type KeptScreenRow } from "@/lib/screen-history";
 
 /** A stored rent roll or T-12 row as the track record reads it. */
 interface ActualsRowLike {
@@ -205,14 +206,16 @@ export default async function AnalyticsPage() {
     }),
   );
 
-  // The track record (lib/track-record): every pooled deal's stored
-  // challenges against what arrived AFTER its verdict — its rent roll and
-  // T-12 by their documents' upload, the decision and the trade off the
-  // move that ended it. Best-effort reads of the actuals tables (0020): on
+  // The track record (lib/track-record): every pooled deal's stress-test
+  // rows as kept with its verdict (its challenges, where the verdict kept
+  // none) against what arrived AFTER that verdict — its rent roll and T-12
+  // uploaded after it and dated after its day, the decision, and a trade
+  // reported after it and not traded on or before its day, off the move
+  // that ended it. Best-effort reads of the actuals tables (0020): on
   // an older schema they error and read as none, and the record is scored
   // on decisions and trades alone.
   const ids = new Set(pooled.map((r) => r.id));
-  const [rollRows, t12Rows, docRows] = await Promise.all([
+  const [rollRows, t12Rows, docRows, keptRows] = await Promise.all([
     readAll<ActualsRowLike>((from, to) =>
       supabase.from("deal_rent_rolls").select("id, deal_id, as_of_date, summary, created_at, source_document_id").order("created_at", { ascending: false }).order("id").range(from, to),
     ),
@@ -222,7 +225,14 @@ export default async function AnalyticsPage() {
     readAll<{ id: string; deal_id: string; created_at: string }>((from, to) =>
       supabase.from("deal_documents").select("id, deal_id, created_at").in("kind", ["rent_roll", "t12"]).order("created_at", { ascending: false }).order("id").range(from, to),
     ),
+    // Every screen kept (migration 0038), so a row scored against an earlier
+    // screen stays scored after later re-screens; none where the table
+    // cannot be read yet, and each deal's prior_screen stands alone.
+    readAll<KeptScreenRow & { id: string }>((from, to) =>
+      supabase.from(SCREEN_SNAPSHOTS).select(`id, ${SCREEN_SNAPSHOT_SELECT}`).order("verdict_at", { ascending: false }).order("id").range(from, to),
+    ),
   ]);
+  const keptByDeal = keptScreensByDeal((keptRows ?? []).filter((r) => ids.has(r.deal_id)));
   const newestByDeal = (rows: ActualsRowLike[] | null) => {
     const out = new Map<string, ActualsRowLike>();
     for (const r of rows ?? []) if (ids.has(r.deal_id) && !out.has(r.deal_id)) out.set(r.deal_id, r);
@@ -244,6 +254,7 @@ export default async function AnalyticsPage() {
         stressSnapshot: (r.verdict as { stressSnapshot?: unknown } | null)?.stressSnapshot,
         challenges: (r.challenges as { challenges?: Challenge[] } | null)?.challenges,
         priorScreen: (r.prior_screen as PriorScreenLike | null | undefined) ?? null,
+        priorScreens: keptByDeal.get(r.id) ?? [],
         rentRoll: roll?.summary ? { arrivedAt: arrivalOf(roll, docs), dated: roll.as_of_date ?? null, summary: roll.summary as RentRollSummary } : null,
         t12: t12Row && t12Summary ? { arrivedAt: arrivalOf(t12Row, docs), dated: t12Row.period_end_date ?? null, summary: t12Summary } : null,
         stage: r.stage ?? null,
@@ -253,9 +264,13 @@ export default async function AnalyticsPage() {
         // The account's record builds no stress test a deal, so it cannot
         // tell whether the market or the documents decided a stabilized
         // vacancy (lib/stress-test `vacancyDecidedBy`, which the deal page
-        // reads): every stated one is held back as the market's, and the
+        // reads): every stated one counted by doors is held back as the
+        // market's (an economic one is the T-12's, `vacancyEconomic`), and the
         // section says so (lib/track-record `ACCOUNT_VACANCY_NOTE`).
         vacancyHeldToMarket: stabilizedVacancyStated(extraction, (r.first_signal as FirstSignal | null) ?? null),
+        // A challenge's vacancy in the measure of the OM's own figure: an
+        // economic one is scored by a later T-12, never a rent roll's doors.
+        vacancyEconomic: vacancyEconomicStated(extraction),
         // A plan deal's NOI and stated vacancy are the finished project's,
         // which no document of the building before the plan scores.
         plan: isPlanDeal(inferStrategy(extraction, (r.first_signal as FirstSignal | null) ?? null).kind),

@@ -77,8 +77,17 @@
 //   NOI              the actuals card's own bands: inside NOI_IN_LINE_BAND
 //                    (5%) holds, past NOI_UNSUPPORTED_SHARE (10%) unsupported
 //   taxes            TAX_UNSUPPORTED_SHARE     15% under the reset bill
-//   insurance        none: no quote for a new owner is on file, so the row
-//                    stands unchecked (`INSURANCE_NO_QUOTE`)
+//   insurance        SAME_SHARE (2%) under the seller's own T-12 premium reads
+//                    stretched, never more (the T-12's is a floor, not a
+//                    quote); at or over it, or with no T-12, unchecked — a
+//                    new owner's quote would decide it, and none is on file
+//   vacancy measure  a figure counted by doors is never decided by the
+//                    T-12's economic loss (dollars), nor an economic one by
+//                    a count of doors (lib/stress-deciders `VACANCY_ORDER`)
+//   growth history   a growth row's deciding figure is one trailing year;
+//                    where the stored history of that series holds two or
+//                    more years, their compound average a year is shown
+//                    beside it, deciding nothing (`GROWTH_AVERAGE_MIN_YEARS`)
 //   basis            BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
 //                    the comps' median
 //   premium          PREMIUM_UNSUPPORTED_SHARE 15% over the achieved premium
@@ -174,12 +183,14 @@ import {
   SALE_COMPS_SF_LABEL,
   SEEDED_RATE_LABEL,
   SEEDED_RATE_ONLY_LABEL,
+  T12_INSURANCE_LABEL,
   T12_NOI_LABEL,
   T12_VACANCY_LABEL,
   basisDecider,
   debtDecider,
   exitCapDecider,
   expenseGrowthDecider,
+  insuranceDecider,
   noiDecider,
   renovationPremiumDecider,
   rentGrowthDeciding,
@@ -530,6 +541,12 @@ const ASSESSED_NOT = /special|ratio|\brate\b|\bper\b|\/|millage|reassess/i;
 const INSURANCE_ROW = /\binsurance\b/i;
 const INSURANCE_NOT = /mortgage|title|index|deductible|reserve|tenant|income|revenue|proceeds|program|\brate\b|\bper\b|\/|psf|increase|growth|claim|\btax/i;
 const INSURANCE_VALUE_NOT = /income|revenue|proceeds|commission/i;
+// A premium stated per unit, door, key, bed, room, pad, space or foot, or by
+// the month, is not the year's premium for the building ("$1,200/unit",
+// "$1,200 per unit", "$32,000/mo", "$650/door"): parsed bare it would read as
+// the year's, so the value is refused, as `taxBillOf` refuses a per-unit bill.
+const INSURANCE_VALUE_PER =
+  /\/\s*(?:unit|door|key|bed|room|pad|space|sf|sq|ft|mo\b|mos\b|month)|\bper\s+(?:unit|door|key|bed|room|pad|space|sf|sq|square|foot|ft|mo\b|month)|\bpsf\b|\bmonthly\b|\b(?:a|each)\s+month\b/i;
 /** A T-12 line that is not the real estate tax line: an abatement, payroll
  *  or transfer tax, or a line combined with insurance. Exported for the
  *  track record's own T-12 reader. */
@@ -573,23 +590,58 @@ function statedLeverage(rows: Row[]): { row: Row; pct: number; measure: "loan-to
  *  read as today's figure, as a stated occupancy is (audit M6). */
 const VACANCY_TODAY = /\b(?:current|in[- ]place|actual|t-?12|ttm|trailing|today)\b/i;
 
+/**
+ * What a vacancy or occupancy figure counts (the review of 2026-10-21): a
+ * physical figure counts doors — the units, or the area, empty — and an
+ * economic one dollars — the rent not collected over gross potential rent,
+ * with credit loss, and concessions or loss to lease where they are netted
+ * there. A label that names the economic measure, or a credit or collection
+ * loss, bad debt or concessions beside the vacancy, is economic; every other
+ * vacancy or occupancy is physical. The two are different measures of one
+ * building, and neither decides the other (lib/stress-deciders
+ * `VACANCY_ORDER`).
+ */
+export type VacancyMeasure = "physical" | "economic";
+const ECONOMIC_WORDS = /\beconomic\b|\bcredit\b|\bcollection\b|\bbad\s+debt\b|\bconcession/i;
+const ECONOMIC_ROW = /\beconomic\s+(?:vacancy|occupancy)\b/i;
+/** A vacancy read off the trailing statement ("T-12 vacancy", "TTM
+ *  vacancy") is the statement's loss over its gross potential rent: dollars. */
+const TRAILING_STATEMENT = /\b(?:t-?12|ttm|trailing)\b/i;
+export const measureOf = (label: string): VacancyMeasure => (ECONOMIC_WORDS.test(label) ? "economic" : "physical");
+const vacancyMeasureOf = (label: string): VacancyMeasure => (ECONOMIC_WORDS.test(label) || TRAILING_STATEMENT.test(label) ? "economic" : "physical");
+
+type OmVacancy = { row: Row; pct: number; from: "vacancy" | "occupancy" | "today"; measure: VacancyMeasure };
+
 /** The OM's stabilized vacancy, as a vacancy row (a stabilized or pro forma
  *  one first) or as what its stated occupancy leaves; else a vacancy the OM
- *  states for today, read as today's figure (`from: "today"`). */
-function omVacancy(rows: Row[]): { row: Row; pct: number; from: "vacancy" | "occupancy" | "today" } | null {
+ *  states for today, read as today's figure (`from: "today"`); else, only
+ *  where the OM states no figure counted by doors, an economic occupancy or
+ *  vacancy it states (the self-storage memorandum's "Economic occupancy"),
+ *  read as today's unless its label says stabilized or pro forma. Each with
+ *  its measure (`measureOf`). */
+function omVacancy(rows: Row[]): OmVacancy | null {
   const vacancyRows = rows.filter((m) => VACANCY_ROW.test(m.label) && !VACANCY_NOT.test(m.label) && !VACANCY_VALUE_NOT.test(m.value) && parsePct(m.value) != null);
   const assumed = vacancyRows.filter((m) => !VACANCY_TODAY.test(m.label));
   const row = assumed.find((m) => VACANCY_PLAN.test(m.label)) ?? assumed[0] ?? null;
   if (row) {
     const pct = parsePct(row.value)!;
-    if (pct >= 0 && pct <= 100) return { row, pct, from: "vacancy" };
+    if (pct >= 0 && pct <= 100) return { row, pct, from: "vacancy", measure: measureOf(row.label) };
   }
   const occ = occupancyRow(rows) as Row | null;
   const occPct = occ ? parsePct(occ.value) : null;
-  if (occ && occPct != null && occPct >= 0 && occPct <= 100) return { row: occ, pct: Math.round((100 - occPct) * 10) / 10, from: "occupancy" };
+  if (occ && occPct != null && occPct >= 0 && occPct <= 100) return { row: occ, pct: Math.round((100 - occPct) * 10) / 10, from: "occupancy", measure: "physical" };
   const today = vacancyRows.find((m) => VACANCY_TODAY.test(m.label)) ?? null;
   const todayPct = today ? parsePct(today.value) : null;
-  if (today && todayPct != null && todayPct >= 0 && todayPct <= 100) return { row: today, pct: todayPct, from: "today" };
+  if (today && todayPct != null && todayPct >= 0 && todayPct <= 100) return { row: today, pct: todayPct, from: "today", measure: vacancyMeasureOf(today.label) };
+  // The economic rows the readers above leave out by their labels.
+  const econ = rows.find((m) => ECONOMIC_ROW.test(m.label) && !/market|submarket|metro|break-?even/i.test(m.label) && !VACANCY_VALUE_NOT.test(m.value) && parsePct(m.value) != null) ?? null;
+  const econPct = econ ? parsePct(econ.value) : null;
+  if (econ && econPct != null && econPct >= 0 && econPct <= 100) {
+    const occupancy = /occupancy/i.test(econ.label);
+    const vacant = occupancy ? Math.round((100 - econPct) * 10) / 10 : econPct;
+    const planned = VACANCY_PLAN.test(econ.label) && !VACANCY_TODAY.test(econ.label);
+    return { row: econ, pct: vacant, from: planned ? "vacancy" : occupancy ? "occupancy" : "today", measure: "economic" };
+  }
   return null;
 }
 
@@ -819,7 +871,8 @@ const NO_RERUN_SHORT: readonly [(why: string) => boolean, string][] = [
   [(w) => w === PLAN_TAX_NOT_ASSESSED, "the reset bill is a floor"],
   [(w) => /the figures do not tie/.test(w), "the figures do not tie"],
   [(w) => /^No achieved premium is stated/.test(w), "no achieved premium stated"],
-  [(w) => w === INSURANCE_NO_RERUN, "nothing tests the premium"],
+  [(w) => w === INSURANCE_NO_RERUN || w === INSURANCE_NO_RERUN_NO_T12, "nothing tests the premium"],
+  [(w) => w === PLAN_INSURANCE_NOT_PRO_FORMA, "no pro forma premium"],
   [(w) => /no count of doors to renovate/.test(w), "no doors to renovate stated"],
 ];
 
@@ -949,11 +1002,24 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
  * the building runs at today (its plan is the gap). The track record reads
  * it too (lib/track-record `vacancyHeldToMarket`), so a later rent roll's
  * vacancy — today's again — never scores a challenge the stress test holds
- * to the market.
+ * to the market. An allowance the OM states as economic (a vacancy and
+ * credit loss) is no such case: the market's vacancy counts doors, so the
+ * row holds it to the T-12, the same measure, never to the market.
  */
 export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
   const om = omVacancy(rowsOf(extraction));
-  return om?.from === "vacancy" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+  return om?.from === "vacancy" && om.measure === "physical" && !isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+}
+
+/**
+ * Whether the OM's vacancy is economic — dollars over gross potential rent,
+ * not doors (`omVacancy`'s measure, the stress test's own reading). The track
+ * record reads it (lib/track-record `vacancyEconomic`) for a challenge scored
+ * where no stress test was kept: an economic OM figure is scored by a later
+ * T-12's economic vacancy, never by a rent roll's count of doors.
+ */
+export function vacancyEconomicStated(extraction: ExtractionResult | null): boolean {
+  return omVacancy(rowsOf(extraction))?.measure === "economic";
 }
 
 /**
@@ -994,8 +1060,33 @@ export function leaseUpNotModelled(todayPct: number, stabilizedPct: number): str
   return `The lease-up from today's ${pct1(todayPct)} to the stabilized ${pct1(stabilizedPct)} is not modelled in either case: each runs its vacancy from year one.`;
 }
 
+/** The T-12's economic vacancy beside a figure counted by doors, said on its
+ *  evidence line. */
+export const T12_ECONOMIC_BESIDE = "dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it";
+
+/** The rent roll's count beside a figure the OM states as economic. */
+export const ROLL_PHYSICAL_BESIDE = "doors, not dollars: shown beside the OM's economic figure and never deciding it";
+
+/** Why a vacancy counted by doors stands unchecked where the deal's T-12 is
+ *  the only figure on file: its loss is dollars. */
+export const VACANCY_ECONOMIC_ONLY =
+  "The deal's T-12 counts vacancy and credit loss in dollars, not doors, so it cannot decide the OM's figure, which counts doors, and no rent roll, published vacancy or class norm could be held to it.";
+
+/** Why a vacancy the OM states as economic stands unchecked with no T-12. */
+export const VACANCY_NO_T12_ECONOMIC =
+  "The OM states its figure as economic, dollars, not doors, and no T-12 is on file to hold it to; a count of doors cannot decide it.";
+
+/** The vacancy row's title where the OM's figure is today's economic
+ *  occupancy (`OCCUPANCY_TITLE`'s economic twin). */
+const ECONOMIC_TITLE = "Economic occupancy today";
+const ECONOMIC_VACANCY_TITLE = "Economic vacancy today";
+
 function vacancyRow(ctx: Ctx): StressRow | null {
   const om = omVacancy(ctx.rows);
+  // What the OM's figure counts (`measureOf`): doors, or dollars. A figure
+  // is decided only by one of its own measure (lib/stress-deciders
+  // `VACANCY_ORDER`); every piece of the other is shown beside it, said so.
+  const economic = om?.measure === "economic";
   // Each piece is gathered apart and set in order once the row knows which
   // kind decides: the deal's documents, the published figures (each with its
   // own tolerance — the survey's margin reaches the survey's figure, never
@@ -1004,12 +1095,14 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   const docs: Piece[] = [];
   const market: Piece[] = [];
   let rot: Piece | null = null;
+  let roll: Piece | null = null;
+  let t12p: Piece | null = null;
   const piece = (e: StressEvidence, tolerance = SAME, compare = true): Piece => ({ e, tolerance, compare: compare && e.value != null });
-  // The deal's own documents: the rent roll's occupancy, the T-12's
-  // vacancy loss over gross potential rent — whether its rent line already
-  // nets the vacancy is the statement's own EGI to say (lib/actuals/analyze
-  // `t12Vacancy`, the track record's one reading), and the sentence says
-  // what the loss was divided by.
+  // The deal's own documents: the rent roll's occupancy, by its doors, and
+  // the T-12's vacancy and credit loss over gross potential rent, in
+  // dollars — whether its rent line already nets the vacancy is the
+  // statement's own EGI to say (lib/actuals/analyze `t12Vacancy`, the track
+  // record's one reading), and the sentence says what the loss was divided by.
   const rr = ctx.actuals?.rentRoll;
   if (rr) {
     // A class priced by the unit (an apartment, a hotel's keys, a park's
@@ -1025,7 +1118,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       const v = Math.round((1 - occ) * 1000) / 10;
       const asOf = rr.asOf ?? s.asOfUsed ?? null;
       const noun = assetWords(ctx.assetClass).noun?.many ?? "units";
-      docs.push(piece({
+      roll = piece({
         kind: "document",
         label: RENT_ROLL_VACANCY_LABEL,
         text: `${pct1(v)} vacant (${useUnits ? `by count, ${s.occupiedUnits} of ${s.unitCount} ${noun} occupied` : "by area, SF-weighted"}${asOf ? `, as of ${proseDay(asOf)}` : ", no stated as-of"})`,
@@ -1033,21 +1126,23 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         asOf,
         publisher: "the deal's rent roll",
         scope: "deal",
-      }));
+      });
+      docs.push(roll);
     }
   }
   const t12 = ctx.actuals?.t12;
   const tv = t12 ? t12Vacancy(t12.summary) : null;
   if (t12 && tv) {
-    docs.push(piece({
+    t12p = piece({
       kind: "document",
       label: T12_VACANCY_LABEL,
-      text: `${pct1(tv.pct)} (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${proseDay(t12.periodEnd)}` : "; period not stated"})`,
+      text: `${pct1(tv.pct)} economic (${money(tv.loss)} of ${money(tv.over)} gross potential rent: ${t12VacancyOverWords(tv)}${t12.periodEnd ? `; TTM to ${proseDay(t12.periodEnd)}` : "; period not stated"})`,
       value: tv.pct,
       asOf: t12.periodEnd,
       publisher: "the deal's T-12",
       scope: "deal",
-    }));
+    });
+    docs.push(t12p);
   }
   // The published figures the model-vs-market read already carries: the
   // survey (with its margin as the tolerance), the region's, the state's,
@@ -1084,23 +1179,26 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // beside it as the gap a lease-up has to close (on a plan deal, the gap
   // the plan closes), or as support where the building already runs at or
   // under the assumption. Where no published figure is fresh, on a deal read
-  // as stabilized the rent roll, then the T-12, decide, and the row says so;
-  // on a plan deal the class's norm does, since the documents are the
-  // building before the plan is done (`planVacancyStated`, the track
-  // record's own rule: a later rent roll or T-12 scores neither). Today's
-  // occupancy is the rent roll's, then the T-12's, then the published
-  // figures', then the class's norm's. Every other piece is shown beside the
-  // one that decides, never in its place: a region's or a state's figure
-  // beside the metro's, a T-12 beside the rent roll, a rule of thumb beside
-  // a document.
+  // as stabilized the rent roll decides, and the row says so; on a plan deal
+  // the class's norm does, since the documents are the building before the
+  // plan is done (`planVacancyStated`, the track record's own rule: a later
+  // rent roll or T-12 scores neither). Today's occupancy is the rent roll's,
+  // then the published figures', then the class's norm's. Every piece counts
+  // doors but the T-12's, whose vacancy and credit loss over gross potential
+  // rent is dollars: it never decides a figure counted by doors, and decides
+  // a figure the OM states as economic, ahead of the class's norm, while the
+  // counts of doors are shown beside that one. Every other piece is shown
+  // beside the one that decides, never in its place: a region's or a
+  // state's figure beside the metro's, the T-12 beside the rent roll, a rule
+  // of thumb beside a document.
   const stabilized = om?.from === "vacancy";
   const pool: Piece[] = [...docs, ...market, ...(rot ? [rot] : [])];
   const decided = vacancyDecider(
     pool.map((p) => ({ evidence: p.e, held: p.compare })),
-    { stabilized, plan: ctx.plan },
+    { stabilized, plan: ctx.plan, economic },
   );
   const best = decided ? pool[decided.index] : null;
-  const marketDecides = stabilized && best != null && best.e.kind === "published";
+  const marketDecides = stabilized && !economic && best != null && best.e.kind === "published";
   // Where a stabilized assumption is decided by anything but a document, the
   // documents stand beside it as today's.
   const docsBeside = stabilized && best != null && best.e.kind !== "document";
@@ -1114,9 +1212,26 @@ function vacancyRow(ctx: Ctx): StressRow | null {
       ? `${pts(diff)} over ${what} — ${gapClosed}`
       : `${diff < -SAME ? `${pts(diff)} under` : "at"} ${what} — support for it`;
   };
-  if (docsBeside && om) {
-    for (const d of docs) d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
+  // A document of the OM figure's own measure is said as today's beside a
+  // stabilized assumption the market (or the class's norm) decides; one of
+  // the other measure is said as that, never as a gap to close.
+  const ownMeasure = (p: Piece) => (economic ? p === t12p : p === roll);
+  if (om) {
+    for (const d of docs) {
+      if (!ownMeasure(d)) d.e = { ...d.e, text: `${d.e.text}; ${economic ? ROLL_PHYSICAL_BESIDE : T12_ECONOMIC_BESIDE}` };
+      else if (docsBeside) d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
+    }
   }
+  // The other measure's figure, said in the gap's own sentence wherever it is
+  // on the row, so no reader takes it for the figure that decides: on a
+  // figure counted by doors, the T-12's economic vacancy; on an economic one,
+  // the counts of doors beside it.
+  const otherMeasure =
+    om && !economic && t12p
+      ? ` The deal's T-12 ran ${pct1(t12p.e.value!)} economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`
+      : om && economic && (roll || market.some((m) => m.e.value != null))
+        ? " The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it."
+        : "";
   // The figure that decides first, then the rest in the order of the kind
   // that decides: the market's, then the documents', where the market (or,
   // on a plan deal, the class's norm) decides a stabilized assumption; else
@@ -1127,21 +1242,33 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // Where the OM states no vacancy allowance, the figure is its occupancy
   // TODAY, not a pro forma assumption: the row is titled and worded so, and
   // the documents — today's figures too — decide it.
-  const title = om && om.from !== "vacancy" ? OCCUPANCY_TITLE : undefined;
+  const title = om && om.from !== "vacancy" ? (economic ? (om.from === "occupancy" ? ECONOMIC_TITLE : ECONOMIC_VACANCY_TITLE) : OCCUPANCY_TITLE) : undefined;
+  const econ = economic ? "economic " : "";
   const omSays: StressRow["omSays"] = om
     ? {
         text:
           om.from === "vacancy"
             ? `${om.row.label}: ${om.row.value}`
             : om.from === "today"
-              ? `${om.row.label}: ${om.row.value} as stated — today's vacancy, not a pro forma assumption`
-              : `${om.row.label}: ${om.row.value} as stated — today's occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} vacant`,
+              ? `${om.row.label}: ${om.row.value} as stated — today's ${econ}vacancy, not a pro forma assumption`
+              : `${om.row.label}: ${om.row.value} as stated — today's ${econ}occupancy, not a pro forma assumption — which leaves ${pct1(om.pct)} ${economic ? "economic vacancy" : "vacant"}`,
         value: om.pct,
         page: pageOf(om.row, ctx.ex),
       }
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"));
-  if (!best) return unchecked("vacancy", omSays, evidence, stabilized && ctx.plan && docs.length > 0 ? PLAN_VACANCY_UNCHECKED : NO_EVIDENCE, title);
+  if (!best) {
+    const why = economic
+      ? t12p
+        ? NO_EVIDENCE
+        : VACANCY_NO_T12_ECONOMIC
+      : stabilized && ctx.plan && docs.length > 0
+        ? PLAN_VACANCY_UNCHECKED
+        : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
+          ? VACANCY_ECONOMIC_ONLY
+          : NO_EVIDENCE;
+    return { ...unchecked("vacancy", omSays, evidence, why, title), ...(economic ? { measure: "economic" as const } : {}) };
+  }
   const bestValue = best.e.value!;
   let judged: Judged;
   if (marketDecides) {
@@ -1157,9 +1284,12 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const moe = band || best.tolerance === SAME ? null : best.tolerance;
     const said = `${lowerFirst(stem(best.e.label))} (${best.e.publisher}), ${band ? `its low read ${pct1(band.lo)} (the band runs to ${pct1(band.hi)})` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
     const edge = bestValue - (moe ?? SAME);
-    const doc = docs[0];
+    // Today's gap is the rent roll's, by its doors, the OM's own measure —
+    // never the T-12's dollars, which carry credit loss a lease-up does not
+    // close (said apart, `otherMeasure`).
+    const doc = roll;
     const docLine = doc
-      ? ` ${doc.e.label === RENT_ROLL_VACANCY_LABEL ? `Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `The deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+      ? ` Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
           // Past the row's own threshold, the building today is materially
           // emptier than the stabilized figure the market holds: whatever
           // the verdict, neither run models getting from one to the other.
@@ -1179,29 +1309,44 @@ function vacancyRow(ctx: Ctx): StressRow | null {
               : gap > 0
                 ? `${pts(gap)} under it, inside its margin`
                 : `${pts(gap)} over it — the conservative side`;
-      return `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}`;
+      return `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}${otherMeasure}`;
     });
   } else {
     // A stabilized assumption with no fresh published figure to hold it to:
-    // on a deal read as stabilized the documents decide, on a plan deal the
-    // class's norm, said so.
-    const doc = docs[0];
-    const noMarket =
-      stabilized && best.e.kind === "document"
-        ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's own documents decide."
+    // on a deal read as stabilized the rent roll decides, on a plan deal the
+    // class's norm, said so. A figure the OM states as economic is held to
+    // the T-12, its own measure, said so.
+    const doc = economic ? t12p : roll;
+    const docToday = (p: Piece) =>
+      p === roll ? `today the deal's rent roll runs ${pct1(p.e.value!)} vacant` : `the deal's T-12 ran ${pct1(p.e.value!)} economic vacancy over its trailing year`;
+    const noMarket = economic
+      ? best === t12p
+        ? " The OM states its figure as economic, dollars, not doors, so it is held to the deal's T-12, the same measure."
+        : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
+          ? ` The OM states its figure as economic, and the deal's T-12 is the building before the plan is done, so the class's norm decides${
+              doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""
+            }.`
+          : best.e.kind === "rule_of_thumb"
+            ? " The OM states its figure as economic, dollars, not doors, and no T-12 is on file to hold it to, so the class's norm decides."
+            : ""
+      : stabilized && best.e.kind === "document"
+        ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides."
         : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
           ? ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
-              doc
-                ? `; ${doc.e.label === RENT_ROLL_VACANCY_LABEL ? `today the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `the deal's T-12 ran ${pct1(doc.e.value!)} vacant over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at`
-                : ""
+              doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""
             }.`
-          : "";
+          : stabilized && best.e.kind === "rule_of_thumb"
+            ? " No fresh published vacancy figure for this market could be held to the stabilized assumption and no rent roll is on file, so the class's norm decides."
+            : "";
+    // A survey's margin, where the figure that decides carries one (today's
+    // occupancy held to the metro's survey), is said as the reach of "at it".
+    const margin = best.tolerance !== SAME ? best.tolerance : null;
     judged = judge(om.pct, bestValue, "low", "pts", VACANCY_UNSUPPORTED_PTS, best.tolerance, (gap) =>
       Math.abs(gap) < SAME
-        ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}`
+        ? `The OM's ${pct1(om.pct)} is at the evidence's ${pct1(bestValue)}.${noMarket}${otherMeasure}`
         : gap > 0
-          ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(bestValue)}.${noMarket}`
-          : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(bestValue)} — the conservative side.${noMarket}`,
+          ? `The OM's ${pct1(om.pct)} is ${pts(gap)} under the evidence's ${pct1(bestValue)}${margin != null && gap <= margin ? `, inside its ±${margin}-pt margin` : ""}.${noMarket}${otherMeasure}`
+          : `The OM's ${pct1(om.pct)} is ${pts(gap)} over the evidence's ${pct1(bestValue)} — the conservative side.${noMarket}${otherMeasure}`,
     );
   }
   // The engine is re-run at the figure that decided, printed first.
@@ -1260,6 +1405,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     challenge: null,
     method: methodSentence("vacancy", evidence, 0, title),
     ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
+    ...(economic ? { measure: "economic" as const } : {}),
   };
 }
 
@@ -1317,8 +1463,44 @@ export function rentGrowthPieces(mvm: ModelVsMarket | null, assetClass: string |
   });
   const decided = rentGrowthDeciding(assetClass, candidatesOf(market));
   const found = decided ? market[decided.index] : null;
-  const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found)];
+  // The deciding series' own average over the years its history holds,
+  // last and never a candidate (`averagePiece`).
+  const average = found ? averagePiece(check, found, mvm) : null;
+  const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found), ...(average ? [average] : [])];
   return { evidence, decided: decided && found ? { ...decided, index: apart.length } : null, apart: apart.length, market: market.length };
+}
+
+/**
+ * A growth row's longer view (lib/growth-average): the compound average a
+ * year of the deciding series' own published changes over the whole years
+ * its stored history holds, two or more — said as an average of published
+ * figures, not a forecast — shown beside the trailing year that decides and
+ * never a candidate to decide. Only of the very series that decides (the
+ * check's `average` names it by its label); null where the history holds
+ * under two years, or the series keeps none (Zillow's asking rents).
+ */
+function averagePiece(check: ModelCheck | null, decider: StressEvidence, mvm: ModelVsMarket | null): StressEvidence | null {
+  const a = check?.average;
+  if (!check || !a || a.of !== decider.label || !Number.isFinite(a.value)) return null;
+  return published(check, a, mvm?.grain ?? null);
+}
+
+/** "Held to consumer prices, all items (the CPI), …: +3.4% over the year to
+ *  Aug 2026 (BLS via FRED), a single year's change." — the gap's first
+ *  sentence on a growth row, which says the decider is one year. */
+function heldGrowth(name: string, why: string, decider: StressEvidence): string {
+  return `Held to ${name}, ${why}: ${decider.text} (${decider.publisher}), a single year's change.`;
+}
+
+/** The longer average beside a growth row's one year, as the gap says it:
+ *  "Beside it, not deciding: its average a year over the four years to Aug
+ *  2026, +3.9%, compounded from its published changes — an average of
+ *  published figures, not a forecast." "" with none. */
+function averageSentence(evidence: StressEvidence[]): string {
+  const a = evidence.find((e) => /: average a year over \d+ years$/.test(e.label));
+  if (!a || a.value == null) return "";
+  const over = a.text.match(/^[+−-]?\d+(?:\.\d+)?% a year (over the \S+ years to [^,]+),/)?.[1];
+  return over ? ` Beside it, not deciding: the same series averaged ${evidenceFigureText("rent_growth", a.value)} a year ${over}, compounded from its published changes against a year earlier — an average of published figures, not a forecast.` : "";
 }
 
 function rentGrowthRow(ctx: Ctx): StressRow | null {
@@ -1339,15 +1521,17 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   const name = pick.d.name!;
   // "Held to Zillow's apartment asking rents, the figure for this kind of
   // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
-  const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
+  const held = heldGrowth(name, pick.d.why!, decider);
   // The OM's figure is a rate a year; the evidence's is a trailing year's
-  // change, said as one, and never as a forecast (`TRAILING_YEAR_NOT_FORECAST`).
+  // change, said as one, and never as a forecast (`TRAILING_YEAR_NOT_FORECAST`);
+  // where the series' history holds more years, their average is beside it.
+  const longer = averageSentence(evidence);
   const judged = judge(om.pct, bestValue, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it. ${TRAILING_YEAR_NOT_FORECAST}`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it. ${TRAILING_YEAR_NOT_FORECAST}`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side. ${TRAILING_YEAR_NOT_FORECAST}`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.${longer} ${TRAILING_YEAR_NOT_FORECAST}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
@@ -1379,7 +1563,11 @@ export function expenseGrowthPieces(mvm: ModelVsMarket | null): RowPieces {
   const evidence: StressEvidence[] = [];
   const check = checkOf(mvm, "expense_growth");
   if (check) for (const f of check.published) evidence.push(published(check, f, mvm?.grain ?? null));
-  return { evidence, decided: expenseGrowthDecider(candidatesOf(evidence)) };
+  const decided = expenseGrowthDecider(candidatesOf(evidence));
+  // The deciding series' own average over the years its history holds, last
+  // and never a candidate (`averagePiece`).
+  const average = decided ? averagePiece(check, evidence[decided.index], mvm) : null;
+  return { evidence: average ? [...evidence, average] : evidence, decided };
 }
 
 function expenseGrowthRow(ctx: Ctx): StressRow | null {
@@ -1395,13 +1583,14 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const bestValue = decided.figure;
   // "Held to consumer prices, all items (the CPI), the broad price level the
   // expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED)."
-  const held = `Held to ${decided.name}, ${decided.why}: ${evidence[evidenceIndex].text} (${evidence[evidenceIndex].publisher}).`;
+  const held = heldGrowth(decided.name!, decided.why!, evidence[evidenceIndex]);
+  const longer = averageSentence(evidence);
   const judged = judge(om.pct, bestValue, "low", "pts", EXPENSE_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it. ${TRAILING_YEAR_NOT_FORECAST}`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it. ${TRAILING_YEAR_NOT_FORECAST}`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side. ${TRAILING_YEAR_NOT_FORECAST}`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side.${longer} ${TRAILING_YEAR_NOT_FORECAST}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
@@ -2152,50 +2341,87 @@ function expenseImpact(
  *  row's index figure where the OM states a premium. */
 export const INSURANCE_MOVED_LABEL = (premium: string): string => `The OM's ${premium} moved by the national premium index`;
 
-/** Why the insurance row stands unchecked wherever the OM states a premium:
- *  what would test it is a quote for a new owner, and nothing on file is
- *  one. The T-12's premium is the same seller's policy, and the index is
- *  the nation's carriers' move. */
+/** Why the insurance row stands unchecked where the OM states a premium and
+ *  no T-12 premium is on file: what would test it is a quote for a new owner,
+ *  and nothing on file is one. */
 export const INSURANCE_NO_QUOTE =
-  "No quote for a new owner on file: the OM's premium is the seller's expiring policy, the T-12's is the same seller's history, and the national index moves the OM's own figure, so nothing here tests what a buyer will be quoted.";
+  "No quote for a new owner and no T-12 premium on file: the OM's premium is the seller's expiring policy, and the national index moves the OM's own figure, so nothing here tests what a buyer will be quoted.";
 
-/** Why the insurance row carries no re-run where the OM states a premium:
- *  nothing on file tests it, and a run at the seller's own T-12 premium would
- *  print a move no evidence makes. */
+/** Why it stands unchecked where the OM's premium is at or over the seller's
+ *  own T-12 premium: the seller's history cannot say a new owner pays less. */
+export const INSURANCE_AT_HISTORY =
+  "No quote for a new owner on file, and the OM's premium is at or over the seller's own T-12 premium: the seller's history cannot say a new owner will pay less, and the national index moves the OM's own figure, so nothing here tests what a buyer will be quoted.";
+
+/** Why it stands unchecked on a development or a conversion: the T-12
+ *  insures the building before the plan delivers a new one. */
+export const INSURANCE_NOT_DELIVERED =
+  "No quote for a new owner on file, and the T-12's premium insures the building before the plan delivers a new one, so it is no floor for the finished building's premium; nothing here tests what a buyer will be quoted.";
+
+/** Why the insurance row carries no re-run where nothing decides it: nothing
+ *  on file tests the premium, and a run at the seller's own T-12 premium
+ *  would print a move no evidence makes. */
 export const INSURANCE_NO_RERUN =
   "No return is re-run: nothing on file tests the premium, and the T-12's premium beside it is the same seller's history, not a figure to swap in.";
 
-/** What the T-12's premium is beside the OM's, said on its evidence line. */
+/** The same, with no T-12 premium on file to name. */
+export const INSURANCE_NO_RERUN_NO_T12 = "No return is re-run: nothing on file tests the premium.";
+
+/** What the T-12's premium is beside the OM's where it decides nothing, said
+ *  on its evidence line. */
 export const INSURANCE_T12_HISTORY = "the seller's history, not a test of a new owner's quote";
 
+/** What the T-12's premium is where it decides the row: the seller's own
+ *  actual, a working floor and a rule of thumb (a new owner is rarely quoted
+ *  under it), never a quote and never a fact about a new owner's premium. */
+export const INSURANCE_T12_FLOOR = "the seller's own premium, a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote";
+
+/** What a re-run at the T-12's premium is, said wherever its part of the
+ *  headline is (`StressHeadlinePart.conditional`). */
+export const INSURANCE_FLOOR_CONDITION = "at the seller's own T-12 premium, a working floor, not a quote";
+
+/** The plan's no-re-run where the premium is not the pro forma's line. */
+export const PLAN_INSURANCE_NOT_PRO_FORMA =
+  "The OM states its premium as no pro forma line, so which premium the stabilized NOI carries is not stated, and no yield on cost is re-run on it.";
 
 /**
  * The insurance row. The OM's premium is the seller's expiring policy, and
- * what would test it is a quote for a new owner, which nothing on file is:
- * the T-12's premium is the same seller's policy (shown beside the OM's as
- * its history, never the figure that decides), and the national premium
+ * what finally decides a premium is a quote for a new owner, which nothing on
+ * file is (none is read from the documents yet). The deal's T-12 premium is
+ * the seller's own actual: where the OM's pro forma premium sits under it by
+ * more than SAME_SHARE, the OM is set against its own building's history and
+ * the T-12's premium decides — a working floor and a rule of thumb (a new
+ * owner is rarely quoted under it), never a quote — so the row reads stretched at most, and the return is re-run at the
+ * T-12's premium (the expense line as `expenseImpact` sets it, so a line the
+ * T-12 already carries is swapped, never added to), said as the floor. At or
+ * over the T-12's premium the seller's history cannot say a new owner pays
+ * less, so the row stands unchecked (`INSURANCE_AT_HISTORY`) with no re-run;
+ * with no T-12 premium, unchecked (`INSURANCE_NO_QUOTE`). On a development or
+ * a conversion the T-12 insures the building before the plan delivers a new
+ * one, so it decides nothing (`INSURANCE_NOT_DELIVERED`). The national premium
  * index applied to the OM's own premium is the OM's figure moved by the
- * nation's carriers' year (shown, held to nothing, carrying no figure of
- * its own). So the row stands unchecked (`INSURANCE_NO_QUOTE`), and no
- * return is re-run on it: an unchecked row has nothing on file that tests
- * it, so a re-run at the seller's own T-12 premium would print a move no
- * evidence makes. The T-12's premium stays shown beside the OM's, and both
- * headline cases keep the model's own premium.
+ * nation's carriers' year (shown, held to nothing, carrying no figure of its
+ * own).
  */
 function insuranceRow(ctx: Ctx): StressRow | null {
   const premiumRow =
-    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
+    ctx.rows.find((m) => INSURANCE_ROW.test(m.label) && !INSURANCE_NOT.test(m.label) && !INSURANCE_VALUE_NOT.test(m.value) && !INSURANCE_VALUE_PER.test(m.value) && !statesRange(m.value) && parseUsd(m.value, 500) != null) ?? null;
   const premium = premiumRow ? parseUsd(premiumRow.value, 500) : null;
   const evidence: StressEvidence[] = [];
-  // The T-12's own insurance line: the seller's history.
+  // The T-12's own insurance line: the seller's actual premium. It decides
+  // only where the OM's premium sits under it past SAME_SHARE, on a building
+  // already delivered — the OM against its own building's history.
   const t12 = ctx.actuals?.t12;
   const t12Ins = t12?.summary.opex.find((l) => /insurance/i.test(l.label) && !T12_INSURANCE_NOT.test(l.label)) ?? null;
-  if (t12Ins && t12Ins.amount > 0) {
+  const t12Premium = t12Ins && t12Ins.amount > 0 ? t12Ins.amount : null;
+  const delivered = !notYetDelivered(ctx.kind);
+  const under = premium != null && t12Premium != null && (t12Premium - premium) / t12Premium > SAME_SHARE;
+  const t12Decides = under && delivered;
+  if (t12Ins && t12Premium != null) {
     evidence.push({
       kind: "document",
-      label: "The deal's T-12 insurance line",
-      text: `${money(t12Ins.amount)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""}); ${INSURANCE_T12_HISTORY}`,
-      value: Math.round(t12Ins.amount),
+      label: T12_INSURANCE_LABEL,
+      text: `${money(t12Premium)} (${t12Ins.label}${t12?.periodEnd ? `, TTM to ${proseDay(t12.periodEnd)}` : ""}); ${t12Decides ? INSURANCE_T12_FLOOR : INSURANCE_T12_HISTORY}`,
+      value: Math.round(t12Premium),
       asOf: t12?.periodEnd ?? null,
       publisher: "the deal's T-12",
       scope: "deal",
@@ -2232,10 +2458,51 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const omSays: StressRow["omSays"] = premiumRow && premium != null
     ? { text: `${premiumRow.label}: ${premiumRow.value}`, value: premium, page: pageOf(premiumRow, ctx.ex) }
     : { text: NO_FIGURE("insurance premium"), value: null, page: null };
-  // Nothing on file is held against the OM's premium (lib/stress-deciders
-  // `insuranceDecider`): every piece is shown beside it.
   if (premium == null) return unchecked("insurance", omSays, evidence, NO_FIGURE("insurance premium"));
-  return { ...unchecked("insurance", omSays, evidence, INSURANCE_NO_QUOTE), noRerun: INSURANCE_NO_RERUN };
+  // ONE figure decides (lib/stress-deciders `insuranceDecider`): the T-12's
+  // premium, handed in as one that may only where the OM's sits under it on a
+  // building already delivered; else nothing, and every piece is beside it.
+  const decided = insuranceDecider(candidatesOf(evidence, (e) => e.label === T12_INSURANCE_LABEL && t12Decides));
+  if (!decided || t12Premium == null) {
+    const why = t12Premium == null ? INSURANCE_NO_QUOTE : !delivered ? INSURANCE_NOT_DELIVERED : INSURANCE_AT_HISTORY;
+    return { ...unchecked("insurance", omSays, evidence, why), noRerun: t12Premium == null ? INSURANCE_NO_RERUN_NO_T12 : INSURANCE_NO_RERUN };
+  }
+  const floor = decided.figure;
+  const share = (floor - premium) / floor;
+  const gap: StressRow["gap"] = {
+    value: Math.round(floor - premium),
+    unit: "usd",
+    text: `The OM's ${money(premium)} premium is ${money(floor - premium)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote, and the row reads stretched at most.`,
+  };
+  const evidenceIndex = decided.index;
+  const words = { what: "the insurance line", om: money(premium), alt: `the seller's ${money(floor)} T-12 premium, a working floor and a rule of thumb, not a quote`, evidence: "" };
+  const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, premium, floor, floor, "insurance line", evidenceIndex, words) : null;
+  // A plan deal re-runs its yield on cost on the premium only where the OM
+  // states it as its pro forma's line, the one its stabilized NOI carries,
+  // as the tax row does; the swap is the premium less the T-12's.
+  let planImpact: StressImpact | null = null;
+  let noRerun: string | null = null;
+  if (ctx.planYield) {
+    if (!PLAN_FIGURE.test(premiumRow!.label)) noRerun = PLAN_INSURANCE_NOT_PRO_FORMA;
+    else {
+      const run = yocSplit(yocImpact(ctx.planYield, "stabilizedNoi", evidenceIndex, ctx.planYield.noi, ctx.planYield.noi - (floor - premium), words));
+      planImpact = run.impact;
+      noRerun = run.noRerun;
+    }
+  }
+  return {
+    key: "insurance",
+    title: TITLES.insurance,
+    omSays,
+    evidence,
+    gap,
+    verdict: "stretched",
+    decidedBy: evidenceIndex,
+    impact: impact ?? planImpact,
+    ...(noRerun ? { noRerun } : {}),
+    challenge: null,
+    method: methodSentence("insurance", evidence, evidenceIndex),
+  };
 }
 
 // — Basis —
@@ -3195,8 +3462,11 @@ function noSwapWhy(row: StressRow): string {
  *  the sale resets the assessment to the price, which is the jurisdiction's
  *  to say — never the stated unabated bill an abatement ends into. */
 function conditionOf(row: StressRow): string | null {
-  if (row.key !== "taxes") return null;
   const at = row.decidedBy ?? row.impact?.evidenceIndex ?? null;
+  // The insurance part is struck at the seller's own T-12 premium: a working
+  // floor and a rule of thumb, never a quote, said beside the part.
+  if (row.key === "insurance") return at != null && row.evidence[at]?.label === T12_INSURANCE_LABEL ? INSURANCE_FLOOR_CONDITION : null;
+  if (row.key !== "taxes") return null;
   return at != null && row.evidence[at]?.label === RESET_BILL_LABEL ? TAX_RESET_CONDITION : null;
 }
 

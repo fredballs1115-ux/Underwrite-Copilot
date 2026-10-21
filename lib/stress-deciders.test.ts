@@ -8,6 +8,7 @@ import {
   GOING_IN_CAP_LABEL,
   METRO_VACANCY_LABEL,
   RENT_ROLL_VACANCY_LABEL,
+  T12_INSURANCE_LABEL,
   T12_VACANCY_LABEL,
   basisDecider,
   decidesTag,
@@ -65,9 +66,24 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     const rot = piece("Multifamily vacancy, a rule of thumb", 5, { kind: "rule_of_thumb" });
     const all = held(t12, rr, region, metro, rot);
     expect(vacancyDecider(all, { stabilized: true })!.label).toBe(METRO_VACANCY_LABEL);
-    // Today's vacancy: the rent roll before the T-12, wherever it sits.
+    // Today's vacancy: the rent roll, wherever it sits.
     expect(vacancyDecider(all, { stabilized: false })!.label).toBe(RENT_ROLL_VACANCY_LABEL);
-    expect(vacancyDecider(held(t12, region, rot), { stabilized: false })!.label).toBe(T12_VACANCY_LABEL);
+    // Doors are never decided by dollars (the review of 2026-10-21): the
+    // T-12's vacancy and credit loss over gross potential rent is economic,
+    // so a figure counted by doors passes it over for the market's, and with
+    // nothing else on file nothing decides it.
+    expect(vacancyDecider(held(t12, region, rot), { stabilized: false })!.label).toBe("Rental vacancy, South Census region");
+    expect(vacancyDecider(held(t12), { stabilized: false })).toBeNull();
+    expect(vacancyDecider(held(t12), { stabilized: true })).toBeNull();
+    // A figure the OM states as economic is the T-12's to decide, the same
+    // measure, ahead of the market and the rent roll, which count doors; the
+    // class's norm stands in only with no T-12; on a plan's stabilized
+    // figure the norm alone, the T-12 being the building before the plan.
+    expect(vacancyDecider(all, { stabilized: true, economic: true })!.label).toBe(T12_VACANCY_LABEL);
+    expect(vacancyDecider(all, { stabilized: false, economic: true })!.label).toBe(T12_VACANCY_LABEL);
+    expect(vacancyDecider(held(rr, metro, rot), { stabilized: false, economic: true })!.label).toBe(rot.label);
+    expect(vacancyDecider(held(rr, metro), { stabilized: true, economic: true })).toBeNull();
+    expect(vacancyDecider(all, { stabilized: true, plan: true, economic: true })!.label).toBe(rot.label);
     // No metro figure: the region's, never the documents', on a stabilized assumption.
     expect(vacancyDecider(held(t12, region, rot), { stabilized: true })!.label).toBe("Rental vacancy, South Census region");
     expect(vacancyDecider(held(rot), { stabilized: true })!.label).toBe(rot.label);
@@ -95,12 +111,18 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(exitCapDecider(held(ten))).toBeNull();
   });
 
-  it("the basis, the NOI and the taxes keep their own one figure; insurance has none", () => {
+  it("the basis, the NOI and the taxes keep their own one figure; insurance the T-12's premium, only where the row hands it in", () => {
     expect(basisDecider(held(piece("Recorded sales (Philadelphia OPA)", 240_000), piece("The memorandum's sale comps", 252_000, { kind: "om_internal" })))!.figure).toBe(252_000);
     expect(basisDecider(held(piece("Other memoranda's asking prices in X (your past screens): asks, not trades", 300_000, { publisher: "your past screens" })))!.figure).toBe(300_000);
     expect(noiDecider(held(piece("The OM's in-place NOI against its pro forma", 2_400_000), piece("The deal's T-12 NOI", 2_350_000)))!.figure).toBe(2_350_000);
     expect(taxesDecider(held(piece("The stated tax abatement and when it ends", 900_000), piece("The bill the OM's own figures imply on the price", 532_000)))!.figure).toBe(532_000);
     expect(insuranceDecider()).toBeNull();
+    // The seller's T-12 premium decides only where the row may hold the OM's
+    // to it (the OM's under it); the index moving the OM's own figure never.
+    const t12Ins = piece(T12_INSURANCE_LABEL, 385_000, { kind: "document", publisher: "the deal's T-12" });
+    const moved = piece("The OM's $310k moved by the national premium index (PPI, commercial multiple peril)", null);
+    expect(insuranceDecider(held(moved, t12Ins))).toMatchObject({ index: 1, figure: 385_000, label: T12_INSURANCE_LABEL });
+    expect(insuranceDecider([{ evidence: t12Ins, held: false }])).toBeNull();
   });
 
   it("rent growth reads lib/rent-growth-decider's order among the pieces that may decide", () => {
@@ -114,7 +136,8 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
 
   it("names every row's order, and /how-we-test's rule for each names its first figure", () => {
     expect(Object.keys(DECIDER_NAMES).sort()).toEqual([...STRESS_KEYS].sort());
-    expect(DECIDER_NAMES.insurance).toEqual([]);
+    expect(DECIDER_NAMES.insurance).toEqual(["the deal's T-12 premium"]);
+    expect(DECIDER_NAMES.vacancy).not.toContain("the deal's T-12");
     expect(VERDICT_RULES.expense_growth).toContain("all-items CPI");
     expect(VERDICT_RULES.exit_cap).toContain("going-in cap alone");
     expect(VERDICT_RULES.noi).toContain("T-12 alone");

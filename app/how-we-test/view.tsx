@@ -7,6 +7,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCORING_RULE,
   SCREENING_MODEL_SECTION,
   STRESS_METHODS,
   TRACK_RECORD,
@@ -21,6 +22,7 @@ import { drawsRerun } from "@/lib/stress-test-words";
 import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
 import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
 import { STRESS_TEST_ANCHOR } from "@/app/(app)/deals/[id]/stress-chip";
+import { BarRow, BarRows, Key, KeyItem, Tick } from "@/app/panel-parts";
 
 /**
  * The methodology page, pure (2026-10-19): one section an assumption the
@@ -215,6 +217,69 @@ function HeadlineSection() {
   );
 }
 
+// Where the rule's picture puts its marks, a share of the track: the OM's
+// figure, the end of the row's margin past it, a later figure past that.
+// Placed for legibility, not measured: the rule has no figures of its own.
+const RULE_OM = 35;
+const RULE_MARGIN_END = 50;
+const RULE_LATER = 72;
+
+/**
+ * The scoring rule as a picture (lib/track-record `scoreTestRow`), drawn with
+ * the deal panels' own parts (app/panel-parts): a track from better for the
+ * buyer to worse, the OM's figure ticked and the row's margin shaded past
+ * it, a later figure dashed; under it, where a flag and a hold come out
+ * right and wrong. Captioned as the rule, with no figure in it; its key says
+ * every mark in words, since the bars are hidden from a screen reader.
+ */
+function ScoringRulePicture() {
+  const r = SCORING_RULE;
+  const span = (from: number, to: number, tone: string, bar: string) => (
+    <span className={`absolute inset-y-0 ${tone} ${from === 0 ? "rounded-l-full" : ""} ${to === 100 ? "rounded-r-full" : ""}`} style={{ left: `${from}%`, width: `${to - from}%` }} data-bar={bar} />
+  );
+  return (
+    <figure className="mt-3 rounded-2xl border border-line bg-surface p-4" data-qa="scoring-rule">
+      <figcaption className="text-xs font-medium uppercase tracking-wider text-muted">{r.caption}</figcaption>
+      <p className="mt-2 flex justify-between text-[11px] text-muted">
+        <span>{r.axis.better}</span>
+        <span>{r.axis.worse}</span>
+      </p>
+      <BarRows className="mt-1 space-y-2 text-xs" qa="scoring-rule-rows">
+        <BarRow label={r.row} figure="">
+          {span(RULE_OM, RULE_MARGIN_END, "bg-caution/40", "rule-margin")}
+          <Tick at={`${RULE_OM}%`} bar="rule-om" track="secondary" />
+          <Tick at={`${RULE_LATER}%`} bar="rule-later" dashed tone="border-ink" track="secondary" />
+        </BarRow>
+        <BarRow label={r.flag} figure="">
+          {span(0, RULE_MARGIN_END, "bg-kill/70", "rule-flag-wrong")}
+          {span(RULE_MARGIN_END, 100, "bg-pass", "rule-flag-right")}
+        </BarRow>
+        <BarRow label={r.hold} figure="">
+          {span(0, RULE_MARGIN_END, "bg-pass", "rule-hold-right")}
+          {span(RULE_MARGIN_END, 100, "bg-kill/70", "rule-hold-wrong")}
+        </BarRow>
+      </BarRows>
+      <Key stack className="mt-3">
+        <KeyItem mark="tick" tone="bg-ink">
+          {r.om}
+        </KeyItem>
+        <KeyItem mark="swatch" tone="bg-caution/40">
+          {r.margin}
+        </KeyItem>
+        <KeyItem mark="dashed" tone="border-ink">
+          {r.later}
+        </KeyItem>
+        <KeyItem mark="swatch" tone="bg-pass">
+          {r.right}
+        </KeyItem>
+        <KeyItem mark="swatch" tone="bg-kill/70">
+          {r.wrong}
+        </KeyItem>
+      </Key>
+    </figure>
+  );
+}
+
 /**
  * The row the page shows as its worked example: the sample's first row, by
  * the panel's own order (the most severe first), that re-runs the return —
@@ -380,6 +445,7 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
 
       <section className="mt-12" id="track-record" data-qa="track-record">
         <h2 className="text-lg font-semibold tracking-tight">{TRACK_RECORD.heading}</h2>
+        <ScoringRulePicture />
         <ul className="mt-3 space-y-1.5 rounded-2xl border border-line bg-surface p-4 text-sm leading-relaxed text-muted">
           {TRACK_RECORD.lines.map((line) => (
             <li key={line} className="flex items-start gap-2">

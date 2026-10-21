@@ -944,7 +944,7 @@ export function DealView({
               isSample={isSample}
               today={stageToday || null}
             />
-            <TrackRecordCard record={trackRecord} />
+            <TrackRecordCard record={trackRecord} sample={isSample} />
           </div>
         )}
 

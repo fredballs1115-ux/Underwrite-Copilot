@@ -17,7 +17,8 @@ import { modelEvidenceFor } from "./model-evidence";
 import { regulationForDeal } from "./rent-regulation";
 import { countyOf, placeDeal } from "./market-county";
 import { modelVsMarketFor } from "./model-vs-market";
-import { PLAN_YIELD_LEAD, buildStressTest } from "./stress-test";
+import { INSURANCE_FLOOR_CONDITION, PLAN_YIELD_LEAD, buildStressTest } from "./stress-test";
+import { compactUsd } from "./money";
 import type { StressTest } from "./stress-test-types";
 import { stressSnapshotOf } from "./stress-snapshot";
 import type { TodayReads } from "./model-vs-market-read";
@@ -200,56 +201,64 @@ describe("the sample's stress test, one build on every surface", () => {
     const h = page.headline!;
     const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
     // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
-    // vacancy, its 4.0% rent growth and its tax bill. Insurance is unchecked
-    // (no quote for a new owner is on file), so it carries no re-run and
-    // both cases keep the model's premium.
-    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes"]);
-    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 12.5]);
-    // An unchecked row re-runs nothing, the T-12's $385k shown beside the
-    // OM's $310k as the seller's history (the walkthrough of 2026-10-20: the
-    // row had printed a move no evidence makes).
+    // vacancy, its 4.0% rent growth, its tax bill and its $310k premium.
+    // The premium sits $75k under the seller's own $385k T-12 premium, so
+    // the T-12's decides it — a working floor and a rule of thumb, never a
+    // quote — and the evidence's case runs it (the review of 2026-10-21).
+    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.5]);
     const insRow = page.rows.find((r) => r.key === "insurance")!;
-    expect(insRow.verdict).toBe("unchecked");
-    expect(insRow.impact).toBeNull();
-    expect(insRow.evidence[0]).toMatchObject({ kind: "document", value: 385_000 });
-    expect(insRow.noRerunShort).toBe("no re-run: nothing tests the premium");
-    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.77"]);
-    // The split, largest first: the reset tax bill and the exit at the
-    // going-in cap lower it; the vacancy holds to the metro's survey and rent
-    // growth to CPI rent, and insurance is unchecked, so none carries a part.
+    expect(insRow.verdict).toBe("stretched");
+    expect(insRow.impact).not.toBeNull();
+    expect(insRow.evidence[insRow.decidedBy!]).toMatchObject({ kind: "document", value: 385_000 });
+    expect(insRow.noRerunShort ?? null).toBeNull();
+    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.70"]);
+    // The split, largest first: the reset tax bill, the exit at the going-in
+    // cap and the premium at the seller's own lower it; the vacancy holds to
+    // the metro's survey and rent growth to CPI rent, so neither carries a part.
     expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
-      ["taxes", -2.7],
+      ["taxes", -2.8],
       ["exit_cap", -1.4],
+      ["insurance", -0.9],
     ]);
-    // The reset bill holds only if the sale resets the assessment: the part
-    // says so on every surface, as a rule of thumb's part is marked.
+    // The reset bill holds only if the sale resets the assessment, and the
+    // premium is the seller's, a floor: each part says so on every surface,
+    // as a rule of thumb's part is marked.
     expect(h.parts.find((p) => p.key === "taxes")!.conditional).toBe("if the sale resets the assessment");
+    expect(h.parts.find((p) => p.key === "insurance")!.conditional).toBe(INSURANCE_FLOOR_CONDITION);
     expect(h.parts.find((p) => p.key === "exit_cap")!.conditional).toBeUndefined();
-    expect(headlineSentence(page)).toContain("the taxes −2.8 pts (if the sale resets the assessment) and the exit cap −1.4 pts");
+    expect(headlineSentence(page)).toContain(
+      `the taxes −2.8 pts (if the sale resets the assessment), the exit cap −1.4 pts and insurance −1.0 pts (${INSURANCE_FLOOR_CONDITION})`,
+    );
     expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
     // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
     // and insurance the rows move on their own; the premium is no model input.
     expect(h.omitted.map((o) => o.key)).toEqual(["basis", "noi", "renovation_premium"]);
-    // The NOI is left out for the tax swap, which moves the year-one NOI by
-    // the reset's $224k, $50k past the NOI row's own $174k gap over the
-    // T-12: said, never swapped.
-    expect(h.noiRest).toEqual({ usd: -50_468, components: ["taxes"] });
+    // The NOI is left out for the tax and insurance swaps, which move the
+    // year-one NOI by the reset's and the premium's gaps, past the NOI row's
+    // own gap over the T-12: said, never swapped — read off the rows' own
+    // gaps, never typed.
+    const gapOf = (k: string) => page.rows.find((r) => r.key === k)!.gap!.value;
+    expect(h.noiRest).toEqual({ usd: gapOf("noi") - gapOf("taxes") - gapOf("insurance"), components: ["taxes", "insurance"] });
     // The memorandum states no loan rate, so the debt row stands unchecked
     // and the headline says it does not test it.
     expect(h.untested).toEqual({ keys: ["debt"], roll: null });
     expect(headlineSentence(page)).toContain(" This headline does not test the loan rate. ");
-    // Both figures said, struck from the row's own: the reset's $224k off
-    // year-one NOI, $50k more than the NOI row's $174k gap over the T-12.
-    expect(headlineSentence(page)).toContain(" The tax reset takes $224k off year-one NOI, $50k more than the OM's NOI sits over the T-12. ");
+    // Both figures said, struck from the rows' own: the two swaps' moves off
+    // year-one NOI, and how far past the NOI row's gap over the T-12.
+    const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
+    expect(headlineSentence(page)).toContain(
+      ` The tax reset and the insurance swap take ${money(gapOf("taxes") + gapOf("insurance"))} off year-one NOI, ${money(-h.noiRest!.usd)} more than the OM's NOI sits over the T-12. `,
+    );
     const noi = page.rows.find((r) => r.key === "noi")!;
     const gap = noi.omSays.value! - noi.evidence[noi.decidedBy!].value!;
-    expect(gap - h.noiRest!.usd).toBeCloseTo(224_000, -4);
+    expect(gap - h.noiRest!.usd).toBeCloseTo(gapOf("taxes") + gapOf("insurance"), -1);
     // With the read failed: the published rows unchecked, rent growth out of
     // both cases, and the vacancy held to the deal's own rent roll.
     const bare = signedInSample(null).headline!;
     expect(bare.omKeys).not.toContain("rent_growth");
-    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 4.8]);
-    expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap"]);
+    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
+    expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
   });
 
   it("names the model as it runs beside the two cases, and why the evidence's case is not it, on every surface (the investor's walkthrough)", () => {
@@ -280,7 +289,7 @@ describe("the sample's stress test, one build on every surface", () => {
     // evidence's case runs the reset tax bill where the model runs the
     // seller's (M4), so the sentence says every figure the two differ on.
     const kept =
-      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.41M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
     // The panel's table says the pinned figure as pinned, as the sentence does.
     expect(keptRows(page).map((r) => [r.key, r.model])).toEqual([
@@ -304,7 +313,7 @@ describe("the sample's stress test, one build on every surface", () => {
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
-    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 12.5% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 11.5% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
     expect(rerunWords(page, row("taxes").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");

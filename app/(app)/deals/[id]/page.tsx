@@ -96,7 +96,7 @@ import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy } from "@/lib/stress-test";
+import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy, vacancyEconomicStated } from "@/lib/stress-test";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { StressChip } from "./stress-chip";
@@ -179,6 +179,7 @@ import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@
 import { readActuals, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { arrivalOf, scoreDeal } from "@/lib/track-record";
+import { readKeptScreens } from "@/lib/screen-history";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -907,7 +908,7 @@ export default async function DealPage({
   // roster — four independent reads, one round-trip. All best-effort: the
   // actuals/tasks tables arrived in 0020/0022, and on an older schema the
   // queries error and read null (the cards simply don't render).
-  const [rrRes, t12Res, tasksRes, versionsRes, memberRes] = await Promise.all([
+  const [rrRes, t12Res, tasksRes, versionsRes, memberRes, keptScreens] = await Promise.all([
     // …each with when it was written and the document it was read from,
     // so the track record can tell a document added after the screen from
     // one the screen read (lib/track-record `arrivalOf`).
@@ -944,6 +945,9 @@ export default async function DealPage({
           .select("user_id")
           .eq("team_id", ownership.team_id)
       : Promise.resolve({ data: null }),
+    // Every screen kept (migration 0038), for the track record; none where
+    // the table cannot be read yet, and deals.prior_screen stands alone.
+    readKeptScreens(supabase, id),
   ]);
   const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
   // The OM's NOI vs the T-12 actual — the shared picker (word-bounded,
@@ -976,14 +980,16 @@ export default async function DealPage({
     assetClass: readClass,
   }) ?? { rentRoll: null, t12: null, noiComparison: null, noiNote: null, assetClass: readClass };
 
-  // The track record (lib/track-record): the stored challenges against what
-  // arrived AFTER the verdict — a rent roll or T-12 by its document's
-  // upload, the decision and the trade off the move that ended the deal.
-  // A document the screen read is named and never scored — and the
-  // previous screen's challenges (the re-screen's snapshot) are scored
-  // against what arrived after THAT verdict, since the re-screen read it.
-  // Scored once the stress test is built (below), which says whether the
-  // market or the documents decided the vacancy row.
+  // The track record (lib/track-record): the stress test's rows as kept with
+  // the verdict (its challenges, where the verdict kept none) against what
+  // arrived AFTER the verdict — a rent roll or T-12 uploaded after it AND
+  // dated after its day, the decision, and a trade reported after it and not
+  // traded on or before its day, off the move that ended the deal. A
+  // document the screen read is named and never scored — and the previous
+  // screen's rows (the re-screen's snapshot) are scored against what
+  // arrived after THAT verdict, since the re-screen read it. Scored once the
+  // stress test is built (below), which says whether the market or the
+  // documents decided the vacancy row.
   const scoreTrackRecord = (vacancyHeldToMarket: boolean) => scoreDeal({
     screenedAt: verdict?.generatedAt ?? null,
     // The stress test as it stood at the verdict (lib/stress-snapshot): its
@@ -992,6 +998,7 @@ export default async function DealPage({
     stressSnapshot: verdict ? verdict.stressSnapshot : undefined,
     challenges: challenges?.challenges,
     priorScreen,
+    priorScreens: keptScreens,
     rentRoll: rrRes.data?.summary
       ? {
           arrivedAt: arrivalOf(rrRes.data as { created_at?: string | null; source_document_id?: string | null }, documents),
@@ -1017,6 +1024,9 @@ export default async function DealPage({
     // where the market's figure decided the row, never where the documents
     // did (audit M5).
     vacancyHeldToMarket,
+    // A challenge's vacancy in the measure of the OM's own figure: an
+    // economic one is scored by a later T-12, never a rent roll's doors.
+    vacancyEconomic: vacancyEconomicStated(extraction),
     // On a plan deal the OM's NOI and its stated vacancy are the finished
     // project's, which a document of the building before the plan cannot
     // speak to.

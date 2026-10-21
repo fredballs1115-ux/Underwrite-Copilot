@@ -16,15 +16,18 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  *
  * Its words say what the documents do to the stress test, and only that
  * (lib/stress-deciders' orders): a T-12's NOI decides the NOI row, and its
- * insurance line stands beside the insurance row, which nothing decides; on
- * a vacancy the OM states as today's occupancy the rent roll decides, else
- * the T-12; beside a stabilized vacancy either is the gap to close, deciding
- * only where no market figure is fresh, and never on a plan deal. The
- * T-12's tax line is shown beside the taxes row and judges nothing, so
- * taxes are not named. And a document dated after the screen's verdict (and
- * uploaded after it) is what the track record scores the screen's
- * stress-test rows against (lib/track-record) — never its taxes or insurance,
- * which a seller's T-12 cannot show for a new owner.
+ * insurance line decides the insurance row where the OM's premium sits more
+ * than 2% under it (the seller's own premium, a working floor and a rule of
+ * thumb, not a quote), and stands beside it otherwise; on
+ * a vacancy counted by doors the rent roll decides, and the T-12, dollars
+ * not doors, decides only one the OM states as economic; beside a
+ * stabilized vacancy they are the gap to close, the rent roll deciding only
+ * where no market figure is fresh, and never on a plan deal. The T-12's tax
+ * line is shown beside the taxes row and judges nothing, so taxes are not
+ * named. And a document dated after the screen's verdict (and uploaded
+ * after it) is what the track record scores the screen's stress-test rows
+ * against (lib/track-record), in the same measures — never its taxes or
+ * insurance, which a seller's T-12 cannot show for a new owner.
  */
 export function ActualsPrompt({
   dealId,
@@ -48,13 +51,15 @@ export function ActualsPrompt({
         <span className="font-normal text-muted">(optional)</span>
       </h2>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        A T-12 tests the OM&apos;s NOI and shows its insurance premium beside
-        the OM&apos;s; a rent roll, else the T-12, tests the OM&apos;s
-        occupancy today. Beside a stabilized vacancy they show the gap to
-        close, and test it only where no market figure is fresh, never on a
-        plan. Dated after this screen (the roll&apos;s as-of,
-        the T-12&apos;s period end), either one lets the track record score
-        the stress test&apos;s rows.
+        A T-12 tests the OM&apos;s NOI, and tests the OM&apos;s insurance
+        premium where it sits under the T-12&apos;s, a working floor, not a
+        quote; a rent roll tests the OM&apos;s occupancy today, by
+        its doors, and the T-12 an economic vacancy, in dollars. Beside a
+        stabilized vacancy they show the gap to close, and the rent roll
+        tests it only where no market figure is fresh, never on a plan.
+        Dated after this screen (the roll&apos;s as-of, the T-12&apos;s
+        period end), either one lets the track record score the stress
+        test&apos;s rows, each in its own measure.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

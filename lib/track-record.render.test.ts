@@ -8,10 +8,30 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Challenge } from "@/lib/anthropic/types";
-import type { T12Summary } from "@/lib/actuals/types";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
-import { ACCOUNT_VACANCY_NOTE, CARD_SCOPE, DOCUMENT_DATE_RULE, RECORD_NONE_LINE, TAX_INSURANCE_NOT_SCORED, accountRecord, scoreDeal, type DealRecord } from "./track-record";
+import {
+  ACCOUNT_VACANCY_NOTE,
+  BASE_RATE_WHY,
+  CALIBRATION_NOTE,
+  CARD_SCOPE,
+  PURCHASE_IS_DECISION,
+  DOCUMENT_DATE_RULE,
+  RECORD_NONE_LINE,
+  RESCREEN_LINE,
+  RESCREEN_RULE,
+  SAMPLE_NO_RECORD,
+  TAX_INSURANCE_NOT_SCORED,
+  TRADE_DATE_RULE,
+  T12_NOT_DOORS_WHY,
+  VACANCY_MEASURE_RULE,
+  accountRecord,
+  scorableGrid,
+  scoreDeal,
+  type DealRecord,
+} from "./track-record";
+import { ScorableGrid } from "@/app/(app)/scorable-grid";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { STRESS_SNAPSHOT_V, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "./stress-snapshot";
 
@@ -32,12 +52,31 @@ const t12: T12Summary = {
   noi: 3_706_500,
   noiDerived: false,
 };
+// A vacancy counted by doors is scored by the rent roll alone; the T-12
+// scores the NOI (and only an economic vacancy).
+const roll: RentRollSummary = {
+  unitCount: 240,
+  occupiedUnits: 218,
+  totalSf: 220_720,
+  occupiedSf: 200_000,
+  sfWeightedOccupancy: 0.906,
+  waltYears: 0.6,
+  weightedAvgRentPsf: 30,
+  expiryBuckets: null,
+  expiryCoveredSf: 0,
+  truncated: false,
+};
+// The roll's vacancy with no class, by area: 9.4%.
+const ROLL_VAC = Math.round((1 - roll.sfWeightedOccupancy!) * 1000) / 10;
+const laterRoll = { rentRoll: { arrivedAt: AFTER, dated: "2026-10-31", summary: roll } };
+const laterT12 = { t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } };
 
 const withLater = (): DealRecord =>
   scoreDeal({
     screenedAt: T,
     challenges: [vacancy, noi, insurance, basis, older],
-    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+    ...laterT12,
+    ...laterRoll,
     stage: "dead",
     history: [{ stage: "dead", at: AFTER, outcome: { reason: "price", trade: null } }],
   });
@@ -74,7 +113,8 @@ const snapDeal = (opts: { only?: "vacancy" } = {}): DealRecord =>
     screenedAt: T,
     stressSnapshot: snapshot(opts.only ? [vacancyRow] : [vacancyRow, noiRow]),
     challenges: [vacancy, noi],
-    t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+    ...laterT12,
+    ...laterRoll,
   });
 
 describe("TrackRecordCard — what came after the screen, on the deal page", () => {
@@ -86,6 +126,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(text).toContain("What came after the screen");
     expect(text).toContain("Screened Oct 1, 2026.");
     expect(text).toContain("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(text).toContain("Rent roll as of Oct 31, 2026 (added Nov 5, 2026)");
     expect(text).toContain("Moved to Dead on price (Nov 5, 2026)");
     expect(out).toContain('data-landing="screen_side"');
     expect(out).toContain('data-landing="between"');
@@ -94,7 +135,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     // The three figures of a scored row, in the key's own unit.
     expect(text).toContain("6.0%");
     expect(text).toContain("9.0%");
-    expect(text).toContain("9.1%");
+    expect(text).toContain(`${ROLL_VAC.toFixed(1)}%`);
     expect(text).toContain("$3.71M");
     // The decision row carries no figures but its sentence.
     expect(text).toContain("a decision on the screen's side, not a figure");
@@ -107,7 +148,7 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(out).toContain('data-qa="track-record-tax-insurance"');
     expect(words).toContain("Insurance: a seller's T-12 cannot show a new owner's premium");
     // …and no tax or insurance line is said where no such challenge is.
-    const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } }) }));
+    const noTax = html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll }) }));
     expect(noTax).not.toContain('data-qa="track-record-tax-insurance"');
   });
 
@@ -157,11 +198,114 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     );
   });
 
-  it("draws nothing where nothing arrived after the screen, or with no record", () => {
+  it("draws what will score what where nothing arrived after a verdict, and nothing with no record or no verdict stamp", () => {
     expect(html(React.createElement(TrackRecordCard, { record: null }))).toBe("");
+    expect(html(React.createElement(TrackRecordCard, { record: scoreDeal({ screenedAt: null, challenges: [vacancy] }) }))).toBe("");
     const before = scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: "2026-09-01T00:00:00Z", dated: null, summary: t12 } });
     expect(before.notScored).toHaveLength(1);
-    expect(html(React.createElement(TrackRecordCard, { record: before }))).toBe("");
+    const out = html(React.createElement(TrackRecordCard, { record: before }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toContain('data-state="waiting"');
+    expect(text).toContain("Screened Oct 1, 2026. Nothing has arrived since, so no row is scored yet.");
+    expect(out).toContain('data-qa="scorable-grid"');
+    expect(text).toContain(RESCREEN_LINE);
+    // The grid is the deal's own record's, drawn as data: a row a key, a mark
+    // a kind of evidence that can score it.
+    expect((out.match(/<tr [^>]*data-row="/g) ?? []).length).toBe(before.scorable!.length);
+    expect((out.match(/data-scores="/g) ?? []).length).toBe(before.scorable!.reduce((n, r) => n + Object.values(r.by).filter(Boolean).length, 0));
+    expect(out).toContain('data-row="vacancy"><th scope="row"');
+    // Nothing is claimed: no row, no share, no evidence list; the read T-12's refusal stays.
+    expect(out).not.toContain('data-qa="track-record-rows"');
+    expect(out).not.toContain('data-qa="track-record-evidence"');
+    expect(text).not.toMatch(/\d+%/);
+    expect(text).toContain("T-12 (period not stated) was on the deal before the screen");
+  });
+
+  it("on the sample, which cannot be re-screened, draws nothing: its Overview says /demo's line, never the grid's 're-screen'", () => {
+    const waiting = scoreDeal({ screenedAt: T, challenges: [vacancy] });
+    const out = html(React.createElement(TrackRecordCard, { record: waiting, sample: true }));
+    expect(out).toBe("");
+    // The line is the Overview's, under the stress test (lib/sample-tabs.test.ts).
+    expect(SAMPLE_NO_RECORD).toMatch(/no track record/);
+    expect(RESCREEN_LINE).toBeTruthy();
+    // The deal view hands the card the sample flag.
+    expect(readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8")).toContain("<TrackRecordCard record={trackRecord} sample={isSample} />");
+  });
+
+  it("draws a decision's badge in a neutral tone, never a verdict's green or red; its words unchanged", () => {
+    const out = html(React.createElement(TrackRecordCard, { record: withLater() }));
+    const badge = out.match(/<span class="([^"]*)"[^>]*data-decision=""[^>]*>([^<]*)<\/span>/);
+    expect(badge).not.toBeNull();
+    expect(badge![1]).toContain("text-muted");
+    expect(badge![1]).not.toMatch(/text-pass|text-kill/);
+    expect(badge![2]).toBe("Screen&#x27;s side");
+  });
+
+  it("draws a flagged row's capture of its gap on a track, said in words, and a Closed deal's own price as a decision in a neutral tone", () => {
+    // The OM's 6.0% against the evidence's 9.0%; the roll's 9.4% went past it.
+    const past = html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) }));
+    expect(a11yIssues(past)).toEqual([]);
+    const text = visibleText(past).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    expect(past).toContain('data-qa="track-record-capture" data-place="past"');
+    for (const bar of ["capture-om", "capture-evidence", "capture-later", "capture-span"]) expect(past).toContain(`data-bar="${bar}"`);
+    expect(text).toContain("The later figure landed past the evidence's figure: the whole gap and more.");
+    expect(text).toContain(CALIBRATION_NOTE);
+    // The score is unchanged beside it.
+    expect(text).toContain("Right: the flag stood");
+    // A hold draws no capture.
+    expect(html(React.createElement(TrackRecordCard, { record: snapDeal() })).match(/data-qa="track-record-capture"/g)).toHaveLength(1);
+    // A Closed deal's own price: a decision, neutral, said as the buyer's.
+    const basisRow: StressSnapshotRow = { ...vacancyRow, key: "basis", title: "Basis", om: 50_000_000, evidence: { value: 44_000_000, label: "Recorded sales, median", asOf: null, kind: "published", publisher: "public records" }, threshold: snapshotThreshold("basis"), worse: "lower" };
+    const bought = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snapshot([basisRow]),
+      challenges: [],
+      askingPrice: 50_000_000,
+      stage: "closed",
+      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 45_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+    });
+    const out = html(React.createElement(TrackRecordCard, { record: bought }));
+    expect(a11yIssues(out)).toEqual([]);
+    const words = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(words)).toEqual([]);
+    const badge = out.match(/<span class="([^"]*)"[^>]*data-decision=""[^>]*>([^<]*)<\/span>/);
+    expect(badge![1]).toContain("text-muted");
+    expect(badge![1]).not.toMatch(/text-pass|text-kill/);
+    expect(badge![2].replace(/&#x27;/g, "'")).toBe("Your own price, on the test's side");
+    expect(words).toContain(PURCHASE_IS_DECISION);
+    expect(words).toContain("You bought it at $45.00M: your own price, a decision (recorded Nov 5, 2026)");
+    expect(out).not.toContain('data-qa="track-record-summary"');
+    expect(out).not.toContain('data-qa="track-record-capture"');
+  });
+
+  it("prints a vacancy row's three figures each as a share vacant", () => {
+    const text = visibleText(html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) })));
+    expect(text).toContain("6.0% vacant");
+    expect(text).toContain("9.0% vacant");
+    expect(text).toContain(`${ROLL_VAC.toFixed(1)}% vacant`);
+  });
+
+  it("says why a later T-12 does not score a vacancy counted by doors, and draws an economic one the T-12 scores", () => {
+    const doors = scoreDeal({ screenedAt: T, stressSnapshot: snapshot([vacancyRow]), challenges: [], ...laterT12 });
+    const out = html(React.createElement(TrackRecordCard, { record: doors }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    // The T-12 is what came after, and the row says why it does not score it.
+    expect(text).toContain("T-12 to Oct 31, 2026 (added Nov 5, 2026)");
+    expect(text).toContain(T12_NOT_DOORS_WHY.replace(/\.$/, ""));
+    expect(text).toContain("the T-12's economic vacancy is dollars, not doors");
+    expect(out).not.toContain('data-landing="right"');
+    expect(out).not.toContain('data-landing="wrong"');
+    // An economic row, the same T-12: scored, in its own measure.
+    const economic = scoreDeal({ screenedAt: T, stressSnapshot: snapshot([{ ...vacancyRow, title: "Economic vacancy", measure: "economic" }]), challenges: [], ...laterT12 });
+    const eco = html(React.createElement(TrackRecordCard, { record: economic }));
+    expect(a11yIssues(eco)).toEqual([]);
+    expect(eco).toContain('data-landing="right"');
+    expect(visibleText(eco)).toContain("economic vacancy");
   });
 
   it("says no row is scored where the later evidence speaks to no challenge with figures", () => {
@@ -186,12 +330,42 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // market's, which a deal's own page does only where the market decided:
     // said where the record is drawn (audit M5).
     expect(text.replace(/&#x27;/g, "'")).toContain(ACCOUNT_VACANCY_NOTE);
-    // What a document must be to score, and what no document scores.
-    expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
+    // …beside the measure each vacancy is scored in.
+    expect(text.replace(/&#x27;/g, "'")).toContain(`${VACANCY_MEASURE_RULE} ${ACCOUNT_VACANCY_NOTE}`);
+    // What a document must be to score, a trade's own date, and what no document scores.
+    expect(text.replace(/&#x27;/g, "'")).toContain(`${DOCUMENT_DATE_RULE} ${TRADE_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`);
+    expect(text.replace(/&#x27;/g, "'")).toContain(RESCREEN_RULE);
+    // Nothing scored: the grid of what will score what, not words alone.
+    expect(out).toContain('data-qa="scorable-grid"');
+    expect(text).toContain(RESCREEN_LINE);
+  });
+
+  it("ScorableGrid: a row a stress-test assumption by its title, a column a kind of later evidence, a mark the scorer can make", () => {
+    const rows = scorableGrid();
+    const out = html(React.createElement(ScorableGrid, { rows }));
+    expect(a11yIssues(out)).toEqual([]);
+    const text = visibleText(out);
+    expect(gluedWords(text)).toEqual([]);
+    expect(out).toMatch(/<caption[^>]*>What will score what<\/caption>/);
+    for (const h of ["T-12", "Rent roll", "Decision", "Trade"]) expect(out).toContain(`scope="col" class="w-16 px-1 py-1 text-center font-medium text-muted">${h}</th>`);
+    for (const r of rows) expect(out).toContain(`data-row="${r.key}"><th scope="row" class="py-1 pr-2 text-left font-normal">${r.title.replace(/'/g, "&#x27;")}</th>`);
+    // Each marked cell says so to a screen reader; an empty one says nothing scores it.
+    const marks = rows.reduce((n, r) => n + Object.values(r.by).filter(Boolean).length, 0);
+    expect(marks).toBeGreaterThan(0);
+    expect((out.match(/can score it/g) ?? []).length).toBe(marks);
+    expect((out.match(/>nothing</g) ?? []).length).toBe(rows.length * 4 - marks);
+    expect(out).toContain('data-row="noi"');
+    expect(out).toMatch(/data-row="noi">[\s\S]*?data-scores="t12"/);
+    // A vacancy is scored in its own measure, said under the grid.
+    expect(out).toContain('data-qa="scorable-grid-vacancy"');
+    expect(text).toContain(VACANCY_MEASURE_RULE);
+    // A grid whose vacancy no document can score (the market decided it) says nothing of it.
+    expect(html(React.createElement(ScorableGrid, { rows: scorableGrid({ vacancyHeldToMarket: true }) }))).not.toContain('data-qa="scorable-grid-vacancy"');
+    expect(html(React.createElement(ScorableGrid, { rows: [] }))).toBe("");
   });
 
   it("few: the counts, a bar a key, and 'a start, not a record' with no share", () => {
-    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
+    const fewer = accountRecord([scoreDeal({ screenedAt: T, challenges: [vacancy, noi], ...laterT12, ...laterRoll })]);
     const few = html(React.createElement(TrackRecordSection, { record: fewer }));
     expect(a11yIssues(few)).toEqual([]);
     const text = visibleText(few);
@@ -200,10 +374,13 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(text).toContain("1 deal tested · 1 with later evidence · 2 rows scored");
     expect(text).toContain("2 challenges scored from screens whose stress test was not kept are a start, not a record: no share is printed under 5.");
     expect(text).not.toMatch(/\d+%/);
-    expect(few).toContain('data-bar="record-screen"');
-    expect(few).toContain('data-bar="record-between"');
-    expect(few).not.toContain('data-bar="record-om"');
-    expect(text).toContain("No share is printed under 5 scored rows.");
+    // Under the floor, a dot a scored row in its tone, never a share bar.
+    expect(few).not.toContain("data-bar=");
+    expect((few.match(/data-dot="record-screen"/g) ?? []).length).toBe(1);
+    expect((few.match(/data-dot="record-between"/g) ?? []).length).toBe(1);
+    expect(few).not.toContain('data-dot="record-om"');
+    expect(text).toContain("Under 5 scored rows an assumption draws a dot a row, never a bar.");
+    expect(few).not.toContain('data-qa="scorable-grid"');
     // A decision is no scored row: withLater's basis row is the Dead
     // decision, counted apart, so its deal alone is two scored rows.
     const decided = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
@@ -212,7 +389,7 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     // Four scored rows is still under the floor: no share.
     const four = html(
       React.createElement(TrackRecordSection, {
-        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy, noi], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]),
+        record: accountRecord([withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy, noi], ...laterT12, ...laterRoll })]),
       }),
     );
     expect(four).toContain('data-state="start"');
@@ -220,7 +397,7 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
   });
 
   it("enough: the shares, said once in the line, each with its count", () => {
-    const record = accountRecord([withLater(), withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 } })]);
+    const record = accountRecord([withLater(), withLater(), scoreDeal({ screenedAt: T, challenges: [vacancy], ...laterRoll })]);
     const out = html(React.createElement(TrackRecordSection, { record }));
     expect(a11yIssues(out)).toEqual([]);
     const text = visibleText(out);
@@ -228,8 +405,11 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(out).toContain('data-state="record"');
     // The two Dead decisions are said apart, never in the shares.
     expect(text.replace(/&#x27;/g, "'")).toContain(
-      "5 challenges scored from screens whose stress test was not kept: 3 of 5 challenges on the screen's side (60%), 0 of 5 challenges on the OM's (0%), 2 of 5 challenges between (40%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
+      "5 challenges from 3 deals scored, from screens whose stress test was not kept: 3 of 5 challenges on the screen's side (60%), 0 of 5 challenges on the OM's (0%), 2 of 5 challenges between (40%). 2 more rows were decisions (Dead, and why), counted apart and in no share.",
     );
+    // Each key holds under five rows, so each draws dots: 3 and 2.
+    expect((out.match(/data-dot="record-screen"/g) ?? []).length).toBe(3);
+    expect((out.match(/data-dot="record-between"/g) ?? []).length).toBe(2);
     expect(text).toContain("3 screen · 0 OM");
     expect(text).toContain("0 screen · 0 OM · 2 between");
   });
@@ -247,11 +427,42 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     const text = visibleText(out);
     expect(gluedWords(text)).toEqual([]);
     expect(out).toContain('data-state="record"');
-    expect(text).toContain("5 stress-test rows scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%), 2 of them false holds.");
-    expect(out).toContain('data-bar="record-right"');
-    expect(out).toContain('data-bar="record-wrong"');
+    expect(text).toContain("5 stress-test rows from 3 deals scored: 3 of 5 rows right (60%), 2 of 5 rows wrong (40%), 2 of them false holds.");
+    expect((out.match(/data-dot="record-right"/g) ?? []).length).toBe(3);
+    expect((out.match(/data-dot="record-wrong"/g) ?? []).length).toBe(2);
     expect(text).toContain("3 right · 0 wrong");
     expect(text).toContain("0 right · 2 wrong");
+    // A key of five scored rows draws its bar.
+    const bar = accountRecord([snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" }), snapDeal({ only: "vacancy" })]);
+    const barred = html(React.createElement(TrackRecordSection, { record: bar }));
+    expect(barred).toContain('data-bar="record-right"');
+    expect(barred).not.toContain("data-dot=");
+    expect(a11yIssues(barred)).toEqual([]);
+  });
+
+  it("draws the base rate and each flagged row's capture beside the record, display only, with the base rate's share only from five", () => {
+    const four = accountRecord([snapDeal(), snapDeal()]);
+    const few = html(React.createElement(TrackRecordSection, { record: four }));
+    expect(a11yIssues(few)).toEqual([]);
+    const fewText = visibleText(few).replace(/&#x27;/g, "'");
+    expect(gluedWords(fewText)).toEqual([]);
+    expect(few).toContain('data-qa="track-record-base-rate"');
+    expect(fewText).toContain("Base rate: 4 of 4 scored rows, whatever the test's verdict, landed past the OM's figure on the buyer's bad side by more than the row's margin. No share is printed under 5 scored rows.");
+    expect(fewText).toContain(BASE_RATE_WHY);
+    // Each flagged row a tick on one track, counted in words, never a share.
+    expect(few).toContain('data-qa="track-record-calibration"');
+    expect((few.match(/data-bar="calibration-row"/g) ?? []).length).toBe(2);
+    expect(fewText).toContain("Of 2 flagged rows scored on figures: 0 landed between the OM's figure and the evidence's, 2 past the evidence's, 0 on the OM's side.");
+    expect(fewText).toContain(CALIBRATION_NOTE);
+    expect(fewText).not.toMatch(/\d+%/);
+    const five = html(React.createElement(TrackRecordSection, { record: accountRecord([snapDeal(), snapDeal(), snapDeal({ only: "vacancy" })]) }));
+    expect(visibleText(five).replace(/&#x27;/g, "'")).toContain(
+      "Base rate: 5 of 5 scored rows landed past the OM's figure on the buyer's bad side by more than the row's margin (100%), whatever the test's verdict.",
+    );
+    // Nothing scored on a stress-test row: neither is drawn.
+    const none = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
+    expect(none).not.toContain('data-qa="track-record-base-rate"');
+    expect(none).not.toContain('data-qa="track-record-calibration"');
   });
 
   it("its bar markers are its own across the app's sources", () => {
@@ -264,8 +475,9 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
       }
     };
     walk(join(process.cwd(), "app"));
+    // The markers are the section's `DOTS` table, a bar's segment and a dot alike.
     for (const marker of ["record-right", "record-wrong", "record-screen", "record-between", "record-om"]) {
-      const holders = files.filter((f) => readFileSync(f, "utf8").includes(`data-bar="${marker}"`));
+      const holders = files.filter((f) => readFileSync(f, "utf8").includes(`"${marker}"`));
       expect(holders.map((f) => f.replace(process.cwd(), "")), marker).toEqual(["/app/(app)/analytics/track-record.tsx"]);
     }
     const landing = files.filter((f) => readFileSync(f, "utf8").includes("data-landing="));
