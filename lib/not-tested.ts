@@ -80,7 +80,7 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "floating_rate",
     title: "A floating-rate loan",
-    why: "The debt row sets a rate against the Treasury tenor nearest the hold plus a spread: a loan quoted over SOFR, and its rate cap, are not priced against SOFR.",
+    why: "A loan quoted over an index (SOFR, Prime) is read as stated and priced on nothing: the debt row stands unchecked, and its spread and rate cap are not set against SOFR.",
   },
   {
     id: "debt_no_rate",

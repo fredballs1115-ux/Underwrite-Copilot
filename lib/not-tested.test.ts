@@ -78,8 +78,10 @@ describe("what the test does not check yet", () => {
     expect(src).toContain('label: "Lender tests at screening defaults, the binding one named"');
     // The debt row's decider is the Treasury-tenor seed plus the class's spread.
     const debt = STRESS_METHODS.find((m) => m.key === "debt")!;
-    expect(debt.against[0]).toMatch(/^Today's index \(the Treasury tenor nearest the hold/);
-    expect(src).not.toMatch(/termSofr|sofrSpread|floatingRate/);
+    expect(debt.against[0]).toMatch(/^Today's index \(the Treasury tenor nearest the OM's stated loan term where read, else the hold's/);
+    // A floating rate is recognised and priced on nothing: no SOFR pricing.
+    expect(src).toContain("floatingRateOf");
+    expect(src).not.toMatch(/termSofr|sofrSpread/);
   });
 
   it("says the concessions an economic T-12 nets in are read on the vacancy row", () => {
