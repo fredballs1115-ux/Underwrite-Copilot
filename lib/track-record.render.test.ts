@@ -223,16 +223,13 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(text).toContain("T-12 (period not stated) was on the deal before the screen");
   });
 
-  it("on the sample, which cannot be re-screened, draws /demo's line in place of the grid and its 're-screen'", () => {
+  it("on the sample, which cannot be re-screened, draws nothing: its Overview says /demo's line, never the grid's 're-screen'", () => {
     const waiting = scoreDeal({ screenedAt: T, challenges: [vacancy] });
     const out = html(React.createElement(TrackRecordCard, { record: waiting, sample: true }));
-    const text = visibleText(out).replace(/&#x27;/g, "'");
-    expect(out).toContain('data-state="sample"');
-    expect(text).toContain(SAMPLE_NO_RECORD);
-    expect(text).not.toContain(RESCREEN_LINE);
-    expect(out).not.toContain('data-qa="scorable-grid"');
-    expect(a11yIssues(out)).toEqual([]);
-    expect(gluedWords(text)).toEqual([]);
+    expect(out).toBe("");
+    // The line is the Overview's, under the stress test (lib/sample-tabs.test.ts).
+    expect(SAMPLE_NO_RECORD).toMatch(/no track record/);
+    expect(RESCREEN_LINE).toBeTruthy();
     // The deal view hands the card the sample flag.
     expect(readFileSync("app/(app)/deals/[id]/deal-view.tsx", "utf8")).toContain("<TrackRecordCard record={trackRecord} sample={isSample} />");
   });

@@ -6,7 +6,6 @@ import {
   NOT_YET_SCORABLE,
   OUTCOME_WORD,
   PURCHASE_IS_DECISION,
-  SAMPLE_NO_RECORD,
   TAX_INSURANCE_NOT_SCORED,
   capturedAt,
   capturedWords,
@@ -35,8 +34,9 @@ import { ScorableGrid } from "../../scorable-grid";
  * display only): the OM's figure, the evidence's and the later one on one
  * track, said in words. A Closed deal's own price is drawn as a decision.
  * The sample cannot be re-screened (rerunAnalysis sends the sample back), so
- * where nothing has arrived it draws /demo's own line (`SAMPLE_NO_RECORD`) in
- * place of the grid and its "upload, then re-screen".
+ * where nothing has arrived it draws nothing: its Overview already says, under
+ * the stress test, the line /demo and the homepage say (`SAMPLE_NO_RECORD`),
+ * and the grid's "upload, then re-screen" would ask for what it cannot do.
  */
 export function TrackRecordCard({ record, sample = false }: { record: DealRecord | null; sample?: boolean }) {
   if (!record) return null;
@@ -45,16 +45,7 @@ export function TrackRecordCard({ record, sample = false }: { record: DealRecord
   // verdict to score against.
   if (record.evidence.length === 0 && !record.refusedLater) {
     if (!record.screenedAt || !record.scorable?.length) return null;
-    if (sample) {
-      return (
-        <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record" data-state="sample">
-          <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted" data-qa="sample-no-record">
-            {SAMPLE_NO_RECORD}
-          </p>
-        </section>
-      );
-    }
+    if (sample) return null;
     return (
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record" data-state="waiting">
         <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
