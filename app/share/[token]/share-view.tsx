@@ -61,7 +61,8 @@ import { PortfolioCard } from "@/app/portfolio-card";
 import { SharePlan } from "./plan-facts";
 import { SharePicture, type SharePictureSource } from "./share-picture";
 import { StressTestPanel } from "@/app/stress-test-panel";
-import type { StressTest } from "@/lib/stress-test-types";
+import type { StressTest, StressVerdict } from "@/lib/stress-test-types";
+import { readStressSnapshot } from "@/lib/stress-snapshot";
 
 /**
  * The read-only shared screen, as pure markup. `page.tsx` is the loader: it
@@ -119,6 +120,33 @@ export interface ShareViewProps {
    *  return is re-run, and the panel says so; absent or null draws nothing */
   stressTest?: StressTest | null;
 }
+
+/**
+ * The call's own stress test, from the snapshot the verdict keeps
+ * (lib/stress-snapshot): "At the call, Oct 12, 2026: 3 unsupported, 4
+ * stretched; 2 could not be checked." The counts only, in the panel's words
+ * (the most severe first, "holds" for one and "hold" for more), never a
+ * figure the snapshot kept, since those can be the sender's rent roll or
+ * T-12. Null where the verdict kept no snapshot.
+ */
+export function callStressLine(stored: unknown, on: string | null): string | null {
+  const snapshot = readStressSnapshot(stored);
+  if (!snapshot) return null;
+  const counts: Record<StressVerdict, number> = { holds: 0, stretched: 0, unsupported: 0, unchecked: 0 };
+  for (const r of snapshot.rows) counts[r.verdict]++;
+  const tested = [
+    counts.unsupported ? `${counts.unsupported} unsupported` : "",
+    counts.stretched ? `${counts.stretched} stretched` : "",
+    counts.holds ? `${counts.holds} ${counts.holds === 1 ? "holds" : "hold"}` : "",
+  ].filter(Boolean);
+  const unchecked = counts.unchecked ? `${counts.unchecked} could not be checked` : "";
+  const said = [tested.join(", "), unchecked].filter(Boolean).join("; ");
+  return `${on ? `At the call, ${on}` : "At the call"}: ${said}.`;
+}
+
+/** Why the panel can read kinder, or plainer, than the call above it. */
+export const SHARE_REREAD_NOTE =
+  "The panel below reads the memorandum again without the sender’s own documents (a rent roll, a T-12), today’s published figures or the sender’s model, so a row one of those decided at the call can read differently here, or unchecked.";
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
 const RANGE_CONF: Record<string, { label: string; cls: string }> = {
@@ -339,6 +367,8 @@ export function ShareView({
   // The day the call was written ("Sep 12, 2026"), or none for a call saved
   // before the pipeline dated one.
   const on = screenedOn(verdict.generatedAt);
+  // The call's own stress-test counts, where the verdict kept its snapshot.
+  const callStressCounts = callStressLine(verdict.stressSnapshot, on);
 
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
@@ -581,10 +611,22 @@ export function ShareView({
         )}
       </section>
 
-      {/* The OM's assumptions, tested (app/stress-test-panel): what the call
-          above rests on, row by row — the stored results alone, so no
-          return is re-run here and the panel says so. */}
-      <StressTestPanel test={stressTest} className="mt-6" />
+      {/* The OM's assumptions, tested (app/stress-test-panel), read again
+          from the stored results alone: no rent roll or T-12, no figures
+          read today and no model, so no return is re-run here and the panel
+          says so. It is NOT the test the call above was reached on, which
+          had the sender's documents and the day's figures; where the
+          verdict kept that test (its stress snapshot), its counts lead,
+          dated with the call, and the panel is said to be the re-read. */}
+      {stressTest && callStressCounts ? (
+        <section className="mt-6" aria-label="The stress test at the call and on this page" data-qa="share-call-stress">
+          <p className="text-sm font-medium">{callStressCounts}</p>
+          <p className="mt-1 max-w-[68ch] text-xs leading-relaxed text-muted">{SHARE_REREAD_NOTE}</p>
+          <StressTestPanel test={stressTest} className="mt-3" />
+        </section>
+      ) : (
+        <StressTestPanel test={stressTest} className="mt-6" />
+      )}
 
       {/* The basis per the counting row's own noun (a hotel counting "Rooms"
           is per room), as the deal page's plan strip says it — else the

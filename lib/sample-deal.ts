@@ -616,18 +616,23 @@ const market: MarketResult = {
       omSays: "4.0%",
       typicalRange: "2.5–3.5%",
       assessment: "aggressive",
-      note: "Above the top of a rule of thumb for apartment rent growth, not a published figure; the stress test sets the 4.0% against today's published rents.",
+      note: "Above the top of a rule of thumb for apartment rent growth, not a published figure; the stress test is where the 4.0% is held to a published rent figure, when today's read has one.",
     },
     {
       assumption: "Vacancy 6%",
       omSays: "6.0%",
       typicalRange: "5–7%",
       assessment: "in-line",
-      note: `Inside a typical stabilized range, a rule of thumb — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it.`,
+      // The range is the market check's rule of thumb, never the stress
+      // test's verdict: the stress test holds the 6% to the market's
+      // published vacancy where today's read has one and to the deal's own
+      // documents where it does not, so how the row reads moves with the
+      // read (lib/sample-stress.test.ts).
+      note: `Inside the market check's rule-of-thumb range for a stabilized building, not a published figure — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it; the stress test is where the 6% is held to the market's published vacancy, or to the deal's own documents when today's read has none.`,
     },
   ],
   summary:
-    "Two of three headline assumptions, the exit cap and rent growth, sit at or beyond the aggressive end of the rules of thumb; stabilized vacancy sits inside its range.",
+    "Against the market check's rules of thumb, the exit cap and rent growth sit at or beyond the aggressive end; stabilized vacancy sits inside the check's range, a rule of thumb the stress test does not rest on.",
 };
 
 const verdict: VerdictResult = {
