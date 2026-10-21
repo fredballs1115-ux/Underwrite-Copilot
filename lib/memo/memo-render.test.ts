@@ -15,6 +15,8 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { actualsFromRows, actualsShortLine } from "@/lib/actuals/actuals-read";
 import { TINY_PNG_DATA_URI } from "./test-png";
+import { pdfSafe } from "./pdf-text";
+import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
 
 /** The sample's memorandum without its renovation program's rows (p. 25):
  *  the fixture the layout tests below were measured on, before the sample
@@ -1331,10 +1333,11 @@ describe("MemoDocument (redesigned)", () => {
       React.createElement(MemoDocument, { data: buildMemoData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
-    // The sample's exit killer quotes the stress test's own re-run, labelled
-    // as the card is: the verdict step's card, under the screen's heading.
-    expect(text).toMatch(/Breaks if \(screen's estimate\): At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
-    expect(text).not.toContain("Breaks if: ");
+    // The sample's exit killer quotes the stress test's own re-run, so the
+    // card takes the shared screen's label and its sentence says whose
+    // figure it is — never "the screen's estimate" over the engine's.
+    expect(text).toMatch(/Breaks if: At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
+    expect(text).not.toContain("Breaks if (screen's estimate)");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
   }, 30000);
 
@@ -1578,8 +1581,13 @@ describe("the memo leads with the stress test", () => {
     // "The call, in full" page prints both whole).
     expect(data.dealKillers).toEqual([]);
     expect(data.sensitivity).toEqual([]);
-    expect(text).not.toContain("Breaks if (screen's estimate)");
+    expect(text).not.toContain("Breaks if:");
     expect(text).not.toContain("Where the call flips");
+    // The sample is read as stabilized: its re-runs say so under the read
+    // line, as the deal page says it under the panel.
+    expect(text).toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
+    expect(text.indexOf("in code. Levered IRR on the OM's figures")).toBeLessThan(text.indexOf("Read as stabilized, the sample re-runs"));
+    expect(text.indexOf("Read as stabilized, the sample re-runs")).toBeLessThan(text.indexOf("UNSUPPORTED Stabilized vacancy"));
     expect(text).toContain("T-12 NOI");
   }, 60000);
 
@@ -1647,6 +1655,28 @@ describe("the memo leads with the stress test", () => {
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
     expect(text).toContain("9 of the memorandum's assumptions read in code — 9 tested (9 hold);");
     expect(text).not.toContain("Ticks:");
+  }, 60000);
+
+  it("names no re-run in the key where the re-runs are withheld, or where no printed row carries one, and drops the sample's note with them", async () => {
+    const { sampleStressTest, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    const why = "No return is re-run: the OM states no stabilized NOI, so no return is re-run.";
+    const withheld = { ...test, impactsWithheld: why, rows: test.rows.map((r) => ({ ...r, impact: null })) };
+    const data = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, withheld);
+    expect(data.stressTest?.rerun).toBe("");
+    expect(data.stressTest?.planNote).toBe("");
+    expect(data.stressTest!.rows.length).toBeGreaterThan(0);
+    const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
+    expect(text).toContain(why);
+    expect(text).toContain("Ticks: the OM's figure in the row's tone, the evidence's in ink; the report has every row.");
+    expect(text).not.toContain("Re-runs:");
+    expect(text).not.toContain("Read as stabilized, the sample re-runs");
+    // Not withheld, but no printed row carries a re-run: the key says none.
+    const live = buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test);
+    const none = { ...live, stressTest: { ...live.stressTest!, rows: live.stressTest!.rows.map((r) => ({ ...r, rerun: false })) } };
+    const noneText = pdfTextOf(await renderMemoPdf(none)).replace(/\s+/g, " ");
+    expect(noneText).not.toContain("Re-runs:");
+    expect(noneText).toContain("the report has every row.");
   }, 60000);
 
   it("gives room back in order where a memo would run to a second page: the actuals line first, then the rows past the second, never the lead row", async () => {

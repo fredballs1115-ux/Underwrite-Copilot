@@ -111,7 +111,35 @@ import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOf
 import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
 import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { DECIDES_TAG, HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rerunWords, rowMoveText, stressReadLine, tickPositions, verdictCounts, whenWords } from "@/lib/stress-test-words";
+import {
+  DECIDES_TAG,
+  HEADLINE_WITHHELD,
+  SAMPLE_PLAN_NOTE,
+  VERDICT_WORD,
+  decidesTag,
+  drawsRerun,
+  headlineName,
+  headlinePlaces,
+  headlineSentence,
+  headlineSplit,
+  isYieldHeadline,
+  keptSentence,
+  liveHeadline,
+  modelClause,
+  noiRestSentence,
+  partNote,
+  ptsText,
+  rerunWords,
+  rowMoveText,
+  shownHeadline,
+  statedYocSentence,
+  stressReadLine,
+  tickPositions,
+  untestedSentence,
+  unsolvedSentence,
+  verdictCounts,
+  whenWords,
+} from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -455,6 +483,89 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
   );
 }
 
+/** The headline as the report lays it out (lib/stress-test-words
+ *  `headlineSentence`, cut into its parts, never reworded): the bold `lead` —
+ *  the two cases and their multiples; `splitNote`, what the split is; `parts`,
+ *  each assumption's share as printed, a row a part; and `after`, the
+ *  sentences that follow (what it does not test, what is left out and why,
+ *  the NOI's rest, the model as it runs), each its own line. */
+export interface ReportHeadline {
+  lead: string;
+  splitNote: string;
+  parts: { name: string; pts: string; note: string | null }[];
+  after: string[];
+}
+
+const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
+
+/**
+ * `headlineSentence` in its parts. Every part is read off the words
+ * module's own functions, and held to the sentence: where the parts do not
+ * make it again, the sentence prints whole as the lead, so the page never
+ * says a figure the module did not. Null where the test carries no live
+ * headline. Exported for its test.
+ */
+export function reportHeadline(test: StressTest): ReportHeadline | null {
+  const h = liveHeadline(test);
+  const sentence = h ? headlineSentence(test) : null;
+  if (!h || !sentence) return null;
+  const whole: ReportHeadline = { lead: sentence, splitNote: "", parts: [], after: [] };
+  const yoc = isYieldHeadline(h);
+  const left = h.omitted.length > 0 ? `Left out: ${h.omitted.map((o) => `${headlineName(o.key)} (${o.why})`).join("; ")}.` : "";
+  const kept = yoc ? null : keptSentence(test);
+  const clause = yoc ? "" : modelClause(h);
+  const after = (
+    yoc
+      ? [untestedSentence(h), left, statedYocSentence(h)]
+      : [unsolvedSentence(h), untestedSentence(h), left, noiRestSentence(h, test), kept ?? (clause ? `${upperFirst(clause)}.` : "")]
+  ).filter(Boolean);
+  const tail = after.join(" ");
+  if (tail && !sentence.endsWith(` ${tail}`)) return whole;
+  const head = tail ? sentence.slice(0, sentence.length - tail.length - 1) : sentence;
+  const shown = shownHeadline(h).parts;
+  const split = headlineSplit(test);
+  if (shown.length === 0 || !split) return { lead: head, splitNote: "", parts: [], after };
+  const at = head.indexOf(`: ${split}, `);
+  if (at < 0) return whole;
+  const note = head.slice(at + 2 + split.length + 2);
+  if (!note.endsWith(".")) return whole;
+  const places = headlinePlaces(h);
+  return {
+    lead: `${head.slice(0, at)}.`,
+    splitNote: upperFirst(note),
+    parts: shown.map((p) => ({ name: upperFirst(headlineName(p.key)), pts: ptsText(p.shown, places), note: partNote(p) })),
+    after,
+  };
+}
+
+/** The headline's block: the lead in bold, the split as a small table of its
+ *  parts under what the split is, and the rest plain, a sentence a line — the
+ *  deal page's panel's order. */
+function HeadlineBlock({ headline }: { headline: ReportHeadline }) {
+  return (
+    <View style={{ marginBottom: 8 }} wrap={false}>
+      <Text style={{ fontSize: 9, color: C.ink, fontFamily: "Helvetica-Bold" }}>{str(headline.lead)}</Text>
+      {headline.parts.length > 0 ? (
+        <View style={{ marginTop: 3 }}>
+          <Text style={{ fontSize: 8, color: C.muted, marginBottom: 2 }}>{str(headline.splitNote)}</Text>
+          {headline.parts.map((p, i) => (
+            <View key={i} style={{ flexDirection: "row", paddingVertical: 1.5, borderBottomWidth: 0.5, borderBottomColor: C.line }}>
+              <Text style={{ width: 130, fontSize: 8.5, color: C.ink }}>{str(p.name)}</Text>
+              <Text style={{ width: 56, fontSize: 8.5, color: C.ink, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 10 }}>{str(p.pts)}</Text>
+              <Text style={{ flex: 1, fontSize: 8, color: C.muted }}>{str(p.note ?? "")}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {headline.after.map((t, i) => (
+        <Text key={i} style={{ fontSize: 8.5, color: C.ink, marginTop: 3 }}>
+          {str(t)}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 /**
  * The stress test's page (lib/stress-test): every assumption the screen
  * tested in code — unsupported first, then stretched, then those that hold,
@@ -488,22 +599,32 @@ function StressTestPage({ test, dealName, branding }: { test: StressTest; dealNa
       : test.publishedRead
         ? ` The published figures were read on ${whenWords(test.readOn)}.`
         : " The published figures are as of the screen's market check.";
+  // What each row's return line is: the engine's own re-run where a row
+  // carries one, else why none is — never a re-run beside a read line that
+  // says no return is re-run.
+  const reruns = !test.impactsWithheld && test.rows.some(drawsRerun);
+  const returnClause = !reruns
+    ? "and why no return is re-run"
+    : test.measure === "yield_on_cost"
+      ? "the yield on cost's move, the plan's stabilized NOI over its total cost struck again in code with one figure moved, never an estimate"
+      : "the return's move, the engine's own run of the model with that one input swapped, never an estimate";
+  const headline = reportHeadline(test);
   return (
     <PageChrome title="The stress test" count={count} dealName={dealName} branding={branding}>
       <Text style={s.sub}>
         {str(
-          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; ${
-            test.measure === "yield_on_cost"
-              ? "the yield on cost's move, the plan's stabilized NOI over its total cost struck again in code with one figure moved, never an estimate"
-              : "the return's move, the engine's own run of the model with that one input swapped, never an estimate"
-          }; the method; and the challenger's question.${readWhen}`,
+          `${stressReadLine(test)} Each row: what the OM says with its page; what it was set against, each piece of evidence typed, dated and attributed — a published figure is the metro's, the Census region's, the state's or the nation's, never the building's; the gap in the assumption's own unit; ${returnClause}; the method; and the challenger's question.${readWhen}`,
         )}
       </Text>
+      {/* The sample is read as stabilized, so its rows re-run the levered
+          return — said as the deal page says it under its panel, wherever
+          the sample's re-runs stand. */}
+      {test.sample && !test.impactsWithheld ? <Text style={{ fontSize: 8, color: C.muted, marginTop: -6, marginBottom: 10 }}>{str(SAMPLE_PLAN_NOTE)}</Text> : null}
       {/* The headline (lib/stress-test-words): the OM's case against the
           evidence's, the gap split by assumption, what is left out and why
           — or, where no return is re-run, that it is withheld with them. */}
-      {liveHeadline(test) ? (
-        <Text style={{ fontSize: 9, color: C.ink, fontFamily: "Helvetica-Bold", marginBottom: 8 }}>{str(headlineSentence(test))}</Text>
+      {headline ? (
+        <HeadlineBlock headline={headline} />
       ) : test.impactsWithheld ? (
         // The read line above already gives the reason.
         <Text style={{ fontSize: 8.5, color: C.muted, marginBottom: 8 }}>{str(HEADLINE_WITHHELD)}</Text>
@@ -1135,7 +1256,7 @@ function CallInFullPage({
                 {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
               </Text>
               {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
-              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if (screen's estimate): ${str(k?.risk)}`)}</Text> : null}
+              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if: ${str(k?.risk)}`)}</Text> : null}
             </View>
           ))}
         </View>

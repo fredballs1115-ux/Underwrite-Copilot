@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices, withActuals } from "./report-document";
+import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, reportHeadline, retradePrices, withActuals } from "./report-document";
 import { actualsFromRows, gapWords } from "@/lib/actuals/actuals-read";
 import { readInterest } from "@/lib/interest";
 import { MemoDocument, buildMemoData } from "./memo-document";
@@ -31,7 +31,7 @@ import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { challengerInstruction } from "@/lib/anthropic/prompts";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
-import { headlineSentence } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, headlineSentence, headlineSplit } from "@/lib/stress-test-words";
 import { pdfSafe } from "./pdf-text";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -505,7 +505,9 @@ describe("ReportDocument (full report)", () => {
       expect(text).toContain(`Source: ${r.source}`);
       expect(text).toContain(`What drives the spread: ${r.basis}`);
     }
-    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if (screen's estimate): ${k.risk}`);
+    // The shared screen's label: the sentence says whose figure it is.
+    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if: ${k.risk}`);
+    expect(text).not.toContain("Breaks if (screen's estimate)");
     for (const f of verdict.screen!.sensitivity) expect(text).toContain(f.note);
     // No verdict, no page.
     const bare = buildReportData({ ...deal, verdict: null } as unknown as DealRow, "September 30, 2026", []);
@@ -2936,11 +2938,27 @@ describe("the report's stress-test page", () => {
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
     expect(page).toContain("9 assumptions · 2 unsupported · 4 stretched · 3 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
-    // The headline under the read line, whole: the two cases, the split and
-    // what is left out with why, in the words the memo and the brief read
-    // (standard Helvetica: a hyphen for the minus, "to" for the arrow).
-    expect(page).toContain(pdfSafe(headlineSentence(test)!).replace(/\s+/g, " "));
-    expect(page).toMatch(/Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple/);
+    // The headline under the read line, in its parts — the lead, what the
+    // split is, a row a part, then each sentence after — every part the
+    // words module's own (standard Helvetica: a hyphen for the minus, "to"
+    // for the arrow), and the parts make the sentence the memo and the
+    // brief read again, word for word.
+    const h = reportHeadline(test)!;
+    expect(h.parts.length).toBeGreaterThan(1);
+    const lower = (t: string) => `${t[0].toLowerCase()}${t.slice(1)}`;
+    expect(`${h.lead.slice(0, -1)}: ${headlineSplit(test)}, ${lower(h.splitNote)}${h.after.map((t) => ` ${t}`).join("")}`).toBe(headlineSentence(test));
+    const flat = (t: string) => pdfSafe(t).replace(/\s+/g, " ");
+    expect(page).toContain(flat(h.lead));
+    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple [^)]+\)\.$/);
+    expect(page).toContain(flat(h.splitNote));
+    for (const p of h.parts) expect(page).toContain(flat(`${p.name} ${p.pts}${p.note ? ` ${p.note}` : ""}`));
+    for (const t of h.after) expect(page).toContain(flat(t));
+    // No longer one bold paragraph: the split is not printed inline.
+    expect(page).not.toContain(flat(`with the evidence: ${headlineSplit(test)}`));
+    // The sample is read as stabilized: its re-runs say so, as the deal
+    // page says it, under the read line and before the headline.
+    expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
+    expect(page.indexOf(flat(SAMPLE_PLAN_NOTE))).toBeLessThan(page.indexOf(flat(h.lead)));
     expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Stabilized vacancy"));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
@@ -3023,5 +3041,10 @@ describe("the report's stress-test page", () => {
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");
+    // The page's own key never follows "no return is re-run" with a re-run,
+    // and the sample's stabilized note goes with the re-runs.
+    expect(text).not.toContain("the return's move, the engine's own run of the model");
+    expect(text).toContain("the gap in the assumption's own unit; and why no return is re-run; the method;");
+    expect(text).not.toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
   }, 90000);
 });

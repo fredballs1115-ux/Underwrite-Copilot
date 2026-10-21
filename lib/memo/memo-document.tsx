@@ -64,7 +64,7 @@ import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { StressTest } from "@/lib/stress-test-types";
-import { headlineShort, leadRows, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, drawsRerun, headlineShort, leadRows, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -577,10 +577,20 @@ export interface MemoStressBlock {
   headline?: string;
   /** what each row's re-run is (lib/stress-test-words `rerunWords`): "from
    *  the model's own 9.3% levered IRR, this input alone set to the OM's
-   *  figure, then to the evidence's" */
+   *  figure, then to the evidence's"; "" where the re-runs are withheld (the
+   *  read line says why), so the key never claims one */
   rerun?: string;
-  rows: StressRowWords[];
+  /** the sample's note (lib/stress-test-words `SAMPLE_PLAN_NOTE`): read as
+   *  stabilized, it re-runs the levered return where a plan deal re-runs its
+   *  yield on total cost — the deal page's rule, printed under the read line
+   *  on the sample wherever its re-runs stand; "" elsewhere */
+  planNote?: string;
+  rows: MemoStressRow[];
 }
+
+/** A printed row, and whether it carries a re-run (lib/stress-test-words
+ *  `drawsRerun`): the key names the re-run only where a printed row has one. */
+export type MemoStressRow = StressRowWords & { rerun?: boolean };
 
 /** The most rows the one-page memo prints; the full report prints every one. */
 export const MEMO_STRESS_ROWS = 4;
@@ -599,10 +609,11 @@ export function memoStressBlock(test: StressTest | null | undefined): MemoStress
     read: pdfSafe(stressReadLine(test)),
     count: pdfSafe(count),
     headline: pdfSafe(headlineShort(test, false) ?? ""),
-    rerun: pdfSafe(rerunWords(test)),
+    rerun: test.impactsWithheld ? "" : pdfSafe(rerunWords(test)),
+    planNote: test.sample && !test.impactsWithheld ? pdfSafe(SAMPLE_PLAN_NOTE) : "",
     rows: leadRows(test, MEMO_STRESS_ROWS).map((r) => {
       const w = rowWords(r);
-      return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move) };
+      return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move), rerun: drawsRerun(r) };
     }),
   };
 }
@@ -829,9 +840,9 @@ export function buildMemoData(
   const hasScreen = ranges.length > 0;
   // The OM's assumptions tested in code (lib/stress-test): where the test
   // found a row past the evidence, the engine's own run takes the room the
-  // screen's estimates had — the deal-killer cards ("Breaks if (screen's
-  // estimate)") and the flips strip ("the screen's estimate, not the
-  // model's") are the verdict step's guesses at the same question, and the
+  // screen's estimates had — the deal-killer cards ("Breaks if:") and the
+  // flips strip ("the screen's estimate, not the model's") are the verdict
+  // step's guesses at the same question, and the
   // full report's "The call, in full" page prints both whole.
   const stressBlock = memoStressBlock(stressTest);
   const hasStress = !!stressBlock && stressBlock.rows.length > 0;
@@ -1093,6 +1104,9 @@ const s = StyleSheet.create({
   stressSpan: { position: "absolute", top: 0, height: 2, backgroundColor: "#b5cdc9" },
   stressTick: { position: "absolute", top: -2.5, width: 1.5, height: 7 },
   stressKey: { fontSize: 6, color: C.muted, marginTop: 2 },
+  // Its own leading: the page wrapper's 1.32 is struck on the wrapper's
+  // type, which sets a 6pt line 13pt apart.
+  stressNote: { fontSize: 6, lineHeight: 1.3, color: C.muted, marginTop: -1, marginBottom: 3 },
 
   buyBoxRow: {
     flexDirection: "row",
@@ -1636,6 +1650,11 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
               {data.stressTest.read}
               {data.stressTest.headline ? <Text style={s.stressHeadline}>{` ${data.stressTest.headline}`}</Text> : null}
             </Text>
+            {/* The sample is read as stabilized, so its rows re-run the
+                levered return: said under the read line, as the deal page
+                says it under the panel, so a sample's re-run is never read
+                as what a value-add OM gets. */}
+            {data.stressTest.planNote ? <Text style={s.stressNote}>{data.stressTest.planNote}</Text> : null}
             {data.stressTest.rows.map((r, i) => {
               const tone = STRESS_TONE[r.verdict] ?? C.muted;
               // The track is the column less its right padding (46 − 8).
@@ -1660,16 +1679,21 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                   </View>
                   <Text style={[s.stressCell, { flex: 1 }]}>
                     {`OM ${r.om}`}
-                    <Text style={s.stressCellMuted}>{`  ·  against ${r.against}`}</Text>
-                    {r.gap ? <Text style={s.stressCellMuted}>{`  ·  gap ${r.gap}`}</Text> : null}
-                    {r.move ? <Text style={[s.stressCell, { fontFamily: "Helvetica-Bold" }]}>{`  ·  ${r.move}`}</Text> : null}
+                    <Text style={s.stressCellMuted}>{` · against ${r.against}`}</Text>
+                    {r.gap ? <Text style={s.stressCellMuted}>{` · gap ${r.gap}`}</Text> : null}
+                    {r.move ? <Text style={[s.stressCell, { fontFamily: "Helvetica-Bold" }]}>{` · ${r.move}`}</Text> : null}
                   </Text>
                 </View>
               );
             })}
             {data.stressTest.rows.length > 0 ? (
               <Text style={s.stressKey}>
-                {`Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun || "from the model as it runs, this input alone set to the OM's figure, then to the evidence's"}; the report has every row.`}
+                {/* The re-runs are named only where a printed row carries
+                    one: never beside a read line that says no return is
+                    re-run. */}
+                {data.stressTest.rerun && data.stressTest.rows.some((r) => r.rerun)
+                  ? `Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun}; the report has every row.`
+                  : "Ticks: the OM's figure in the row's tone, the evidence's in ink; the report has every row."}
               </Text>
             ) : null}
           </Section>
@@ -1768,10 +1792,11 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                       {i + 1}. {k.label}
                     </Text>
                     <Text style={s.killerRead}>{k.read}</Text>
-                    {/* The verdict step reads what breaks the deal without
-                        the engine: its IRR moves are estimates, said so. */}
+                    {/* The shared screen's label: the sentence says whose
+                        figure it is (the sample's quotes the stress test's
+                        own re-run, which no "estimate" label may cover). */}
                     {k.risk ? (
-                      <Text style={s.killerRisk}>Breaks if (screen&apos;s estimate): {k.risk}</Text>
+                      <Text style={s.killerRisk}>Breaks if: {k.risk}</Text>
                     ) : null}
                   </View>
                 ))}
