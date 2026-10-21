@@ -123,11 +123,12 @@ describe("/how-we-test draws every method from the table", () => {
       vacancy: ["published", "published", "document", "document", "rule_of_thumb"],
       rent_growth: ["published", "published", "published", "published", "published"],
       expense_growth: ["published", "published", "published", "published"],
-      taxes: ["om_internal", "om_internal"],
+      // The seller's T-12 bill decides only where nothing above does.
+      taxes: ["om_internal", "om_internal", "document"],
       // The seller's own T-12 premium decides where the OM's sits under it.
       insurance: ["document", "published"],
       // The break-even is said beside the row, never set against it.
-      renovation_premium: ["om_internal", "om_internal"],
+      renovation_premium: ["om_internal", "om_internal", "om_internal"],
       other: [null],
     });
     // The page's words for a kind are the panel's own.

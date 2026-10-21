@@ -817,10 +817,15 @@ export function untestedSentence(h: StressHeadline): string {
   if (!u) return "";
   const items = u.keys.map(headlineName);
   if (u.roll) items.push(`the ${Math.round(u.roll.sharePct)}% of the listed ${u.roll.basis} rolling in the year to ${u.roll.through}`);
+  // Every re-run sells at the model's hold, never the OM's.
+  if (u.hold) items.push(`the OM's ${yearsText(u.hold.omYears)} hold${u.hold.page != null ? ` (p. ${u.hold.page})` : ""}, since the model sells at ${u.hold.modelYears} year${u.hold.modelYears === 1 ? "" : "s"}`);
   if (items.length === 0) return "";
   const said = items.length === 1 ? items[0] : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
   return `This headline does not test ${said}.`;
 }
+
+/** "7-year", "7.5-year". */
+const yearsText = (y: number): string => `${Number.isInteger(y) ? y : y.toFixed(1)}-year`;
 
 /** `noiRestClause` as a sentence; "" with none. */
 export function noiRestSentence(h: StressHeadline, test?: StressTest): string {

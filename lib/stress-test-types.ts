@@ -334,8 +334,9 @@ export interface StressHeadline {
    *  unchecked: the price, NOI and debt rows that stand unchecked (or that
    *  no row could be built for), and a tenant roster's worst year before the
    *  model's sale where it rolls 25% or more (lib/tenant-roster
-   *  `readRoster`). Null where nothing is named; absent on a headline struck
-   *  before it was carried. */
+   *  `readRoster`), and a hold the OM states that is not the model's. Null
+   *  where nothing is named; absent on a headline struck before it was
+   *  carried. */
   untested?: StressUntested | null;
 }
 
@@ -347,6 +348,10 @@ export interface StressUntested {
    *  more: its share, what the share is of (the listed rent, else the listed
    *  area), and the month that year ends ("Oct 2028") */
   roll: { sharePct: number; basis: "rent" | "area"; through: string } | null;
+  /** the hold the OM states where it differs from the model's (every re-run
+   *  sells at the model's): its years and the model's, with the OM's page;
+   *  absent where the OM states none or the model's own */
+  hold?: { omYears: number; modelYears: number; page: number | null } | null;
 }
 
 /** One row the evidence's case keeps at the OM's figure (`keptAtOm`). */
@@ -531,7 +536,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The debt",
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
-      "Today's index (the Treasury tenor nearest the hold, from FRED, dated) plus the class's screening spread, said as a screening default: the one figure that decides, the bare index beside it setting only where a rate reads unsupported",
+      "Today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a screening default: the one figure that decides, the bare index setting only where a rate reads unsupported",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
       "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],
@@ -541,7 +546,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     engine: "The all-in rate is a direct input: the return is re-run at the index plus spread; the lender tests are sized on the model's year-one NOI at the OM's rate where it states one, else the model's (index plus spread, or a flat 6.00% placeholder).",
     limits: [
       "A benchmark is not a quote: only a rate a loan document states is treated as one.",
-      "A floating-rate or supplemental loan is read as stated and priced on nothing.",
+      "A floating rate (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
     ],
   },
   {
@@ -550,7 +555,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The pro forma's net operating income is what the building earns.",
     against: [
       "The deal's own T-12 NOI, the one figure that decides where one is on file, with its period printed beside it and the sign of every deduction read once",
-      "The rent roll's in-place rent against the pro forma's, in words beside it",
+      "The rent roll's in-place rent against the pro forma's, in words beside it, on the class's own yardstick: a month a unit, else per SF a year",
       "The memorandum's own in-place figures against its stabilized ones, deciding only where no T-12 is on file",
     ],
     engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
@@ -620,12 +625,14 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The tax line stays at the seller's bill.",
     against: [
       "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment, the one figure that decides where both are stated",
-      "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck, and the T-12's tax line is shown beside it",
+      "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck",
+      "The deal's T-12 tax line, the seller's own bill: it decides only where nothing above does and the OM's line sits more than 2% under it, a working floor, stretched at most; else it is shown beside it",
     ],
-    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures. A plan's yield on cost is re-run on its pro forma line, reset at today's bill and assessment; not on a development, conversion or forward purchase.",
+    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures, else at the T-12's bill where it decides. A plan's yield on cost is re-run on its pro forma line; not on a development, conversion or forward purchase.",
     limits: [
       "No assessment ratio or millage is assumed: with no bill and assessed value stated, the line says the rate is the assessor's to give.",
       "A bill over its assessed value past 5% is read as a misread or an assessment at a fraction of value, and no reset bill is struck on it.",
+      "The seller's T-12 bill is history, not a new owner's bill: a sale rarely lowers a bill, so a line under it reads stretched at most, and on a development or a conversion it decides nothing.",
     ],
   },
   {
@@ -651,11 +658,12 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "An achieved premium the memorandum states, against the projected one: the one figure that decides",
       "The memorandum's own classic and renovated rents against its comps' rents, shown beside it",
+      "The program's pace, the memorandum against itself: the turnover its stated period needs against the turnover it states, shown beside it and deciding nothing",
     ],
     engine: "The premium is not a model input: its worth is struck at the exit cap against a door's cost, the break-even the program needs. On a value-add the gap is carried to the stabilized NOI on the doors to renovate, and the yield on cost is re-run.",
     limits: [
       "The model grows today's rent at one rate, so the premium is in none of its levered returns, said so.",
-      "The program's pace against the building's turnover is not tested here.",
+      "Whether tenants leave at the stated turnover is not tested: the pace is the memorandum against itself, and the rent roll's lease ends are expiries, not move-outs.",
     ],
   },
   {

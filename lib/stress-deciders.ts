@@ -81,6 +81,7 @@ export const SEEDED_RATE_LABEL = "The class's screening spread over it, a rule o
 export const SEEDED_RATE_ONLY_LABEL = "The index the model prices off, plus the class's screening spread";
 export const T12_NOI_LABEL = "The deal's T-12 NOI";
 export const T12_INSURANCE_LABEL = "The deal's T-12 insurance line";
+export const T12_TAX_LABEL = "The deal's T-12 tax line";
 export const OM_IN_PLACE_NOI_LABEL = "The OM's in-place NOI against its pro forma";
 export const RESET_BILL_LABEL = "The bill the OM's own figures imply on the price";
 export const ABATEMENT_LABEL = "The stated tax abatement and when it ends";
@@ -264,6 +265,15 @@ export function noiDecider(candidates: readonly DeciderCandidate[]): DecidingFig
 export const TAXES_ORDER: readonly DeciderStep[] = [
   { name: "the bill the OM's own figures imply on the price", why: "the bill if the sale resets the assessment to the price", is: isLabel(RESET_BILL_LABEL) },
   { name: "the unabated bill the OM states", why: "where an abatement ends inside the model's hold", is: isLabel(ABATEMENT_LABEL) },
+  // The seller's own bill decides only where the row hands it in as one that
+  // may (lib/stress-test: no reset bill, no abatement ending in the hold, and
+  // the OM's line under it past SAME_SHARE on a building already delivered):
+  // a working floor and a rule of thumb, never the bill a new owner pays.
+  {
+    name: "the deal's T-12 tax line",
+    why: "the seller's own bill, where the OM's sits under it and no reset bill can be struck: a working floor and a rule of thumb, not a new owner's bill",
+    is: isLabel(T12_TAX_LABEL),
+  },
 ];
 
 export function taxesDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
