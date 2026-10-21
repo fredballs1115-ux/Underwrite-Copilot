@@ -19,6 +19,30 @@ import { noIrrText } from "./no-irr";
 import type { PlausibilityFinding } from "@/lib/deal-strategy";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { FLAG_RULE, SOURCE_NOT_LOCATED, type OmFacts } from "./om-facts";
+import { HEADLINE_METHOD, type EvidenceKind, type StressEvidence, type StressKey, type StressRow, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
+import {
+  SAMPLE_PLAN_NOTE,
+  VERDICT_WORD,
+  bestEvidence,
+  compsStruckOver,
+  drawsRerun,
+  evidenceDay,
+  evidencePage,
+  evidencePeriod,
+  headlineSentence,
+  headlinePlaces,
+  isYieldHeadline,
+  isYieldImpact,
+  liveHeadline,
+  measureName,
+  noMoveWhy,
+  partNote,
+  rerunsStand,
+  rowMoveText,
+  shownHeadline,
+  stressReadLine,
+  whenWords,
+} from "@/lib/stress-test-words";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -219,6 +243,11 @@ export async function buildUnderwriteWorkbook(
    *  `readOmFacts`) — a data tab of its own beside the Market Read; no tab
    *  at all where the extraction read none */
   omFacts?: OmFacts | null,
+  /** the stress test (lib/stress-test `buildStressTest`, built as the deal
+   *  page builds it; lib/sample-stress on the sample) — a data tab of its
+   *  own beside the Market Read, one row a stress row in the panel's order,
+   *  then the headline; no tab at all where the test has no rows */
+  stressTest?: StressTest | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -245,6 +274,10 @@ export async function buildUnderwriteWorkbook(
     marketRead && marketRead.checks.length > 0
       ? wb.addWorksheet("Market Read", { views: [{ showGridLines: false }] })
       : null;
+  const wsStress =
+    stressTest && stressTest.rows.length > 0
+      ? wb.addWorksheet("Stress Test", { views: [{ state: "frozen", xSplit: 1, ySplit: STRESS_HEAD_ROW, showGridLines: false }] })
+      : null;
   const wsFacts =
     omFacts && omFacts.rows.length > 0
       ? wb.addWorksheet("OM Facts", { views: [{ state: "frozen", ySplit: OM_FACTS_HEAD_ROW, showGridLines: false }] })
@@ -268,10 +301,17 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead, omFacts: !!wsFacts }, builtAt);
+  buildCover(
+    wsCover,
+    model,
+    branding,
+    { portfolio: !!wsPortfolio, marketRead: !!wsRead, stressTest: !!wsStress, stressRerun: !!wsStress && !!stressTest && rerunsStand(stressTest), omFacts: !!wsFacts },
+    builtAt,
+  );
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
+  if (wsStress && stressTest) buildStressTestTab(wsStress, stressTest);
   if (wsFacts && omFacts) buildOmFacts(wsFacts, omFacts);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears, withheld);
@@ -286,6 +326,7 @@ export async function buildUnderwriteWorkbook(
     ...(wsPortfolio ? [wsPortfolio] : []),
     wsAssum,
     ...(wsRead ? [wsRead] : []),
+    ...(wsStress ? [wsStress] : []),
     ...(wsFacts ? [wsFacts] : []),
     wsCf,
     wsMonthly,
@@ -319,7 +360,9 @@ function buildCover(
   model: DerivedModel,
   branding?: ExportBranding | null,
   /** which of the optional tabs this workbook carries, for the Contents */
-  optional: { portfolio: boolean; marketRead: boolean; omFacts?: boolean } = { portfolio: false, marketRead: false },
+  /** `stressRerun`: the Stress Test tab draws a re-run (lib/stress-test-words
+   *  `rerunsStand`), so its line may say the return is re-run */
+  optional: { portfolio: boolean; marketRead: boolean; stressTest?: boolean; stressRerun?: boolean; omFacts?: boolean } = { portfolio: false, marketRead: false },
   /** when it was built: the day "years from today" on this cover counts from */
   builtAt: Date = new Date(),
 ) {
@@ -792,6 +835,14 @@ function buildCover(
     ["Assumptions", "Every input with its source (OM page, derived, or assumption)"],
     ...(optional.marketRead
       ? ([["Market Read", "The model's assumptions against the published figures, as read the day this was built"]] as [string, string][])
+      : []),
+    ...(optional.stressTest
+      ? ([
+          [
+            "Stress Test",
+            `The memorandum's assumptions, each set against the one figure that decides it${optional.stressRerun ? ", and the return re-run in code" : ""}`,
+          ],
+        ] as [string, string][])
       : []),
     ...(optional.omFacts
       ? ([["OM Facts", "Every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged"]] as [string, string][])
@@ -1301,6 +1352,403 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
     across(r, n, { color: MUTED, size: 9 });
     r++;
   }
+}
+
+/** The Stress Test tab's header row, frozen under its title and notes; the
+ *  rows start on the row under it. */
+export const STRESS_HEAD_ROW = 6;
+
+/** The Stress Test tab's columns, in order (the tests address them). */
+export const STRESS_COLUMNS = [
+  "Assumption",
+  "Verdict",
+  "OM's figure",
+  "OM page",
+  "The figure that decides",
+  "Kind",
+  "Figure",
+  "Publisher or source",
+  "Its OM page",
+  "As of",
+  "Gap (+ = the OM is more optimistic)",
+  "The gap, in words",
+  "Re-run of",
+  "At the OM's figure",
+  "At the evidence's",
+  "Move (pts)",
+  "The re-run, or why none",
+  "How it was tested",
+] as const;
+
+/** Each kind of evidence in the panel's own words (app/stress-test-panel's
+ *  key), the published grain beside a published figure. */
+const STRESS_KIND_WORD: Record<EvidenceKind, string> = {
+  document: "The deal's own document",
+  published: "A published figure",
+  rule_of_thumb: "A rule of thumb",
+  om_internal: "The OM against itself",
+};
+const STRESS_GRAIN: Partial<Record<StressEvidence["scope"], string>> = {
+  metro: "the metro's",
+  region: "the Census region's",
+  state: "the state's",
+  nation: "the nation's",
+};
+
+/** The verdict's rank, most severe first — the panel's own order
+ *  (app/stress-test-panel `sortStressRows`, which the tab's test holds this
+ *  to): unsupported, stretched, holds, unchecked, the test's order inside
+ *  each. */
+const STRESS_RANK: Record<StressVerdict, number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+export function stressTabRows(test: StressTest): StressRow[] {
+  return test.rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => STRESS_RANK[a.r.verdict] - STRESS_RANK[b.r.verdict] || a.i - b.i)
+    .map((x) => x.r);
+}
+
+const MINUS = "−";
+/** A signed number format: "+", the true minus, and none on a zero. */
+const signedFmt = (body: string) => `+${body};"${MINUS}"${body};${body}`;
+
+/** A figure in its row's own unit as a cell holds it: a percent as Excel's
+ *  percent (the stored 6.0 is 6.0%), a dollar as a dollar with the basis's
+ *  noun or a premium's month in its format, so the value stays raw and sorts.
+ *  `per` is the yardstick a basis figure is on ("/unit", "/SF"). A growth
+ *  row's OM figure is a rate a year ("4.0%/yr"); its evidence is a trailing
+ *  year's change, signed with no "/yr" ("+1.1%"), the words module's
+ *  `evidenceFigureText` rule. */
+function stressFigure(key: StressKey, value: number, per: string, evidence = false): { value: number; numFmt: string } {
+  switch (key) {
+    case "vacancy":
+      return { value: value / 100, numFmt: FMT.pct1 };
+    case "rent_growth":
+    case "expense_growth":
+      return { value: value / 100, numFmt: evidence ? signedFmt("0.0%") : '0.0%"/yr"' };
+    case "exit_cap":
+    case "debt":
+      return { value: value / 100, numFmt: FMT.pct2 };
+    case "noi":
+    case "taxes":
+    case "insurance":
+      return { value, numFmt: FMT.usd };
+    case "basis":
+      return { value, numFmt: per ? `$#,##0"${per}"` : "$#,##0" };
+    case "renovation_premium":
+      return { value, numFmt: '$#,##0"/mo"' };
+    default:
+      return { value, numFmt: "General" };
+  }
+}
+
+/** The gap in its own unit, signed from the buyer's side as the row has it. */
+function stressGap(gap: NonNullable<StressRow["gap"]>): { value: number; numFmt: string } {
+  switch (gap.unit) {
+    case "pts":
+      return { value: gap.value, numFmt: signedFmt('0.0" pts"') };
+    case "pct":
+      return { value: gap.value / 100, numFmt: signedFmt("0.0%") };
+    case "bps":
+      return { value: gap.value, numFmt: signedFmt('0" bps"') };
+    case "usd":
+      return { value: gap.value, numFmt: signedFmt("$#,##0") };
+  }
+}
+
+/** The basis's noun, as the reader writes the OM's figure first in its text
+ *  ("$274k/unit …") — lib/stress-test-words `figureText`'s own read. */
+const basisPer = (row: StressRow): string => {
+  const noun = row.omSays.text.match(/^\$[\d.,]+[kMB]?\/(\S+)/)?.[1];
+  return noun ? `/${noun}` : "";
+};
+
+/**
+ * The Stress Test tab — the stress test as the deal page's panel draws it,
+ * one row a stress row in the panel's order (most severe first): the
+ * assumption, the verdict code struck, the OM's figure and its page, the one
+ * figure that decides it (its kind, publisher and date as the words module
+ * says them), the gap signed from the buyer's side, and the return's move —
+ * the engine run with that one input at the OM's figure and at the
+ * evidence's — where the row draws one, blank where not, with the re-run's
+ * sentence or why there is none. Then the headline: the OM's case against
+ * the evidence's, split by assumption. Data only: every value is the test's
+ * own, raw so it sorts; the move and the headline's gap are formulas over
+ * this tab's own two cells, and no formula on any other tab reads this one,
+ * so the model's own tabs stay as live as they were.
+ */
+function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
+  const widths = [22, 11, 12, 7, 30, 18, 12, 18, 7, 12, 12, 30, 11, 10, 10, 9, 44, 44];
+  widths.forEach((w, i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+  const lastCol = widths.length;
+  const tabWidth = widths.reduce((s, w) => s + w, 0);
+  // The Market Read's own measure of a line (Arial, about 1.15 characters a
+  // column unit at 9 pt and 1.0 at 10 pt, on the safe side).
+  const linesIn = (text: string, width: number, size: number) =>
+    Math.max(1, Math.ceil(text.length / Math.max(1, Math.floor(width * (size <= 9 ? 1.15 : 1.0)))));
+  const lineHeight = (size: number) => (size <= 9 ? 12 : 13);
+  const across = (row: number, text: string, opts: { color?: { argb: string }; size?: number; bold?: boolean } = {}) => {
+    const size = opts.size ?? 9;
+    ws.mergeCells(row, 1, row, lastCol);
+    label(ws.getCell(row, 1), text, { color: opts.color ?? MUTED, size, bold: opts.bold });
+    ws.getCell(row, 1).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = linesIn(text, tabWidth, size) * lineHeight(size) + 2;
+  };
+  const C = (name: (typeof STRESS_COLUMNS)[number]) => STRESS_COLUMNS.indexOf(name) + 1;
+
+  titleRow(ws, "The stress test, struck in code");
+  const published = test.rows.some((r) => r.evidence.some((e) => e.kind === "published"));
+  const readSaid = published
+    ? test.publishedRead
+      ? ` Published figures read ${whenWords(test.readOn)}.`
+      : " Published figures as of the screen's market check."
+    : "";
+  // A re-run is said only where one stands (lib/stress-test-words
+  // `rerunsStand`: nothing withheld, and a row that draws one).
+  const rerun = rerunsStand(test) ? ", and the return re-run in code with that one input swapped for the evidence's" : "";
+  across(
+    2,
+    `Each assumption the memorandum makes, set against the one figure that decides it${rerun}. Data only: no formula on the model's own tabs reads this tab, and they stay live; change the model on the Assumptions tab.${readSaid}`,
+  );
+  across(3, stressReadLine(test), { color: INK });
+  // The sample's note, where its re-runs stand (the memo's and the report's rule).
+  if (test.sample && !test.impactsWithheld) across(4, SAMPLE_PLAN_NOTE);
+
+  sectionHeader(ws, STRESS_HEAD_ROW, STRESS_COLUMNS[0], 1, lastCol);
+  STRESS_COLUMNS.forEach((h, i) => {
+    const c = ws.getCell(STRESS_HEAD_ROW, i + 1);
+    if (i > 0) {
+      c.value = h.toUpperCase();
+      c.font = { name: ARIAL, size: 9, bold: true, color: WHITE };
+    }
+    c.alignment = { wrapText: true, vertical: "bottom" };
+  });
+  ws.getRow(STRESS_HEAD_ROW).height = 40;
+
+  const verdictColor: Record<StressVerdict, { argb: string }> = {
+    unsupported: { argb: "FFB3261E" },
+    stretched: { argb: "FFA05A1C" },
+    holds: GREEN,
+    unchecked: MUTED,
+  };
+  let r = STRESS_HEAD_ROW + 1;
+  const firstRow = r;
+  for (const row of stressTabRows(test)) {
+    let height = lineHeight(10) + 3;
+    const wrapped = (col: number, text: string, size: number, color: { argb: string } = INK, bold = false) => {
+      const cell = ws.getCell(r, col);
+      label(cell, text, { size, color, bold });
+      cell.alignment = { wrapText: true, vertical: "top" };
+      height = Math.max(height, linesIn(text, widths[col - 1], size) * lineHeight(size) + 3);
+    };
+    const number = (col: number, v: { value: number; numFmt: string }) => {
+      const cell = ws.getCell(r, col);
+      cell.value = v.value;
+      cell.numFmt = v.numFmt;
+      cell.font = { name: ARIAL, size: 10, color: INK };
+      cell.alignment = { vertical: "top" };
+    };
+    wrapped(C("Assumption"), row.title, 10, INK, true);
+    // No surface draws a row struck on a rule of thumb alone as a green
+    // "holds" (StressRow.ruleOfThumbOnly).
+    const word = VERDICT_WORD[row.verdict];
+    wrapped(C("Verdict"), `${word[0].toUpperCase()}${word.slice(1)}`, 10, row.ruleOfThumbOnly && row.verdict === "holds" ? MUTED : verdictColor[row.verdict], true);
+    // A blank is null: the OM's figure, its page, the evidence and the gap
+    // are written only where the row carries them.
+    if (row.omSays.value != null && Number.isFinite(row.omSays.value)) number(C("OM's figure"), stressFigure(row.key, row.omSays.value, basisPer(row)));
+    if (row.omSays.page != null) number(C("OM page"), { value: row.omSays.page, numFmt: "0" });
+    // The one figure that decided the row (lib/stress-deciders): none on a
+    // row nothing decided.
+    const e = row.verdict === "unchecked" ? null : bestEvidence(row);
+    if (e) {
+      wrapped(C("The figure that decides"), `${e.label}: ${e.text}`, 9);
+      const grain = e.kind === "published" ? STRESS_GRAIN[e.scope] : undefined;
+      wrapped(C("Kind"), grain ? `${STRESS_KIND_WORD[e.kind]} (${grain})` : STRESS_KIND_WORD[e.kind], 9);
+      // A growth row's published figure is a trailing year's change, signed
+      // and never a rate a year (lib/stress-test-words `evidenceFigureText`).
+      if (e.value != null && Number.isFinite(e.value)) number(C("Figure"), stressFigure(row.key, e.value, e.ownYardstick?.per ?? basisPer(row), true));
+      // The memorandum's comps a price is struck over, in their count, as
+      // the panel and `evidenceShort` say it ("the OM's one comp graded
+      // clean"); else the publisher.
+      wrapped(C("Publisher or source"), compsStruckOver(e, true) ?? e.publisher, 9, MUTED);
+      // The memorandum's own page the piece is read off, where validated.
+      const evPage = evidencePage(e);
+      if (evPage != null) number(C("Its OM page"), { value: evPage, numFmt: "0" });
+      // By the piece's own period (lib/stress-test-words `evidencePeriod`):
+      // a date cell, so the column sorts, only where the period is a day
+      // ("May 31, 2026"); a month's or a quarter's figure in its own words
+      // ("Aug 2026", "Q2 2026"), never its first day; a published figure
+      // with no date "undated", any other piece blank.
+      const asOf = ws.getCell(r, C("As of"));
+      const day = evidenceDay(e);
+      const period = evidencePeriod(e);
+      if (day) {
+        asOf.value = new Date(`${day}T00:00:00Z`);
+        asOf.numFmt = "mmm d, yyyy";
+        asOf.font = { name: ARIAL, size: 9, color: INK };
+        asOf.alignment = { horizontal: "left", vertical: "top" };
+      } else if (period) {
+        wrapped(C("As of"), period.said, 9);
+      } else if (e.kind === "published") {
+        wrapped(C("As of"), whenWords(e.asOf), 9);
+      }
+    }
+    if (row.gap) {
+      // A premium's gap is a month's rent, as its figures are.
+      const gap = stressGap(row.gap);
+      number(C("Gap (+ = the OM is more optimistic)"), row.key === "renovation_premium" && row.gap.unit === "usd" ? { ...gap, numFmt: signedFmt('$#,##0"/mo"') } : gap);
+      wrapped(C("The gap, in words"), row.gap.text, 9);
+    }
+    // The return's move, the engine's own, only where a surface draws it
+    // (lib/stress-test-words `drawsRerun`: never on a row that holds or one
+    // left unchecked); a case that does not solve is blank, its sentence
+    // saying so.
+    const impact = drawsRerun(row) ? row.impact : null;
+    if (impact) {
+      const yoc = isYieldImpact(impact);
+      wrapped(C("Re-run of"), yoc ? "Yield on cost" : "Levered IRR", 9);
+      // Each case stored at the place it prints (a levered IRR at one, a
+      // yield on cost at two, as the headline's `shownHeadline` does), so the
+      // move's formula over them is the difference of the two figures shown.
+      const places = yoc ? 2 : 1;
+      const shownAt = (n: number | null | undefined): number | null => (n == null || !Number.isFinite(n) ? null : Number(n.toFixed(places)));
+      const base = shownAt(yoc ? impact.baseYocPct : impact.baseIrrPct);
+      const alt = shownAt(yoc ? impact.altYocPct : impact.altIrrPct);
+      const fmt = yoc ? FMT.pct2 : FMT.pct1;
+      const ok = (n: number | null): n is number => n != null && Number.isFinite(n);
+      if (ok(base)) number(C("At the OM's figure"), { value: base / 100, numFmt: fmt });
+      if (ok(alt)) number(C("At the evidence's"), { value: alt / 100, numFmt: fmt });
+      if (ok(base) && ok(alt)) {
+        // A formula over the two cells beside it, the move in points.
+        const at = (name: (typeof STRESS_COLUMNS)[number]) => cellA1(r, C(name));
+        const move = ws.getCell(r, C("Move (pts)"));
+        move.value = { formula: `(${at("At the evidence's")}-${at("At the OM's figure")})*100`, result: Number((alt - base).toFixed(places)) } as ExcelJS.CellFormulaValue;
+        styleFormula(move, signedFmt(yoc ? '0.00" pts"' : '0.0" pts"'));
+        move.alignment = { vertical: "top" };
+      }
+    }
+    // The re-run's own sentence where the row draws one (its caveat after
+    // it); where it does not, why — the test's own withheld reason, the
+    // row's, or why it stands unchecked.
+    const why =
+      row.verdict === "unchecked"
+        ? (row.unchecked ?? noMoveWhy(test, row))
+        : impact
+          ? [impact.note, impact.caveat].filter(Boolean).join(" ")
+          : rowMoveText(test, row);
+    if (why) wrapped(C("The re-run, or why none"), why, 9, impact ? INK : MUTED);
+    if (row.method) wrapped(C("How it was tested"), row.method, 9, MUTED);
+    ws.getRow(r).height = height;
+    bottomBorder(ws, r, 1, lastCol);
+    r++;
+  }
+  const lastRow = r - 1;
+  // Excel's own data bars on the move, from a centre axis: a re-run that
+  // lowers the return to the left in red, one that raises it to the right.
+  const moveCol = STRESS_COLUMNS.indexOf("Move (pts)") + 1;
+  const signedBars = (ref: string) =>
+    ws.addConditionalFormatting({
+      ref,
+      rules: [
+        {
+          type: "dataBar",
+          priority: 1,
+          gradient: false,
+          border: false,
+          showValue: true,
+          minLength: 0,
+          maxLength: 100,
+          axisPosition: "middle",
+          negativeBarColorSameAsPositive: false,
+          negativeFillColor: { argb: "FFE5B4AE" },
+          cfvo: [{ type: "min" }, { type: "max" }],
+          color: { argb: "FFB5CDC9" },
+        } as unknown as ExcelJS.ConditionalFormattingRule,
+      ],
+    });
+  signedBars(`${cellA1(firstRow, moveCol)}:${cellA1(lastRow, moveCol)}`);
+
+  // ── The headline: the OM's case against the evidence's ──
+  const h = liveHeadline(test);
+  const sentence = headlineSentence(test);
+  if (!h && !sentence) return;
+  r++;
+  sectionHeader(ws, r, HEADLINE_METHOD.title, 1, lastCol);
+  r++;
+  if (!h) {
+    // Withheld with the re-runs: the test's own reason, and that the
+    // headline goes with it.
+    across(r, sentence!, { color: INK });
+    return;
+  }
+  const yoc = isYieldHeadline(h);
+  const places = headlinePlaces(h);
+  const caseFmt = places === 2 ? FMT.pct2 : FMT.pct1;
+  const ptsFmt = signedFmt(places === 2 ? '0.00" pts"' : '0.0" pts"');
+  // The figures as the panel prints them (lib/stress-test-words
+  // `shownHeadline`): each case at its measure's place and each part
+  // rounded so the parts add up to the printed gap.
+  const shown = shownHeadline(h);
+  const head = (col: number, text: string) => {
+    label(ws.getCell(r, col), text.toUpperCase(), { bold: true, color: MUTED, size: 9 });
+  };
+  head(1, measureName(h));
+  head(2, "Figure");
+  head(3, "Note");
+  r++;
+  const line = (text: string, value: number | null, fmt: string, note = "", bold = false) => {
+    label(ws.getCell(r, 1), text, { bold });
+    ws.getCell(r, 1).alignment = { wrapText: true, vertical: "top" };
+    let height = linesIn(text, widths[0], 10) * lineHeight(10) + 3;
+    if (value != null && Number.isFinite(value)) {
+      const c = ws.getCell(r, 2);
+      c.value = value;
+      c.numFmt = fmt;
+      c.font = { name: ARIAL, size: 10, color: INK, bold };
+      c.alignment = { vertical: "top" };
+    }
+    if (note) {
+      ws.mergeCells(r, 3, r, lastCol);
+      label(ws.getCell(r, 3), note, { size: 9, color: MUTED });
+      ws.getCell(r, 3).alignment = { wrapText: true, vertical: "top" };
+      height = Math.max(height, linesIn(note, tabWidth - widths[0] - widths[1], 9) * lineHeight(9) + 3);
+    }
+    ws.getRow(r).height = height;
+    r++;
+    return r - 1;
+  };
+  const noSolve = yoc ? "not struck" : "does not solve";
+  const omRow = line("On the OM's figures", shown.om != null ? shown.om / 100 : null, caseFmt, shown.om == null ? noSolve : "", true);
+  const firstPart = r;
+  for (const p of shown.parts) {
+    const note = partNote(p);
+    line(`${p.label}${note ? ` (${note})` : ""}`, p.shown, ptsFmt);
+  }
+  const lastPart = r - 1;
+  const evRow = line("With the evidence", shown.evidence != null ? shown.evidence / 100 : null, caseFmt, shown.evidence == null ? noSolve : "", true);
+  if (shown.om != null && shown.evidence != null) {
+    // The gap, a formula over the two cases above: the parts add up to it.
+    const g = line("The gap, the evidence's case less the OM's", null, ptsFmt);
+    const c = ws.getCell(g, 2);
+    c.value = { formula: `(${cellA1(evRow, 2)}-${cellA1(omRow, 2)})*100`, result: Number((shown.evidence - shown.om).toFixed(places)) } as ExcelJS.CellFormulaValue;
+    styleFormula(c, ptsFmt);
+  }
+  if (yoc) {
+    // The yield on cost the memorandum states in a row of its own, as the OM's.
+    if (h.statedYoc && Number.isFinite(h.statedYoc.pct)) {
+      line("The OM's stated yield on cost", h.statedYoc.pct / 100, FMT.pct2, `${h.statedYoc.label}${h.statedYoc.page != null ? `, p. ${h.statedYoc.page}` : ""}`);
+    }
+  } else if (h.modelIrrPct !== undefined) {
+    // The screening model as it runs, every input its own: the base every
+    // row's re-run starts from, which neither case is.
+    line("The screening model as it runs", h.modelIrrPct != null ? h.modelIrrPct / 100 : null, FMT.pct1, h.modelIrrPct == null ? "its levered IRR does not solve" : "");
+  }
+  for (const o of h.omitted) line(`Left out: ${o.label}`, null, "", o.why);
+  if (shown.parts.length > 0) signedBars(`${cellA1(firstPart, 2)}:${cellA1(lastPart, 2)}`);
+  r++;
+  // The headline in whole sentences, the report's and the brief's own.
+  if (sentence) across(r, sentence, { color: INK });
 }
 
 /** The OM Facts tab's header row, frozen under its title and notes. */

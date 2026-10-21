@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices, withActuals } from "./report-document";
+import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, reportHeadline, retradePrices, withActuals } from "./report-document";
 import { actualsFromRows, gapWords } from "@/lib/actuals/actuals-read";
 import { readInterest } from "@/lib/interest";
 import { MemoDocument, buildMemoData } from "./memo-document";
@@ -31,7 +31,7 @@ import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { challengerInstruction } from "@/lib/anthropic/prompts";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
-import { headlineSentence } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, headlineSentence, headlineSplit } from "@/lib/stress-test-words";
 import { pdfSafe } from "./pdf-text";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -505,13 +505,35 @@ describe("ReportDocument (full report)", () => {
       expect(text).toContain(`Source: ${r.source}`);
       expect(text).toContain(`What drives the spread: ${r.basis}`);
     }
-    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if (screen's estimate): ${k.risk}`);
+    // The verdict kept no stress snapshot, and this row is not the sample:
+    // its cards are the verdict step's words, the screen's estimate.
+    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if (the screen's estimate): ${k.risk}`);
+    expect(text).not.toContain("Breaks if:");
+    // Where the call was reached on the engine's re-runs (its snapshot has a
+    // row past its evidence that carried one), and on the sample, whose call
+    // is written on its own test, the plain label.
+    const { stressSnapshotOf } = await import("@/lib/stress-snapshot");
+    const { sampleStressTest } = await import("@/lib/sample-stress");
+    const callPage = async (d: DealRow) => {
+      const ps = pdfPageTextsOf(
+        await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(d, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+      ).map((p) => p.replace(/\s+/g, " "));
+      return ps.slice(ps.findIndex((p) => p.includes("The call, in full"))).join(" ");
+    };
+    for (const d of [
+      { ...deal, verdict: { ...verdict, stressSnapshot: stressSnapshotOf(sampleStressTest({ today: "2026-09-30" })) } },
+      { ...deal, is_sample: true },
+    ]) {
+      const t = await callPage(d as unknown as DealRow);
+      for (const k of verdict.screen!.dealKillers) expect(t).toContain(`Breaks if: ${k.risk}`);
+      expect(t).not.toContain("Breaks if (the screen's estimate)");
+    }
     for (const f of verdict.screen!.sensitivity) expect(text).toContain(f.note);
     // No verdict, no page.
     const bare = buildReportData({ ...deal, verdict: null } as unknown as DealRow, "September 30, 2026", []);
     const bareText = pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: bare }) as unknown as Parameters<typeof renderToBuffer>[0]));
     expect(bareText).not.toContain("The call, in full");
-  }, 60000);
+  }, 120000);
 
   it("prints the deal page's max bid — solved on the buy box's every floor, the binding one named — never the IRR floor's alone", async () => {
     // The demo report route's own chain, beside the demo page's playground.
@@ -2936,11 +2958,27 @@ describe("the report's stress-test page", () => {
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
     expect(page).toContain("9 assumptions · 2 unsupported · 4 stretched · 3 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
-    // The headline under the read line, whole: the two cases, the split and
-    // what is left out with why, in the words the memo and the brief read
-    // (standard Helvetica: a hyphen for the minus, "to" for the arrow).
-    expect(page).toContain(pdfSafe(headlineSentence(test)!).replace(/\s+/g, " "));
-    expect(page).toMatch(/Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple/);
+    // The headline under the read line, in its parts — the lead, what the
+    // split is, a row a part, then each sentence after — every part the
+    // words module's own (standard Helvetica: a hyphen for the minus, "to"
+    // for the arrow), and the parts make the sentence the memo and the
+    // brief read again, word for word.
+    const h = reportHeadline(test)!;
+    expect(h.parts.length).toBeGreaterThan(1);
+    const lower = (t: string) => `${t[0].toLowerCase()}${t.slice(1)}`;
+    expect(`${h.lead.slice(0, -1)}: ${headlineSplit(test)}, ${lower(h.splitNote)}${h.after.map((t) => ` ${t}`).join("")}`).toBe(headlineSentence(test));
+    const flat = (t: string) => pdfSafe(t).replace(/\s+/g, " ");
+    expect(page).toContain(flat(h.lead));
+    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple [^)]+\)\.$/);
+    expect(page).toContain(flat(h.splitNote));
+    for (const p of h.parts) expect(page).toContain(flat(`${p.name} ${p.pts}${p.note ? ` ${p.note}` : ""}`));
+    for (const t of h.after) expect(page).toContain(flat(t));
+    // No longer one bold paragraph: the split is not printed inline.
+    expect(page).not.toContain(flat(`with the evidence: ${headlineSplit(test)}`));
+    // The sample is read as stabilized: its re-runs say so, as the deal
+    // page says it, under the read line and before the headline.
+    expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
+    expect(page.indexOf(flat(SAMPLE_PLAN_NOTE))).toBeLessThan(page.indexOf(flat(h.lead)));
     expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Stabilized vacancy"));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
@@ -2968,12 +3006,17 @@ describe("the report's stress-test page", () => {
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
     // The vacancy row, whole.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
-    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll, May 31, 2026)");
+    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll)");
     expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
     expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
     expect(page).toMatch(/The return: from the model's own 9\.3% levered IRR, this input alone set to the OM's figure, then to the evidence's\. If vacancy is the deal's rent roll's 9\.3%, not the OM's 6\.0%, the levered IRR moves from 12\.4% to 9\.1%/);
     expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
+    // The memorandum's own pieces carry their validated page, as the panel's
+    // page chip and the memo's evidence cell do.
+    const clean = test.rows.find((r) => r.key === "basis")!.evidence.find((e) => e.page != null)!;
+    expect(clean.page).toBe(14);
+    expect(page).toContain(flat(`${clean.label}: ${clean.text} (OM p. 14)`));
     // The basis row's move is the engine's, spelled.
     expect(page).toContain(
       "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
@@ -3023,5 +3066,10 @@ describe("the report's stress-test page", () => {
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");
+    // The page's own key never follows "no return is re-run" with a re-run,
+    // and the sample's stabilized note goes with the re-runs.
+    expect(text).not.toContain("the return's move, the engine's own run of the model");
+    expect(text).toContain("the gap in the assumption's own unit; why no return is re-run; the method;");
+    expect(text).not.toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
   }, 90000);
 });

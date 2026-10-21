@@ -8,7 +8,7 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StageChange } from "@/lib/stages";
 import { STRESS_KEYS, type StressEvidence, type StressKey, type StressRow, type StressTest } from "@/lib/stress-test-types";
-import { STRESS_SNAPSHOT_V, WORSE_WHEN, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
+import { BREAKS_IF, BREAKS_IF_ESTIMATE, STRESS_SNAPSHOT_V, WORSE_WHEN, breaksIfLabel, callCitesEngine, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import {
   CARD_SCOPE,
   DECISION_SCORES,
@@ -770,6 +770,30 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
     expect(readStressSnapshot(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(stressSnapshotOf(null)).toBeNull();
     expect(stressSnapshotOf(test())).toBeNull();
+  });
+
+  it("labels the deal-killer cards 'Breaks if:' only where the call was reached on the engine's re-runs, else the screen's estimate", () => {
+    const impact = { input: "vacancyPct" as const, evidenceIndex: 0, omValue: 0.05, altValue: 0.09, baseIrrPct: 10, altIrrPct: 9, baseMultiple: 1.8, altMultiple: 1.7, note: "" };
+    const stretched: StressRow = { ...base, key: "vacancy", title: "Stabilized vacancy", verdict: "stretched", impact };
+    const snap = (...rows: StressRow[]) => JSON.parse(JSON.stringify(stressSnapshotOf(test(...rows))));
+    // A row past its evidence that carried a re-run: the brief cited it.
+    expect(callCitesEngine(snap(base, stretched))).toBe(true);
+    expect(breaksIfLabel(snap(base, stretched))).toBe(BREAKS_IF);
+    expect(BREAKS_IF).toBe("Breaks if:");
+    // A row that holds keeps its impact for the headline but draws no re-run,
+    // and a row past its evidence with none re-ran nothing: no citation.
+    expect(callCitesEngine(snap({ ...stretched, verdict: "holds" }))).toBe(false);
+    expect(callCitesEngine(snap(base))).toBe(false);
+    expect(breaksIfLabel(snap(base))).toBe(BREAKS_IF_ESTIMATE);
+    expect(BREAKS_IF_ESTIMATE).toBe("Breaks if (the screen's estimate):");
+    // A verdict saved before the stress test, or a snapshot kept before
+    // `rerun` was carried, is the screen's estimate.
+    expect(breaksIfLabel(undefined)).toBe(BREAKS_IF_ESTIMATE);
+    const old = snap(base, stretched);
+    for (const r of old.rows) delete r.rerun;
+    expect(breaksIfLabel(old)).toBe(BREAKS_IF_ESTIMATE);
+    // The sample's call is written on its own stress test.
+    expect(breaksIfLabel(undefined, true)).toBe(BREAKS_IF);
   });
 
   it("keeps the row's own deciding figure (decidedBy) ahead of the re-run's", () => {

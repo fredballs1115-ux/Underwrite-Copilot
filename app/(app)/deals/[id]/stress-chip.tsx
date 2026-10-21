@@ -25,7 +25,7 @@ const PARTS: { verdict: StressVerdict; word: (n: number) => string; dot: string;
   { verdict: "unsupported", word: () => "unsupported", dot: "bg-kill", text: "text-kill" },
   { verdict: "stretched", word: () => "stretched", dot: "bg-caution", text: "text-caution" },
   { verdict: "holds", word: (n) => (n === 1 ? "holds" : "hold"), dot: "bg-pass", text: "text-pass" },
-  // The panel's own words (app/stress-test-panel `stressReadLine`): a row
+  // The panel's own words (lib/stress-test-words `stressCountLine`): a row
   // nothing tested "could not be checked", never "unchecked".
   { verdict: "unchecked", word: () => "could not be checked", dot: "border border-muted", text: "text-muted" },
 ];

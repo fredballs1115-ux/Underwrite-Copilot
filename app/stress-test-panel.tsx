@@ -5,9 +5,13 @@ import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote
 import {
   HEADLINE_WITHHELD,
   HOLDS_NO_RERUN,
+  UNCHECKED_COUNT_WORDS,
   decidesTag,
   drawsRerun,
-  figureText as wordsFigure,
+  evidenceFigureText,
+  evidenceDateTime,
+  evidencePeriod,
+  figureText,
   headlineLine,
   headlineName,
   headlinePlaces,
@@ -24,8 +28,10 @@ import {
   ptsText,
   rerunWords,
   shownHeadline,
+  stressCountLine,
   unsolvedSentence,
   untestedSentence,
+  whenWords,
   type ShownPart,
 } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKept, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
@@ -169,31 +175,6 @@ export function publishedScopeLine(rows: readonly StressRow[]): string | null {
 
 const SEVERITY: Record<NonNullable<StressRow["challenge"]>["severity"], string> = { high: "High", medium: "Medium", low: "Low" };
 
-/** "Jun 30, 2026" for an ISO day; a period as published ("Q2 2026") as is. */
-function dayText(s: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const at = Date.parse(`${s}T00:00:00Z`);
-  if (!Number.isFinite(at)) return s;
-  return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
-/** A figure in the assumption's own unit, as the row's reader writes it. */
-function figureText(key: StressKey, v: number): string {
-  switch (key) {
-    case "exit_cap":
-    case "debt":
-      return `${v.toFixed(2)}%`;
-    case "vacancy":
-    case "rent_growth":
-    case "expense_growth":
-      return `${v.toFixed(1)}%`;
-    case "renovation_premium":
-      return `${compactUsd(v, MONEY)}/mo`;
-    default:
-      return compactUsd(v, MONEY);
-  }
-}
-
 const upperFirst = (t: string) => (t ? `${t[0].toUpperCase()}${t.slice(1)}` : t);
 
 const pctText = (n: number | null): string => {
@@ -213,24 +194,6 @@ const yocText = (n: number | null): string => {
 /** Most severe first, the reader's order inside a verdict. */
 export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
   return rows.map((r, i) => ({ r, i })).sort((a, b) => VERDICT[a.r.verdict].rank - VERDICT[b.r.verdict].rank || a.i - b.i).map((x) => x.r);
-}
-
-/** "9 assumptions: 1 unsupported, 2 stretched, 1 holds; 5 could not be
- *  checked" — a row that could not be checked is never counted among the
- *  tested, and the line says so in a reader's words. */
-export function stressReadLine(rows: readonly StressRow[]): string {
-  const n = (v: StressVerdict) => rows.filter((r) => r.verdict === v).length;
-  const parts: [number, string][] = [
-    [n("unsupported"), "unsupported"],
-    [n("stretched"), "stretched"],
-    [n("holds"), n("holds") === 1 ? "holds" : "hold"],
-  ];
-  const said = parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`);
-  const read = rows.length;
-  const head = `${read} assumption${read === 1 ? "" : "s"}`;
-  const notChecked = n("unchecked");
-  if (said.length === 0) return `${head}: none could be checked`;
-  return `${head}: ${said.join(", ")}${notChecked > 0 ? `; ${notChecked} could not be checked` : ""}`;
 }
 
 /**
@@ -283,7 +246,7 @@ export function uncheckedName(row: StressRow): string {
 
 /** "5 could not be checked: debt, rent growth, real estate taxes, insurance, the renovation premium" */
 export function uncheckedLine(rows: readonly StressRow[]): string {
-  return `${rows.length} could not be checked: ${rows.map(uncheckedName).join(", ")}`;
+  return `${rows.length} ${UNCHECKED_COUNT_WORDS}: ${rows.map(uncheckedName).join(", ")}`;
 }
 
 /** The survey's margin, read back off the figure's own text ("6.2% ±2.2 pts"). */
@@ -382,7 +345,7 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
     <div className="mt-3 text-[11px] leading-4" data-qa="stress-track">
       <p className="text-muted">The OM against the figure that decides</p>
       <div className="relative mt-1 h-4">
-        <TrackLabel at={pos(om)} className="font-semibold text-ink" qa="stress-om-label">{`OM ${figureText(row.key, om)}`}</TrackLabel>
+        <TrackLabel at={pos(om)} className="font-semibold text-ink" qa="stress-om-label">{`OM ${figureText(row.key, om, row.omSays.text)}`}</TrackLabel>
       </div>
       <div className="relative mt-1 h-2 rounded-full bg-faint" aria-hidden>
         {row.evidence.map((e, i) => {
@@ -418,7 +381,7 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
       </div>
       <div className="relative h-6">
         {decider && (
-          <TrackLabel at={pos(decider.value!)} className="top-1.5 font-semibold text-ink" qa="stress-evidence-label">{`Decides ${figureText(row.key, decider.value!)}`}</TrackLabel>
+          <TrackLabel at={pos(decider.value!)} className="top-1.5 font-semibold text-ink" qa="stress-evidence-label">{`Decides ${evidenceFigureText(row.key, decider.value!, row.omSays.text)}`}</TrackLabel>
         )}
       </div>
     </div>
@@ -602,6 +565,7 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
         const tag = tags[0] == null ? null : tags.every((t) => t === tags[0]) ? tags[0] : `${tags[at.indexOf(d!)]}: the ${at.indexOf(d!) === 0 ? "low" : "high"} end`;
         const comps = range ? null : compLines(e);
         const href = at.map((i) => evidence[i].href).find(Boolean);
+        const period = evidencePeriod(e);
         const Body = comps ? "div" : "p";
         return (
           <li key={at[0]} className="flex gap-2" data-evidence={e.kind} data-decides={tag == null ? undefined : deciding ? "true" : "false"}>
@@ -626,21 +590,39 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                 <Dated text={range ? `${range.base}: ${range.text}` : comps ? `${e.label}: ${comps.head}` : `${e.label}: ${e.text}`} />
               </span>{" "}
               {/* The OM's own pieces are the memorandum itself: no date to
-                  print, and their kind already says whose they are. */}
+                  print, and their kind already says whose they are; their
+                  page where one is validated. A piece is dated by its own
+                  period (a month, a quarter, a day only for a day's figure),
+                  and not again where its text already says it. */}
               <span className="text-muted">
                 {`— ${e.publisher}`}
-                {e.asOf ? (
-                  <>
-                    {", "}
-                    <time dateTime={e.asOf} className="whitespace-nowrap">
-                      {dayText(e.asOf)}
-                    </time>
-                  </>
+                {period ? (
+                  period.inText ? null : (
+                    <>
+                      {", "}
+                      {/* The machine-readable date matches the words: a day
+                          for a day, a month for a month, none for a quarter
+                          (lib/stress-test-words `evidenceDateTime`). */}
+                      {evidenceDateTime(e) ? (
+                        <time dateTime={evidenceDateTime(e)!} className="whitespace-nowrap">
+                          {period.said}
+                        </time>
+                      ) : (
+                        <span className="whitespace-nowrap">{period.said}</span>
+                      )}
+                    </>
+                  )
                 ) : e.kind === "rule_of_thumb" || e.kind === "om_internal" ? null : (
                   ", undated"
                 )}
                 {e.scope === "deal" && (e.kind === "document" || e.kind === "om_internal") ? "" : ` · ${SCOPE[e.scope]}`}
               </span>
+              {e.page != null && (
+                <>
+                  {" "}
+                  <PageChip page={e.page} />
+                </>
+              )}
               {href && (
                 <>
                   {" "}
@@ -721,14 +703,9 @@ function UncheckedRow({ row }: { row: StressRow }) {
         </p>
       )}
       <EvidenceList row={row} />
-      {/* A re-run on a row that stands unchecked (the insurance line at the
-          seller's own T-12 premium) is said in its own words, which say it
-          tests nothing; no bars, since nothing decided it. */}
-      {row.impact && (
-        <p className={`mt-1 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-unchecked-rerun">
-          <Dated text={row.impact.note} />
-        </p>
-      )}
+      {/* An unchecked row carries no re-run (lib/stress-test drops any: a
+          move struck at a figure that tests nothing would read as one the
+          evidence makes), so none is drawn. */}
       {row.challenge && <ChallengeFold challenge={row.challenge} />}
       <MethodLine row={row} />
     </li>
@@ -842,17 +819,18 @@ const DOT: Record<string, string> = {
   stretched: "before:bg-caution",
   hold: "before:bg-pass",
   holds: "before:bg-pass",
-  "could not be checked": "before:bg-ink/25",
+  [UNCHECKED_COUNT_WORDS]: "before:bg-ink/25",
 };
 
 /**
- * The read line, word for word `stressReadLine`'s, each count kept whole on
- * its line ("1 holds" never breaks after its figure on a phone) and led by
- * its verdict's dot. The counts are `<b>`, which the line's weight already
- * is, so the words stay one run of text for a screen reader and the lints.
+ * The read line, word for word lib/stress-test-words `stressCountLine`'s,
+ * each count kept whole on its line ("1 holds" never breaks after its
+ * figure on a phone) and led by its verdict's dot. The counts are `<b>`,
+ * which the line's weight already is, so the words stay one run of text for
+ * a screen reader and the lints.
  */
 function ReadLine({ rows }: { rows: readonly StressRow[] }) {
-  const parts = stressReadLine(rows).split(/(\d+ (?:unsupported|stretched|holds?|could not be checked))/);
+  const parts = stressCountLine(rows).split(new RegExp(`(\\d+ (?:unsupported|stretched|holds?|${UNCHECKED_COUNT_WORDS}))`));
   return (
     <span className="text-sm font-semibold leading-snug" data-qa="stress-read">
       {parts.map((p, i) => {
@@ -940,13 +918,13 @@ export function keptRows(test: StressTest): KeptRow[] {
       .map((k) => ({
         key: k.key,
         assumption: k.key === "noi" && k.noi != null ? `Rent line (makes the OM's ${compactUsd(k.noi, MONEY)} NOI)` : k.label,
-        evidence: k.key === "noi" ? compactUsd(k.om, MONEY) : wordsFigure(k.key, k.om),
+        evidence: k.key === "noi" ? compactUsd(k.om, MONEY) : figureText(k.key, k.om),
         why: KEPT_WHY[why],
         model: k.key === "noi" ? compactUsd(k.model, MONEY) : modelCellText(test, k.key, k.model),
       })),
   );
   for (const a of h.atEvidence ?? []) {
-    rows.push({ key: a.key, assumption: a.label, evidence: wordsFigure(a.key, a.evidence), why: "the evidence's", model: modelCellText(test, a.key, a.model) });
+    rows.push({ key: a.key, assumption: a.label, evidence: figureText(a.key, a.evidence), why: "the evidence's", model: modelCellText(test, a.key, a.model) });
   }
   return rows;
 }
@@ -1189,7 +1167,7 @@ export function StressTestPanel({ test, className = "" }: { test: StressTest | n
           <KeyItem>{"A full mark decides its row; a faded one is shown beside it, not deciding"}</KeyItem>
         )}
         {published && (
-          <KeyItem>{test.publishedRead ? `Published figures read ${dayText(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>
+          <KeyItem>{test.publishedRead ? `Published figures read ${whenWords(test.readOn)}` : "Published figures as of the screen's market check"}</KeyItem>
         )}
         {/* Whose a published figure is, said once for every line. */}
         {publishedScopeLine(test.rows) && <KeyItem>{publishedScopeLine(test.rows)}</KeyItem>}

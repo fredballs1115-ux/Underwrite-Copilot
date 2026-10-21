@@ -5,7 +5,9 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import type { ExportBranding } from "@/lib/excel-branding";
 import { countyOf, placeDeal } from "@/lib/market-county";
-import { todayReads } from "@/lib/model-vs-market-read";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
+import { sampleStressTest } from "@/lib/sample-stress";
+import type { StressTest } from "@/lib/stress-test-types";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
 import { regulationForDeal } from "@/lib/rent-regulation";
@@ -34,7 +36,8 @@ let cachedBuild: (HeldRender & { xlsx: Promise<Buffer> }) | null = null;
  * builds for the sample, argument for argument (a test holds the two
  * `buildUnderwriteWorkbook` argument lists equal, as lib/sample-cover's test
  * does for the memo and the report): the OM Facts tab, the Market Read tab,
- * the plausibility findings and what the price buys, on the day it is read.
+ * the plausibility findings, what the price buys and the Stress Test tab, on
+ * the day it is read.
  */
 async function buildSampleWorkbook(readerDay: string): Promise<Buffer> {
   const extraction = SAMPLE_DEAL.extraction as ExtractionResult;
@@ -59,23 +62,43 @@ async function buildSampleWorkbook(readerDay: string): Promise<Buffer> {
   // A visitor has no firm to brand the workbook with.
   const branding: ExportBranding | null = null;
 
-  // The model's assumptions against the published figures, read today for
-  // the market the sample sits in. Its own try, as there: a failed live
-  // read leaves the tab out, never the workbook.
-  let marketRead: ModelVsMarket | null = null;
+  // Today's published figures for the market the sample sits in, read once
+  // for the Market Read tab and the stress test. A failed live read leaves
+  // the Market Read out and the stress test's published rows unchecked,
+  // never the workbook.
+  const metro = placeDeal(address, countyOf(address, null)).live;
+  let reads: TodayReads | null = null;
   try {
-    const metro = placeDeal(address, countyOf(address, null)).live;
-    marketRead = modelVsMarketFor({
-      derived: model,
-      extraction,
-      firstSignal: null,
-      storedAssetClass: SAMPLE_DEAL.asset_class,
-      metro,
-      reads: await todayReads(metro),
-      regulation,
-    });
+    reads = await todayReads(metro);
   } catch (err) {
     console.warn("sample workbook market read failed:", err instanceof Error ? err.message : err);
+  }
+  // The model's assumptions against the published figures. Its own try, as
+  // there: a failed read leaves the tab out, never the workbook.
+  let marketRead: ModelVsMarket | null = null;
+  try {
+    marketRead = reads
+      ? modelVsMarketFor({
+          derived: model,
+          extraction,
+          firstSignal: null,
+          storedAssetClass: SAMPLE_DEAL.asset_class,
+          metro,
+          reads,
+          regulation,
+        })
+      : null;
+  } catch (err) {
+    console.warn("sample workbook market read failed:", err instanceof Error ? err.message : err);
+  }
+  // The sample's stress test — lib/sample-stress's one build, the one /demo,
+  // the homepage and the signed-in sample's page print — on the same day and
+  // the same reads, so the Stress Test tab prints that StressTest.
+  let stressTest: StressTest | null = null;
+  try {
+    stressTest = sampleStressTest({ today: readerDay, reads });
+  } catch (err) {
+    console.warn("sample workbook stress test failed:", err instanceof Error ? err.message : err);
   }
 
   // The deal page's own reads: its findings (no first signal on the sample)
@@ -83,7 +106,7 @@ async function buildSampleWorkbook(readerDay: string): Promise<Buffer> {
   const findings = assessPlausibility(extraction, inferStrategy(extraction, null));
   const interest = modelReturnsRead(extraction, screeningCompareModel(model.inputs), asOf);
 
-  const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date(), readOmFacts(extraction));
+  const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction), asOf, findings, interest, new Date(), readOmFacts(extraction), stressTest);
   return buffer;
 }
 

@@ -26,7 +26,7 @@ import { compactUsd } from "./money";
 import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
-import { STRESS_KEYS, STRESS_METHODS, type StressKey, type StressRow } from "./stress-test-types";
+import { STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
@@ -63,7 +63,7 @@ import {
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, moveShort, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
+import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
 import { METRO_VACANCY_LABEL } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
@@ -449,8 +449,14 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(g.gap).toEqual({
       value: 2.9,
       unit: "pts",
-      text: "Held to Zillow's apartment asking rents, the figure for this kind of rent: +1.1% over the year to Aug 2026 (Zillow Research). The OM's 4.0%/yr is 2.9 points over it.",
+      text: `Held to Zillow's apartment asking rents, the figure for this kind of rent: +1.1% over the year to Aug 2026 (Zillow Research). The OM's 4.0%/yr is 2.9 points over it. ${TRAILING_YEAR_NOT_FORECAST}`,
     });
+    // The trailing year is said as one in the re-run's own words, never as a
+    // rate a year the publisher states, and the memo's cell says it too.
+    expect(g.impact!.note).toMatch(/^If rent growth is Zillow Research's \+1\.1% over the year to Aug 2026, run each year of the hold, not the OM's 4\.0%\/yr, the levered IRR moves from /);
+    expect(g.impact!.note).not.toContain("1.1%/yr");
+    expect(rowWords(g).against).toBe("+1.1% over the year to Aug 2026 (Zillow Research)");
+    expect(STRESS_METHODS.find((m) => m.key === "rent_growth")!.limits).toContain(TRAILING_YEAR_NOT_FORECAST);
     expect(g.verdict).toBe("unsupported");
     expect(g.method).toBe("The OM's rent growth against asking rent, apartments (Zillow Research), the one figure that decides; beside it, not deciding: asking rent, all home types (Zillow Research) and rent paid by sitting tenants (CPI rent) (BLS).");
     expect(g.impact!.input).toBe("rentGrowthPct");
@@ -470,8 +476,9 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(e.gap).toEqual({
       value: 0.9,
       unit: "pts",
-      text: "Held to consumer prices, all items (the CPI), the broad price level the expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED). The OM's 2.5%/yr is 0.9 points under it.",
+      text: "Held to consumer prices, all items (the CPI), the broad price level the expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED). The OM's 2.5%/yr is 0.9 points under it. A trailing year is what the assumption is asked to beat, not a forecast.",
     });
+    expect(e.impact!.note).toMatch(/^If expense growth is \+3\.4% over the year to Aug 2026 \(BLS via FRED\), run each year of the hold, not the OM's 2\.5%\/yr, /);
     expect(e.verdict).toBe("stretched");
     expect(e.method).toMatch(/^The OM's expense growth against consumer prices \(CPI, all items\) \(BLS via FRED\), the one figure that decides; beside it, not deciding: core CPI \(BLS via FRED\)/);
     expect(e.impact!.input).toBe("expenseGrowthPct");
@@ -821,7 +828,7 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: null }) }), "rent_growth");
     expect(g.evidence.map((e) => e.label)).toEqual(["Rent paid by sitting tenants (CPI rent)"]);
     expect(g.gap!.text).toBe(
-      "Held to the rent sitting tenants pay (CPI rent), the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at: +5.0% over the year to Aug 2026 (BLS). The OM's 4.0%/yr is 1.0 point under it — the conservative side.",
+      "Held to the rent sitting tenants pay (CPI rent), the figure for this kind of rent where no Zillow asking rent was read; it averages every lease in place, so it lags the rents new leases sign at: +5.0% over the year to Aug 2026 (BLS). The OM's 4.0%/yr is 1.0 point under it — the conservative side. A trailing year is what the assumption is asked to beat, not a forecast.",
     );
     expect(g.verdict).toBe("holds");
     // The evidence lifts the return: the conservative side's cushion.
@@ -832,7 +839,7 @@ describe("the rent growth is held to the figure for the deal's own kind of rent"
     const args = apartmentArgs();
     const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: { ...zori, mfrRent: null, mfrYoyPct: null } }) }), "rent_growth");
     expect(g.evidence.map((e) => e.label)).toEqual(["Asking rent, all home types", "Rent paid by sitting tenants (CPI rent)"]);
-    expect(g.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month: \+2\.3% over the year to Aug 2026 \(Zillow Research\)\. The OM's 4\.0%\/yr is 1\.7 points over it\.$/);
+    expect(g.gap!.text).toMatch(/^Held to Zillow's asking rents across all home types, the nearest figure for this kind of rent, since Zillow's apartment index has no figure for the month: \+2\.3% over the year to Aug 2026 \(Zillow Research\)\. The OM's 4\.0%\/yr is 1\.7 points over it\. A trailing year is what the assumption is asked to beat, not a forecast\.$/);
     expect(g.verdict).toBe("stretched");
   });
 
@@ -910,10 +917,10 @@ describe("the exit cap row", () => {
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.74%", "5.50%") })), "exit_cap")).toMatchObject({ gap: { value: 24, unit: "bps" }, verdict: "stretched" });
   });
 
-  it("an exit flat to the going-in cap holds, and says most underwriting adds expansion — no expansion figure invented", () => {
+  it("an exit flat to the going-in cap holds, and names adding expansion as a rule of thumb — no expansion figure invented", () => {
     const x = rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.50%", "5.50%") })), "exit_cap");
     expect(x.verdict).toBe("holds");
-    expect(x.gap!.text).toBe("The OM's 5.50% exit is flat to its 5.50% going-in cap; most underwriting adds expansion over a hold.");
+    expect(x.gap!.text).toBe("The OM's 5.50% exit is flat to its 5.50% going-in cap; adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to.");
   });
 
   it("says the exit's spread under the 10-year where it is under it", () => {
@@ -1234,6 +1241,9 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     expect(headlineSentence(test)).toContain(
       "The OM states its own yield on cost of 7.10% (Untrended yield on cost, p. 24), its row naming no cost it is struck on; the plan's 6.85% is struck on the $43.8M total cost, the $42M price plus the $1.8M budget.",
     );
+    // The memo's one line carries the OM's own stated figure too, from the
+    // same reader.
+    expect(headlineShort(test)).toContain("with the evidence (the OM states 7.10%, p. 24");
     expect(headlineSentence(test)).toContain("-point gap averaged over every order the swaps could be made in.");
   });
 
@@ -2113,6 +2123,138 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(none.verdict).toBe("unchecked");
   });
 
+  it("carries the OM's own validated page on its own pieces and says a price struck on one comp as one comp's", () => {
+    const one = {
+      saleComps: [
+        { name: "The Brixton", detail: "$252,000 per unit", support: "supports" as const, note: "", page: "p. 14" },
+        { name: "Vue", detail: "$298,000 per unit", support: "stretched" as const, note: "", page: "p. 15" },
+      ],
+      leaseComps: [],
+      redFlags: [],
+      summary: "",
+    };
+    const t = buildStressTest(apartmentArgs({ brokerComps: one }));
+    const b = rowOf(t, "basis");
+    // The clean comp's own page, validated against the deck's 48 pages; the
+    // left-out comp's page is no page of the figure.
+    expect(b.evidence[0]).toMatchObject({ kind: "om_internal", value: 252_000, page: 14 });
+    expect(rowWords(b).against).toBe("$252k/unit (the one comp graded clean, OM p. 14)");
+    // The verdict's brief cites the same page on the piece's own line.
+    const briefLine = stressSection(t).find((l) => l.startsWith("- ") && l.includes("(basis)"))!;
+    expect(briefLine).toContain(`${b.evidence[0].label}: ${b.evidence[0].text} (OM p. 14; the memorandum's own figure)`);
+    // A page past the deck's length is no page: nothing new is printed.
+    const past = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [{ ...one.saleComps[0], page: "p. 99" }] } })), "basis");
+    expect(past.evidence[0].page).toBeUndefined();
+    expect(rowWords(past).against).toBe("$252k/unit (the OM's one comp graded clean)");
+    // Two clean comps on two pages: their midpoint, no one page.
+    const two = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [one.saleComps[0], { ...one.saleComps[1], support: "supports" as const }] } })), "basis");
+    expect(two.evidence[0].page).toBeUndefined();
+    // With no page beside them, whose comps they are is said.
+    expect(rowWords(two).against).toMatch(/\(the midpoint of the OM's two comps graded clean\)$/);
+    // The going-in cap's own row's page.
+    const x = rowOf(t, "exit_cap");
+    expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", page: 6 });
+    expect(rowWords(x).against).toBe("5.71% (OM p. 6)");
+  });
+
+  it("dates each published piece by its own period, a day only for a day's figure", () => {
+    const t = buildStressTest(apartmentArgs());
+    const ev = t.rows.flatMap((r) => r.evidence);
+    const zillow = ev.find((e) => e.label === "Asking rent, apartments")!;
+    // Zillow's month is dated its last day; CPI's its first: both a month.
+    expect(evidencePeriod(zillow)).toEqual({ said: "Aug 2026", inText: true });
+    expect(evidenceWhen(zillow)).toBe("");
+    const cpi = ev.find((e) => e.label === "Consumer prices (CPI, all items)")!;
+    expect(evidencePeriod(cpi)).toEqual({ said: "Aug 2026", inText: true });
+    expect(rowWords(rowOf(t, "expense_growth")).against).toMatch(/^\+[\d.]+% over the year to Aug 2026 \(BLS via FRED\)$/);
+    // The 10-year is a day's figure.
+    const ten = ev.find((e) => e.label === "10-year Treasury, as the market check read it")!;
+    expect(evidencePeriod(ten)).toEqual({ said: "Sep 17, 2026", inText: true });
+    // A stored day the text does not date stays a day; no date, no period.
+    expect(evidencePeriod({ asOf: "2026-06-30", text: "$2.2M" })).toEqual({ said: "Jun 30, 2026", inText: false });
+    expect(evidenceWhen({ asOf: null, text: "x", kind: "published" })).toBe(", undated");
+    expect(evidenceWhen({ asOf: null, text: "x", kind: "om_internal" })).toBe("");
+    // No growth evidence anywhere is cited as a rate a year.
+    for (const k of ["rent_growth", "expense_growth"] as const) expect(rowWords(rowOf(t, k)).against).not.toMatch(/\/yr/);
+  });
+
+  it("dates a piece read at a moment by its UTC day, and gives a table a date, and a page a dateTime, only for the period its words say", () => {
+    // A recorded-sales pull stores the moment it read the records (lib/
+    // public-comps/run `retrievedAt: new Date().toISOString()`).
+    const stamp = new Date(Date.UTC(2026, 9, 12, 23, 41, 7, 512)).toISOString();
+    expect(stamp).toBe("2026-10-12T23:41:07.512Z");
+    expect(isoDayOf(stamp)).toBe("2026-10-12");
+    expect(isoDayOf("2026-10-12T19:41:07-04:00")).toBe("2026-10-12");
+    expect(isoDayOf("2026-10-12T22:41:07-04:00")).toBe("2026-10-13");
+    expect(isoDayOf("Q2 2026")).toBe("Q2 2026");
+    const sale = { asOf: stamp, text: "Median $250k/unit over 4 recorded sales, thin" };
+    expect(evidencePeriod(sale)).toEqual({ said: "Oct 12, 2026", inText: false });
+    expect(whenWords(stamp)).toBe("Oct 12, 2026");
+    expect(evidenceDay(sale)).toBe("2026-10-12");
+    expect(evidenceDateTime(sale)).toBe("2026-10-12");
+    // At the source too: a recorded-sales piece is dated its day.
+    const t = buildStressTest(
+      apartmentArgs({ recordedSales: { count: 4, medianPerSqft: 310, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: stamp, href: null } }),
+    );
+    const recorded = rowOf(t, "basis").evidence.find((e) => e.label.startsWith("Recorded sales"))!;
+    expect(recorded).toBeDefined();
+    expect(recorded.asOf).toBe("2026-10-12");
+    expect(evidenceShort(rowOf(t, "basis"), recorded)).not.toContain("T23:41");
+    // A month's figure stored under its first day is a month, never a day.
+    const cpi = { asOf: "2026-08-01", text: "+2.9% over the year to Aug 2026" };
+    expect(evidenceDay(cpi)).toBeNull();
+    expect(evidenceDateTime(cpi)).toBe("2026-08");
+    // A quarter has no valid HTML date string: no dateTime.
+    const survey = { asOf: "2026-04-01", text: "6.2% ±2.2 pts (Q2 2026)" };
+    expect(evidencePeriod(survey)).toEqual({ said: "Q2 2026", inText: true });
+    expect(evidenceDay(survey)).toBeNull();
+    expect(evidenceDateTime(survey)).toBeNull();
+    // A day's figure is a day.
+    expect(evidenceDay({ asOf: "2026-06-30", text: "$2.2M" })).toBe("2026-06-30");
+    expect(evidenceDay({ asOf: null, text: "x" })).toBeNull();
+  });
+
+  it("prints the memorandum's own page beside the publisher, as the report and the brief say it", () => {
+    expect(sourceWithPage({ publisher: "the offering memorandum", page: 14 })).toBe("OM p. 14");
+    expect(sourceWithPage({ publisher: "the deal's T-12", page: 3 })).toBe("the deal's T-12, OM p. 3");
+    expect(sourceWithPage({ publisher: "the offering memorandum" })).toBe("the offering memorandum");
+    expect(sourceWithPage({ publisher: "Zillow Research", page: 0 })).toBe("Zillow Research");
+  });
+
+  it("says the levered return was re-run only where a row draws a re-run", () => {
+    const t = buildStressTest(apartmentArgs());
+    expect(stressReadLine(t)).toMatch(/; the levered return re-run with one input swapped for the evidence's, in code\.$/);
+    // Every row holding or stripped of its re-run: nothing is withheld, and
+    // nothing is re-run, so the line ends on its counts.
+    const none = { ...t, rows: t.rows.map((r) => ({ ...r, impact: null })) };
+    expect(stressReadLine(none)).not.toContain("re-run");
+    expect(stressReadLine(none)).toMatch(/unchecked\.$|\)\.$/);
+    const held = { ...t, rows: t.rows.map((r) => (r.verdict === "unchecked" ? r : { ...r, verdict: "holds" as const })) };
+    expect(stressReadLine(held)).not.toContain("re-run");
+  });
+
+  it("leads a document with the larger move within a verdict, a row with no re-run after", () => {
+    const t = buildStressTest(apartmentArgs());
+    const led = leadRows(t, 10);
+    const rank = { unsupported: 0, stretched: 1 } as Record<string, number>;
+    for (let i = 1; i < led.length; i++) {
+      const [a, b] = [led[i - 1], led[i]];
+      if (rank[a.verdict] !== rank[b.verdict]) {
+        expect(rank[a.verdict]).toBeLessThan(rank[b.verdict]);
+        continue;
+      }
+      const [sa, sb] = [moveSize(a), moveSize(b)];
+      if (sa == null) expect(sb).toBeNull();
+      else if (sb != null) expect(sa).toBeGreaterThanOrEqual(sb);
+    }
+    // A synthetic pair: the larger move first, whatever the test's order.
+    const small = { ...rowOf(t, "rent_growth"), verdict: "stretched" as const };
+    const big = { ...small, key: "vacancy" as const, impact: { ...small.impact!, baseIrrPct: 12, altIrrPct: 6 } };
+    const none = { ...small, key: "noi" as const, impact: null };
+    const s2 = { ...small, impact: { ...small.impact!, baseIrrPct: 12, altIrrPct: 11 } };
+    expect(leadRows({ ...t, rows: [none, s2, big] }).map((r) => r.key)).toEqual(["vacancy", "rent_growth", "noi"]);
+  });
+
   it("names one or two clean comps, never a median, and calls the basis no worse than stretched on them", () => {
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" } })), "basis");
@@ -2676,6 +2818,9 @@ describe("the headline", () => {
     const shownDebt = shownHeadline(h).parts.find((p) => p.key === "debt")!;
     expect(headlineSentence(test)).toContain(`the loan rate ${ptsText(shownDebt.shown)} (against a screening default)`);
     for (const p of h.parts.filter((x) => x.key !== "debt")) expect(p.ruleOfThumb, p.key).toBeUndefined();
+    // The memo's one line says so too: it carries the evidence's case whole.
+    expect(headlineShort(test)).toMatch(/ with the evidence \(the loan rate against a screening default; the screening model as it runs: [\d.]+%\); the report splits the gap by assumption\.$/);
+    expect(headlineShort(test, false)).toMatch(/ with the evidence \(the loan rate against a screening default\); the report splits/);
   });
 
   it("names in the method every assumption the OM's case can hold", () => {

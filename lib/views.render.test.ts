@@ -3112,6 +3112,81 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("challenger: (deal.challenges as ChallengerResult | null) ?? null");
     // Without a test, the screen draws no panel.
     expect(renderToStaticMarkup(React.createElement(ShareView, props))).not.toContain('data-qa="stress-test-panel"');
+    // A verdict that kept no snapshot says nothing of the call's own test.
+    expect(html).not.toContain('data-qa="share-call-stress"');
+  });
+
+  it("leads the re-read panel with the call's own counts, from the verdict's snapshot, dated with the call — no figure of the sender's documents (2026-10-21)", async () => {
+    const { SHARE_NO_MODEL, buildStressTest } = await import("@/lib/stress-test");
+    const { stressSnapshotOf } = await import("@/lib/stress-snapshot");
+    const { callStressLine, SHARE_REREAD_NOTE } = await import("@/app/share/[token]/share-view");
+    const { sampleStressTest } = await import("@/lib/sample-stress");
+    // The call was reached on the signed-in sample's test (its rent roll and
+    // T-12 among the evidence); the shared screen re-reads the memorandum
+    // without them.
+    const atCall = sampleStressTest({ today: "2026-10-12" });
+    const snapshot = stressSnapshotOf(atCall)!;
+    const shared = buildStressTest({
+      extraction: SAMPLE_DEAL.extraction,
+      firstSignal: null,
+      challenger: SAMPLE_DEAL.challenges,
+      market: SAMPLE_DEAL.market,
+      modelVsMarket: null,
+      actuals: null,
+      derived: null,
+      storedAssetClass: SAMPLE_DEAL.asset_class,
+      brokerComps: SAMPLE_DEAL.comps,
+      withheldReason: SHARE_NO_MODEL,
+      readOn: "2026-10-21",
+    });
+    const verdict = { ...SAMPLE_DEAL.verdict, generatedAt: "2026-10-12T15:00:00Z", stressSnapshot: JSON.parse(JSON.stringify(snapshot)) };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: SAMPLE_DEAL.name,
+        assetClass: SAMPLE_DEAL.asset_class,
+        expiresAt: "2026-10-30T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: SAMPLE_DEAL.extraction,
+        comps: SAMPLE_DEAL.comps,
+        market: SAMPLE_DEAL.market,
+        verdict,
+        stressTest: shared,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    // The counts are the snapshot's own, by verdict, in the panel's words.
+    const n = (v: string) => snapshot.rows.filter((r) => r.verdict === v).length;
+    const line = callStressLine(verdict.stressSnapshot, "Oct 12, 2026")!;
+    expect(line.startsWith("At the call, Oct 12, 2026: ")).toBe(true);
+    if (n("unsupported")) expect(line).toContain(`${n("unsupported")} unsupported`);
+    if (n("stretched")) expect(line).toContain(`${n("stretched")} stretched`);
+    if (n("unchecked")) expect(line).toContain(`${n("unchecked")} could not be checked`);
+    const start = html.indexOf('data-qa="share-call-stress"');
+    const panel = html.indexOf('data-qa="stress-test-panel"');
+    expect(start).toBeGreaterThan(html.indexOf("First-pass verdict"));
+    expect(panel).toBeGreaterThan(start);
+    const lead = visibleText(html.slice(start, panel)).replace(/&#x27;/g, "'").replace(/&#x2019;|’/g, "’").replace(/\s+/g, " ");
+    expect(lead).toContain(line);
+    expect(lead).toContain(SHARE_REREAD_NOTE);
+    // No figure the snapshot kept — the rent roll's or the T-12's among them —
+    // is printed beside it.
+    for (const r of snapshot.rows) {
+      if (r.evidence?.kind === "document") expect(lead).not.toContain(String(r.evidence.value));
+    }
+    expect(lead).not.toMatch(/\d+\.\d+%|\$\d/);
+    // The call was reached on the engine's re-runs (a row past its evidence
+    // carried one), so the deal-killer cards take the plain label.
+    expect(snapshot.rows.some((r) => r.rerun != null && (r.verdict === "stretched" || r.verdict === "unsupported"))).toBe(true);
+    const all = visibleText(html).replace(/&#x27;/g, "'");
+    expect(all).toContain("Breaks if: ");
+    expect(all).not.toContain("Breaks if (the screen's estimate)");
+    // A stored snapshot that does not read is no snapshot: nothing new drawn.
+    expect(callStressLine({ v: 99, rows: [] }, "Oct 12, 2026")).toBeNull();
+    expect(callStressLine(undefined, null)).toBeNull();
+    // The loader hands the view the verdict whole, snapshot and all.
+    expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("verdict={deal.verdict as VerdictResult}");
   });
 
   it("renders the sample deal: the verdict mark, the flip dots, every range, the killers, key terms and the folded reads", () => {
@@ -3172,7 +3247,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // `bg-caution/10` is the confidence, not the position).
     expect(html).not.toMatch(/class="[^"]*\bbg-caution\b(?!\/)[^"]*"\s+style="left:/);
     expect(text).toContain("Basis");
-    expect(text).toContain("Breaks if:");
+    // The verdict kept no stress snapshot, so the call's cards are the
+    // screen's estimate, said so (lib/stress-snapshot `breaksIfLabel`).
+    expect(text.replace(/&#x27;/g, "'")).toContain("Breaks if (the screen's estimate):");
+    expect(text).not.toContain("Breaks if:");
     expect(text).toContain("Key terms");
     expect(text).toContain("pro forma");
     // The comp and market reads: first sentence in the open, the rest folded

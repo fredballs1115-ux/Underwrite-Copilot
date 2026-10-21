@@ -81,6 +81,12 @@ export function valueAddTermRows<M extends { label: string; value: string }>(met
   return [pick(TO_RENOVATE), pick(COST_PER), pick(PREMIUM, ACHIEVED), pick(ACHIEVED)].filter((m): m is M => m != null);
 }
 
+/** The row the achieved premium is read off — `readValueAdd`'s own pick, by
+ *  its ACHIEVED pattern — for a caller that cites its page; null with none. */
+export function achievedPremiumRow<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M | null {
+  return (metrics.filter(isRow) as M[]).find((m) => ACHIEVED.test(m.label)) ?? null;
+}
+
 // ── Reading one figure ─────────────────────────────────────────────────
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();

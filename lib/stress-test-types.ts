@@ -56,7 +56,19 @@ export interface StressEvidence {
    *  Its value is on that yardstick, so it is drawn on no track shared with
    *  the OM's figure. Absent on every other piece. */
   ownYardstick?: { om: number; per: string } | null;
+  /** the memorandum's page the piece is read off, where it is the OM's own
+   *  figure (`om_internal`) and the engine holds a page validated against the
+   *  deck's length (lib/facts `locatedPage`): the going-in cap's row, the
+   *  achieved premium's row, the clean comps' page where they share one.
+   *  Absent where none is validated — never the model's raw page. */
+  page?: number | null;
 }
+
+/** What a trailing year of a published growth figure is, said in a growth
+ *  row's own words on every surface (the gap's sentence) and on the
+ *  methodology page: the year the assumption is asked to beat, never a
+ *  forecast of the hold. */
+export const TRAILING_YEAR_NOT_FORECAST = "A trailing year is what the assumption is asked to beat, not a forecast.";
 
 /** The return's move when the OM's figure is replaced by the evidence's,
  *  computed with lib/underwrite/engine's `computeUnderwrite` on the deal's
@@ -555,7 +567,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     ],
     engine: "Rent growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
     limits: [
-      "A trailing year is what the assumption is asked to beat, not a forecast.",
+      TRAILING_YEAR_NOT_FORECAST,
       "The highest figure is not the test: where Zillow's asking rents are read, a sitting-tenant index running ahead of them is shown beside them, never held to.",
       "Lodging and licensed care read no rent index: they sell nights and care, not leases.",
     ],
@@ -571,7 +583,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The bond market's ten-year expected inflation (the breakeven), shown apart",
     ],
     engine: "Expense growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
-    limits: ["The insurance line's own repricing is read apart (below), not through the growth rate."],
+    limits: [TRAILING_YEAR_NOT_FORECAST, "The insurance line's own repricing is read apart (below), not through the growth rate."],
   },
   {
     key: "taxes",

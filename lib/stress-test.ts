@@ -129,7 +129,7 @@ import { planYieldBase, yieldOnCost } from "@/lib/plan-sensitivity";
 import { datedLong, indexName, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { locatedPage } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
-import { publisherTag } from "@/lib/live-rates-core";
+import { periodLabel, publisherTag } from "@/lib/live-rates-core";
 import type { ModelCheck, ModelVsMarket, PublishedFigure } from "@/lib/model-vs-market";
 import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { SIZER_LENDER_TESTS } from "@/lib/sizer-terms";
@@ -139,7 +139,7 @@ import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engin
 import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
 import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
-import { readValueAdd } from "@/lib/value-add";
+import { achievedPremiumRow, readValueAdd } from "@/lib/value-add";
 import { readRoster } from "@/lib/tenant-roster";
 import { CPI_RENT_LABEL, CPI_RENT_LAGS, NO_RENT_INDEX, readsNoRentIndex } from "@/lib/rent-growth-decider";
 import {
@@ -158,8 +158,10 @@ import {
   type StressKept,
   type PlanYieldInput,
   TAX_RESET_CONDITION,
+  TRAILING_YEAR_NOT_FORECAST,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
+import { evidenceFigureText, evidencePeriod, isoDayOf } from "@/lib/stress-test-words";
 import {
   ABATEMENT_LABEL,
   ACHIEVED_PREMIUM_LABEL,
@@ -424,15 +426,18 @@ function runImpact(
   omValue: number,
   altValue: number,
   modelValue: number,
-  words: { what: string; om: string; alt: string; evidence: string; omSide?: string; model: string },
+  words: { what: string; om: string; alt: string; altRun?: string; evidence: string; omSide?: string; model: string },
 ): StressImpact {
   const base = computeUnderwrite(baseInputs).returns;
   const alt = computeUnderwrite(altInputs).returns;
   const same = Math.abs(altValue - omValue) < 1e-9;
   const omSide = words.omSide ?? "the OM's";
   // A publisher named with its channel ("BLS via FRED") takes no
-  // possessive: the figure, then whose it is.
-  const altSaid = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
+  // possessive: the figure, then whose it is. A trailing year's change is
+  // then said as what the run does with it (`altRun`: "run each year of the
+  // hold"), never as a rate a year the publisher states.
+  const altFigure = !words.evidence ? words.alt : / via /.test(words.evidence) ? `${words.alt} (${words.evidence})` : `${words.evidence}'s ${words.alt}`;
+  const altSaid = words.altRun && !same ? `${altFigure}, ${words.altRun}` : altFigure;
   const modelClause =
     Math.abs(modelValue - omValue) < 1e-9 ? "" : Math.abs(modelValue - altValue) < 1e-9 ? " The model itself already runs at it." : ` The model itself runs ${words.model}.`;
   const note = same
@@ -459,10 +464,25 @@ function pctImpact(
   evidenceIndex: number,
   omPct: number,
   altPct: number,
-  words: { what: string; om: string; alt: string; evidence: string; model: string },
+  words: { what: string; om: string; alt: string; altRun?: string; evidence: string; model: string },
 ): StressImpact {
   const inputs = derived.inputs;
   return runImpact(input, { ...inputs, [input]: omPct / 100 }, { ...inputs, [input]: altPct / 100 }, evidenceIndex, omPct / 100, altPct / 100, inputs[input], words);
+}
+
+/**
+ * A growth row's deciding figure as a re-run's note says it: the trailing
+ * year's change with its own period ("+1.1% over the year to Aug 2026",
+ * lib/stress-test-words `evidencePeriod`), then what the run does with it
+ * ("run each year of the hold") — never "1.1%/yr", which reads as a rate a
+ * year the publisher states. A figure whose text is no trailing year keeps
+ * the rate a year. Words only: the run is the same either way.
+ */
+function trailingWords(key: "rent_growth" | "expense_growth", e: StressEvidence): { alt: string; altRun?: string } {
+  if (e.value == null) return { alt: "not stated" };
+  if (!/\bover the year\b/.test(e.text)) return { alt: `${pct1(e.value)}/yr` };
+  const p = evidencePeriod(e);
+  return { alt: `${evidenceFigureText(key, e.value)} over the year${p ? ` to ${p.said}` : ""}`, altRun: "run each year of the hold" };
 }
 
 /** The year-1 NOI the model's inputs make, before capital and fees. */
@@ -1320,19 +1340,21 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   // "Held to Zillow's apartment asking rents, the figure for this kind of
   // rent: +1.6% over the year to Aug 2026 (Zillow Research)."
   const held = `Held to ${name}, ${pick.d.why}: ${decider.text} (${decider.publisher}).`;
+  // The OM's figure is a rate a year; the evidence's is a trailing year's
+  // change, said as one, and never as a forecast (`TRAILING_YEAR_NOT_FORECAST`).
   const judged = judge(om.pct, bestValue, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it. ${TRAILING_YEAR_NOT_FORECAST}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it. ${TRAILING_YEAR_NOT_FORECAST}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side. ${TRAILING_YEAR_NOT_FORECAST}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
       ? pctImpact(ctx.derived, "rentGrowthPct", pick.i, om.pct, bestValue, {
           what: "rent growth",
           om: `${pct1(om.pct)}/yr`,
-          alt: `${pct1(bestValue)}/yr`,
+          ...trailingWords("rent_growth", decider),
           evidence: decider.publisher,
           model: `${pct1(ctx.derived.inputs.rentGrowthPct * 100)}/yr`,
         })
@@ -1376,17 +1398,17 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
   const held = `Held to ${decided.name}, ${decided.why}: ${evidence[evidenceIndex].text} (${evidence[evidenceIndex].publisher}).`;
   const judged = judge(om.pct, bestValue, "low", "pts", EXPENSE_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it. ${TRAILING_YEAR_NOT_FORECAST}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it.`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side.`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it. ${TRAILING_YEAR_NOT_FORECAST}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side. ${TRAILING_YEAR_NOT_FORECAST}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
       ? pctImpact(ctx.derived, "expenseGrowthPct", evidenceIndex, om.pct, bestValue, {
           what: "expense growth",
           om: `${pct1(om.pct)}/yr`,
-          alt: `${pct1(bestValue)}/yr`,
+          ...trailingWords("expense_growth", evidence[evidenceIndex]),
           evidence: evidence[evidenceIndex].publisher,
           model: `${pct1(ctx.derived.inputs.expenseGrowthPct * 100)}/yr`,
         })
@@ -1420,6 +1442,8 @@ export function exitCapPieces(
   const goingIn = goingRow ? parsePct(goingRow.value) : null;
   const goingInOk = goingIn != null && goingIn > 0 && !plan && buildingPriceOf(ex, 1) != null;
   if (goingInOk) {
+    // The going-in cap's own row's page, validated against the deck.
+    const page = pageOf(goingRow, ex);
     evidence.push({
       kind: "om_internal",
       label: GOING_IN_CAP_LABEL,
@@ -1428,6 +1452,7 @@ export function exitCapPieces(
       asOf: null,
       publisher: "the offering memorandum",
       scope: "deal",
+      ...(page != null ? { page } : {}),
     });
   }
   const check = checkOf(mvm, "exit_cap");
@@ -1504,10 +1529,10 @@ function exitCapRow(ctx: Ctx): StressRow | null {
       ? // Flat to the entry holds: the code carries no expansion default (the
         // model exits at the higher of the going-in cap and the OM's own
         // exit, lib/model-evidence, never at an expansion of its own), so
-        // none is invented here; the sentence says what most underwriting
-        // does.
+        // none is invented here; the sentence names the habit as the rule of
+        // thumb it is, held to nothing.
         Math.abs(diffBps) < SAME * 100
-        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; most underwriting adds expansion over a hold.`
+        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to.`
         : diffBps > 0
           ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} going-in cap — cap compression.`
           : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} going-in cap — the conservative side.`
@@ -2184,7 +2209,10 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const check = checkOf(ctx.mvm, "expense_growth");
   const idx = check?.published.find((f) => /insurance premiums/i.test(f.label)) ?? null;
   const stored = ctx.market?.liveBrief?.figures?.find((f) => f.key === "insurance_index_yoy") ?? null;
-  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${proseDay(stored.asOf)}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
+  // The index is a monthly series (the BLS's PPI), so a stored figure is
+  // dated by its month, never its first day.
+  const storedWhen = stored && /^\d{4}-\d{2}-\d{2}$/.test(stored.asOf) ? periodLabel(stored.asOf, "monthly") : stored ? proseDay(stored.asOf) : "";
+  const index = idx ? { pct: idx.value, text: idx.text, asOf: idx.asOf, publisher: idx.publisher } : stored ? { pct: stored.value, text: `${stored.value > 0 ? "+" : ""}${stored.value.toFixed(1)}% over the year to ${storedWhen}`, asOf: stored.asOf, publisher: "BLS via FRED" } : null;
   if (index) {
     const moved = premium != null ? Math.round(premium * (1 + index.pct / 100)) : null;
     evidence.push({
@@ -2339,6 +2367,11 @@ function basisRow(ctx: Ctx): StressRow | null {
           : clean.length === 1
             ? " — the one comp graded clean, too few for a median"
             : ", none graded clean (supports), so none is set against the ask";
+    // The page the figure is read off: the clean comps' own page, each
+    // validated against the deck (lib/facts `locatedPage`), where they all
+    // sit on one; none where they sit on several or any states none.
+    const cleanPages = new Set(clean.map((c) => locatedPage(c.comp.page, ex?.totalPages)));
+    const compsPage = figure != null && cleanPages.size === 1 ? [...cleanPages][0] : null;
     pushComparable(
       {
         kind: "om_internal",
@@ -2348,6 +2381,7 @@ function basisRow(ctx: Ctx): StressRow | null {
         asOf: null,
         publisher: "the offering memorandum",
         scope: "deal",
+        ...(compsPage != null ? { page: compsPage } : {}),
       },
       on,
       clean.length === 1 || clean.length === 2 ? { count: clean.length as 1 | 2, names: clean.map((c) => c.comp.name) } : null,
@@ -2381,7 +2415,9 @@ function basisRow(ctx: Ctx): StressRow | null {
                 ? `${sales}; no per-${nounOne} median is struck on recorded sales`
                 : `${sales}, too few of them stating an area for a median /SF`,
         value: v != null ? Math.round(v) : null,
-        asOf: rs.retrievedAt,
+        // The day the records were read (lib/public-comps/run stores the
+        // moment, a full timestamp), by its UTC day.
+        asOf: rs.retrievedAt ? isoDayOf(rs.retrievedAt) || null : null,
         publisher: rs.providerName,
         scope: "metro",
         href: rs.href ?? null,
@@ -2642,6 +2678,10 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
   const evidence: StressEvidence[] = [];
   const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
   if (r.achievedPremium != null) {
+    // The achieved premium's own row, picked by the reader's own ACHIEVED
+    // pattern (lib/value-add `achievedPremiumRow`), never by its place in a
+    // list; its page validated against the deck.
+    const page = locatedPage(achievedPremiumRow(ctx.rows)?.page, ctx.ex?.totalPages);
     evidence.push({
       kind: "om_internal",
       label: ACHIEVED_PREMIUM_LABEL,
@@ -2650,6 +2690,7 @@ function renovationPremiumRow(ctx: Ctx): StressRow | null {
       asOf: null,
       publisher: "the offering memorandum",
       scope: "deal",
+      ...(page != null ? { page } : {}),
     });
   }
   if (r.classicRent != null && r.renovatedRent != null) {

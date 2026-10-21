@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
 import {
+  achievedPremiumRow,
   monthlyOf,
   readValueAdd,
   valueAddContextLine,
@@ -157,6 +158,11 @@ describe("the program on every summary", () => {
       "Renovation premium",
       "Achieved renovation premium",
     ]);
+    // The achieved premium's own row, by its pattern, wherever it sits.
+    const metrics = PROGRAM().metrics;
+    expect(achievedPremiumRow(metrics)?.label).toBe("Achieved renovation premium");
+    expect(achievedPremiumRow([...metrics].reverse())?.label).toBe("Achieved renovation premium");
+    expect(achievedPremiumRow(metrics.filter((m) => m.label !== "Achieved renovation premium"))).toBeNull();
   });
 
   it("the prompt asks for the rows the reader reads, by their labels", () => {

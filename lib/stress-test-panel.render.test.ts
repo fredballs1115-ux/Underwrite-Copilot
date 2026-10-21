@@ -10,9 +10,9 @@ import React from "react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { METHOD_FOLD_LABEL, StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, stressReadLine, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
+import { METHOD_FOLD_LABEL, StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence, modelCellText } from "./stress-test-words";
+import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence, modelCellText, stressCountLine } from "./stress-test-words";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { sampleStressTest } from "./sample-stress";
@@ -203,8 +203,8 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
   it("heads with the count and leads most severe first: unsupported, stretched, holds, unchecked", () => {
     expect(html).toContain('<h2 class="text-[11px] font-semibold uppercase tracking-wider text-kill">The OM&#x27;s assumptions, tested</h2>');
     expect(text).toContain("5 assumptions: 1 unsupported, 1 stretched, 1 holds; 2 could not be checked");
-    expect(stressReadLine([TAXES, TAXES])).toBe("2 assumptions: 2 hold");
-    expect(stressReadLine([GROWTH])).toBe("1 assumption: none could be checked");
+    expect(stressCountLine([TAXES, TAXES])).toBe("2 assumptions: 2 hold");
+    expect(stressCountLine([GROWTH])).toBe("1 assumption: none could be checked");
     expect(sortStressRows(TEST.rows).map((r) => r.key)).toEqual(["vacancy", "exit_cap", "taxes", "rent_growth", "other"]);
     const verdicts = [...html.matchAll(/data-verdict="([a-z]+)"/g)].map((m) => m[1]);
     expect(verdicts).toEqual(["unsupported", "stretched", "holds", "unchecked", "unchecked"]);
@@ -369,9 +369,12 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // The deal's own document says whose it is by its kind; a published
     // figure names its grain, and that none is the building's is said once,
     // in the key.
-    expect(t).toContain("The deal's own document Decides The deal's T-12: vacancy loss over scheduled rent: 9.1% ($400k of $4.4M, TTM to 2026-06-30) — the deal's T-12, Jun 30, 2026");
+    expect(t).toContain("The deal's own document Decides The deal's T-12: vacancy loss over scheduled rent: 9.1% ($400k of $4.4M, TTM to 2026-06-30) — the deal's T-12 A published figure");
     expect(t).not.toContain("the deal's own figure");
-    expect(t).toContain("A published figure Beside it, not deciding Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) — Census Bureau, Apr 1, 2026 · the metro's figure Source");
+    // Dated by its own period, which its text already says: never the
+    // quarter's first day beside "(Q2 2026)".
+    expect(t).toContain("A published figure Beside it, not deciding Rental vacancy, metro area: 6.2% ±2.2 pts (Q2 2026) — Census Bureau · the metro's figure Source");
+    expect(t).not.toContain("Apr 1, 2026");
     expect(t).not.toContain("not the building's Source");
     expect(t.match(/never the building's/g)).toBeNull();
     const all = visibleText(html).replace(/&#x27;/g, "'");
@@ -431,6 +434,47 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(taxes).not.toContain('data-qa="stress-span"');
     expect(t).toContain(HOLDS_NO_RERUN);
     expect(taxes).not.toContain('data-qa="stress-impact"');
+  });
+
+  it("prints the OM's own page beside a piece the engine validated one for, and a growth row's evidence as a trailing year's change", () => {
+    const paged: StressRow = { ...EXIT, evidence: [{ ...EXIT.evidence[0], page: 6 }] };
+    const growth: StressRow = {
+      key: "rent_growth",
+      title: "Rent growth",
+      omSays: { text: "Rent growth: 4.0%", value: 4, page: 21 },
+      evidence: [{ kind: "published", label: "Asking rent, apartments", text: "+1.1% over the year to Aug 2026", value: 1.1, asOf: "2026-08-31", publisher: "Zillow Research", scope: "metro" }],
+      gap: { value: 2.9, unit: "pts", text: "The OM's 4.0%/yr is 2.9 points over it." },
+      verdict: "unsupported",
+      decidedBy: 0,
+      impact: null,
+      challenge: null,
+      method: "",
+    };
+    const out = renderToStaticMarkup(h(StressTestPanel, { test: { ...TEST, rows: [paged, growth], headline: null } }));
+    const t = visibleText(out).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(t).toContain("— the offering memorandum OM p. 6");
+    // The OM's figure is a rate a year; the evidence a trailing year's
+    // change, dated by its month, never by the month's last day.
+    expect(t).toContain("OM 4.0%/yr");
+    expect(t).toContain("Decides +1.1%");
+    expect(t).not.toContain("Decides +1.1%/yr");
+    expect(t).not.toContain("Aug 31, 2026");
+  });
+
+  it("gives a piece's period a machine-readable date that matches its words: a day for a day, a recorded-sales pull by its UTC day", () => {
+    const piece = (asOf: string, text: string): StressRow => ({ ...EXIT, evidence: [{ ...EXIT.evidence[0], kind: "published", asOf, text, publisher: "Philadelphia OPA", scope: "metro" }] });
+    const html = (row: StressRow) => renderToStaticMarkup(h(StressTestPanel, { test: { ...TEST, rows: [row], headline: null } }));
+    const day = html(piece("2026-06-30", "$2.2M"));
+    expect(day).toMatch(/<time datetime="2026-06-30"[^>]*>Jun 30, 2026<\/time>/i);
+    // A full timestamp is its UTC day, in the words and the dateTime alike.
+    const stamp = html(piece("2026-10-12T23:41:07.512Z", "Median $240k/unit over 4 recorded sales"));
+    expect(stamp).toMatch(/<time datetime="2026-10-12"[^>]*>Oct 12, 2026<\/time>/i);
+    expect(stamp).not.toContain("T23:41");
+    // A period stated in words carries no dateTime of its own.
+    const quarter = html(piece("Q2 2026", "6.2%"));
+    expect(quarter).toContain("Q2 2026");
+    expect(quarter).not.toMatch(/datetime="Q2/i);
+    expect(a11yIssues(stamp)).toEqual([]);
   });
 
   it("draws a basis piece judged on its own yardstick in the list, never on the track shared with the OM's per-unit figure", () => {

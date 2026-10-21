@@ -368,7 +368,7 @@ describe("the sample's stress test, one build on every surface", () => {
     const check = SAMPLE_DEAL.market.checks.find((c) => /rent growth/i.test(c.assumption))!;
     expect(check).toMatchObject({ typicalRange: "2.5–3.5%", assessment: "aggressive" });
     expect(check.note).toMatch(/rule of thumb/);
-    expect(check.note).toMatch(/the stress test sets the 4\.0% against today's published rents\.$/);
+    expect(check.note).toMatch(/the stress test is where the 4\.0% is held to a published rent figure, when today's read has one\.$/);
   });
 
   it("draws one renovation program under the header: the deal page's props and /demo's, the homepage leaving it to the stress test", () => {

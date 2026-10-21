@@ -563,7 +563,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
     expect(brief).toContain("the levered IRR moves from 9.3% to 5.9%");
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll, May 31, 2026; the deal's own document)",
+      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll; the deal's own document)",
     );
     // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
     expect(brief).toMatch(/the levered IRR moves from 12\.4% to 9\.1%/);
@@ -589,8 +589,8 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const test = sampleStressTest("2026-10-19");
     const region = { kind: "published" as const, label: "Rental vacancy, South Census region", text: "9.5% (Q2 2026)", value: 9.5, asOf: "2026-04-01", publisher: "FRED", scope: "region" as const };
     const brief = buildBrief({ extraction: null, ...none, stressTest: { ...test, rows: test.rows.map((r) => (r.key === "vacancy" ? { ...r, evidence: [...r.evidence, region] } : r)) } });
-    expect(brief).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the Census region's figure)");
-    expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED, Apr 1, 2026; the metro's figure)");
+    expect(brief).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026) (FRED; the Census region's figure)");
+    expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED; the metro's figure)");
   });
 
   it("says the impacts are withheld, and why, where no model could be built", async () => {

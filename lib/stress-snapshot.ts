@@ -232,3 +232,34 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
   if (rows.length === 0) return null;
   return { v: STRESS_SNAPSHOT_V, readOn: str(s.readOn) ? s.readOn : "", rows };
 }
+
+/** The deal-killer card's label where the call cites the engine's figures. */
+export const BREAKS_IF = "Breaks if:";
+/** The same card's label where it may not: the verdict step's own words,
+ *  which can carry a return it estimated rather than one the engine ran. */
+export const BREAKS_IF_ESTIMATE = "Breaks if (the screen's estimate):";
+
+/**
+ * Whether the call was reached on the engine's own re-runs: the snapshot
+ * its verdict kept has a row past its evidence (stretched or unsupported)
+ * that carried a re-run — the rows the verdict's brief cites by figure
+ * (lib/anthropic/pipeline `screenStressTest`; a row that holds or is
+ * unchecked draws none). A verdict saved before the stress test, a snapshot
+ * kept before `rerun` was carried, or one whose rows re-ran nothing, is not.
+ */
+export function callCitesEngine(stored: unknown): boolean {
+  const snapshot = readStressSnapshot(stored);
+  return !!snapshot && snapshot.rows.some((r) => r.rerun != null && (r.verdict === "stretched" || r.verdict === "unsupported"));
+}
+
+/**
+ * The deal-killer card's label, on the memo, the report's "The call, in
+ * full" and the shared screen alike: "Breaks if:" only where the call cites
+ * the engine's figures (`callCitesEngine` on the verdict's `stressSnapshot`),
+ * else "Breaks if (the screen's estimate):". The sample's call is written by
+ * hand on its own stress test (lib/sample-figures.test.ts holds its exit
+ * card to the engine's re-run), so `sample` is read as citing it.
+ */
+export function breaksIfLabel(stored: unknown, sample = false): string {
+  return sample || callCitesEngine(stored) ? BREAKS_IF : BREAKS_IF_ESTIMATE;
+}

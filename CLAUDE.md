@@ -109,6 +109,14 @@ tested and whether that is right. So:
   cap), else whichever stands, else the default; every surface that builds
   the model reads it once, the sample is never seeded, and each source note
   says which ran and why.
+- **The workbook carries the stress test** (2026-10-21): a data-only
+  "Stress Test" tab beside Market Read (`buildStressTestTab` in
+  lib/underwrite/workbook.ts), built in both workbook routes exactly as the
+  deal page builds the test, so the tab and the page print one StressTest;
+  no other tab reads it. Evidence everywhere is dated by its own period
+  (`evidencePeriod` / `evidenceWhen` in lib/stress-test-words), a trailing
+  year is said as one (`TRAILING_YEAR_NOT_FORECAST`), and an OM page on a
+  piece of evidence is only ever one `locatedPage` validated.
 - **The track record scores every row** (2026-10-20, `lib/stress-snapshot.ts`):
   the stress test is kept with its verdict (`stressSnapshot`, in the
   verdict's jsonb, riding into `prior_screen`), and each row — holds

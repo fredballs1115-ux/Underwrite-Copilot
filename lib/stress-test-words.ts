@@ -3,7 +3,8 @@
 // report's "The stress test" page and the verdict brief's section each read
 // ONE set of sentences off a StressTest (lib/stress-test), so no document
 // can say a row differently from another. Pure, no I/O; imports only the
-// types, the dollar writer and STRESS_KEYS.
+// types, the dollar writer, the cadence reader (lib/live-rates-core
+// `periodLabel`, which holds no table) and STRESS_KEYS.
 //
 // Rules: a figure is written in the assumption's own unit, the one the
 // reader struck it in; the evidence a row is read against is the one its
@@ -13,6 +14,7 @@
 // said as none, never as a move; an arrow is spelled "to", since the
 // documents print in standard Helvetica (WinAnsi only).
 
+import { periodLabel } from "@/lib/live-rates-core";
 import { compactUsd } from "@/lib/money";
 import {
   STRESS_KEYS,
@@ -35,14 +37,28 @@ export const VERDICT_WORD: Record<StressVerdict, string> = {
   unchecked: "unchecked",
 };
 
-/** The rows a document leads with: unsupported first, then stretched, in
- *  the test's own order within each; at most `max`. */
+/** How far a row's re-run moves its measure, in points (the levered IRR, or
+ *  a plan's yield on cost); null where it carries no re-run, or one whose
+ *  two runs do not both solve. Display order only: no figure is changed. */
+export function moveSize(row: StressRow): number | null {
+  const i = row.impact;
+  if (!i) return null;
+  const base = isYieldImpact(i) ? (i.baseYocPct ?? null) : i.baseIrrPct;
+  const alt = isYieldImpact(i) ? (i.altYocPct ?? null) : i.altIrrPct;
+  return base != null && alt != null && Number.isFinite(base) && Number.isFinite(alt) ? Math.abs(alt - base) : null;
+}
+
+/** The rows a document leads with: unsupported first, then stretched;
+ *  within each, the larger move of the return first, a row with no re-run
+ *  after every row with one, and the test's own order between equals; at
+ *  most `max`. */
 export function leadRows(test: StressTest, max = 4): StressRow[] {
   const rank: Record<StressVerdict, number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+  const bySize = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : b - a);
   return test.rows
     .filter((r) => r.verdict === "unsupported" || r.verdict === "stretched")
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.i - b.i)
+    .map((r, i) => ({ r, i, size: moveSize(r) }))
+    .sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || bySize(a.size, b.size) || a.i - b.i)
     .slice(0, max)
     .map((x) => x.r);
 }
@@ -59,7 +75,8 @@ export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
  * code — 4 tested (1 unsupported, 2 stretched, 1 holds), 5 unchecked; the
  * levered return re-run with one input swapped for the evidence's." An
  * unchecked row was read and not tested, so it is never counted among the
- * tested. Where no return was re-run, why.
+ * tested. Where no return was re-run, why; where nothing is withheld and no
+ * row draws a re-run, the counts alone, never a re-run the rows do not make.
  */
 export function stressReadLine(test: StressTest): string {
   const c = verdictCounts(test);
@@ -76,15 +93,43 @@ export function stressReadLine(test: StressTest): string {
       ? "No assumption of the memorandum's could be tested in code."
       : `${n} of the memorandum's assumptions read in code — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
   // The withheld reason is a whole sentence that already says no return is
-  // re-run (lib/stress-test), printed as it stands.
+  // re-run (lib/stress-test), printed as it stands. The re-run clause is
+  // said only where a row draws one; with none, the line ends on its counts.
   const tail = test.impactsWithheld
     ? `${head.endsWith(".") ? "" : "."} ${test.impactsWithheld}`
     : n === 0
       ? ""
+      : !test.rows.some(drawsRerun)
+        ? "."
       : test.measure === "yield_on_cost"
         ? "; the plan's yield on total cost re-run with one figure swapped for the evidence's, in code."
         : "; the levered return re-run with one input swapped for the evidence's, in code.";
   return `${head}${tail}`;
+}
+
+/** What an unchecked row is called where a line counts it in a reader's
+ *  words, beside the verdict word "unchecked" on its chip. */
+export const UNCHECKED_COUNT_WORDS = "could not be checked";
+
+/**
+ * The counts in short, for the panel's header and the deal header's chip:
+ * "9 assumptions: 1 unsupported, 2 stretched, 1 holds; 5 could not be
+ * checked". `stressReadLine` is the documents' whole sentence; this is its
+ * counts alone, a row that could not be checked never counted among the
+ * tested.
+ */
+export function stressCountLine(rows: readonly StressRow[]): string {
+  const n = (v: StressVerdict) => rows.filter((r) => r.verdict === v).length;
+  const parts: [number, string][] = [
+    [n("unsupported"), "unsupported"],
+    [n("stretched"), "stretched"],
+    [n("holds"), n("holds") === 1 ? "holds" : "hold"],
+  ];
+  const said = parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`);
+  const head = `${rows.length} assumption${rows.length === 1 ? "" : "s"}`;
+  const notChecked = n("unchecked");
+  if (said.length === 0) return `${head}: none could be checked`;
+  return `${head}: ${said.join(", ")}${notChecked > 0 ? `; ${notChecked} ${UNCHECKED_COUNT_WORDS}` : ""}`;
 }
 
 /** Whether a re-run measures a plan deal's yield on total cost. */
@@ -178,10 +223,39 @@ export function figureText(key: StressKey, value: number | null, rowText?: strin
   }
 }
 
-/** An ISO day in words ("May 31, 2026"); any other stated period as it
- *  stands ("Q2 2026"); "undated" with none. */
-export function whenWords(asOf: string | null | undefined): string {
+/** Whether a row's figure is a growth rate a year (rent or expense growth). */
+const isGrowth = (key: StressKey) => key === "rent_growth" || key === "expense_growth";
+
+/** A piece of evidence's figure in the row's unit, as a track label prints
+ *  it: a growth row's published figure is a trailing year's change, signed
+ *  ("+1.1%") and never a rate a year — the OM's figure is the rate a year
+ *  ("4.0%/yr", `figureText`); every other figure as `figureText` writes it. */
+export function evidenceFigureText(key: StressKey, value: number | null, rowText?: string): string {
+  if (value == null || !Number.isFinite(value)) return "not stated";
+  if (!isGrowth(key)) return figureText(key, value, rowText);
+  const t = pct1(value);
+  return Number(value.toFixed(1)) > 0 ? `+${t}` : t;
+}
+
+/** A full ISO timestamp ("2026-10-12T15:04:05.123Z", a recorded-sales pull's
+ *  `retrievedAt`) as its UTC day ("2026-10-12"); any other text as it
+ *  stands, trimmed. A day is what every surface prints for a piece read at a
+ *  moment, never the moment's raw string. */
+export function isoDayOf(asOf: string | null | undefined): string {
   const s = (asOf ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(s)) {
+    const t = Date.parse(s);
+    if (Number.isFinite(t)) return new Date(t).toISOString().slice(0, 10);
+  }
+  return s;
+}
+
+/** An ISO day in words ("May 31, 2026"), a full timestamp by its UTC day;
+ *  any other stated period as it stands ("Q2 2026"); "undated" with none. A
+ *  piece of evidence is dated by its own period (`evidencePeriod`), never by
+ *  this alone. */
+export function whenWords(asOf: string | null | undefined): string {
+  const s = isoDayOf(asOf);
   if (!s) return "undated";
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const t = Date.parse(`${s}T00:00:00Z`);
@@ -190,19 +264,154 @@ export function whenWords(asOf: string | null | undefined): string {
   return s;
 }
 
+/** The cadences a published figure's text is dated in, finest first
+ *  (lib/live-rates-core `periodLabel`): a day, a month, a quarter. A year is
+ *  read apart, only in brackets — "2026" alone is in most dates. */
+const TEXT_CADENCES = ["daily", "monthly", "quarterly"] as const;
+
+/**
+ * The period a piece of evidence is for, said by its own cadence: the one
+ * its own text is dated in, read through the cadence reader that wrote it
+ * (lib/live-rates-core `periodLabel` — "Aug 2026" for a monthly index or a
+ * Zillow month, "Q2 2026" for the survey's quarter, a day only for a day's
+ * figure), with `inText` true where the text already says it, so no surface
+ * prints it twice. A stored ISO day the text does not date is a day (a
+ * T-12's period end, the day records were read — a full timestamp by its
+ * UTC day, `isoDayOf`); any other stated period stands as written. Null with
+ * no date.
+ */
+export function evidencePeriod(e: Pick<StressEvidence, "asOf" | "text">): { said: string; inText: boolean } | null {
+  const s = isoDayOf(e.asOf);
+  if (!s) return null;
+  const text = e.text ?? "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(`${s}T00:00:00Z`))) {
+    if (text.includes(s)) return { said: whenWords(s), inText: true };
+    for (const c of TEXT_CADENCES) {
+      const label = periodLabel(s, c);
+      if (text.includes(label)) return { said: label, inText: true };
+    }
+    const year = s.slice(0, 4);
+    if (text.includes(`(${year})`)) return { said: year, inText: true };
+    return { said: whenWords(s), inText: false };
+  }
+  return { said: s, inText: text.includes(s) };
+}
+
+/** The ISO day a piece is dated, only where its own period IS a day
+ *  (`evidencePeriod` says it as one): "2026-05-31" for a rent roll's day, a
+ *  recorded-sales pull's UTC day; null for a month's or a quarter's figure
+ *  stored under its first day, a stated period, or no date. A table cell
+ *  holds a date only then, so a monthly figure never reads as its first. */
+export function evidenceDay(e: Pick<StressEvidence, "asOf" | "text">): string | null {
+  const s = isoDayOf(e.asOf);
+  const p = evidencePeriod(e);
+  if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return p.said === whenWords(s) ? s : null;
+}
+
+/**
+ * What a surface prints after a piece's publisher where it prints the
+ * piece's own text beside it (the report's evidence line, the verdict's
+ * brief, the panel): ", Aug 2026" by the piece's own period; "" where the
+ * text already says it, or where a document, the memorandum's own figure or
+ * a rule of thumb states no date; ", undated" for a published figure with
+ * none.
+ */
+export function evidenceWhen(e: Pick<StressEvidence, "asOf" | "text" | "kind">): string {
+  const p = evidencePeriod(e);
+  if (!p) return e.kind === "published" ? ", undated" : "";
+  return p.inText ? "" : `, ${p.said}`;
+}
+
+/** The memorandum's sale comps a basis figure is struck over, in their
+ *  count, read off the reader's own sentence (lib/stress-test `basisRow`):
+ *  "the one comp graded clean", "the midpoint of the two comps graded
+ *  clean", "the median of the 4 comps graded clean"; null on any other
+ *  piece, or a sentence that strikes no figure. `ofTheOm` names whose comps
+ *  they are where no page beside them says so: "the OM's one comp graded
+ *  clean". */
+export function compsStruckOver(e: Pick<StressEvidence, "label" | "text" | "value">, ofTheOm = false): string | null {
+  if (e.value == null || !/^The memorandum's sale comps\b/.test(e.label)) return null;
+  const the = ofTheOm ? "the OM's" : "the";
+  if (/ — the one comp graded clean\b/.test(e.text)) return `${the} one comp graded clean`;
+  if (/ — the two graded clean, midpoint\b/.test(e.text)) return `the midpoint of ${the} two comps graded clean`;
+  const m = e.text.match(/ — median .*? over the (\d+)\b/);
+  return m ? `the median of ${the} ${m[1]} comps graded clean` : null;
+}
+
+/** The memorandum's own page a piece is read off, as a whole page number,
+ *  where the engine holds a validated one (`StressEvidence.page`); null
+ *  with none. */
+export function evidencePage(e: Pick<StressEvidence, "page">): number | null {
+  return e.page != null && Number.isInteger(e.page) && e.page > 0 ? e.page : null;
+}
+
+/** "OM p. 14" — the memorandum's own page a piece is read off, where the
+ *  engine holds a validated one (`StressEvidence.page`); "" with none. */
+export function evidencePageText(e: Pick<StressEvidence, "page">): string {
+  const p = evidencePage(e);
+  return p != null ? `OM p. ${p}` : "";
+}
+
+/** A piece's publisher with its validated OM page, as the report's evidence
+ *  line and the verdict's brief print it after the piece's own words: "the
+ *  rent roll", "the offering memorandum, OM p. 14" — the page alone, "OM p.
+ *  14", where the publisher is the memorandum itself. */
+export function sourceWithPage(e: Pick<StressEvidence, "publisher" | "page">): string {
+  const page = evidencePageText(e);
+  if (!page) return e.publisher;
+  return e.publisher === "the offering memorandum" ? page : `${e.publisher}, ${page}`;
+}
+
+/**
+ * The `dateTime` a page's `<time>` carries for a piece's period, matching
+ * the words beside it (`evidencePeriod`): the day ("2026-05-31") where the
+ * period is a day, the month ("2026-08") where it is a month, the year
+ * ("2026") where a year; null for a quarter or a period stated in words,
+ * which no valid HTML date string names.
+ */
+export function evidenceDateTime(e: Pick<StressEvidence, "asOf" | "text">): string | null {
+  const day = evidenceDay(e);
+  if (day) return day;
+  const s = isoDayOf(e.asOf);
+  const p = evidencePeriod(e);
+  if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (p.said === periodLabel(s, "monthly")) return s.slice(0, 7);
+  if (p.said === s.slice(0, 4)) return s.slice(0, 4);
+  return null;
+}
+
 /** "9.1% (the deal's rent roll, May 31, 2026)" — the evidence's figure in
- *  the row's unit with its publisher and date; its own words where it
- *  carries no figure. */
+ *  the row's unit with its publisher and its period; its own words where it
+ *  carries no figure. A growth row's published figure is said as the
+ *  trailing year it is ("+1.1% over the year to Aug 2026 (Zillow
+ *  Research)"), never as a rate a year; the memorandum's own figure carries
+ *  its page ("(OM p. 14)") and, on a price struck over comps, their count
+ *  ("(the one comp graded clean, OM p. 14)"; with no validated page, "(the
+ *  OM's one comp graded clean)"). */
 export function evidenceShort(row: StressRow, e: StressEvidence | null): string {
   if (!e) return "no evidence with a figure";
+  const period = evidencePeriod(e);
+  // A trailing year of a published growth figure, its period in its words.
+  if (isGrowth(row.key) && e.value != null && /\bover the year\b/.test(e.text)) {
+    return `${evidenceFigureText(row.key, e.value)} over the year${period ? ` to ${period.said}` : ""} (${e.publisher})`;
+  }
   // The evidence's figure wears the OM's own noun (a basis "/unit"): the
   // reader struck both on one track.
-  const figure = e.value != null ? figureText(row.key, e.value, row.omSays.text) : e.text;
+  const figure = e.value != null ? evidenceFigureText(row.key, e.value, row.omSays.text) : e.text;
+  // The memorandum's own figure is the memorandum's page where one is
+  // validated, and a price struck over its comps says over how many — whose
+  // comps they are, where no page beside them says so.
+  const page = evidencePageText(e);
+  const comps = compsStruckOver(e, !page);
+  const omBase = comps ?? (e.publisher === "the offering memorandum" && page ? "" : e.publisher);
+  const source = page ? (omBase ? `${omBase}, ${page}` : page) : comps ?? e.publisher;
   // A published figure with no date is said undated; the deal's own
   // document, the memorandum's own figure and a rule of thumb carry a date
-  // only where one is stated.
-  const when = e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : "";
-  return `${figure} (${e.publisher}${when})`;
+  // only where one is stated — each by its own period, never a monthly
+  // figure's first day.
+  const when = period ? `, ${period.said}` : e.kind === "published" ? ", undated" : "";
+  return `${figure} (${source}${when})`;
 }
 
 /** "6.0% (p. 8)" — the OM's figure in the row's unit with its page. */
@@ -259,6 +468,10 @@ export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run
  *  file tests it; lib/stress-test drops any), and a row with no impact has
  *  none to draw. */
 export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
+
+/** Whether a surface may say the return is re-run in code: the re-runs
+ *  stand (nothing withheld) and some row draws one (`drawsRerun`). */
+export const rerunsStand = (test: StressTest): boolean => !test.impactsWithheld && test.rows.some(drawsRerun);
 
 /**
  * The row's return in one line, for the report and the verdict's brief: the
@@ -622,13 +835,26 @@ function joinAnd(parts: string[]): string {
  * read line, the split does not): "Levered IRR on the OM's figures 16.7%
  * to 11.5% with the evidence; the report splits the gap by assumption."
  * The report prints `headlineSentence`, the split and what is left out
- * with why. Null with no headline.
+ * with why. Where a swap in the evidence's case was struck against a rule
+ * of thumb alone (the loan rate against a screening default), the line says
+ * so in its brackets, as the split marks the part ("…with the evidence (the
+ * loan rate against a screening default; …)"); on a plan deal the OM's own
+ * stated yield on cost rides there too, from the reader the panel's
+ * sentence reads (`statedYoc`: "the OM states 7.10%, p. 24"). Null with no
+ * headline.
  */
 export function headlineShort(test: StressTest, withModel = true): string | null {
   const h = liveHeadline(test);
-  if (!h) return null;
+  const line = headlineLine(test);
+  if (!h || !line) return null;
+  const notes: string[] = [];
+  const against = h.parts.map((p) => (partAgainst(p) ? `${headlineName(p.key)} ${partAgainst(p)}` : null)).filter((t): t is string => !!t);
+  if (against.length > 0) notes.push(joinAnd(against));
+  const stated = isYieldHeadline(h) ? h.statedYoc : null;
+  if (stated && Number.isFinite(stated.pct)) notes.push(`the OM states ${pct2(stated.pct)}${stated.page != null ? `, p. ${stated.page}` : ""}`);
   const model = withModel ? modelClause(h) : "";
-  return `${headlineLine(test)!}${model ? ` (${model})` : ""}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
+  if (model) notes.push(model);
+  return `${line}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
 }
 
 // ── The model as it runs: the base every re-run starts from ─────────────
@@ -749,12 +975,13 @@ export function keptSentence(test: StressTest): string | null {
 export const HEADLINE_WITHHELD = "The headline, the OM's figures against the evidence's in one run each, is withheld for the same reason.";
 
 /** Under the sample's panel (/demo, the homepage's walkthrough and the
- *  signed-in sample): the sample is read as stabilized, so its rows re-run
- *  the levered return, and a plan deal's re-run its yield on total cost — in
+ *  signed-in sample): the sample is read as stabilized, so the rows it
+ *  re-runs move the levered return (a row that holds or is unchecked draws
+ *  none, `drawsRerun`), and a plan deal's re-run its yield on total cost — in
  *  the plan rule's own words (lib/stress-test `PLAN_YIELD_LEAD`;
  *  lib/sample-stress.test.ts holds the two to one another). */
 export const SAMPLE_PLAN_NOTE =
-  "Read as stabilized, the sample re-runs each row's levered return. A value-add, lease-up, conversion or development OM is re-run on its yield on total cost instead, where it states its stabilized NOI and total cost: the model runs today's income, not the business plan.";
+  "Read as stabilized, the sample's re-runs move its levered return. A value-add, lease-up, conversion or development OM is re-run on its yield on total cost instead, where it states its stabilized NOI and total cost: the model runs today's income, not the business plan.";
 
 /**
  * The headline in whole sentences, for the memo, the report and the
