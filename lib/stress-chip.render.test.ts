@@ -15,8 +15,7 @@ vi.mock("next/navigation", () => ({
 import { STRESS_TEST_ANCHOR, StressChip, stressChipLine } from "@/app/(app)/deals/[id]/stress-chip";
 import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
 import { DealStickyBar } from "@/app/(app)/deals/[id]/deal-sticky-bar";
-import { stressReadLine } from "@/app/stress-test-panel";
-import { verdictCounts } from "./stress-test-words";
+import { stressCountLine, verdictCounts } from "./stress-test-words";
 import { sampleStressTest } from "./sample-stress";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -31,7 +30,7 @@ describe("the stress-test chip", () => {
     const line = stressChipLine(counts)!;
     // The panel's line is "N assumptions: …; M could not be checked"; the
     // chip's parts are its.
-    expect(line.replace(/^Stress test: /, "")).toBe(stressReadLine(test.rows).replace(/^\d+ assumptions?: /, ""));
+    expect(line.replace(/^Stress test: /, "")).toBe(stressCountLine(test.rows).replace(/^\d+ assumptions?: /, ""));
     const html = renderToStaticMarkup(h(StressChip, { counts }));
     const text = visibleText(html).replace(/\s+/g, " ").trim();
     for (const part of line.replace(/^Stress test: /, "").split(/, |; /)) expect(text).toContain(part);
