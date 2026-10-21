@@ -33,7 +33,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { regionClause } from "@/lib/live-market-brief";
 import type { StressTest } from "@/lib/stress-test-types";
-import { HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rowMoveText, stressReadLine, whenWords } from "@/lib/stress-test-words";
+import { HEADLINE_WITHHELD, VERDICT_WORD, decidesTag, headlineSentence, liveHeadline, rowMoveText, stressReadLine, evidenceWhen } from "@/lib/stress-test-words";
 import type {
   ExtractionResult,
   FirstSignal,
@@ -160,7 +160,7 @@ export function stressSection(test: StressTest): string[] {
                   : e.kind === "rule_of_thumb"
                     ? "a rule of thumb"
                     : "the memorandum's own figure";
-            const when = e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : "";
+            const when = evidenceWhen(e);
             // ONE figure decided the row (lib/stress-deciders): it is named
             // so, and every other piece as beside it, deciding nothing.
             const tag = decidesTag(r, i);

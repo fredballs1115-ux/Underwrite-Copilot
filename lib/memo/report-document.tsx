@@ -139,6 +139,7 @@ import {
   unsolvedSentence,
   verdictCounts,
   whenWords,
+  evidenceWhen,
 } from "@/lib/stress-test-words";
 
 const C = {
@@ -463,7 +464,7 @@ function StressRowBlock({ row, test }: { row: StressRow; test: StressTest }) {
         const tag = decidesTag(row, i);
         return (
           <Text key={i} style={{ fontSize: 8, color: tag === DECIDES_TAG ? C.ink : C.muted, marginTop: 1, marginLeft: 8 }}>
-            {str(`${tag ? `${tag}: ` : ""}${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${e.asOf ? `, ${whenWords(e.asOf)}` : e.kind === "published" ? ", undated" : ""})`)}
+            {str(`${tag ? `${tag}: ` : ""}${EVIDENCE_KIND_WORD[e.kind]} — ${e.label}: ${e.text} (${e.publisher}${evidenceWhen(e)})`)}
           </Text>
         );
       })}
