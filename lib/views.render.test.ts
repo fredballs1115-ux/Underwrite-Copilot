@@ -1507,8 +1507,10 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
       // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
-      // by count (225 of 248 doors).
-      expect(visibleText(row)).toContain("Levered IRR 12.4% → 9.1%");
+      // by count (225 of 248 doors) — the row's own two runs, never typed.
+      const vac = data.stressTest!.rows.find((r) => r.key === "vacancy")!.impact!;
+      expect(vac.baseIrrPct!).toBeGreaterThan(vac.altIrrPct!);
+      expect(visibleText(row)).toContain(`Levered IRR ${vac.baseIrrPct!.toFixed(1)}% → ${vac.altIrrPct!.toFixed(1)}%`);
       // The sample's two unchecked rows are one folded group at the end:
       // the memorandum states no loan rate, and no figure was read today for
       // rent growth. Its taxes, insurance and renovation premium are tested.
@@ -8468,6 +8470,7 @@ describe("ShareView — a note the seller offers to carry, as stated (#462)", ()
 // ── A leasehold's exit, on its term (#421) ──────────────────────────────────
 import { LeaseholdExitCard } from "@/app/(app)/deals/[id]/leasehold-exit-card";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
+import { computeUnderwrite } from "@/lib/underwrite/engine";
 
 describe("LeaseholdExitCard — the term, the two exits, and the model's returns on the term", () => {
   const AS_OF = new Date(Date.UTC(2026, 8, 25));
@@ -8506,7 +8509,9 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
     expect(text).toMatch(/Left at the sale\s+40\.3 yrs\s+of 45\.3 today/);
     expect(text).toMatch(/The term's share\s+87%/);
     expect(text).toMatch(/Exit cap, on the term\s+6\.23%\s+the model runs 5\.45%/);
-    expect(text).toMatch(/Levered IRR, on the term\s+6\.2%\s+11\.7% as it runs/);
+    // As it runs: the engine on the leasehold's own model, never typed.
+    const asRuns = (computeUnderwrite(deriveForAssumable(leasehold([]), SAMPLE_DEAL.name).inputs).returns.leveredIrrPct! * 100).toFixed(1);
+    expect(text).toMatch(new RegExp(`Levered IRR, on the term\\s+6\\.2%\\s+${asRuns.replace(".", "\\.")}% as it runs`));
     expect(text).toContain("the term bears 87% of the capitalised exit — $72.2M against $82.5M");
     expect(text).toContain("Were every extension option exercised (four of 10 years, as stated)");
     expect(text).toContain("It will have 40.3 years.");

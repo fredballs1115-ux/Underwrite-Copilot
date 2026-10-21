@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread, statedReserveOf } from "./inputs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { sampleDerivedInputs } from "@/lib/sample-derive";
+import { SAMPLE_ACTUALS, sampleDerivedInputs } from "@/lib/sample-derive";
 import { compactUsd, parseUsd } from "@/lib/money";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -537,28 +537,109 @@ describe("deriveUnderwriteInputs — the rate starts from today's curve", () => 
   });
 });
 
-// The model runs the class's reserve whatever the OM states (the figure is
-// the owner's); the source note names the OM's own reserve beside it.
-describe("the reserve's source note names the OM's own reserve", () => {
-  it("on the sample, names the memorandum's figure a unit, read off the fixture, and leaves the model's figure alone", () => {
-    const row = SAMPLE_DEAL.extraction.metrics.find((m) => /replacement reserve/i.test(m.label))!;
-    const perUnit = parseUsd(row.value, 1)!;
-    const { inputs, sources } = sampleDerivedInputs();
-    const note = sources.reservesPsf?.note ?? "";
-    expect(note).toContain(`the OM states ${compactUsd(perUnit)} a unit a year`);
-    expect(note).toMatch(/enter it to run the OM's$/);
-    expect(note).toContain(`default, $${inputs.reservesPsf.toFixed(2)}/SF/yr`);
-    expect(sources.reservesPsf?.provenance).toBe("assumption");
-    // Words only: the model still runs the class's default.
-    const without = deriveUnderwriteInputs(
+// The owner's rule (2026-10-21, "the cautious side"): the model runs the
+// higher of the OM's stated replacement reserve and the class's default, on
+// the model's own area, and the source note says which ran and why.
+describe("the reserve runs the higher of the OM's stated figure and the class's default", () => {
+  const row = SAMPLE_DEAL.extraction.metrics.find((m) => /replacement reserve/i.test(m.label))!;
+  const withoutRow = () =>
+    deriveUnderwriteInputs(
       { ...SAMPLE_DEAL.extraction, metrics: SAMPLE_DEAL.extraction.metrics.filter((m) => m !== row) },
       SAMPLE_DEAL.name,
+      SAMPLE_ACTUALS,
     );
-    expect(inputs.reservesPsf).toBe(without.inputs.reservesPsf);
-    expect(without.sources.reservesPsf?.note).toMatch(/^Multifamily default \$\d\.\d{2}\/SF\/yr$/);
+
+  it("on the sample, runs the memorandum's figure a unit — the higher — through the deal's own count and area", () => {
+    const perUnit = parseUsd(row.value, 1)!;
+    const count = SAMPLE_ACTUALS.rentRoll.summary.unitCount!;
+    const { inputs, sources } = sampleDerivedInputs();
+    const without = withoutRow();
+    // The default, read off the derivation that has no stated reserve.
+    const defaultPsf = without.inputs.reservesPsf;
+    expect(perUnit * count).toBeGreaterThan(defaultPsf * inputs.rsf);
+    // A year's reserve is the OM's figure across the count, to the cent.
+    expect(inputs.reservesPsf * inputs.rsf).toBeCloseTo(perUnit * count, 6);
+    expect(inputs.rsf).toBe(without.inputs.rsf);
+    const note = sources.reservesPsf?.note ?? "";
+    expect(note).toContain(`The OM's stated ${compactUsd(perUnit)} a unit a year (${compactUsd(perUnit * count)} a year across ${count} units, $${inputs.reservesPsf.toFixed(2)}/SF over ${inputs.rsf.toLocaleString("en-US")} SF)`);
+    expect(note).toContain(`above the multifamily default of $${defaultPsf.toFixed(2)}/SF`);
+    expect(note).toMatch(/the model never runs more optimistic than the OM$/);
+    // A unit's figure put on the area is two figures divided, with its page.
+    expect(sources.reservesPsf?.provenance).toBe("derived");
+    expect(sources.reservesPsf?.page).toBe(row.page);
+    // With no stated reserve, the default runs and the note says none is stated.
+    expect(without.sources.reservesPsf?.note).toBe(`Multifamily default $${defaultPsf.toFixed(2)}/SF/yr — the OM states no replacement reserve`);
+    expect(without.sources.reservesPsf?.provenance).toBe("assumption");
   });
 
-  it("reads a unit's, a foot's and a building's figure, a month made a year, and refuses a report's, a range and an auction's reserve", () => {
+  const office = (reserve: string | null, cls = "Office"): ExtractionResult => ({
+    dealName: "One Main",
+    assetClass: cls,
+    metrics: [
+      { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
+      { label: "Net operating income", value: "$1,300,000", flagged: false, page: "" },
+      { label: "Rentable square feet", value: "100,000", flagged: false, page: "" },
+      ...(reserve ? [{ label: "Replacement reserve", value: reserve, flagged: false, page: "p. 9" }] : []),
+    ],
+  });
+
+  it("runs a foot's figure over the default as the OM's own, and a building's put on the area", () => {
+    const base = deriveUnderwriteInputs(office(null), "x").inputs.reservesPsf;
+    const foot = deriveUnderwriteInputs(office("$0.40/SF/yr"), "x");
+    expect(foot.inputs.reservesPsf).toBe(0.4);
+    expect(foot.inputs.reservesPsf).toBeGreaterThan(base);
+    expect(foot.sources.reservesPsf?.provenance).toBe("extracted");
+    expect(foot.sources.reservesPsf?.note).toBe(
+      `The OM's stated $0.40/SF a year, above the office default of $${base.toFixed(2)}/SF — the model never runs more optimistic than the OM`,
+    );
+    const whole = deriveUnderwriteInputs(office("$35,000 per year"), "x");
+    expect(whole.inputs.reservesPsf * whole.inputs.rsf).toBeCloseTo(35_000, 6);
+    expect(whole.sources.reservesPsf?.provenance).toBe("derived");
+    expect(whole.sources.reservesPsf?.note).toContain(`over 100,000 SF)`);
+  });
+
+  it("runs the default where the OM's figure is at or under it, and says so", () => {
+    const base = deriveUnderwriteInputs(office(null), "x").inputs.reservesPsf;
+    const under = deriveUnderwriteInputs(office("$0.10/SF"), "x");
+    expect(under.inputs.reservesPsf).toBe(base);
+    expect(under.sources.reservesPsf?.provenance).toBe("assumption");
+    expect(under.sources.reservesPsf?.note).toBe(
+      `Office default, $${base.toFixed(2)}/SF/yr — at or above the OM's stated $0.10/SF a year, so the default runs: the model never runs more optimistic than the OM`,
+    );
+    const equal = deriveUnderwriteInputs(office(`$${base.toFixed(2)}/SF`), "x");
+    expect(equal.inputs.reservesPsf).toBe(base);
+  });
+
+  it("never runs a hotel's stated reserve, read as its FF&E reserve", () => {
+    const hotel = deriveUnderwriteInputs(
+      {
+        dealName: "Inn",
+        assetClass: "Hotel",
+        metrics: [
+          { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
+          { label: "Net operating income", value: "$1,600,000", flagged: false, page: "" },
+          { label: "Keys", value: "120", flagged: false, page: "" },
+          { label: "Reserve for replacement", value: "$5,000 per key per year", flagged: false, page: "" },
+        ],
+      },
+      "x",
+    );
+    const bare = deriveUnderwriteInputs(
+      { dealName: "Inn", assetClass: "Hotel", metrics: [{ label: "Asking price", value: "$20,000,000", flagged: false, page: "" }, { label: "Net operating income", value: "$1,600,000", flagged: false, page: "" }, { label: "Keys", value: "120", flagged: false, page: "" }] },
+      "x",
+    );
+    expect(hotel.inputs.reservesPsf).toBe(bare.inputs.reservesPsf);
+    expect(hotel.sources.reservesPsf?.note).toContain("is read as its FF&E reserve");
+  });
+
+  it("runs the default where a unit's figure has no count to put it on the area", () => {
+    const base = deriveUnderwriteInputs(office(null), "x").inputs.reservesPsf;
+    const r = deriveUnderwriteInputs(office("$900 per unit per year"), "x");
+    expect(r.inputs.reservesPsf).toBe(base);
+    expect(r.sources.reservesPsf?.note).toContain("which no stated count puts on the model's area");
+  });
+
+  it("reads a unit's, a foot's and a building's figure, a month made a year, and refuses a report's, a range, a share of revenue and an auction's reserve", () => {
     const m = (label: string, value: string) => [{ label, value }];
     expect(statedReserveOf(m("Replacement reserve", "$300 per unit per year"))).toMatchObject({ amount: 300, basis: "unit" });
     expect(statedReserveOf(m("Capital reserves", "$0.20/SF"))).toMatchObject({ amount: 0.2, basis: "sf" });
@@ -568,5 +649,6 @@ describe("the reserve's source note names the OM's own reserve", () => {
     expect(statedReserveOf(m("FF&E reserve", "4% of revenue"))).toBeNull();
     expect(statedReserveOf(m("Reserve price", "$4,000,000"))).toBeNull();
     expect(statedReserveOf(m("Replacement reserve", "$250-$300/unit"))).toBeNull();
+    expect(statedReserveOf(m("Reserve for replacement", "4% of total revenue, $1,500 per key"))).toBeNull();
   });
 });

@@ -346,12 +346,16 @@ describe("a stabilized apartment deal with a T-12", () => {
 
   it("never reads holds where its own re-run lowers the levered IRR 100 bps or more", async () => {
     // The sample's NOI is 4.7% over its T-12, inside the 5% band, yet the
-    // re-run moves the levered IRR from 11.7% to 9.3%.
+    // re-run moves the levered IRR well over 100 bps (its figures the
+    // engine's own, read off the row, never typed).
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const n = rowOf(sampleStressTest("2026-10-19"), "noi");
     expect(IRR_MOVE_STRETCH_BPS).toBe(100);
     expect(n.verdict).toBe("stretched");
-    expect(n.gap!.text).toMatch(/^The OM's \$3\.88M is 4\.7% \(\$174k\) over the deal's T-12's \$3\.71M\. The gap is within 5% of the T-12, but the return moves \d+ bps on it \(levered IRR 11\.7% to 9\.3%\)\.$/);
+    const [from, to] = [n.impact!.baseIrrPct!, n.impact!.altIrrPct!].map((x) => x.toFixed(1).replace(".", "\\."));
+    expect(n.gap!.text).toMatch(
+      new RegExp(`^The OM's \\$3\\.88M is 4\\.7% \\(\\$174k\\) over the deal's T-12's \\$3\\.71M\\. The gap is within 5% of the T-12, but the return moves \\d+ bps on it \\(levered IRR ${from}% to ${to}%\\)\\.$`),
+    );
   });
 
   it("says a verdict struck on a rule of thumb alone is one, and the vacancy's turns on the best kind present", () => {

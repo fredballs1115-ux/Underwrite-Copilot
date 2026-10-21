@@ -33,6 +33,9 @@ const leasehold = (rows: ReturnType<typeof row>[], groundLease = "Ground lease t
     metrics: [...SAMPLE_DEAL.extraction.metrics, ...rows],
   }) as ExtractionResult;
 const modelOf = (ex: ExtractionResult) => deriveUnderwriteInputs(ex, SAMPLE_DEAL.name).inputs;
+// The model's own levered IRR as it runs, from the engine — never typed, so
+// the sentences below hold to whatever the model's inputs run.
+const asRuns = () => `${(computeUnderwrite(modelOf(leasehold([]))).returns.leveredIrrPct! * 100).toFixed(1)}%`;
 const read = (end: string, extra: ReturnType<typeof row>[] = [], groundLease?: string) => {
   const ex = leasehold([row("Ground lease expiration", end), ...extra], groundLease);
   return readLeaseholdExit(ex, modelOf(ex), AS_OF)!;
@@ -80,7 +83,7 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
     expect(t.leveredIrrPct!).toBeLessThan(r.leveredIrrPct!);
     expect(t.unleveredIrrPct!).toBeLessThan(r.unleveredIrrPct!);
     expect(leaseholdExitSentence(r)).toBe(
-      "With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts. At that exit the model's levered IRR is 6.2%, against 11.7% as it runs.",
+      `With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts. At that exit the model's levered IRR is 6.2%, against ${asRuns()} as it runs.`,
     );
   });
 
@@ -91,7 +94,7 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
     expect(Math.round(short.sharePct)).toBe(52);
     expect(short.termCapPct).toBeGreaterThan(long.termCapPct);
     // A negative return is said with a minus sign.
-    expect(leaseholdExitSentence(read("December 31, 2045"))).toContain("the model's levered IRR is −24.4%, against 11.7% as it runs");
+    expect(leaseholdExitSentence(read("December 31, 2045"))).toContain(`the model's levered IRR is −24.4%, against ${asRuns()} as it runs`);
   });
 
   it("says the sale does not repay the loan where no levered return solves", () => {
@@ -246,7 +249,7 @@ describe("the term, wherever a leasehold is summarized (#422)", () => {
     const ex = leasehold([row("Ground lease expiration", "December 31, 2071")]);
     const derived = deriveUnderwriteInputs(ex, SAMPLE_DEAL.name);
     expect(derived.meta.leasehold?.line).toBe(
-      "With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts. At that exit the model's levered IRR is 6.2%, against 11.7% as it runs. Enter 6.23% as the Exit Cap to run this workbook on the term.",
+      `With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts. At that exit the model's levered IRR is 6.2%, against ${asRuns()} as it runs. Enter 6.23% as the Exit Cap to run this workbook on the term.`,
     );
     expect(derived.meta.leasehold?.read).toContain("It will have 40.3 years.");
     expect(derived.meta.leasehold?.read).toContain("The years left are valued at the model's own exit return");

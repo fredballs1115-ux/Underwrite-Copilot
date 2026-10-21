@@ -56,7 +56,7 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "reserves",
     title: "Replacement reserves",
-    why: "No row: the model runs the class's default reserve, and its source note names the OM's own figure where the OM states one.",
+    why: "No row: the model runs the higher of the OM's stated replacement reserve and the class's default, its source note saying which; nothing sets either against a condition report.",
   },
   {
     id: "leasing_capital",

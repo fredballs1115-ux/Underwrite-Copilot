@@ -53,9 +53,10 @@ describe("what the test does not check yet", () => {
     expect(inputs.lcPct).toBe(0);
     expect(inputs.holdMonths).toBe(HOLD_MONTHS);
     expect(item("hold_and_sale").why).toContain(`${HOLD_MONTHS / 12}-year hold`);
-    // The reserve is the class's default, an assumption, its note naming the OM's.
-    expect(sources.reservesPsf?.provenance).toBe("assumption");
-    expect(sources.reservesPsf?.note).toMatch(/the OM states /);
+    // The reserve is the higher of the OM's stated figure and the class's
+    // default; on the sample the OM's is the higher, and the note says so.
+    expect(sources.reservesPsf?.note).toMatch(/^The OM's stated .* above the multifamily default of .* the model never runs more optimistic than the OM$/);
+    expect(item("reserves").why).toContain("the higher of the OM's stated replacement reserve and the class's default");
   });
 
   it("says loss-to-lease is filed on the rent growth row, and the NOI row shows the rent roll's rent in words", () => {

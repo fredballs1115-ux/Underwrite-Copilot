@@ -437,12 +437,15 @@ const RESERVE_NOT = /\bPCA\b|property condition|FF&E|\bFFE\b|association|\bHOA\b
 const PER_UNIT_WORDS = /(?:\/|\bper\s+|\ba\s+)(?:unit|door|apt|apartment|key|room|pad|bed|home|site|space)s?\b/i;
 const PER_SF_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:sf|sq\.?\s*ft|square\s+f(?:oo|ee)t)\b|\bpsf\b/i;
 const PER_MONTH_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:mo|month)\b|\bmonthly\b/i;
+/** A value whose first figure is a percentage ("4% of revenue") states a
+ *  share, never a dollar reserve. */
+const PERCENT_FIRST = /^[^$\d]*\d+(?:\.\d+)?\s*%/;
 
 /**
  * The replacement reserve the OM states, as a year's figure on its own
  * basis — a unit's, a square foot's or the building's — read only from one
- * figure (a range is none) and never from a row the words above set apart.
- * Null where no such row states one.
+ * dollar figure (a range or a share of revenue is none) and never from a row
+ * the words above set apart. Null where no such row states one.
  */
 export function statedReserveOf(
   metrics: readonly { label: string; value: string }[],
@@ -450,7 +453,7 @@ export function statedReserveOf(
   for (const row of metrics) {
     if (!RESERVE_ROW.test(row.label) || RESERVE_NOT.test(row.label) || RESERVE_NOT.test(row.value)) continue;
     const v = row.value;
-    if (statesRange(v)) continue;
+    if (statesRange(v) || PERCENT_FIRST.test(v)) continue;
     const basis = PER_SF_WORDS.test(v) ? "sf" : PER_UNIT_WORDS.test(v) ? "unit" : "total";
     // A foot's reserve is cents (`parseUsd` reads whole dollars).
     const cents = basis === "sf" ? /^\s*\$\s*(\d+(?:\.\d+)?)\b/.exec(v) : null;
@@ -1623,6 +1626,30 @@ export function deriveUnderwriteInputs(
           : "default";
   const exitCapRun = exitPick === "decided" ? decidedExit! : exitPick === "stated" ? statedExit!.pct / 100 : (capPct ?? DEFAULT_EXIT_CAP);
 
+  // The replacement reserve (the owner's rule, 2026-10-21, "the cautious
+  // side"): the higher of the OM's stated reserve and the class's default,
+  // compared as a year's dollars over the model's own area and run in the
+  // model's unit, a square foot a year — a unit's figure through the deal's
+  // count, a building's over its area. A figure that cannot be put on the
+  // model's area (a unit's with no count) runs nothing; a hotel's stated
+  // reserve is its FF&E reserve, a share of revenue the expense line already
+  // carries, and is never run as a replacement reserve.
+  const omReserve = statedReserveOf(metrics);
+  const isHotel = assetClass === "hospitality_str";
+  const omReserveAnnual =
+    omReserve == null || isHotel || !(rsf > 0)
+      ? null
+      : omReserve.basis === "unit"
+        ? units != null && units > 0
+          ? omReserve.amount * units
+          : null
+        : omReserve.basis === "sf"
+          ? omReserve.amount * rsf
+          : omReserve.amount;
+  const defaultReserveAnnual = cd.reservesPsf * rsf;
+  const reserveFromOm = omReserveAnnual != null && omReserveAnnual > defaultReserveAnnual + 1e-6;
+  const reservesPsfRun = reserveFromOm ? omReserveAnnual! / rsf : cd.reservesPsf;
+
   const inputs: UnderwriteInputs = {
     purchasePrice: price,
     holdMonths: HOLD_MONTHS,
@@ -1648,7 +1675,7 @@ export function deriveUnderwriteInputs(
     expenseGrowthPct: expenseRun.pct,
 
     rsf,
-    reservesPsf: cd.reservesPsf,
+    reservesPsf: reservesPsfRun,
     capitalImprovementsYr1: capitalBudget,
     tiPsf: 0,
     lcPct: 0,
@@ -1716,36 +1743,64 @@ export function deriveUnderwriteInputs(
           : `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
-  // The model runs the class's reserve whatever the OM states (the figure
-  // is the owner's call); where the memorandum states its own replacement
-  // reserve, the note names it beside the default, so the two are read
-  // together and the OM's can be entered (words only).
+  // The reserve's note says which ran and why (the owner's rule, above):
+  // the OM's stated reserve where it is the higher, else the class's
+  // default, naming the OM's figure beside it where one is stated.
   {
-    const omReserve = statedReserveOf(metrics);
     const perSfText = (psf: number) => `$${psf.toFixed(2)}/SF`;
+    const defaultWords = `the ${classWord.toLowerCase()} default of ${perSfText(cd.reservesPsf)}`;
     const aboutPerUnit =
       units != null && units > 0 && rsf > 0
         ? ` (about ${compactUsd((cd.reservesPsf * rsf) / units)} ${withArticle(unitNoun.one)} a year)`
         : "";
-    let omSaid = "";
-    if (omReserve) {
-      if (omReserve.basis === "unit") {
-        const asPsf = units != null && units > 0 && rsf > 0 ? `, about ${perSfText((omReserve.amount * units) / rsf)} here` : "";
-        omSaid = `; the OM states ${compactUsd(omReserve.amount)} ${withArticle(unitNoun.one)} a year${asPsf} — enter it to run the OM's`;
-      } else if (omReserve.basis === "sf") {
-        omSaid = `; the OM states ${perSfText(omReserve.amount)} a year — enter it to run the OM's`;
-      } else {
-        const asPsf = rsf > 0 ? `, about ${perSfText(omReserve.amount / rsf)} here` : "";
-        omSaid = `; the OM states ${compactUsd(omReserve.amount)} a year${asPsf} — enter it to run the OM's`;
-      }
+    const omFigure = !omReserve
+      ? ""
+      : omReserve.basis === "unit"
+        ? `${compactUsd(omReserve.amount)} ${withArticle(unitNoun.one)} a year`
+        : omReserve.basis === "sf"
+          ? `${perSfText(omReserve.amount)} a year`
+          : `${compactUsd(omReserve.amount)} a year`;
+    const cautious = "the model never runs more optimistic than the OM";
+    if (reserveFromOm) {
+      // A unit's figure through the count, a building's over the area: the
+      // arithmetic said, so the per-SF input the workbook shows is checkable.
+      const area = `${rsf.toLocaleString("en-US")} SF`;
+      const conversion =
+        omReserve!.basis === "unit"
+          ? ` (${compactUsd(omReserveAnnual!)} a year across ${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many}, ${perSfText(reservesPsfRun)} over ${area})`
+          : omReserve!.basis === "total"
+            ? ` (${perSfText(reservesPsfRun)} over ${area})`
+            : "";
+      mark(
+        "reservesPsf",
+        // A foot's figure is the OM's own; a unit's or a building's put on
+        // the model's area is two figures divided, not one the OM states.
+        omReserve!.basis === "sf" ? "extracted" : "derived",
+        `The OM's stated ${omFigure}${conversion}, above ${defaultWords}${aboutPerUnit} — ${cautious}`,
+        pageOf(omReserve!.row),
+      );
+    } else if (omReserve && isHotel) {
+      mark(
+        "reservesPsf",
+        "assumption",
+        `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — on a hotel the OM's stated reserve (${omFigure}) is read as its FF&E reserve, which the class's expense load carries, and is never run as a replacement reserve`,
+      );
+    } else if (omReserve && omReserveAnnual == null) {
+      mark(
+        "reservesPsf",
+        "assumption",
+        `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — the OM states ${omFigure}, which no stated count puts on the model's area`,
+      );
+    } else if (omReserve) {
+      const asPsf = omReserve.basis === "sf" ? "" : `, ${perSfText(omReserveAnnual! / rsf)} here`;
+      mark(
+        "reservesPsf",
+        "assumption",
+        `${classWord} default, ${perSfText(cd.reservesPsf)}/yr${aboutPerUnit} — at or above the OM's stated ${omFigure}${asPsf}, so the default runs: ${cautious}`,
+      );
+    } else {
+      mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — the OM states no replacement reserve`);
     }
-    mark(
-      "reservesPsf",
-      "assumption",
-      omReserve
-        ? `${classWord} default, ${perSfText(cd.reservesPsf)}/yr${aboutPerUnit}${omSaid}`
-        : `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`,
-    );
   }
   if (budgetRead) {
     mark(

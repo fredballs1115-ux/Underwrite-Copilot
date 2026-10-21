@@ -24,6 +24,23 @@ describe("the sample's stress test", () => {
     const i = row(key).impact;
     return i ? [Number(i.baseIrrPct!.toFixed(1)), Number(i.altIrrPct!.toFixed(1))] : null;
   };
+  // The engine run on the sample's own model with ONE input swapped — the
+  // figures every re-run is held to, computed here, never typed (the model's
+  // inputs move with its rules: the reserve, 2026-10-21).
+  const { derived: model } = sampleModelReads({ today: "2026-10-20", reads: null });
+  const engineAt = (input: string, value: number) => {
+    const inputs = { ...model.inputs } as Record<string, unknown>;
+    if (input === "expenseLines") {
+      expect(model.inputs.expenseLines).toHaveLength(1);
+      inputs.expenseLines = [{ ...model.inputs.expenseLines[0], annual: value }];
+    } else inputs[input] = value;
+    return Number((computeUnderwrite(inputs as unknown as typeof model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
+  };
+  const rerun = (key: string) => {
+    const i = row(key).impact!;
+    return [engineAt(i.input, i.omValue), engineAt(i.input, i.altValue)];
+  };
+  const own = Number((computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
 
   it("tests seven of its nine assumptions; the two unchecked are the loan rate no document states and a rent growth no figure was read for", () => {
     expect(test.impactsWithheld).toBeNull();
@@ -51,20 +68,27 @@ describe("the sample's stress test", () => {
   it("re-runs the engine one input apart on every row whose figure is a model input", () => {
     // At the one comp the comps step graded supports, The Brixton's $252k:
     // Parkside, graded favorable, leans the seller's way and is left out.
-    expect(irr("basis")).toEqual([9.3, 13.6]);
-    expect(irr("exit_cap")).toEqual([10.8, 9.3]);
-    expect(irr("noi")).toEqual([11.7, 9.3]);
+    expect(irr("basis")).toEqual(rerun("basis"));
+    expect(irr("basis")![0]).toBe(own);
+    expect(irr("basis")![1]).toBeGreaterThan(own);
+    expect(irr("exit_cap")).toEqual(rerun("exit_cap"));
+    expect(irr("exit_cap")![1]).toBe(own);
+    expect(irr("noi")).toEqual(rerun("noi"));
+    expect(irr("noi")![1]).toBe(own);
     // At the rent roll's 9.3% by count (225 of 248 doors): with no published
     // figure read, the rent roll decides the stabilized assumption, said so;
     // the T-12's 9.1% is its vacancy and credit loss, dollars, beside it.
     const t12 = SAMPLE_DEAL.t12.summary;
     const t12Pct = ((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 100).toFixed(1);
     const rollPct = (((SAMPLE_DEAL.rentRoll.summary.unitCount - SAMPLE_DEAL.rentRoll.summary.occupiedUnits) / SAMPLE_DEAL.rentRoll.summary.unitCount) * 100).toFixed(1);
-    expect(irr("vacancy")).toEqual([12.4, 9.1]);
+    expect(irr("vacancy")).toEqual(rerun("vacancy"));
+    expect(irr("vacancy")![0]).toBeGreaterThan(irr("vacancy")![1]);
     expect(row("vacancy").gap?.text).toBe(
       `The OM's 6.0% is 3.3 points under the evidence's ${rollPct}%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides. The deal's T-12 ran ${t12Pct}% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`,
     );
-    expect(irr("taxes")).toEqual([9.3, 5.9]);
+    expect(irr("taxes")).toEqual(rerun("taxes"));
+    expect(irr("taxes")![0]).toBe(own);
+    expect(irr("taxes")![1]).toBeLessThan(own);
     // The premium is re-run at the seller's own T-12 premium, the floor a new
     // owner can expect: swapped into the model's expense line, which is the
     // T-12's and already carries it, so the evidence's run is the model's own.
