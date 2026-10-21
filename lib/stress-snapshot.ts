@@ -20,7 +20,11 @@
 //     with it, so the two figures kept are always on one yardstick;
 //   - the margin the row's own rule reads as "at" the evidence is kept beside
 //     it (`threshold`), in the key's own terms: points for a percent, a share
-//     of the OM's figure for a dollar figure. A later figure is scored against
+//     of the OM's figure for a dollar figure — the verdict's ACTUAL tolerance
+//     (`rowThreshold`): the survey's margin of error where a survey's figure
+//     decided a vacancy (lib/stress-test's vacancy judge reads it off the
+//     figure's own text, "6.2% ±2.2 pts", and holds a 6.0% inside it), else
+//     the key's own (`snapshotThreshold`). A later figure is scored against
 //     the OM's by that margin (lib/track-record), so a stretched row is right
 //     only where the later figure lands past it, and a hold wrong only where
 //     the later figure lands past it on the buyer's bad side;
@@ -125,6 +129,33 @@ export function snapshotThreshold(key: StressKey): StressSnapshotRow["threshold"
 
 const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
 
+/** A survey's margin of error, read off its figure's own text ("6.2% ±2.2
+ *  pts (Q2 2026)") exactly as lib/stress-test's vacancy judge reads it
+ *  (`moeOf`); null where the text states none. */
+function marginOfError(text: string): number | null {
+  const m = text.match(/±\s*(\d+(?:\.\d+)?)\s*pts?/);
+  return m && finite(Number(m[1])) ? Number(m[1]) : null;
+}
+
+/**
+ * The tolerance the row's own verdict was struck by, kept so a later figure
+ * is scored by the margin the verdict drew, never a stricter one. On a
+ * vacancy decided by a published figure that states its margin of error
+ * (the Census survey's metro figure), the verdict held the OM's figure
+ * anywhere inside that margin (lib/stress-test `judge`'s tolerance), so the
+ * margin is the row's; on every other row, the key's own
+ * (`snapshotThreshold`) — the judges of the rent growth, the expense growth,
+ * the exit cap and the debt strike at `SAME`, the NOI, the basis, a tax bill
+ * and a premium at their own lines.
+ */
+export function rowThreshold(key: StressKey, decider: { kind: EvidenceKind; text: string } | null): StressSnapshotRow["threshold"] {
+  if (key === "vacancy" && decider?.kind === "published") {
+    const moe = marginOfError(decider.text);
+    if (moe != null) return { value: moe, unit: "pts" };
+  }
+  return snapshotThreshold(key);
+}
+
 /** The stress test as it stood at the verdict; null with no test or no rows. */
 export function stressSnapshotOf(test: StressTest | null | undefined): StressSnapshot | null {
   if (!test || test.rows.length === 0) return null;
@@ -150,7 +181,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
         ? { value: decider.value as number, label: decider.label, asOf: decider.asOf ?? null, kind: decider.kind, publisher: decider.publisher }
         : null,
       per: own ? own.per : null,
-      threshold: snapshotThreshold(r.key),
+      threshold: rowThreshold(r.key, decider),
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
     };

@@ -388,7 +388,7 @@ function FinancialsView({ financials }: { financials?: SampleFinancials }) {
       <w.ModelVsMarketCard read={financials?.modelVsMarket ?? null} />
       {/* The walkthrough's Overview draws the sensitivity playground, as
           /demo's does, so the card's note names it. */}
-      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} />
+      <w.SampleModelCard model={SAMPLE_DEAL.model} interest={financials?.modelInterest ?? null} screening={financials?.underwrite ?? null} />
     </div>
   );
 }

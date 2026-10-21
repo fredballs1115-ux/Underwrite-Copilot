@@ -14,9 +14,13 @@
 //   - vacancy: a stabilized assumption on a deal read as stabilized, the
 //     market's published figure first (the metro survey, a commercial
 //     class's tracker band at its low read, the Census region, the state),
-//     then the deal's rent roll, then its T-12, then the class's norm; any
-//     other vacancy, the rent roll, then the T-12, then the published
-//     figures in the same order, then the class's norm;
+//     then the deal's rent roll, then its T-12, then the class's norm; a
+//     plan deal's stated stabilized vacancy, the market's figure in the same
+//     order, then the class's norm — never the rent roll or the T-12, which
+//     are the building before the plan is done (shown beside it as the gap
+//     the plan closes); any other vacancy (today's occupancy), the rent
+//     roll, then the T-12, then the published figures in the same order,
+//     then the class's norm;
 //   - expense growth: all-items CPI (the broad price level the expense base
 //     moves with), then core CPI only where all-items is not fresh; the
 //     insurance premium index and the breakeven never decide;
@@ -135,12 +139,17 @@ const RULE_VACANCY: DeciderStep = { name: "the class's norm, a rule of thumb", w
 export const VACANCY_ORDER = {
   /** a stabilized assumption on a deal read as stabilized */
   stabilized: [...MARKET_VACANCY, ...DOCUMENT_VACANCY, RULE_VACANCY],
-  /** an occupancy for today, or a plan deal's stabilized figure */
+  /** a plan deal's stated stabilized figure: the market's, then the class's
+   *  norm; the deal's documents are today's building, never its figure */
+  plan: [...MARKET_VACANCY, RULE_VACANCY],
+  /** an occupancy for today */
   today: [...DOCUMENT_VACANCY, ...MARKET_VACANCY, RULE_VACANCY],
 } as const;
 
-export function vacancyDecider(candidates: readonly DeciderCandidate[], opts: { stabilized: boolean }): DecidingFigure | null {
-  return pickDecider(opts.stabilized ? VACANCY_ORDER.stabilized : VACANCY_ORDER.today, candidates);
+/** `stabilized`: the OM's figure is a stated stabilized vacancy; `plan`: on
+ *  a value-add, lease-up, conversion or development deal. */
+export function vacancyDecider(candidates: readonly DeciderCandidate[], opts: { stabilized: boolean; plan?: boolean }): DecidingFigure | null {
+  return pickDecider(opts.stabilized ? (opts.plan ? VACANCY_ORDER.plan : VACANCY_ORDER.stabilized) : VACANCY_ORDER.today, candidates);
 }
 
 // — Rent growth —

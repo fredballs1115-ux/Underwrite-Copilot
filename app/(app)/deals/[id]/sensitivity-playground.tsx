@@ -33,7 +33,7 @@ import {
 } from "@/lib/underwrite/report-grid";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import type { PlausibilityFinding } from "@/lib/deal-strategy";
-import { SCREENING_MODEL_IS } from "@/lib/screening-model-words";
+import { ScreeningModelLines } from "./screening-model-lines";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -102,14 +102,23 @@ export interface PlaygroundData {
    *  research pass 37, audit C4 L4), as the price label names it; absent,
    *  "share" */
   shareNoun?: "share" | "interest";
+  /** the sample deal, whose growth and exit are pinned: the model's note
+   *  says its figures, never that it runs a published one */
+  sample?: boolean;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
 /** Which model the playground runs, and why its returns are not the
  *  first-draft model's (model-body's `FIRST_DRAFT_MODEL_LINE` is its
- *  other half). */
-const PLAYGROUND_MODEL_LINE = `The screening model: ${SCREENING_MODEL_IS}. It is the one the stress test re-runs on a stabilized deal, and the one the Excel workbook and the full report carry. A first-draft model, where the Financials tab has one, sets its own assumptions, so its returns can differ.`;
+ *  other half) — the first of its three lines (screening-model-lines). */
+const PLAYGROUND_MODEL_LEAD =
+  "The screening model: the one the stress test re-runs on a stabilized deal, and the one the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ.";
+
+/** On a plan deal the stress test's rows re-run the yield on total cost,
+ *  never this model (lib/stress-test `measure: "yield_on_cost"`). */
+const PLAYGROUND_MODEL_LEAD_PLAN =
+  "The screening model: the one the workbook and the full report carry. On a plan deal the stress test's rows re-run its yield on total cost, not this model. A first-draft model sets its own assumptions, so its returns can differ.";
 
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
 
@@ -421,10 +430,15 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       {/* Which model this is, where a second model's returns can be seen
           beside it (the first-draft model's, on the Financials tab): the
           one the stress test re-runs and the Excel workbook and the full
-          report carry, and why the two differ. One string, one text node. */}
-      <p className="mt-1 text-xs text-muted" data-qa="playground-model">
-        {PLAYGROUND_MODEL_LINE}
-      </p>
+          report carry, and why the two differ; then what it is built on and
+          how its growth and exit are set, three short lines. */}
+      <ScreeningModelLines
+        qa="playground-model"
+        className="mt-1 text-xs text-muted"
+        lead={planDeal ? PLAYGROUND_MODEL_LEAD_PLAN : PLAYGROUND_MODEL_LEAD}
+        sample={data.sample === true}
+        figures={inputs}
+      />
 
       <PriceCapControls
         basePrice={inputs.purchasePrice}

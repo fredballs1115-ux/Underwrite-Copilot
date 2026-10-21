@@ -1413,7 +1413,8 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(text).not.toMatch(/Conflicts sheet/);
     expect(text).not.toMatch(/same math as the Excel/);
     expect(text).toMatch(/Upgrade to Pro to download the screening model \(\.xlsx\)/);
-    expect(text).toMatch(/The workbook is the screening model, a separate one built on the memorandum's price and terms/);
+    expect(text).toContain("The workbook is the screening model, a separate one — its returns can differ from the ones above.");
+    expect(text).toContain("Built on the OM's price and terms, and the rent roll and T-12 where the deal has them.");
     // Research pass 34: the card named only the workbook as the other model,
     // never the playground beside it on the Overview tab, which runs it.
     expect(text).toContain("The Overview’s sensitivity playground runs the screening model, not this one.");
@@ -1514,11 +1515,13 @@ describe("ModelView — the sample model renders every panel", () => {
       // renovation premium are tested.
       expect(visibleText(html)).toContain("3 could not be checked: debt, rent growth, insurance");
       expect(visibleText(html)).toContain("Read why (3)");
-      // The insurance row's re-run at the seller's own T-12 premium is said
-      // in its own words, which say it tests nothing.
+      // The insurance row is unchecked and re-runs nothing (the walkthrough
+      // of 2026-10-20): the T-12's premium is shown beside it, no move.
       const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));
       expect(ins).toContain('data-verdict="unchecked"');
-      expect(visibleText(ins.slice(0, ins.indexOf('data-qa="stress-row-', 10)))).toContain("so this re-run is no test of the OM's premium.");
+      const insRow = ins.slice(0, ins.indexOf('data-qa="stress-row-', 10));
+      expect(insRow).not.toContain('data-qa="stress-unchecked-rerun"');
+      expect(visibleText(insRow)).toContain("$385k");
       // The taxes' reset is the jurisdiction's to make: stretched at most.
       for (const [k, v] of [["taxes", "stretched"], ["renovation_premium", "unsupported"]]) {
         const at = html.indexOf(`data-qa="stress-row-${k}"`);
@@ -1530,7 +1533,12 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(html.indexOf('data-qa="stress-row-debt"')).toBeGreaterThan(html.indexOf('data-qa="stress-unchecked-group"'));
       expect(row).toContain('data-qa="stress-impact"');
       expect(data.stressTest!.rows.find((r) => r.key === "vacancy")!.evidence.some((e) => e.kind === "document" && e.publisher === "the deal's T-12")).toBe(true);
-      expect(text).toContain("The screening model: the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and for growth and the exit: never more optimistic than the memorandum: rent growth at the lower of the memorandum's stated rate and the published figure the stress test decides it by, expense growth at the higher of the two — either only inside −5% to +15% a year, the published one only where it is fresh — either alone where only one stands, else 3.0% a year; the exit at the higher of the memorandum's stated exit and the cap the stress test decides it by — the going-in cap where the price buys the building as it stands, else the research tracker's cap range at its low end where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury — either alone where only one stands, else the going-in cap it states or 6.0%; the sample deal, its figures pinned, keeps 3.0% and its going-in cap. It is the one the stress test re-runs on a stabilized deal, and the one the Excel workbook and the full report carry.");
+      // The sample's figures are pinned, read off its own derived model, and
+      // no sentence says it runs a published figure.
+      expect(text.replace(/\s+/g, " ")).toContain(
+        "The screening model: the one the stress test re-runs on a stabilized deal, and the one the workbook and the full report carry. A first-draft model sets its own assumptions, so its returns can differ. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. The sample's figures are pinned: 3.0% growth and an exit at its 5.45% going-in cap. See how it works",
+      );
+      expect(text).not.toContain("Growth and the exit run");
       expect(text).toContain("Levered IRR 9.3%, the base case");
       expect(a11yIssues(html)).toEqual([]);
       expect(gluedWords(text)).toEqual([]);
@@ -1552,6 +1560,7 @@ describe("ModelView — the sample model renders every panel", () => {
             compare: false,
             sample: true,
             interest: data.modelInterest,
+            screening: data.underwrite,
             download: React.createElement(DownloadRow, { href: "/api/demo/underwrite.xlsx" }),
           }),
         ),
@@ -1566,8 +1575,8 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(text).toContain("Add more to the model");
       expect(html).not.toContain('aria-label="Model views"');
       expect(html).toContain('data-qa="workbook-note"');
-      expect(text).toContain(
-        "The workbook is the screening model, a separate one built on the memorandum's price and terms, the rent roll's and T-12's figures where the deal has them, and for growth and the exit: never more optimistic than the memorandum: rent growth at the lower of the memorandum's stated rate and the published figure the stress test decides it by, expense growth at the higher of the two — either only inside −5% to +15% a year, the published one only where it is fresh — either alone where only one stands, else 3.0% a year; the exit at the higher of the memorandum's stated exit and the cap the stress test decides it by — the going-in cap where the price buys the building as it stands, else the research tracker's cap range at its low end where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury — either alone where only one stands, else the going-in cap it states or 6.0%; the sample deal, its figures pinned, keeps 3.0% and its going-in cap — its returns can differ from the ones above. The Overview’s sensitivity playground runs the screening model, not this one.",
+      expect(text.replace(/\s+/g, " ")).toContain(
+        "The workbook is the screening model, a separate one — its returns can differ from the ones above. The Overview’s sensitivity playground runs the screening model, not this one. Built on the OM's price and terms, and the rent roll and T-12 where the deal has them. The sample's figures are pinned: 3.0% growth and an exit at its 5.45% going-in cap. See how it works",
       );
       expect(html).toMatch(/<a href="\/api\/demo\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the screening model \(\.xlsx\)<\/a>/);
       // Nothing that needs an account: no document form, no regenerate.

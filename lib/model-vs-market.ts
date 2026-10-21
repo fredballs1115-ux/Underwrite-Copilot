@@ -94,7 +94,10 @@ export type CheckTone =
   | "aside"
   | "stale"
   | "undated"
-  | "old";
+  | "old"
+  // The model's own input was set from this row's deciding figure (lib/
+  // model-evidence): the row says so and is no check against it.
+  | "set_from";
 
 export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
@@ -115,7 +118,24 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   // period: shown, named, held to nothing.
   undated: "beside an undated figure",
   old: "beside a figure over a year old",
+  set_from: "the figure the model runs",
 };
+
+/**
+ * Where the model's own input was set from the figure a row decides by
+ * (lib/model-evidence, the source's `published`), setting the model against
+ * that figure is the figure against itself: the row says the model runs it,
+ * with no tone, and checks nothing. One sentence's opening, every surface.
+ */
+export const SET_FROM_WORDS = "The model runs this figure (set from it)";
+
+/** A read off a trailing year, said as the stance it is: cautious only where
+ *  the OM's own figure stood and was the more optimistic one, so the model
+ *  ran the published figure in its place (lib/underwrite/inputs
+ *  `published.overOm`); a published figure run alone is a stance, no more. */
+export const SET_FROM_TRAILING_CAUTIOUS = "Read off a trailing year, it is a cautious stance, not a forecast.";
+export const SET_FROM_TRAILING_STANCE = "Read off a trailing year, it is a stance, not a forecast.";
+const setFromTrailing = (s: InputSource | undefined): string => (s?.published?.overOm ? SET_FROM_TRAILING_CAUTIOUS : SET_FROM_TRAILING_STANCE);
 
 /** The rent-growth and expense-growth checks' chip where ONE figure decides (lib/rent-growth-
  *  decider): set against that figure, never a range the others make. */
@@ -156,6 +176,11 @@ export interface ModelCheck {
   scope: "metro" | "national";
   /** the one sentence */
   read: string;
+  /** the model's input was set from the figure this row decides by
+   *  (lib/model-evidence): the row says so and checks nothing against it —
+   *  on the exit, only the research range's part, the exit's spread still
+   *  set against the entry. Absent where the OM's figure or a default ran. */
+  setFrom?: true;
   /** Display only — the deal page's picture of the row: the model's
    *  assumption as a figure, percent. Absent where the row is said in words
    *  alone (the exit cap's, a spread against a spread). The report and the
@@ -460,6 +485,13 @@ function sourceWords(s: InputSource | undefined): string {
   }
 }
 
+/** Whether the model's input runs this published figure — set from it,
+ *  the source naming it (lib/underwrite/inputs `published`) and the value
+ *  the figure's own. */
+function runsFigure(s: InputSource | undefined, f: PublishedFigure | undefined, model: number): boolean {
+  return !!f && !!s?.published && !s.published.research && s.published.label === f.label && Math.abs(model - f.value) < SAME;
+}
+
 function fresh(rates: readonly LiveRate[] | undefined, pick: (r: LiveRate) => boolean): LiveRate | null {
   return rates?.find((r) => pick(r) && r.fresh && Number.isFinite(r.value)) ?? null;
 }
@@ -536,9 +568,11 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
       publisher: "BLS via FRED",
     },
   ];
-  const tone = rangeTone(g, [r.value]);
-  const clause =
-    tone === "ahead"
+  const setFrom = runsFigure(input.sources?.rentGrowthPct, published[0], g);
+  const tone: CheckTone = setFrom ? "set_from" : rangeTone(g, [r.value]);
+  const clause = setFrom
+    ? `${SET_FROM_WORDS}: the index, so it is not checked against it. ${setFromTrailing(input.sources?.rentGrowthPct)}`
+    : tone === "ahead"
       ? `The model runs ahead of the index, ${byPoints(g, [r.value])}.`
       : tone === "behind"
         ? `The model runs behind the index, ${byPoints(g, [r.value])}.`
@@ -552,7 +586,8 @@ function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck |
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "national",
-    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the year to ${when} the rents ${idx.lessor} charge moved ${signed(r.value)}% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+    ...(setFrom ? { setFrom: true as const } : {}),
+    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the year to ${when} the rents ${idx.lessor} charge moved ${signed(r.value)}% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. ${clause}${setFrom ? "" : " A trailing year is what the assumption is being asked to beat, not a forecast."}`,
     modelValue: g,
     marks: [mark("range", true)],
   };
@@ -642,10 +677,15 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   // apartment rents' +0.8% (audit H1). The rest are shown beside it.
   const decided = rentGrowthDecider(input.assetClass, published.map((p) => p.label));
   const values = decided ? [published[decided.index].value] : published.map((p) => p.value);
-  const tone = rangeTone(g, values);
+  // The model set from the deciding figure itself (lib/model-evidence): the
+  // figure against itself is no check, so the row says the model runs it.
+  const setFrom = !!decided && runsFigure(input.sources?.rentGrowthPct, published[decided.index], g);
+  const tone: CheckTone = setFrom ? "set_from" : rangeTone(g, values);
   const regulated = allowanceRead(input, g);
   const others = decided && published.length > 1 ? "; the other figures are shown beside it, never held to" : "";
-  const clause = decided
+  const clause = setFrom && decided
+    ? `${SET_FROM_WORDS}: ${decided.name}, ${decided.why.split(";")[0]}, so it is not checked against it${others}.`
+    : decided
     ? tone === "ahead"
       ? `Held to ${decided.name}, ${decided.why.split(";")[0]}, the model runs ahead of it ${byPoints(g, values)}${others}.`
       : tone === "behind"
@@ -657,7 +697,7 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
         ? `The model runs behind every published figure, ${byPoints(g, values)}.`
         : "The model sits inside the published range.";
   const toneLabel = decided ? DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone] : TONE_LABEL[tone];
-  const trailing = "A trailing year is what the assumption is being asked to beat, not a forecast.";
+  const trailing = setFrom ? setFromTrailing(input.sources?.rentGrowthPct) : "A trailing year is what the assumption is being asked to beat, not a forecast.";
   return {
     key: "rent_growth",
     title: "Rent growth",
@@ -669,6 +709,7 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel,
     scope: "metro",
+    ...(setFrom ? { setFrom: true as const } : {}),
     read: regulated
       ? `${regulated.lead} For the market-rate units, over the past year ${joinWords(phrases)}. ${clause} ${trailing}`
       : `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} ${trailing}`,
@@ -702,10 +743,12 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   // repricing, not the expense base's, and is never in it either.
   const decider = EXPENSE_GROWTH_ORDER[0];
   const values = [cpi.value];
-  const tone = rangeTone(e, values);
+  const setFrom = runsFigure(input.sources?.expenseGrowthPct, published[0], e);
+  const tone: CheckTone = setFrom ? "set_from" : rangeTone(e, values);
   const besideCore = core ? "; core CPI is shown beside it, never held to" : "";
-  const clause =
-    tone === "ahead"
+  const clause = setFrom
+    ? `${SET_FROM_WORDS}: ${decider.name}, ${decider.why}, so it is not checked against it${besideCore}. ${setFromTrailing(input.sources?.expenseGrowthPct)}`
+    : tone === "ahead"
       ? `Held to ${decider.name}, ${decider.why}, the model runs ahead of it ${byPoints(e, values)}${besideCore}.`
       : tone === "behind"
         ? `Held to ${decider.name}, ${decider.why}, the model runs behind it ${byPoints(e, values)}${besideCore}.`
@@ -755,6 +798,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: DECIDED_TONE_LABEL[tone] ?? TONE_LABEL[tone],
     scope: "national",
+    ...(setFrom ? { setFrom: true as const } : {}),
     read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}${breakevenClause}`,
     // Every figure here is the nation's; all-items CPI is the one figure the
     // tone reads, core is shown beside it, and the insurance index and the
@@ -873,7 +917,7 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
  * to research past the research rule's limit (lib/research-age): the range
  * is shown, named stale with its age.
  */
-function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string } {
+function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string; setFrom?: true } {
   const t = input.tracker;
   if (!t || t.capLow === null) return { figures: [], sentence: "" };
   const lo = t.capLow;
@@ -895,6 +939,15 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
     return {
       figures,
       sentence: `${head}. ${notHeld.because}, so the exit is not held to it; the exit cap sits ${where}.`,
+    };
+  }
+  // The model's exit set from the range's low end itself (lib/model-
+  // evidence, a research print): the range against itself is no check.
+  if (input.sources?.exitCapPct?.published?.research && Math.abs(x - lo) < 0.005) {
+    return {
+      figures,
+      sentence: `${head}. ${SET_FROM_WORDS}: the exit runs at ${point ? "it" : "its low end"}, so the exit is not checked against ${point ? "it" : "the range"}.`,
+      setFrom: true,
     };
   }
   const position =
@@ -945,6 +998,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       tone: "stated",
       toneLabel: TONE_LABEL.stated,
       scope,
+      ...(band.setFrom ? { setFrom: true as const } : {}),
       read: `${head} ${input.plan ? "A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
     };
   }
@@ -992,6 +1046,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope,
+    ...(band.setFrom ? { setFrom: true as const } : {}),
     read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it${ownClause} ${clause}${band.sentence}`,
   };
 }

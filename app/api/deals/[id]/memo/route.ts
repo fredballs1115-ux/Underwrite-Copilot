@@ -336,6 +336,7 @@ export async function GET(
           brokerComps: (deal.comps as BrokerCompsResult | null) ?? null,
           recordedSales,
           pastScreens,
+          sample: !!(deal as { is_sample?: boolean }).is_sample,
           readOn: readerDay,
         });
       }

@@ -208,7 +208,7 @@ export function DemoSections({
             <ModelVsMarketCard read={data.modelVsMarket} />
             {/* The deal page's first-draft model card, open as it opens
                 with a model, its body the card's own (model-body). */}
-            <SampleModelCard model={data.model} interest={data.modelInterest} />
+            <SampleModelCard model={data.model} interest={data.modelInterest} screening={data.underwrite} />
           </div>
         )}
 

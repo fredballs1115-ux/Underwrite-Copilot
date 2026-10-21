@@ -54,7 +54,7 @@ import { MemoPreview } from "./memo-preview";
 import { SamplePipelineCard } from "./sample-pipeline-card";
 import { sampleMemoData } from "@/lib/sample-memo";
 import { compRating, inCompOrder } from "@/lib/comp-rating";
-import { SCREENING_MODEL_IS } from "@/lib/screening-model-words";
+import { SCREENING_BUILT_ON, SCREENING_GROWTH_EXIT_LINE } from "@/lib/screening-model-words";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -389,7 +389,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: `Included with every Pro test: the screening model as a live-formula workbook, built on ${SCREENING_MODEL_IS}. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.`,
+    a: `Included with every Pro test: the screening model as a live-formula workbook. ${SCREENING_BUILT_ON} ${SCREENING_GROWTH_EXIT_LINE}; /how-we-test has the whole rule. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets each assumption the OM or a default set against them, and names a figure the model was set from as the figure it runs, never as a check.`,
   },
   {
     q: "Can my team share one pipeline?",

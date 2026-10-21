@@ -25,6 +25,7 @@ import {
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
   PUBLISHERS,
+  SCREENING_MODEL_SECTION,
   TRACK_RECORD,
   VERDICT_RULES,
   VERDICT_WORDS,
@@ -42,7 +43,7 @@ import {
   RENT_GROWTH_UNSUPPORTED_PTS,
   VACANCY_UNSUPPORTED_PTS,
 } from "./stress-test";
-import { RECORD_FLOOR } from "./track-record";
+import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, SCORED_BY } from "./track-record";
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
@@ -202,7 +203,11 @@ describe("/how-we-test draws every method from the table", () => {
     expect((html.match(/data-qa="verdict-rule"/g) ?? []).length).toBe(STRESS_METHODS.length);
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
-    expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized assumption is held to the market/);
+    expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized vacancy is held to the market/);
+    // lib/stress-deciders' order: the market, the rent roll, the T-12 (not on
+    // a plan), the class's norm; the documents beside a market figure are
+    // today's gap, never "shown" in the norm's place (audit of PR #486).
+    expect(VERDICT_RULES.vacancy).toContain("then the rent roll, then the T-12 (never on a plan), then the class's norm; beside a market figure the documents show today's gap.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
@@ -225,11 +230,25 @@ describe("/how-we-test draws every method from the table", () => {
     // Every row scored, holds included, each outcome said, and the margins
     // the snapshot keeps (lib/stress-snapshot) printed as the reader's own.
     const record = TRACK_RECORD.lines.join(" ");
-    expect(record).toContain("Every row of the stress test is scored, holds included");
+    // Scored where a later figure can speak to a row, never "every row": the
+    // rows nothing can score yet are named (lib/track-record-words, held to
+    // the scorer key by key in lib/track-record.test.ts).
+    expect(record).toContain("Each row of the stress test, holds included, is scored where a later figure can speak to it");
+    expect(record).not.toMatch(/every row/i);
+    expect(TRACK_RECORD.lines).toContain(SCORED_BY);
+    expect(TRACK_RECORD.lines).toContain(DECISION_SCORES);
+    expect(TRACK_RECORD.lines).toContain(NOT_YET_SCORABLE);
     expect(record).toContain("a false hold");
     expect(record).toContain("An unchecked row is not scored.");
     expect(record).toContain('"3 of 5 rows"');
-    expect(record).toContain("0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    // The margin is the verdict's own tolerance: the survey's margin of error
+    // where the survey decided a vacancy, else the key's own.
+    // A vacancy the survey decided is never scored (a later document is
+    // today's vacancy, not a test of it), so its margin of error is a
+    // tolerance no scored row uses, and the page does not offer it.
+    expect(record).toContain("kept with it: 0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    expect(record).not.toContain("the survey's margin of error on a vacancy");
+    expect(record).toContain("A row kept before its tolerance was carried keeps the margin it was stored with.");
     expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });
     expect(snapshotThreshold("noi")).toEqual({ value: 0.05, unit: "share" });
     expect(snapshotThreshold("basis")).toEqual({ value: 0.05, unit: "share" });
@@ -252,6 +271,42 @@ describe("/how-we-test draws every method from the table", () => {
     expect(html).toContain('<section id="headline"');
     expect(html.indexOf('id="headline"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-qa="headline-picture"/);
+  });
+
+  it("keeps every line of the methods and the headline's method to one thought, under 260 characters", () => {
+    // A 490-character "set against" item stood on the vacancy's section
+    // (audit of PR #486): every string the page draws from either table is
+    // held to the same ceiling as the track record's and the model's lines.
+    const strings: string[] = [];
+    const walk = (v: unknown) => {
+      if (typeof v === "string") strings.push(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object") Object.values(v).forEach(walk);
+    };
+    walk(STRESS_METHODS);
+    walk(HEADLINE_METHOD);
+    for (const line of [...CANNOT.map((c) => c.line), ...Object.values(VERDICT_RULES)]) strings.push(line);
+    expect(strings.length).toBeGreaterThan(100);
+    for (const line of strings) expect(line.length, line).toBeLessThanOrEqual(260);
+  });
+
+  it("says what the screening model runs, the whole rule, where the deal page's links land (an investor's walkthrough)", () => {
+    const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+    expect(SCREENING_MODEL_SECTION.id).toBe("model");
+    expect(html).toContain('<section id="model"');
+    expect(flat).toContain(SCREENING_MODEL_SECTION.heading);
+    for (const line of SCREENING_MODEL_SECTION.lines) {
+      expect(flat).toContain(line);
+      expect(line.length, line).toBeLessThanOrEqual(260);
+    }
+    // After the headline, before the assumptions' own sections.
+    expect(html.indexOf('id="model"')).toBeGreaterThan(html.indexOf('id="headline"'));
+    expect(html.indexOf('id="model"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
+    // "Not a forecast" agrees with it: the model is a stance off a trailing year.
+    const forecast = CANNOT.find((c) => c.heading === "Not a forecast")!.line;
+    expect(forecast).toContain("the screening model's growth and exit are read off one: a stance, more cautious than the OM only where its own figure is the more optimistic");
+    expect(SCREENING_MODEL_SECTION.heading).toBe("The model a stabilized deal's rows re-run from");
+    expect(forecast).toContain("nothing here says where rents, caps or rates go");
   });
 
   it("reads clean: no glued words, no accessibility faults, no article typed before a value", () => {

@@ -84,6 +84,38 @@ tested and whether that is right. So:
 - **The challenger's downside paragraph is a scenario in words**: its prompt
   asks for no return figures and the verdict does not read it; every return
   on a page is the engine's.
+- **One figure decides each row** (2026-10-20, the owner's rule,
+  `lib/stress-deciders.ts`): a row's verdict is struck on ONE named figure,
+  picked by a fixed order of fallbacks (`StressRow.decidedBy`); the rest of
+  its evidence is drawn beside it, "Beside it, not deciding" — never the
+  most lenient piece. Expense growth is all-items CPI (core only where it
+  is not fresh); the exit cap the going-in cap, else the tracker range's
+  low end. A row that holds draws no re-run; the insurance row is unchecked
+  until a new owner's quote exists (the T-12's premium is the seller's).
+  The headline draws the screening model's own levered IRR beside its two
+  cases, names what the evidence's case keeps at the OM's, what of the
+  NOI's gap neither case carries, and what it does not test.
+- **A plan deal re-runs its yield on total cost** (2026-10-20): the
+  stabilized NOI over the price plus the budget (a forward purchase's price
+  alone), through `yieldOnCost` in lib/plan-sensitivity, split by Shapley
+  in points; only where the OM states both, never on today's building's
+  vacancy, a land assessment, a master lease's price, or a result at or
+  under zero NOI or at or past 25%.
+- **The screening model runs published figures, never more optimistic
+  than the OM** (2026-10-20, the owner's rule, `lib/model-evidence.ts`):
+  rent growth, expense growth and the exit cap run the stress test's
+  deciding figure where fresh, held to the cautious side of the OM's stated
+  one (the lower rent growth, the higher expense growth, the higher exit
+  cap), else whichever stands, else the default; every surface that builds
+  the model reads it once, the sample is never seeded, and each source note
+  says which ran and why.
+- **The track record scores every row** (2026-10-20, `lib/stress-snapshot.ts`):
+  the stress test is kept with its verdict (`stressSnapshot`, in the
+  verdict's jsonb, riding into `prior_screen`), and each row — holds
+  included — is scored against a later figure that can speak to it, dated
+  after the verdict by its own period, by the row's own margin; taxes and
+  insurance never by a seller's document; a share prints from five scored
+  rows, always with its count.
 
 ## Architecture
 
@@ -3049,7 +3081,7 @@ tested and whether that is right. So:
   state no cap**, the exit is set against the going-in cap their NOI over
   their price implies (through `buildingPriceOf`'s rules: a share grossed
   up, none for a note or a leased fee, none on a plan deal), said as
-  implied; the model's own default exit is unchanged (an owner item). The
+  implied; the model's own exit follows lib/model-evidence (the owner's rule of 2026-10-20, above). The
   three surfaces' scope sentence is `readScope` in
   `lib/model-vs-market-scope.ts` ("set against the published figures for
   the Washington DC market and the nation, read on …" — the nation named

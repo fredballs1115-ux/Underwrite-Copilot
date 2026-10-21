@@ -7,9 +7,13 @@ import { join } from "node:path";
 import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StageChange } from "@/lib/stages";
-import type { StressEvidence, StressRow, StressTest } from "@/lib/stress-test-types";
-import { STRESS_SNAPSHOT_V, WORSE_WHEN, readStressSnapshot, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
+import { STRESS_KEYS, type StressEvidence, type StressKey, type StressRow, type StressTest } from "@/lib/stress-test-types";
+import { STRESS_SNAPSHOT_V, WORSE_WHEN, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import {
+  CARD_SCOPE,
+  DECISION_SCORES,
+  NOT_YET_SCORABLE,
+  SCORED_BY,
   OUTCOME_WORD,
   RECORD_FLOOR,
   dealRecordLine,
@@ -614,6 +618,18 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     expect(plan.rows[0].landing).toBe("unscored");
   });
 
+  it("a plan deal's stated vacancy the survey decided is said as the plan's target, never a deal read as stabilized", () => {
+    const published = row({ key: "vacancy", verdict: "holds", om: 6, evidence: { value: 6.2, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" } });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(published), challenges: [], plan: true, vacancyIsPlanTarget: true, ...laterT12() });
+    expect(r.rows[0].landing).toBe("unscored");
+    expect(r.rows[0].why).toBe("the OM's vacancy is the stabilized figure a plan deal is to reach; a document's vacancy is the building's today, before the plan is done, not a test of it.");
+    expect(r.rows[0].text).not.toContain("a deal read as stabilized");
+    // An older screen's challenge with both flags reads the plan's sentence too.
+    const old = scoreDeal({ screenedAt: T, challenges: [vacancy], plan: true, vacancyIsPlanTarget: true, vacancyHeldToMarket: true, ...laterT12() });
+    expect(old.rows[0].landing).toBe("unscored");
+    expect(old.rows[0].text).not.toContain("a deal read as stabilized");
+  });
+
   it("a decision is a direction: on a flagged row it agrees, against a hold it does not, and either is counted apart", () => {
     const flagged = row({ key: "basis", om: 274_000, evidence: { value: 240_000, label: "The OM's sale comps", asOf: null, kind: "om_internal", publisher: "the memorandum" } });
     const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(flagged), challenges: [], ...dead("price") });
@@ -816,5 +832,173 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
     const row0 = stressSnapshotOf(test(basisRow))!.rows[0];
     expect(row0).toMatchObject({ om: 300, per: "/SF", threshold: { value: 0.05, unit: "share" }, worse: "lower" });
     expect(row0.evidence?.value).toBe(260);
+  });
+});
+
+// ── What can score which row, held to the scorer ─────────────────────────
+
+describe("what can score a row — the words held to the scorer, key by key (the investor walkthrough of 2026-10-20)", () => {
+  const OM: Record<StressKey, number> = {
+    basis: 50_000_000,
+    exit_cap: 5.25,
+    debt: 5,
+    noi: 4_000_000,
+    vacancy: 6,
+    rent_growth: 3,
+    expense_growth: 3,
+    taxes: 1_000_000,
+    insurance: 300_000,
+    renovation_premium: 250,
+    other: 1,
+  };
+  const rowFor = (key: StressKey): StressSnapshotRow => ({
+    key,
+    title: key,
+    verdict: "stretched",
+    om: OM[key],
+    page: 3,
+    evidence: { value: OM[key] * 1.2, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
+    per: null,
+    threshold: snapshotThreshold(key),
+    worse: WORSE_WHEN[key],
+  });
+  // The challenger's other points are always unchecked rows, which no
+  // record scores ("An unchecked row is not scored").
+  const keys = STRESS_KEYS.filter((k) => k !== "other");
+  const snapshot: StressSnapshot = { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: keys.map(rowFor) };
+  const scoredKeys = (r: DealRecord) => r.rows.filter((x) => x.landing === "right" || x.landing === "wrong").map((x) => x.key);
+
+  it("with every kind of later figure in hand — a T-12, a rent roll, a trade — only the vacancy, the NOI and the price are scored", () => {
+    const r = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snapshot,
+      challenges: [],
+      askingPrice: 50_000_000,
+      t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
+      rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: roll },
+      stage: "closed",
+      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+    });
+    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "basis"]));
+    // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
+    expect(SCORED_BY).toContain("a vacancy by a rent roll or T-12 dated after the verdict, unless the market's figure decided it");
+    expect(SCORED_BY).toContain("the NOI by a T-12, neither on a plan deal");
+    expect(CARD_SCOPE).toContain("for a vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
+    expect(SCORED_BY).toContain("the price by a reported trade");
+    const named: Record<string, string> = {
+      rent_growth: "Rent growth",
+      expense_growth: "expense growth",
+      exit_cap: "the exit cap",
+      taxes: "taxes",
+      insurance: "insurance",
+      renovation_premium: "a renovation premium",
+    };
+    // The loan is answered by a decision alone (the next case), so it is
+    // neither a figure's row nor one nothing can answer.
+    const unscored = keys.filter((k) => !scoredKeys(r).includes(k) && k !== "debt");
+    expect(new Set(unscored)).toEqual(new Set(Object.keys(named)));
+    for (const k of unscored) expect(NOT_YET_SCORABLE, k).toContain(named[k]);
+  });
+
+  it("the loan is answered only by a Dead decision on financing, and the price by one on price — counted apart, never a figure", () => {
+    const fin = scoreDeal({ screenedAt: T, stressSnapshot: snapshot, challenges: [], ...dead("financing") });
+    expect(scoredKeys(fin)).toEqual(["debt"]);
+    expect(fin.rows.find((x) => x.key === "debt")).toMatchObject({ decision: true, outcome: null });
+    const price = scoreDeal({ screenedAt: T, stressSnapshot: snapshot, challenges: [], askingPrice: 50_000_000, ...dead("price") });
+    expect(scoredKeys(price)).toEqual(["basis"]);
+    expect(price.rows.find((x) => x.key === "basis")).toMatchObject({ decision: true });
+    expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, counted apart.");
+  });
+
+  it("no surface says every row is scored", () => {
+    for (const s of [CARD_SCOPE, SCORED_BY, NOT_YET_SCORABLE, RECORD_NONE_LINE]) expect(s).not.toMatch(/every (?:row|test)\b[^.]*\bis scored/i);
+    expect(CARD_SCOPE).toContain("is scored where a later figure can speak to it");
+  });
+});
+
+// ── The row's own tolerance, kept with the verdict ───────────────────────
+
+describe("the snapshot keeps the verdict's own tolerance, and the record scores by it", () => {
+  const ev = (over: Partial<StressEvidence>): StressEvidence => ({
+    kind: "published",
+    label: "Rental vacancy, metro area",
+    text: "5.8% ±1.9 pts (Q2 2026)",
+    value: 5.8,
+    asOf: "2026-04-01",
+    publisher: "Census Bureau",
+    scope: "metro",
+    ...over,
+  });
+  const vacRow = (evidence: StressEvidence[]): StressRow => ({
+    key: "vacancy",
+    title: "Stabilized vacancy",
+    omSays: { text: "Vacancy (pro forma): 6.0%", value: 6, page: 21 },
+    evidence,
+    gap: { value: -0.2, unit: "pts", text: "" },
+    verdict: "holds",
+    decidedBy: 0,
+    impact: null,
+    challenge: null,
+    method: "",
+  });
+  const test = (...rows: StressRow[]): StressTest => ({ rows, readOn: "2026-10-01", publishedRead: true, impactsWithheld: null });
+
+  it("a vacancy the survey decided keeps the survey's margin of error, the one its verdict held the OM's figure inside", () => {
+    // The sample's own case: 6.0% against the metro survey's 5.8% ±1.9 holds.
+    expect(stressSnapshotOf(test(vacRow([ev({})])))!.rows[0].threshold).toEqual({ value: 1.9, unit: "pts" });
+    expect(rowThreshold("vacancy", { kind: "published", text: "6.2% ±2.2 pts (Q2 2026)" })).toEqual({ value: 2.2, unit: "pts" });
+  });
+
+  it("every other row keeps the key's own threshold: a document, a figure with no margin, and every other key", () => {
+    const doc = ev({ kind: "document", label: "The deal's rent roll", text: "9.3% vacant", value: 9.3, publisher: "the deal's rent roll", scope: "deal" });
+    expect(stressSnapshotOf(test(vacRow([doc])))!.rows[0].threshold).toEqual({ value: 0.05, unit: "pts" });
+    expect(rowThreshold("vacancy", { kind: "published", text: "4.6% (Q2 2026)" })).toEqual(snapshotThreshold("vacancy"));
+    expect(rowThreshold("vacancy", null)).toEqual(snapshotThreshold("vacancy"));
+    // A margin in another row's text is not that row's tolerance: only the
+    // vacancy judge reads one.
+    for (const k of STRESS_KEYS.filter((x) => x !== "vacancy")) expect(rowThreshold(k, { kind: "published", text: "6.2% ±2.2 pts" }), k).toEqual(snapshotThreshold(k));
+  });
+
+  it("reads the margin off the figure's text exactly as lib/stress-test's vacancy judge does", () => {
+    const re = String.raw`/±\s*(\d+(?:\.\d+)?)\s*pts?/`;
+    expect(readFileSync(join(process.cwd(), "lib/stress-test.ts"), "utf8")).toContain(re);
+    expect(readFileSync(join(process.cwd(), "lib/stress-snapshot.ts"), "utf8")).toContain(re);
+  });
+
+  it("a row is scored by the tolerance it was kept with, and a stored snapshot keeps the margin it stored", () => {
+    // The stored margin alone decides: a hold at 6.0% and a later 7.0%, one
+    // point worse for the buyer.
+    const row = (threshold: StressSnapshotRow["threshold"]): StressSnapshotRow => ({
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      verdict: "holds",
+      om: 6,
+      page: 21,
+      evidence: { value: 6.5, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
+      per: null,
+      threshold,
+      worse: "higher",
+    });
+    const later = { ...roll, occupiedUnits: 0, unitCount: 0, sfWeightedOccupancy: 0.93 };
+    const score = (t: StressSnapshotRow["threshold"]) =>
+      scoreDeal({
+        screenedAt: T,
+        stressSnapshot: { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [row(t)] },
+        challenges: [],
+        rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: later },
+      }).rows[0];
+    const wide = score({ value: 1.9, unit: "pts" });
+    expect(wide).toMatchObject({ outcome: "hold_right", landing: "right" });
+    expect(wide.text).toContain("within the row's 1.9-point margin of the OM's figure");
+    expect(score({ value: 0.05, unit: "pts" })).toMatchObject({ outcome: "false_hold", landing: "wrong" });
+    // Read back, a stored threshold is kept as stored, never recomputed from
+    // the evidence: a snapshot kept before the tolerance was carried keeps its
+    // 0.05 points beside a survey's figure.
+    const older = {
+      v: STRESS_SNAPSHOT_V,
+      readOn: "2026-10-01",
+      rows: [{ ...row({ value: 0.05, unit: "pts" }), evidence: { value: 5.8, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" } }],
+    };
+    expect(readStressSnapshot(JSON.parse(JSON.stringify(older)))!.rows[0].threshold).toEqual({ value: 0.05, unit: "pts" });
   });
 });

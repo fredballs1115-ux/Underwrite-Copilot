@@ -8,6 +8,7 @@
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { DownloadRow, InputsNeeded, ModelBody } from "./(app)/deals/[id]/model-body";
+import type { ScreeningFigures } from "./(app)/deals/[id]/screening-model-lines";
 
 /** The public sample's workbook, the one the header's tools download. */
 export const SAMPLE_WORKBOOK_HREF = "/api/demo/underwrite.xlsx";
@@ -16,6 +17,7 @@ export function SampleModelCard({
   model,
   interest = null,
   playground = true,
+  screening = null,
 }: {
   model: UnderwritingModel;
   /** what the price buys, read as the deal page reads it (lib/compare-
@@ -24,6 +26,9 @@ export function SampleModelCard({
   /** the page draws the Overview's sensitivity playground (/demo does, the
    *  homepage's walkthrough does not), so the card's note may name it */
   playground?: boolean;
+  /** the sample's screening model inputs (its one derivation,
+   *  lib/sample-derive): the workbook note states its pinned figures */
+  screening?: ScreeningFigures | null;
 }) {
   return (
     <details className="rounded-2xl border border-line bg-surface shadow-card" open>
@@ -47,6 +52,7 @@ export function SampleModelCard({
             sample
             playground={playground}
             interest={interest}
+            screening={screening}
             download={<DownloadRow href={SAMPLE_WORKBOOK_HREF} />}
           />
           <InputsNeeded documents={[]} builtFrom={model.generatedFrom} />
