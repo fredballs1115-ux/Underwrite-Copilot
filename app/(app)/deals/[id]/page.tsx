@@ -179,6 +179,7 @@ import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@
 import { readActuals, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { t12SummaryOf } from "@/lib/actuals/analyze";
 import { arrivalOf, scoreDeal } from "@/lib/track-record";
+import { readKeptScreens } from "@/lib/screen-history";
 import {
   signalGoingInCap,
   assessPlausibility,
@@ -907,7 +908,7 @@ export default async function DealPage({
   // roster — four independent reads, one round-trip. All best-effort: the
   // actuals/tasks tables arrived in 0020/0022, and on an older schema the
   // queries error and read null (the cards simply don't render).
-  const [rrRes, t12Res, tasksRes, versionsRes, memberRes] = await Promise.all([
+  const [rrRes, t12Res, tasksRes, versionsRes, memberRes, keptScreens] = await Promise.all([
     // …each with when it was written and the document it was read from,
     // so the track record can tell a document added after the screen from
     // one the screen read (lib/track-record `arrivalOf`).
@@ -944,6 +945,9 @@ export default async function DealPage({
           .select("user_id")
           .eq("team_id", ownership.team_id)
       : Promise.resolve({ data: null }),
+    // Every screen kept (migration 0038), for the track record; none where
+    // the table cannot be read yet, and deals.prior_screen stands alone.
+    readKeptScreens(supabase, id),
   ]);
   const t12Summary: T12Summary | null = t12SummaryOf(t12Res.data?.summary);
   // The OM's NOI vs the T-12 actual — the shared picker (word-bounded,
@@ -994,6 +998,7 @@ export default async function DealPage({
     stressSnapshot: verdict ? verdict.stressSnapshot : undefined,
     challenges: challenges?.challenges,
     priorScreen,
+    priorScreens: keptScreens,
     rentRoll: rrRes.data?.summary
       ? {
           arrivedAt: arrivalOf(rrRes.data as { created_at?: string | null; source_document_id?: string | null }, documents),

@@ -275,7 +275,7 @@ describe("/how-we-test draws every method from the table", () => {
     expect(TRACK_RECORD.lines).toContain(RESCREEN_RULE);
     expect(flat).toContain("Nor is a T-12 whose period ended, or a rent roll dated, on or before the verdict's day, only uploaded later.");
     expect(flat).not.toContain("whose year ended before the verdict");
-    expect(RESCREEN_RULE).toContain("each re-screen keeps the one screen it replaces, none before it");
+    expect(RESCREEN_RULE).toContain("each re-screen keeps the screen it replaces, every one");
     // The picture: under the record's heading, its marks the panels' own parts.
     const at = html.indexOf('data-qa="scoring-rule"');
     expect(at).toBeGreaterThan(html.indexOf('id="track-record"'));

@@ -1,5 +1,19 @@
 import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
-import { CARD_SCOPE, NOT_YET_SCORABLE, OUTCOME_WORD, TAX_INSURANCE_NOT_SCORED, dealRecordLine } from "@/lib/track-record-words";
+import {
+  CALIBRATION_NOTE,
+  CAPTURE_TRACK,
+  CARD_SCOPE,
+  NOT_YET_SCORABLE,
+  OUTCOME_WORD,
+  PURCHASE_IS_DECISION,
+  TAX_INSURANCE_NOT_SCORED,
+  capturedAt,
+  capturedWords,
+  dealRecordLine,
+  decisionBadge,
+  type GapCapturedLike,
+} from "@/lib/track-record-words";
+import { Key, KeyItem, Tick } from "@/app/panel-parts";
 import { ScorableGrid } from "../../scorable-grid";
 
 /**
@@ -14,7 +28,11 @@ import { ScorableGrid } from "../../scorable-grid";
  * scored in lib/track-record and handed in as data. Where nothing has
  * arrived after the screen, a deal with a verdict draws what will score what
  * (`ScorableGrid`, the scorer's own rules on this deal) and claims nothing;
- * a deal with no verdict stamp draws nothing.
+ * a deal with no verdict stamp draws nothing. Beside right and wrong, each
+ * flagged row scored on figures draws how much of the gap the evidence
+ * opened its later figure covered (the owner's decision of 2026-10-21,
+ * display only): the OM's figure, the evidence's and the later one on one
+ * track, said in words. A Closed deal's own price is drawn as a decision.
  */
 export function TrackRecordCard({ record }: { record: DealRecord | null }) {
   if (!record) return null;
@@ -45,6 +63,8 @@ export function TrackRecordCard({ record }: { record: DealRecord | null }) {
   const taxOrInsurance = record.rows.some((r) => r.key === "taxes" || r.key === "insurance");
   const summary = dealRecordLine(record);
   const allTest = record.rows.length > 0 && record.rows.every((r) => r.fromTest);
+  const calibrated = scored.some((r) => r.captured);
+  const bought = record.rows.some((r) => r.purchase);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record">
       <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
@@ -63,6 +83,16 @@ export function TrackRecordCard({ record }: { record: DealRecord | null }) {
       {taxOrInsurance && (
         <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-tax-insurance">
           {TAX_INSURANCE_NOT_SCORED}
+        </p>
+      )}
+      {bought && (
+        <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-purchase">
+          {PURCHASE_IS_DECISION}
+        </p>
+      )}
+      {calibrated && (
+        <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-calibration-note">
+          {CALIBRATION_NOTE}
         </p>
       )}
       {record.evidence.length > 0 && (
@@ -143,7 +173,8 @@ const LANDING_TONE: Record<Scored, string> = {
 /** The badge's words: the outcome, a decision's direction, or a challenge's side. */
 function badgeWord(row: ScoredRow): string {
   const landing = row.landing as Scored;
-  if (row.fromTest && row.decision) return landing === "right" ? "A decision on the test's side" : "A decision against the hold";
+  if (row.fromTest && row.decision) return decisionBadge(row);
+  if (row.purchase) return "Your own price";
   if (row.fromTest && row.outcome) return OUTCOME_WORD[row.outcome];
   if (landing === "right" || landing === "wrong") return landing === "right" ? "Right" : "Wrong";
   return LANDING_WORD[landing];
@@ -174,8 +205,43 @@ function RowView({ row }: { row: ScoredRow }) {
           <Figure label="Later" value={row.figures.later} />
         </dl>
       )}
+      {row.captured && <CaptureTrack captured={row.captured} />}
       <p className="mt-2 text-xs leading-relaxed text-muted">{row.text}</p>
     </li>
+  );
+}
+
+/**
+ * How much of the gap the evidence opened the later figure covered, drawn:
+ * the OM's figure and the evidence's as ticks on one track, the later figure
+ * a brand tick, the stretch from the OM's figure to it filled — held inside
+ * the track, the words saying where it went past either end. Display only.
+ */
+function CaptureTrack({ captured }: { captured: GapCapturedLike }) {
+  const { at } = capturedAt(captured.pct);
+  const from = Math.min(CAPTURE_TRACK.om, at);
+  const to = Math.max(CAPTURE_TRACK.om, at);
+  return (
+    <div className="mt-2" data-qa="track-record-capture" data-place={captured.place}>
+      <div className="relative h-3 rounded-full bg-surface" aria-hidden>
+        <span className="absolute inset-y-0 rounded-full bg-brand/25" data-bar="capture-span" style={{ left: `${from}%`, width: `${to - from}%` }} />
+        <Tick at={`${CAPTURE_TRACK.om}%`} bar="capture-om" />
+        <Tick at={`${CAPTURE_TRACK.evidence}%`} bar="capture-evidence" tone="border-ink/50" dashed />
+        <Tick at={`${at}%`} bar="capture-later" tone="bg-brand" />
+      </div>
+      <Key>
+        <KeyItem mark="tick" tone="bg-ink">
+          The OM&apos;s figure
+        </KeyItem>
+        <KeyItem mark="dashed" tone="border-ink/50">
+          The evidence&apos;s
+        </KeyItem>
+        <KeyItem mark="tick" tone="bg-brand">
+          The later figure
+        </KeyItem>
+      </Key>
+      <p className="mt-1 text-xs leading-relaxed">{capturedWords(captured)}</p>
+    </div>
   );
 }
 

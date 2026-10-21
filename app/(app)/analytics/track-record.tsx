@@ -1,6 +1,10 @@
 import {
   ACCOUNT_VACANCY_NOTE,
+  BASE_RATE_WHY,
+  CALIBRATION_NOTE,
+  CAPTURE_TRACK,
   DECISION_SCORES,
+  PURCHASE_IS_DECISION,
   DOCUMENT_DATE_RULE,
   NOT_YET_SCORABLE,
   RECORD_FLOOR,
@@ -8,6 +12,9 @@ import {
   SCORED_BY,
   TAX_INSURANCE_NOT_SCORED,
   TRADE_DATE_RULE,
+  baseRateLine,
+  calibrationCountsLine,
+  capturedAt,
   recordCountsLine,
   recordLine,
   recordState,
@@ -15,6 +22,7 @@ import {
   type AccountRecord,
   type KeyRecord,
 } from "@/lib/track-record";
+import { Key, KeyItem, Tick } from "@/app/panel-parts";
 import { ScorableGrid } from "../scorable-grid";
 
 /** A key's counts, each its marker and tone: the bar's segments over the
@@ -40,13 +48,20 @@ const DOTS: readonly { count: "right" | "wrong" | "screenSide" | "between" | "om
  * every count said in words beside the bar — and under the floor a dot a
  * scored row, never a bar, since a bar of two rows is a share by another
  * name. With nothing scored, what will score what (`ScorableGrid`). A row is
- * filed under the title the deal's card prints for it. Pure.
+ * filed under the title the deal's card prints for it. Beside right and
+ * wrong, display only (the owner's decision of 2026-10-21): the base rate —
+ * how many scored rows, whatever their verdict, landed past the OM's figure
+ * on the buyer's bad side, a share only from the floor — and where each
+ * flagged row's later figure landed between the OM's figure and the
+ * evidence's, a tick a row on one track, counted in words. Pure.
  */
 export function TrackRecordSection({ record }: { record: AccountRecord }) {
   const state = recordState(record);
   const total = (k: KeyRecord) => k.right + k.wrong + k.screenSide + k.omSide + k.between;
   const widest = Math.max(1, ...record.byKey.map(total));
   const anyChallenges = record.challenges.scored > 0;
+  const baseRate = baseRateLine(record);
+  const calibration = calibrationCountsLine(record.capturedCounts);
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record">
       <h2 className="text-sm font-semibold tracking-tight">Track record</h2>
@@ -89,6 +104,36 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
           })}
         </ul>
       )}
+      {baseRate && (
+        <div className="mt-4" data-qa="track-record-base-rate">
+          <p className="max-w-prose text-sm leading-relaxed">{baseRate}</p>
+          <p className="mt-0.5 max-w-prose text-[11px] text-muted">{BASE_RATE_WHY}</p>
+        </div>
+      )}
+      {calibration && (
+        <div className="mt-4" data-qa="track-record-calibration">
+          <p className="max-w-prose text-sm leading-relaxed">{calibration}</p>
+          <div className="relative mt-2 h-3 max-w-md rounded-full bg-faint" aria-hidden>
+            <Tick at={`${CAPTURE_TRACK.om}%`} bar="calibration-om" />
+            <Tick at={`${CAPTURE_TRACK.evidence}%`} bar="calibration-evidence" tone="border-ink/50" dashed />
+            {record.calibration.map((c, i) => (
+              <Tick key={`${c.key}-${i}`} at={`${capturedAt(c.captured.pct).at}%`} bar="calibration-row" tone="bg-brand/70" track="secondary" />
+            ))}
+          </div>
+          <Key>
+            <KeyItem mark="tick" tone="bg-ink">
+              The OM&apos;s figure
+            </KeyItem>
+            <KeyItem mark="dashed" tone="border-ink/50">
+              The evidence&apos;s
+            </KeyItem>
+            <KeyItem mark="tick" tone="bg-brand/70">
+              A flagged row&apos;s later figure
+            </KeyItem>
+          </Key>
+          <p className="mt-1 max-w-prose text-[11px] text-muted">{CALIBRATION_NOTE}</p>
+        </div>
+      )}
       {record.byKey.length > 0 && (
         <p className="mt-2 text-[11px] text-muted">
           {`A bar a tested assumption: the stress-test rows a later figure bore out (right) and did not (wrong)${
@@ -97,7 +142,7 @@ export function TrackRecordSection({ record }: { record: AccountRecord }) {
         </p>
       )}
       <p className="mt-2 max-w-prose text-[11px] text-muted" data-qa="track-record-scored-by">
-        {`${SCORED_BY} ${DECISION_SCORES} ${NOT_YET_SCORABLE}`}
+        {`${SCORED_BY} ${DECISION_SCORES} ${PURCHASE_IS_DECISION} ${NOT_YET_SCORABLE}`}
       </p>
       <p className="mt-1 max-w-prose text-[11px] text-muted" data-qa="track-record-documents">
         {`${DOCUMENT_DATE_RULE} ${TRADE_DATE_RULE} ${TAX_INSURANCE_NOT_SCORED}`}

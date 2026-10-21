@@ -42,6 +42,7 @@ import { askingPriceOf } from "@/lib/deal-strategy";
 import { accountRecord, arrivalOf, scoreDeal, type PriorScreenLike } from "@/lib/track-record";
 import { planVacancyStated, stabilizedVacancyStated } from "@/lib/stress-test";
 import { TrackRecordSection } from "./track-record";
+import { SCREEN_SNAPSHOTS, SCREEN_SNAPSHOT_SELECT, keptScreensByDeal, type KeptScreenRow } from "@/lib/screen-history";
 
 /** A stored rent roll or T-12 row as the track record reads it. */
 interface ActualsRowLike {
@@ -214,7 +215,7 @@ export default async function AnalyticsPage() {
   // an older schema they error and read as none, and the record is scored
   // on decisions and trades alone.
   const ids = new Set(pooled.map((r) => r.id));
-  const [rollRows, t12Rows, docRows] = await Promise.all([
+  const [rollRows, t12Rows, docRows, keptRows] = await Promise.all([
     readAll<ActualsRowLike>((from, to) =>
       supabase.from("deal_rent_rolls").select("id, deal_id, as_of_date, summary, created_at, source_document_id").order("created_at", { ascending: false }).order("id").range(from, to),
     ),
@@ -224,7 +225,14 @@ export default async function AnalyticsPage() {
     readAll<{ id: string; deal_id: string; created_at: string }>((from, to) =>
       supabase.from("deal_documents").select("id, deal_id, created_at").in("kind", ["rent_roll", "t12"]).order("created_at", { ascending: false }).order("id").range(from, to),
     ),
+    // Every screen kept (migration 0038), so a row scored against an earlier
+    // screen stays scored after later re-screens; none where the table
+    // cannot be read yet, and each deal's prior_screen stands alone.
+    readAll<KeptScreenRow & { id: string }>((from, to) =>
+      supabase.from(SCREEN_SNAPSHOTS).select(`id, ${SCREEN_SNAPSHOT_SELECT}`).order("verdict_at", { ascending: false }).order("id").range(from, to),
+    ),
   ]);
+  const keptByDeal = keptScreensByDeal((keptRows ?? []).filter((r) => ids.has(r.deal_id)));
   const newestByDeal = (rows: ActualsRowLike[] | null) => {
     const out = new Map<string, ActualsRowLike>();
     for (const r of rows ?? []) if (ids.has(r.deal_id) && !out.has(r.deal_id)) out.set(r.deal_id, r);
@@ -246,6 +254,7 @@ export default async function AnalyticsPage() {
         stressSnapshot: (r.verdict as { stressSnapshot?: unknown } | null)?.stressSnapshot,
         challenges: (r.challenges as { challenges?: Challenge[] } | null)?.challenges,
         priorScreen: (r.prior_screen as PriorScreenLike | null | undefined) ?? null,
+        priorScreens: keptByDeal.get(r.id) ?? [],
         rentRoll: roll?.summary ? { arrivedAt: arrivalOf(roll, docs), dated: roll.as_of_date ?? null, summary: roll.summary as RentRollSummary } : null,
         t12: t12Row && t12Summary ? { arrivedAt: arrivalOf(t12Row, docs), dated: t12Row.period_end_date ?? null, summary: t12Summary } : null,
         stage: r.stage ?? null,

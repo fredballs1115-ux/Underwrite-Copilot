@@ -110,6 +110,7 @@ import { omFingerprint } from "@/lib/om-fingerprint";
 import { READER_ROUND } from "@/lib/reader-round";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
+import { keepScreen } from "@/lib/screen-history";
 import type {
   AssetClass,
   ExtractionResult,
@@ -1341,17 +1342,17 @@ async function runAnalysisSteps(
         .eq("id", dealId)
         .single();
       if (prev?.extraction) {
-        await admin
-          .from("deals")
-          .update({
-            prior_screen: {
-              at: new Date().toISOString(),
-              extraction: prev.extraction,
-              verdict: prev.verdict ?? null,
-              challenges: prev.challenges ?? null,
-            },
-          })
-          .eq("id", dealId);
+        const kept = {
+          at: new Date().toISOString(),
+          extraction: prev.extraction,
+          verdict: prev.verdict ?? null,
+          challenges: prev.challenges ?? null,
+        };
+        await admin.from("deals").update({ prior_screen: kept }).eq("id", dealId);
+        // …and appended to every screen kept (migration 0038), so a later
+        // re-screen never drops a row the track record scored against this
+        // one. Best-effort: before the table exists it logs and moves on.
+        await keepScreen(admin, dealId, kept);
       }
     } catch {
       // No snapshot — the screen itself proceeds regardless.

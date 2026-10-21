@@ -13,7 +13,10 @@ import { TrackRecordCard } from "@/app/(app)/deals/[id]/track-record-card";
 import { TrackRecordSection } from "@/app/(app)/analytics/track-record";
 import {
   ACCOUNT_VACANCY_NOTE,
+  BASE_RATE_WHY,
+  CALIBRATION_NOTE,
   CARD_SCOPE,
+  PURCHASE_IS_DECISION,
   DOCUMENT_DATE_RULE,
   RECORD_NONE_LINE,
   RESCREEN_LINE,
@@ -205,6 +208,44 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(badge![2]).toBe("Screen&#x27;s side");
   });
 
+  it("draws a flagged row's capture of its gap on a track, said in words, and a Closed deal's own price as a decision in a neutral tone", () => {
+    // The OM's 6.0% against the evidence's 9.0%; the T-12's 9.1% went past it.
+    const past = html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) }));
+    expect(a11yIssues(past)).toEqual([]);
+    const text = visibleText(past).replace(/&#x27;/g, "'");
+    expect(gluedWords(text)).toEqual([]);
+    expect(past).toContain('data-qa="track-record-capture" data-place="past"');
+    for (const bar of ["capture-om", "capture-evidence", "capture-later", "capture-span"]) expect(past).toContain(`data-bar="${bar}"`);
+    expect(text).toContain("The later figure landed past the evidence's figure: the whole gap and more.");
+    expect(text).toContain(CALIBRATION_NOTE);
+    // The score is unchanged beside it.
+    expect(text).toContain("Right: the flag stood");
+    // A hold draws no capture.
+    expect(html(React.createElement(TrackRecordCard, { record: snapDeal() })).match(/data-qa="track-record-capture"/g)).toHaveLength(1);
+    // A Closed deal's own price: a decision, neutral, said as the buyer's.
+    const basisRow: StressSnapshotRow = { ...vacancyRow, key: "basis", title: "Basis", om: 50_000_000, evidence: { value: 44_000_000, label: "Recorded sales, median", asOf: null, kind: "published", publisher: "public records" }, threshold: snapshotThreshold("basis"), worse: "lower" };
+    const bought = scoreDeal({
+      screenedAt: T,
+      stressSnapshot: snapshot([basisRow]),
+      challenges: [],
+      askingPrice: 50_000_000,
+      stage: "closed",
+      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 45_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+    });
+    const out = html(React.createElement(TrackRecordCard, { record: bought }));
+    expect(a11yIssues(out)).toEqual([]);
+    const words = visibleText(out).replace(/&#x27;/g, "'");
+    expect(gluedWords(words)).toEqual([]);
+    const badge = out.match(/<span class="([^"]*)"[^>]*data-decision=""[^>]*>([^<]*)<\/span>/);
+    expect(badge![1]).toContain("text-muted");
+    expect(badge![1]).not.toMatch(/text-pass|text-kill/);
+    expect(badge![2].replace(/&#x27;/g, "'")).toBe("Your own price, on the test's side");
+    expect(words).toContain(PURCHASE_IS_DECISION);
+    expect(words).toContain("You bought it at $45.00M: your own price, a decision (recorded Nov 5, 2026)");
+    expect(out).not.toContain('data-qa="track-record-summary"');
+    expect(out).not.toContain('data-qa="track-record-capture"');
+  });
+
   it("prints a vacancy row's three figures each as a share vacant", () => {
     const text = visibleText(html(React.createElement(TrackRecordCard, { record: snapDeal({ only: "vacancy" }) })));
     expect(text).toContain("6.0% vacant");
@@ -335,6 +376,31 @@ describe("TrackRecordSection — the account's record on /analytics, in three st
     expect(barred).toContain('data-bar="record-right"');
     expect(barred).not.toContain("data-dot=");
     expect(a11yIssues(barred)).toEqual([]);
+  });
+
+  it("draws the base rate and each flagged row's capture beside the record, display only, with the base rate's share only from five", () => {
+    const four = accountRecord([snapDeal(), snapDeal()]);
+    const few = html(React.createElement(TrackRecordSection, { record: four }));
+    expect(a11yIssues(few)).toEqual([]);
+    const fewText = visibleText(few).replace(/&#x27;/g, "'");
+    expect(gluedWords(fewText)).toEqual([]);
+    expect(few).toContain('data-qa="track-record-base-rate"');
+    expect(fewText).toContain("Base rate: 4 of 4 scored rows, whatever the test's verdict, landed past the OM's figure on the buyer's bad side by more than the row's margin. No share is printed under 5 scored rows.");
+    expect(fewText).toContain(BASE_RATE_WHY);
+    // Each flagged row a tick on one track, counted in words, never a share.
+    expect(few).toContain('data-qa="track-record-calibration"');
+    expect((few.match(/data-bar="calibration-row"/g) ?? []).length).toBe(2);
+    expect(fewText).toContain("Of 2 flagged rows scored on figures: 0 landed between the OM's figure and the evidence's, 2 past the evidence's, 0 on the OM's side.");
+    expect(fewText).toContain(CALIBRATION_NOTE);
+    expect(fewText).not.toMatch(/\d+%/);
+    const five = html(React.createElement(TrackRecordSection, { record: accountRecord([snapDeal(), snapDeal(), snapDeal({ only: "vacancy" })]) }));
+    expect(visibleText(five).replace(/&#x27;/g, "'")).toContain(
+      "Base rate: 5 of 5 scored rows landed past the OM's figure on the buyer's bad side by more than the row's margin (100%), whatever the test's verdict.",
+    );
+    // Nothing scored on a stress-test row: neither is drawn.
+    const none = html(React.createElement(TrackRecordSection, { record: accountRecord([withLater()]) }));
+    expect(none).not.toContain('data-qa="track-record-base-rate"');
+    expect(none).not.toContain('data-qa="track-record-calibration"');
   });
 
   it("its bar markers are its own across the app's sources", () => {

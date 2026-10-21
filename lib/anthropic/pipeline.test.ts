@@ -45,6 +45,8 @@ interface State {
   /** every series id a read of `rates` asked for, in order, where a test
    *  counts how often a figure is read in one run */
   reads?: string[];
+  /** `screen_snapshots` answers as a schema before migration 0038 does */
+  noScreenSnapshots?: boolean;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -74,6 +76,11 @@ class FakeQuery {
   insert(rows: Row | Row[]) {
     this.op = "insert";
     this.patch = { rows };
+    return this;
+  }
+  upsert(rows: Row | Row[], options?: Row) {
+    this.op = "insert";
+    this.patch = { rows, upsert: options ?? {} };
     return this;
   }
   delete() {
@@ -179,6 +186,11 @@ class FakeQuery {
     // document evidence); the rent-roll table answers nothing.
     if (table === "deal_t12_statements") {
       return { data: state.t12 && state.t12.deal_id === this.where("deal_id") ? state.t12 : null, error: null };
+    }
+    // Every screen kept (migration 0038): answers as a schema without the
+    // table does, where a test says so.
+    if (table === "screen_snapshots" && state.noScreenSnapshots) {
+      return { data: null, error: { message: 'relation "public.screen_snapshots" does not exist' } };
     }
     return { data: null, error: null };
   }
@@ -2612,6 +2624,35 @@ describe("runAnalysis — a re-screen snapshots the challenges it replaces besid
     state.jobs[0].payload = { kind: "screen", completed: ["signal"] };
     await runAnalysis("d1", { resume: true });
     expect(state.deals.d1.prior_screen).toBeUndefined();
+  });
+
+  it("appends the screen it replaces to every screen kept (screen_snapshots), once by its verdict's stamp, beside prior_screen", async () => {
+    state.deals.d1.verdict = { ...VERDICT, generatedAt: "2026-09-10T12:00:00Z" };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const kept = state.writes.filter((w) => w.table === "screen_snapshots");
+    expect(kept).toHaveLength(1);
+    const { rows, upsert } = kept[0].patch as { rows: { deal_id: string; verdict_at: string; snapshot: unknown }; upsert: Row };
+    expect(rows.deal_id).toBe("d1");
+    expect(rows.verdict_at).toBe("2026-09-10T12:00:00Z");
+    // The same shape prior_screen holds, the same screen.
+    expect(rows.snapshot).toEqual(state.deals.d1.prior_screen);
+    expect(upsert).toEqual({ onConflict: "deal_id,verdict_at", ignoreDuplicates: true });
+  });
+
+  it("a schema without the table (0038 not run) never fails the screen: prior_screen is written as before", async () => {
+    state.noScreenSnapshots = true;
+    state.deals.d1.verdict = { ...VERDICT, generatedAt: "2026-09-10T12:00:00Z" };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.prior_screen as { verdict: { generatedAt?: string } }).verdict.generatedAt).toBe("2026-09-10T12:00:00Z");
+  });
+
+  it("a previous verdict with no stamp of its own is kept in prior_screen and appended nowhere", async () => {
+    state.deals.d1.verdict = { ...VERDICT, generatedAt: undefined };
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(state.writes.filter((w) => w.table === "screen_snapshots")).toEqual([]);
   });
 });
 

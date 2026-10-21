@@ -29,7 +29,7 @@ import {
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
-import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, marginWords } from "@/lib/track-record";
+import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, TRADE_DATE_RULE, marginWords } from "@/lib/track-record";
 import { snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
@@ -296,9 +296,10 @@ export const TRACK_RECORD = {
   heading: "Whether it is right",
   lines: [
     "Each row of the stress test, holds included, is scored where a later figure can speak to it: the code's verdict and the evidence figure that decided it, kept with the verdict, set against what arrived on the deal after that verdict.",
-    "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade.",
+    "What can arrive: a rent roll or T-12 uploaded after the verdict and dated after it (the roll's as-of, the T-12's period end), a Dead decision with its reason, a reported trade, the price a Closed deal was bought at.",
     SCORED_BY,
     DECISION_SCORES,
+    PURCHASE_IS_DECISION,
     NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands within that margin, or better for the buyer.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
@@ -311,12 +312,18 @@ export const TRACK_RECORD = {
     "A T-12 whose period ends after the verdict's day is scored even where most of its months precede the verdict, and each row it scores says how many do.",
     TRADE_DATE_RULE,
     // lib/anthropic/pipeline: a document is read on a screen, and a re-screen
-    // writes the screen it replaces to deals.prior_screen, over the last.
+    // writes the screen it replaces to deals.prior_screen, over the last, and
+    // appends it to screen_snapshots (migration 0038), every one kept.
     RESCREEN_RULE,
     "Taxes and insurance are never scored by a document: a seller's T-12 cannot show a new owner's tax bill or premium.",
     "On a plan deal a T-12 or rent roll is the building before the plan is done, so it scores neither the OM's NOI nor its stated vacancy.",
     "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
-    "A decision is a direction, not a figure: it is counted apart and in no share.",
+    "A decision is a direction, not a verdict on the OM's figure: it is counted apart and in no share.",
+    // lib/track-record `gapCaptured` and `accountRecord`'s base rate: shown,
+    // never scored (the owner's decision of 2026-10-21).
+    "Beside right or wrong, a flagged row scored on figures says how much of the gap between the OM's figure and the evidence's the later figure covered. It is shown, never scored.",
+    `The record also says the base rate: how many scored rows, whatever their verdict, landed past the OM's figure on the buyer's bad side by more than the row's margin, a share only from ${RECORD_FLOOR}.`,
+    BASE_RATE_WHY,
     `No share is printed under ${RECORD_FLOOR} scored rows: until then the record is a start, not a record. A share is always printed with its count beside it ("3 of 5 rows").`,
     "The sample deal has no worked case: nothing on it postdates its screen, and none is faked.",
   ],

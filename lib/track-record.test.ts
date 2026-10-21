@@ -281,10 +281,10 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
       screenedAt: T,
       challenges: [basis],
       askingPrice: 65_760_000,
-      stage: "closed",
+      stage: "dead",
       history: [
         { stage: "screening", at: BEFORE },
-        { stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: "2026-10-03", reportedBy: "Jane", reportedAt: AFTER } } },
+        { stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: "2026-10-03", reportedBy: "Jane", reportedAt: AFTER } } },
       ],
     });
     expect(r.evidence[0].label).toBe("The building traded at $60.00M on Oct 3, 2026, reported by Jane (recorded Nov 5, 2026)");
@@ -320,8 +320,8 @@ describe("scoreDeal — only what arrived after the screen scores a challenge", 
       screenedAt: T,
       challenges: [{ ...basis, omFigure: null, altFigure: null }],
       askingPrice: 65_760_000,
-      stage: "closed",
-      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+      stage: "dead",
+      history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
     expect(noFig.rows[0].landing).toBe("unscored");
     expect(noFig.rows[0].why).toBe("the challenger gave no OM figure to score it on.");
@@ -518,8 +518,8 @@ describe("accountRecord — counts, by key, and the floor", () => {
       screenedAt: T,
       challenges: [basis],
       askingPrice: null,
-      stage: "closed",
-      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+      stage: "dead",
+      history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 60_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.rows[0].text).toBe("Basis: the building traded at $60.00M, but it carries no figure on the OM figure's basis, so it is not scored.");
@@ -650,8 +650,8 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     const perSf = row({ key: "basis", om: 300, per: "/SF", evidence: { value: 260, label: "Recorded sales, median a foot", asOf: "2026-09-01", kind: "published", publisher: "public records" } });
     const trade = (price: number) => ({
       askingPrice: 66_000_000,
-      stage: "closed",
-      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }] as StageChange[],
+      stage: "dead",
+      history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }] as StageChange[],
     });
     // $60.0M over the $66.0M ask is $272.73 a foot: 9.1% under $300.
     const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(perSf), challenges: [], ...trade(60_000_000) });
@@ -904,8 +904,8 @@ describe("what can score a row — the words held to the scorer, key by key (the
       askingPrice: 50_000_000,
       t12: { arrivedAt: AFTER, dated: "2026-10-31", summary: t12 },
       rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: roll },
-      stage: "closed",
-      history: [{ stage: "closed", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
+      stage: "dead",
+      history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
     expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "basis"]));
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
@@ -935,7 +935,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
     const price = scoreDeal({ screenedAt: T, stressSnapshot: snapshot, challenges: [], askingPrice: 50_000_000, ...dead("price") });
     expect(scoredKeys(price)).toEqual(["basis"]);
     expect(price.rows.find((x) => x.key === "basis")).toMatchObject({ decision: true });
-    expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, counted apart.");
+    expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, and a Closed deal's own price answers the price, each counted apart.");
   });
 
   it("no surface says every row is scored", () => {
@@ -1046,14 +1046,14 @@ describe("a trade is scored only where it traded after the verdict's day, as a d
     worse: WORSE_WHEN.basis,
   };
   const snapOf = (...rows: StressSnapshotRow[]): StressSnapshot => ({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows });
-  const closed = (date: string | null, reportedAt = AFTER) => ({
+  const traded = (date: string | null, reportedAt = AFTER) => ({
     askingPrice: 50_000_000,
-    stage: "closed",
-    history: [{ stage: "closed", at: reportedAt, outcome: { reason: null, trade: { price: 45_000_000, buyer: null, date, reportedBy: null, reportedAt } } }] as StageChange[],
+    stage: "dead",
+    history: [{ stage: "dead", at: reportedAt, outcome: { reason: null, trade: { price: 45_000_000, buyer: null, date, reportedBy: null, reportedAt } } }] as StageChange[],
   });
 
   it("refuses a trade dated before the verdict though reported after it, and says so; the card is still drawn", () => {
-    const r = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...closed("2026-05-01") });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...traded("2026-05-01") });
     expect(r.evidence).toEqual([]);
     expect(r.rows[0].landing).toBe("unscored");
     expect(r.refusedLater).toBe(true);
@@ -1063,12 +1063,12 @@ describe("a trade is scored only where it traded after the verdict's day, as a d
   });
 
   it("refuses one dated on the verdict's own day, and scores one dated the day after", () => {
-    expect(scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...closed("2026-10-01") }).rows[0].landing).toBe("unscored");
-    const after = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...closed("2026-10-02") });
+    expect(scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...traded("2026-10-01") }).rows[0].landing).toBe("unscored");
+    const after = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...traded("2026-10-02") });
     expect(after.rows[0]).toMatchObject({ landing: "right", outcome: "flag_right" });
     expect(after.refusedLater).toBe(false);
     // A trade with no date of its own is scored on its report, as before.
-    expect(scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...closed(null) }).rows[0].outcome).toBe("flag_right");
+    expect(scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...traded(null) }).rows[0].outcome).toBe("flag_right");
   });
 
   it("a trade dated between two screens scores the earlier screen's row, and the current screen's refusal says so", () => {
@@ -1078,7 +1078,7 @@ describe("a trade is scored only where it traded after the verdict's day, as a d
       stressSnapshot: snapOf({ ...basisRow, verdict: "holds" }),
       challenges: [],
       priorScreen: { verdict: { generatedAt: PRIOR, stressSnapshot: snapOf(basisRow) } },
-      ...closed("2026-09-20"),
+      ...traded("2026-09-20"),
     });
     expect(r.rows[0]).toMatchObject({ key: "basis", outcome: "flag_right", priorScreenedOn: "Sep 10, 2026" });
     expect(r.evidence.map((e) => e.label)).toEqual(["The building traded at $45.00M on Sep 20, 2026 (recorded Nov 5, 2026; traded after the screen of Sep 10, 2026 and before this one)"]);
@@ -1088,10 +1088,10 @@ describe("a trade is scored only where it traded after the verdict's day, as a d
   });
 
   it("the price's sentence says the market priced it under the ask, never that a trade under it was worse for the buyer", () => {
-    const r = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...closed("2026-10-20") });
+    const r = scoreDeal({ screenedAt: T, stressSnapshot: snapOf(basisRow), challenges: [], ...traded("2026-10-20") });
     expect(r.rows[0].text).toContain("more than the row's 5% margin under the OM's figure, the market pricing it under the ask: the test was right.");
     expect(r.rows[0].text).not.toContain("worse for the buyer");
-    const held = scoreDeal({ screenedAt: T, stressSnapshot: snapOf({ ...basisRow, verdict: "holds" }), challenges: [], ...closed("2026-10-20") });
+    const held = scoreDeal({ screenedAt: T, stressSnapshot: snapOf({ ...basisRow, verdict: "holds" }), challenges: [], ...traded("2026-10-20") });
     expect(held.rows[0].text).toContain("the market pricing it under the ask: a false hold.");
   });
 });

@@ -55,6 +55,7 @@ import { personName } from "@/lib/person";
 import { writeStageGuarded } from "@/lib/stage-write";
 import { readBulkStageForm, type BulkStageResult } from "@/lib/bulk-stage";
 import { UPLOAD_MAX_BYTES } from "@/lib/upload-limit";
+import { keepScreen } from "@/lib/screen-history";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -495,12 +496,18 @@ export async function updateManualFacts(
   // snapshot keeps them, so the track record (lib/track-record) can score
   // the earlier screen's challenges against what arrived after its verdict.
   if (deal.extraction && deal.verdict) {
+    const kept = {
+      at: new Date().toISOString(),
+      extraction: deal.extraction,
+      verdict: deal.verdict,
+      challenges: deal.challenges ?? null,
+    };
     try {
       await supabase
         .from("deals")
         .update({
           prior_screen: {
-            at: new Date().toISOString(),
+            at: kept.at,
             extraction: deal.extraction,
             verdict: deal.verdict,
             challenges: deal.challenges ?? null,
@@ -510,6 +517,10 @@ export async function updateManualFacts(
     } catch {
       // pre-0010 schema — the re-screen proceeds without the diff
     }
+    // Every screen kept (migration 0038), so a later re-screen never drops a
+    // row the track record scored against this one. Best-effort: it never
+    // throws, and before the table exists it logs and moves on.
+    await keepScreen(supabase, dealId, kept);
   }
 
   const structured = parseStructuredAddress(formData.get("address"));
