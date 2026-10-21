@@ -495,7 +495,7 @@ export function OverviewView({
               each row's own link lands on its section. */}
           <p className="mt-2 px-1 text-xs" data-qa="how-we-test-link">
             <Link href="/how-we-test" className="font-medium text-brand hover:underline">
-              How each assumption is tested
+              How the stress test is struck
             </Link>
           </p>
           {/* A re-run is the stabilized deal's: the sample says so, so its

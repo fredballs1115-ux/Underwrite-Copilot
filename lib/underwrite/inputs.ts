@@ -431,9 +431,33 @@ const pageOf = (m: unknown): string | undefined =>
 /** The memorandum's own replacement reserve row: the pro forma's capital
  *  reserve, never a condition report's recommendation (lib/site-reports
  *  reads "PCA replacement reserves"), a hotel's FF&E reserve, an
- *  association's fund, a lender's escrow or an auction's reserve price. */
-const RESERVE_ROW = /\b(?:replacement|capital|capex|cap\s?ex)\s+reserves?\b|^reserves?\b(?!\s+price)/i;
+ *  association's fund, a lender's escrow or an auction's reserve price. A
+ *  row names what it reserves for: a bare "Reserve" or "Reserves" may be an
+ *  auction's reserve, a lender's holdback or a fund at closing, so it is no
+ *  replacement reserve without a qualifying word ("Reserve: $5,000,000" had
+ *  run as $5M a year). */
+const RESERVE_ROW =
+  /\b(?:replacement|capital|capex|cap\s?ex|annual|recurring|ongoing)\s+(?:capital\s+)?reserves?\b|\breserves?\s+for\s+(?:replacements?|capital)\b/i;
 const RESERVE_NOT = /\bPCA\b|property condition|FF&E|\bFFE\b|association|\bHOA\b|lender|escrow|immediate|balance|\bprice\b|recommend/i;
+/** A fund put up once — at closing, up front, a holdback — is no year's
+ *  reserve ("Capital reserve: $500,000 funded at closing"). */
+const RESERVE_ONCE = /\bat\s+(?:the\s+)?closing\b|\bup[- ]?front\b|\binitial\b|\bone[- ]time\b|\bhold[- ]?back\b|\bescrow/i;
+/** Words that say a building's figure is a year's. */
+const PER_YEAR_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:yr|year)\b|\bannual(?:ly)?\b|\bper\s+annum\b|\bp\.?\s?a\.?(?=$|[\s,;)])/i;
+/**
+ * The most a stated replacement reserve is read at: a unit's a year and a
+ * square foot's a year. Not a market's figure for a reserve — a ceiling set
+ * far above every reserve the model's own class defaults run (the highest,
+ * a hotel's $0.50/SF a year, is about $275 a key at its 550 SF), so it
+ * refuses only a figure that cannot be a year's reserve on this building (a
+ * fund at closing, a building's total read as a unit's), never one that is
+ * merely high. A stated figure over it runs the class's default, said so.
+ */
+export const RESERVE_CEILING_PER_UNIT_YEAR = 5_000;
+/** An NOI the OM's words state after its reserves ("NOI after reserves",
+ *  "net of replacement reserves"). */
+const NOI_AFTER_RESERVES = /\b(?:after|net\s+of|less|post)[- ](?:(?:replacement|capital|capex)\s+)?reserves?\b/i;
+export const RESERVE_CEILING_PER_SF_YEAR = 5;
 const PER_UNIT_WORDS = /(?:\/|\bper\s+|\ba\s+)(?:unit|door|apt|apartment|key|room|pad|bed|home|site|space)s?\b/i;
 const PER_SF_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:sf|sq\.?\s*ft|square\s+f(?:oo|ee)t)\b|\bpsf\b/i;
 const PER_MONTH_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:mo|month)\b|\bmonthly\b/i;
@@ -445,7 +469,13 @@ const PERCENT_FIRST = /^[^$\d]*\d+(?:\.\d+)?\s*%/;
  * The replacement reserve the OM states, as a year's figure on its own
  * basis — a unit's, a square foot's or the building's — read only from one
  * dollar figure (a range or a share of revenue is none) and never from a row
- * the words above set apart. Null where no such row states one.
+ * the words above set apart. The basis is read off the value, else off the
+ * label ("Replacement reserves ($/unit)": "$300" is a unit's); a building's
+ * figure is a year's only where the words say so ("per year", "annual") or
+ * the label names a replacement reserve; a fund put up once (`RESERVE_ONCE`)
+ * is none; and a unit's or a foot's figure past its ceiling
+ * (`RESERVE_CEILING_PER_UNIT_YEAR`, `RESERVE_CEILING_PER_SF_YEAR`) is none.
+ * Null where no such row states one.
  */
 export function statedReserveOf(
   metrics: readonly { label: string; value: string }[],
@@ -454,12 +484,21 @@ export function statedReserveOf(
     if (!RESERVE_ROW.test(row.label) || RESERVE_NOT.test(row.label) || RESERVE_NOT.test(row.value)) continue;
     const v = row.value;
     if (statesRange(v) || PERCENT_FIRST.test(v)) continue;
-    const basis = PER_SF_WORDS.test(v) ? "sf" : PER_UNIT_WORDS.test(v) ? "unit" : "total";
+    if (RESERVE_ONCE.test(row.label) || RESERVE_ONCE.test(v)) continue;
+    // The value's own words first, then the label's.
+    const basis =
+      PER_SF_WORDS.test(v) ? "sf" : PER_UNIT_WORDS.test(v) ? "unit" : PER_SF_WORDS.test(row.label) ? "sf" : PER_UNIT_WORDS.test(row.label) ? "unit" : "total";
+    // A building's figure is a year's only where the words say so, or the
+    // label names a replacement reserve, which is a year's by what it is.
+    const yearly = PER_YEAR_WORDS.test(v) || PER_YEAR_WORDS.test(row.label) || PER_MONTH_WORDS.test(v) || PER_MONTH_WORDS.test(row.label);
+    if (basis === "total" && !yearly && !/\breplacements?\b/i.test(row.label)) continue;
     // A foot's reserve is cents (`parseUsd` reads whole dollars).
     const cents = basis === "sf" ? /^\s*\$\s*(\d+(?:\.\d+)?)\b/.exec(v) : null;
     const figure = basis === "sf" ? (cents ? Number(cents[1]) : null) : parseUsd(v, basis === "unit" ? 1 : 100);
     if (figure == null || figure <= 0) continue;
-    const amount = PER_MONTH_WORDS.test(v) ? figure * 12 : figure;
+    const amount = PER_MONTH_WORDS.test(v) || PER_MONTH_WORDS.test(row.label) ? figure * 12 : figure;
+    if (basis === "unit" && amount > RESERVE_CEILING_PER_UNIT_YEAR) continue;
+    if (basis === "sf" && amount > RESERVE_CEILING_PER_SF_YEAR) continue;
     return { row, amount, basis };
   }
   return null;
@@ -1289,6 +1328,13 @@ export function deriveUnderwriteInputs(
   // A building the memorandum states 0% occupied with no NOI, its year-1 NOI
   // the 6% placeholder: the rent line's note says what its rent is, below.
   let noIncomeInPlace = false;
+  // The OM's own NOI row the year-1 NOI was read from, where it was: its
+  // words say whether that NOI is stated after reserves (the reserve's note).
+  let noiAnchor: { label: string; value: string } | null = null;
+  const anchorOf = (f: { label: string }) => {
+    const m = metrics.find((x) => x.label === f.label);
+    return { label: f.label, value: m ? String(m.value) : "" };
+  };
   if (t12Noi != null) {
     noi = t12Noi;
     noiRead = "the T-12's actual NOI";
@@ -1299,6 +1345,7 @@ export function deriveUnderwriteInputs(
     );
   } else if (goingFig && plausibleOnPrice(goingFig.value)) {
     noi = goingFig.value;
+    noiAnchor = anchorOf(goingFig);
     const month = monthWords(goingFig);
     noiRead = `the OM's ${goingFig.label}${month ? `, ${month}` : ""}`;
     mark(
@@ -1313,6 +1360,7 @@ export function deriveUnderwriteInputs(
     plausibleOnPrice(stabilizedFig.value)
   ) {
     noi = stabilizedFig.value;
+    noiAnchor = anchorOf(stabilizedFig);
     const month = monthWords(stabilizedFig);
     noiRead = `the OM's ${stabilizedFig.label}${month ? `, ${month}` : ""}`;
     mark(
@@ -1634,7 +1682,14 @@ export function deriveUnderwriteInputs(
   // model's area (a unit's with no count) runs nothing; a hotel's stated
   // reserve is its FF&E reserve, a share of revenue the expense line already
   // carries, and is never run as a replacement reserve.
-  const omReserve = statedReserveOf(metrics);
+  const omReserveStated = statedReserveOf(metrics);
+  // A building's stated figure past the ceiling a unit (else a foot) a year
+  // is no year's reserve on this building (statedReserveOf's ceilings): the
+  // default runs, as with no stated reserve.
+  const totalPastCeiling =
+    omReserveStated?.basis === "total" &&
+    (units != null && units > 0 ? omReserveStated.amount / units > RESERVE_CEILING_PER_UNIT_YEAR : rsf > 0 && omReserveStated.amount / rsf > RESERVE_CEILING_PER_SF_YEAR);
+  const omReserve = totalPastCeiling ? null : omReserveStated;
   const isHotel = assetClass === "hospitality_str";
   const omReserveAnnual =
     omReserve == null || isHotel || !(rsf > 0)
@@ -1760,7 +1815,14 @@ export function deriveUnderwriteInputs(
         : omReserve.basis === "sf"
           ? `${perSfText(omReserve.amount)} a year`
           : `${compactUsd(omReserve.amount)} a year`;
-    const cautious = "the model never runs more optimistic than the OM";
+    // An NOI the OM states after its reserves already carries them, and the
+    // model deducts its reserve below the NOI it reads, so the reserve is
+    // counted twice: said, never changed (words only).
+    const afterReserves =
+      noiAnchor != null && NOI_AFTER_RESERVES.test(`${noiAnchor.label} ${noiAnchor.value}`)
+        ? `. The OM states its NOI after reserves (its ${noiAnchor.label.trim()}), and the model deducts the reserve again below that NOI, so here it is counted twice — enter the NOI before reserves`
+        : "";
+    const cautious = `the model never runs more optimistic than the OM${afterReserves}`;
     if (reserveFromOm) {
       // A unit's figure through the count, a building's over the area: the
       // arithmetic said, so the per-SF input the workbook shows is checkable.
@@ -1798,8 +1860,17 @@ export function deriveUnderwriteInputs(
         "assumption",
         `${classWord} default, ${perSfText(cd.reservesPsf)}/yr${aboutPerUnit} — at or above the OM's stated ${omFigure}${asPsf}, so the default runs: ${cautious}`,
       );
+    } else if (totalPastCeiling) {
+      mark(
+        "reservesPsf",
+        "assumption",
+        `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — the OM's ${omReserveStated!.row.label.trim()} of ${omReserveStated!.row.value.trim()} is past ${
+          units != null && units > 0 ? `${compactUsd(RESERVE_CEILING_PER_UNIT_YEAR)} ${withArticle(unitNoun.one)}` : `$${RESERVE_CEILING_PER_SF_YEAR.toFixed(2)}/SF`
+        } a year, more than any year's reserve the model reads, so it is read as a figure of another kind and the default runs${afterReserves}`,
+        pageOf(omReserveStated!.row),
+      );
     } else {
-      mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — the OM states no replacement reserve`);
+      mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr — the OM states no replacement reserve${afterReserves}`);
     }
   }
   if (budgetRead) {

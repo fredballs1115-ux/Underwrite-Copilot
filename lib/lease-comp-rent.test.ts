@@ -1,7 +1,7 @@
 // What a lease comp's one line states as its rent (lib/lease-comp-rent):
 // only what the text says, on its own yardstick.
 import { describe, expect, it } from "vitest";
-import { statedRent } from "./lease-comp-rent";
+import { monthlyRentFloor, statedLeaseBasis, statedRent } from "./lease-comp-rent";
 
 describe("statedRent", () => {
   it("reads a month's rent a unit as stated", () => {
@@ -27,5 +27,30 @@ describe("statedRent", () => {
     for (const line of ["$252k/unit · 5.6% cap", "$2,520 · 2BR", "$2,400–$2,600/mo", "$2,400 to $2,600 per month", "$30,000 per unit per year", "$189/night ADR", "$45/mo pet fee"]) {
       expect(statedRent(line), line).toEqual({ perUnitMonthly: null, perSfYear: null, sfFromMonth: false });
     }
+  });
+});
+
+describe("a space's, a pad's or a bed's month is read as stated; a dwelling's under $100 is no rent", () => {
+  it("lowers the floor by the class's own noun", () => {
+    expect(monthlyRentFloor("unit")).toBe(100);
+    expect(monthlyRentFloor("home")).toBe(100);
+    for (const noun of ["space", "pad", "bed"]) expect(monthlyRentFloor(noun), noun).toBe(0);
+    expect(statedRent("$85/space/mo").perUnitMonthly).toBeNull();
+    expect(statedRent("$85/space/mo", { unitFloor: monthlyRentFloor("space") }).perUnitMonthly).toBe(85);
+  });
+});
+
+describe("the lease basis a rent a foot is quoted on, only as the line states it", () => {
+  it("reads net, full service, modified gross and gross, and nothing from a line that states none", () => {
+    expect(statedLeaseBasis("$34.00/SF NNN")).toBe("net");
+    expect(statedLeaseBasis("$34.00/SF triple net")).toBe("net");
+    expect(statedLeaseBasis("$41.00/SF full service")).toBe("full service");
+    expect(statedLeaseBasis("$41.00/SF FSG")).toBe("full service");
+    expect(statedLeaseBasis("$28.00/SF modified gross")).toBe("modified gross");
+    expect(statedLeaseBasis("$28.00/SF MG")).toBe("modified gross");
+    expect(statedLeaseBasis("$30.00/SF gross")).toBe("gross");
+    expect(statedLeaseBasis("$35.50/SF/yr")).toBeNull();
+    expect(statedLeaseBasis("$35.50/SF/yr net effective")).toBeNull();
+    expect(statedLeaseBasis("$35.50/SF, 12,000 gross leasable area")).toBeNull();
   });
 });

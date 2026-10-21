@@ -58,7 +58,7 @@ const text = visibleText(html);
 describe("/how-we-test draws every method from the table", () => {
   it("names the page, says who does what, and carries the marker", () => {
     expect(text).toContain(HOW_WE_TEST_TITLE);
-    expect(html).toMatch(/<h1[^>]*>How each assumption is tested<\/h1>/);
+    expect(html).toMatch(/<h1[^>]*>How the stress test is struck<\/h1>/);
     for (const side of [WHO_DOES_WHAT.ai, WHO_DOES_WHAT.code]) {
       expect(text).toContain(side.heading);
       for (const item of side.items) expect(text).toContain(item);

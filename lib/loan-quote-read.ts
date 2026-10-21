@@ -13,7 +13,10 @@ export async function readLoanQuote(supabase: SupabaseClient, deal: { id?: unkno
   // The sample's documents are a fixture: no term sheet is ever on it.
   if (!deal.model || typeof deal.id !== "string" || deal.is_sample) return null;
   try {
-    const { data } = await supabase.from("deal_documents").select("id, kind, filename, created_at").eq("deal_id", deal.id).eq("kind", "loan_terms");
+    const { data } = await supabase.from("deal_documents").select("id, kind, filename, created_at").eq("deal_id", deal.id).eq("kind", "loan_terms")
+      // The deal page's own order, oldest first, so `loanQuoteOf` names the
+      // same sheet on every surface where several were the model's sources.
+      .order("created_at", { ascending: true });
     return loanQuoteOf(deal.model as UnderwritingModel, (data ?? []) as LoanDocument[]);
   } catch (err) {
     console.warn(`loan quote not read for ${deal.id}:`, err instanceof Error ? err.message : err);

@@ -37,7 +37,7 @@ import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-mode
 export { STRESS_METHODS };
 
 /** The page's title, its one h1 and its metadata's. */
-export const HOW_WE_TEST_TITLE = "How each assumption is tested";
+export const HOW_WE_TEST_TITLE = "How the stress test is struck";
 
 /**
  * The phrase live-verify greps in the served HTML

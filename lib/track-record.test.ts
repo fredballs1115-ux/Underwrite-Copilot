@@ -13,6 +13,8 @@ import {
   CARD_SCOPE,
   DECISION_SCORES,
   NOT_YET_SCORABLE,
+  MARKET_RENT_WHY,
+  recordFigure,
   SCORED_BY,
   SCORED_BY_TOO,
   OUTCOME_WORD,
@@ -1041,12 +1043,17 @@ describe("what can score a row — the words held to the scorer, key by key (the
       stage: "dead",
       history: [{ stage: "dead", at: AFTER, outcome: { reason: null, trade: { price: 47_000_000, buyer: null, date: null, reportedBy: null, reportedAt: AFTER } } }],
     });
-    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "opex", "market_rent", "basis"]));
-    // The market rent by the later rent roll's in-place rent, said as in-place.
+    expect(new Set(scoredKeys(r))).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
+    // The market rent is named beside the later rent roll's in-place rent and
+    // left unscored: an in-place rent sits under market by its loss to lease.
     const rent = r.rows.find((x) => x.key === "market_rent")!;
+    expect(rent.landing).toBe("unscored");
     expect(rent.later?.source).toBe("rent_roll");
     expect(rent.later?.text).toContain("ran $30.00 a square foot a year in place — an in-place rent, not a market's");
-    expect(SCORED_BY_TOO).toContain("a market rent by a later rent roll's in-place rent, said as in-place, not market");
+    expect(rent.why).toBe(MARKET_RENT_WHY);
+    expect(rent.text).toContain("a later rent roll cannot score a market rent, so it is not scored.");
+    expect(SCORED_BY_TOO).toContain("A market rent is not scored: a rent roll shows in-place rent, which sits under market by its loss to lease.");
+    expect(CARD_SCOPE).not.toContain("market rent");
     // The operating expenses by the later T-12 on the row's own footing.
     expect(r.rows.find((x) => x.key === "opex")!.later?.source).toBe("t12");
     expect(SCORED_BY_TOO).toContain("The operating expenses are scored by a later T-12 on the row's own footing");
@@ -1067,6 +1074,7 @@ describe("what can score a row — the words held to the scorer, key by key (the
       taxes: "taxes",
       insurance: "insurance",
       renovation_premium: "a renovation premium",
+      market_rent: "a market rent",
     };
     // The loan is answered by a decision alone (the next case), so it is
     // neither a figure's row nor one nothing can answer.
@@ -1083,6 +1091,14 @@ describe("what can score a row — the words held to the scorer, key by key (the
     expect(scoredKeys(price)).toEqual(["basis"]);
     expect(price.rows.find((x) => x.key === "basis")).toMatchObject({ decision: true });
     expect(DECISION_SCORES).toBe("A Dead decision on price or financing answers the price or the loan, and a Closed deal's own price answers the price, each counted apart.");
+  });
+
+  it("writes a market rent's places by its yardstick, never by its size", () => {
+    // A unit's month in whole dollars, however small; a foot's to the cent, however large.
+    expect(recordFigure("market_rent", 185.4, "/mo")).toBe("$185");
+    expect(recordFigure("market_rent", 2_350.6, "/mo")).toBe("$2,351");
+    expect(recordFigure("market_rent", 38.5, "/SF")).toBe("$38.50");
+    expect(recordFigure("market_rent", 212.25, "/SF")).toBe("$212.25");
   });
 
   it("no surface says every row is scored", () => {
@@ -1330,7 +1346,7 @@ describe("what will score what — the grid is the scorer's own rules, never wri
       taxes: [],
       insurance: [],
       opex: ["t12"],
-      market_rent: ["rent_roll"],
+      market_rent: [],
       renovation_premium: [],
       other: [],
     });
@@ -1365,7 +1381,7 @@ describe("what will score what — the grid is the scorer's own rules, never wri
     // decisions, are exactly the marked cells.
     const grid = marked(scorableGrid());
     const figureKeys = Object.entries(grid).filter(([, s]) => s.some((x) => x !== "outcome")).map(([k]) => k);
-    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "opex", "market_rent", "basis"]));
+    expect(new Set(figureKeys)).toEqual(new Set(["vacancy", "noi", "opex", "basis"]));
     expect(Object.entries(grid).filter(([, s]) => s.includes("outcome")).map(([k]) => k).sort()).toEqual(["basis", "debt"]);
     const component = readFileSync(join(process.cwd(), "app/(app)/scorable-grid.tsx"), "utf8");
     const order = [...component.matchAll(/source: "(\w+)"/g)].map((m) => m[1]);

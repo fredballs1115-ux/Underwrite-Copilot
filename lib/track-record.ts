@@ -398,12 +398,14 @@ const TITLES: Record<StressKey, string> = {
 /** The keys whose figures are percents; the rest are dollars. */
 const PERCENT_KEYS: ReadonlySet<StressKey> = new Set(["exit_cap", "debt", "vacancy", "rent_growth", "expense_growth"]);
 
-/** A figure in the key's own unit: a percent to one place, a dollar compact. */
-export function recordFigure(key: StressKey, n: number): string {
+/** A figure in the key's own unit: a percent to one place, a dollar compact.
+ *  A market rent's places follow its yardstick (the row's `per`, which rides
+ *  beside the figure): a foot's rent to the cent, a unit's month in whole
+ *  dollars — never decided by the figure's size. */
+export function recordFigure(key: StressKey, n: number, per: string | null = null): string {
   if (PERCENT_KEYS.has(key)) return `${n.toFixed(1)}%`;
   if (key === "renovation_premium") return `$${Math.round(n).toLocaleString("en-US")}/mo`;
-  // A market rent's yardstick rides beside it (the row's `per`).
-  if (key === "market_rent") return n < 200 ? `$${n.toFixed(2)}` : `$${Math.round(n).toLocaleString("en-US")}`;
+  if (key === "market_rent") return per != null && /sf/i.test(per) ? `$${n.toFixed(2)}` : `$${Math.round(n).toLocaleString("en-US")}`;
   if (key === "other") return Number.isInteger(n) ? n.toLocaleString("en-US") : n.toFixed(2);
   return compactUsd(n, { millions: 2 });
 }
@@ -456,6 +458,12 @@ const PLAN_VACANCY_WHY = "the OM's vacancy is the stabilized figure a plan deal 
 /** A stabilized vacancy the market decided, against a later document. */
 const MARKET_VACANCY_WHY =
   "the OM's vacancy is a stabilized assumption on a deal read as stabilized, which the stress test holds to the market's published figures where one is fresh; a document's vacancy is the building's today, the gap a lease-up has to close, not a test of it.";
+
+/** A market rent against a later rent roll: the roll's rent is what its
+ *  leases are paying, which sits under market by its loss to lease, so it
+ *  would score every market rent as overstated. */
+export const MARKET_RENT_WHY =
+  "a rent roll shows in-place rent, which sits under market by its loss to lease; a later rent roll cannot score a market rent.";
 
 /** An unchecked stress-test row. */
 const UNCHECKED_WHY = "the stress test left it unchecked — no evidence with a figure decided it — so there is no verdict to score.";
@@ -871,6 +879,7 @@ function documentCannotSpeak(key: StressKey, later: Later, args: ScoreDealArgs, 
   if (key === "vacancy" && args.vacancyIsPlanTarget) return PLAN_VACANCY_WHY;
   if (key === "vacancy" && heldToMarket) return MARKET_VACANCY_WHY;
   if (key === "noi" && args.plan) return PLAN_NOI_WHY;
+  if (key === "market_rent") return MARKET_RENT_WHY;
   return null;
 }
 
@@ -896,7 +905,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   const key = r.key;
   const title = r.title || TITLES[key];
   const per = r.per ?? "";
-  const fig = (n: number) => `${recordFigure(key, n)}${per}`;
+  const fig = (n: number) => `${recordFigure(key, n, r.per)}${per}`;
   const base = {
     key,
     title,
@@ -1213,9 +1222,10 @@ function laterFor(
       if (ev.decision?.reason === "price") return { source: "outcome", value: null, at: ev.decision.at, text: "walked away on price", decision: true };
       return null;
     }
-    // A market rent is scored by a later rent roll's in-place rent on the
-    // row's own yardstick, said as in-place: what the building's leases
-    // reached, never a market's.
+    // A later rent roll's in-place rent on the row's own yardstick, read
+    // only to be named beside the row: an in-place rent sits under market by
+    // its loss to lease, so it never scores a market rent
+    // (`documentCannotSpeak`, `MARKET_RENT_WHY`).
     case "market_rent": {
       if (!ev.roll || (ev.per !== "/mo" && ev.per !== "/SF")) return null;
       const s = ev.roll.summary;

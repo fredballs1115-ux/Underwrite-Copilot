@@ -656,7 +656,7 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     const link = html.indexOf('data-qa="how-we-test-link"');
     expect(link).toBeGreaterThan(panel);
     expect(link).toBeLessThan(html.indexOf("Risk digest"));
-    expect(html.slice(link, link + 300)).toMatch(/href="\/how-we-test"[^>]*>How each assumption is tested</);
+    expect(html.slice(link, link + 300)).toMatch(/href="\/how-we-test"[^>]*>How the stress test is struck</);
     // The page hands the walkthrough the same build: /demo's, which builds
     // its stress test through lib/sample-stress.
     expect(readFileSync("app/page.tsx", "utf8")).toContain("<DemoTabs {...walkthroughData(data)} />");

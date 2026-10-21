@@ -80,7 +80,7 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "floating_rate",
     title: "A floating-rate loan",
-    why: "A rate quoted over SOFR, or a coupon that resets, is shown as stated and priced on nothing: the debt row stands unchecked, and no rate cap is priced.",
+    why: "A rate the OM quotes over SOFR, or a coupon that resets, is priced on nothing: the debt row stands unchecked. A floating quote on file is shown as stated; the OM's rate meets the screening default.",
     beside: { key: "debt", line: "The lender tests and the leverage read are shown, sized at the model's own rate." },
   },
   {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HOLD_MONTHS, deriveUnderwriteInputs, permanentLoanSpread, statedReserveOf } from "./inputs";
+import { HOLD_MONTHS, RESERVE_CEILING_PER_SF_YEAR, RESERVE_CEILING_PER_UNIT_YEAR, deriveUnderwriteInputs, permanentLoanSpread, statedReserveOf } from "./inputs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { SAMPLE_ACTUALS, sampleDerivedInputs } from "@/lib/sample-derive";
 import { compactUsd, parseUsd } from "@/lib/money";
@@ -644,11 +644,64 @@ describe("the reserve runs the higher of the OM's stated figure and the class's 
     expect(statedReserveOf(m("Replacement reserve", "$300 per unit per year"))).toMatchObject({ amount: 300, basis: "unit" });
     expect(statedReserveOf(m("Capital reserves", "$0.20/SF"))).toMatchObject({ amount: 0.2, basis: "sf" });
     expect(statedReserveOf(m("Replacement reserve", "$25/unit/mo"))).toMatchObject({ amount: 300, basis: "unit" });
-    expect(statedReserveOf(m("Reserves", "$62,000"))).toMatchObject({ amount: 62000, basis: "total" });
+    expect(statedReserveOf(m("Replacement reserves", "$62,000"))).toMatchObject({ amount: 62000, basis: "total" });
+    expect(statedReserveOf(m("Capital reserves", "$62,000 per year"))).toMatchObject({ amount: 62000, basis: "total" });
     expect(statedReserveOf(m("PCA replacement reserves", "$300 per unit per year"))).toBeNull();
     expect(statedReserveOf(m("FF&E reserve", "4% of revenue"))).toBeNull();
     expect(statedReserveOf(m("Reserve price", "$4,000,000"))).toBeNull();
     expect(statedReserveOf(m("Replacement reserve", "$250-$300/unit"))).toBeNull();
     expect(statedReserveOf(m("Reserve for replacement", "4% of total revenue, $1,500 per key"))).toBeNull();
+  });
+
+  it("reads the basis off the label too, a building's figure only as a year's, and refuses a fund put up once, a bare reserve and a figure past the ceiling", () => {
+    const m = (label: string, value: string) => [{ label, value }];
+    // The basis the label states.
+    expect(statedReserveOf(m("Replacement reserves ($/unit)", "$300"))).toMatchObject({ amount: 300, basis: "unit" });
+    expect(statedReserveOf(m("Capital reserve ($/SF)", "$0.30"))).toMatchObject({ amount: 0.3, basis: "sf" });
+    // A fund at closing is no year's reserve.
+    expect(statedReserveOf(m("Capital reserve", "$500,000 funded at closing"))).toBeNull();
+    expect(statedReserveOf(m("Capital reserve", "$500,000 upfront"))).toBeNull();
+    expect(statedReserveOf(m("Initial capital reserve", "$250,000"))).toBeNull();
+    expect(statedReserveOf(m("Capital reserve", "$250,000 one-time deposit"))).toBeNull();
+    expect(statedReserveOf(m("Capital reserve holdback", "$250,000"))).toBeNull();
+    // A bare "Reserve" names nothing it reserves for.
+    expect(statedReserveOf(m("Reserve", "$5,000,000"))).toBeNull();
+    expect(statedReserveOf(m("Reserves", "$25/unit/month"))).toBeNull();
+    // A building's figure is a year's only where the words say so, or the
+    // label names a replacement reserve.
+    expect(statedReserveOf(m("Capital reserve", "$75,000"))).toBeNull();
+    expect(statedReserveOf(m("Capital reserve", "$75,000 annually"))).toMatchObject({ amount: 75_000, basis: "total" });
+    expect(statedReserveOf(m("Replacement reserves", "$75,000"))).toMatchObject({ amount: 75_000, basis: "total" });
+    // Past the ceiling a unit or a foot a year.
+    expect(statedReserveOf(m("Replacement reserves", `$${(RESERVE_CEILING_PER_UNIT_YEAR + 1).toLocaleString("en-US")} per unit per year`))).toBeNull();
+    expect(statedReserveOf(m("Replacement reserves", `$${RESERVE_CEILING_PER_UNIT_YEAR.toLocaleString("en-US")} per unit per year`))).toMatchObject({ basis: "unit" });
+    expect(statedReserveOf(m("Replacement reserves", `$${RESERVE_CEILING_PER_SF_YEAR + 1}.00/SF`))).toBeNull();
+    // The sample's own figure still reads.
+    const sampleRow = SAMPLE_DEAL.extraction.metrics.find((x) => /replacement reserve/i.test(x.label))!;
+    expect(statedReserveOf([sampleRow])).toMatchObject({ amount: 250, basis: "unit" });
+  });
+
+  it("runs the default where a building's stated figure is past the ceiling, and says so", () => {
+    const base = deriveUnderwriteInputs(office(null), "x").inputs.reservesPsf;
+    // $5M a year over 100,000 SF is $50/SF a year: no year's reserve.
+    const r = deriveUnderwriteInputs(office("$5,000,000 per year"), "x");
+    expect(r.inputs.reservesPsf).toBe(base);
+    expect(r.sources.reservesPsf?.note).toContain(`the OM's Replacement reserve of $5,000,000 per year is past $${RESERVE_CEILING_PER_SF_YEAR.toFixed(2)}/SF a year`);
+    expect(r.sources.reservesPsf?.note).toContain("the default runs");
+  });
+
+  it("says where the OM states its NOI after reserves that the model counts the reserve again — words only", () => {
+    const after: ExtractionResult = {
+      ...office("$0.40/SF/yr"),
+      metrics: office("$0.40/SF/yr").metrics.map((x) => (x.label === "Net operating income" ? { ...x, label: "Net operating income (after reserves)" } : x)),
+    };
+    const r = deriveUnderwriteInputs(after, "x");
+    const plain = deriveUnderwriteInputs(office("$0.40/SF/yr"), "x");
+    expect(r.inputs.reservesPsf).toBe(plain.inputs.reservesPsf);
+    expect(r.inputs.inPlaceRentAnnual).toBe(plain.inputs.inPlaceRentAnnual);
+    expect(r.sources.reservesPsf?.note).toContain(
+      "The OM states its NOI after reserves (its Net operating income (after reserves)), and the model deducts the reserve again below that NOI, so here it is counted twice — enter the NOI before reserves",
+    );
+    expect(plain.sources.reservesPsf?.note).not.toContain("after reserves");
   });
 });

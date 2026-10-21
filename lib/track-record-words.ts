@@ -69,7 +69,7 @@ export const SCORED_BY =
  *  later figure that speaks to it (lib/track-record `laterFor`; its test
  *  holds the words to the scorer). */
 export const SCORED_BY_TOO =
-  "The operating expenses are scored by a later T-12 on the row's own footing, its taxes and insurance left out; a market rent by a later rent roll's in-place rent, said as in-place, not market.";
+  "The operating expenses are scored by a later T-12 on the row's own footing, its taxes and insurance left out. A market rent is not scored: a rent roll shows in-place rent, which sits under market by its loss to lease.";
 
 /** A decision's part in the record, said apart from the figures'. */
 export const DECISION_SCORES =
@@ -79,11 +79,11 @@ export const DECISION_SCORES =
  *  later figure for, the taxes and insurance said apart
  *  (`TAX_INSURANCE_NOT_SCORED`). */
 export const NOT_YET_SCORABLE =
-  "Rent growth, expense growth, the exit cap, taxes, insurance and a renovation premium have nothing yet that can score them, so those rows stay unscored.";
+  "Rent growth, a market rent, expense growth, the exit cap, taxes, insurance and a renovation premium have nothing yet that can score them, so those rows stay unscored.";
 
 /** What the deal page's card scores against, in one sentence. */
 export const CARD_SCOPE =
-  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal, or the operating expenses; a rent roll's in-place rent for a market rent; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
+  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal, or the operating expenses; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
 
 /** Under this many scored rows the record is a start, and no share is
  *  printed (the owner's decision of 2026-10-20: five, not the comps' three).

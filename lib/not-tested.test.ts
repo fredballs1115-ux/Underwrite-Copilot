@@ -97,6 +97,10 @@ describe("what the test does not check yet", () => {
     expect(src).toContain("floatingRateOf");
     expect(debt.limits.join(" ")).toContain("priced on nothing: the row stands unchecked");
     expect(item("floating_rate").why).toContain("priced on nothing: the debt row stands unchecked");
+    // A floating quote on file is not the OM's floating rate: the quote is
+    // shown as stated, and the OM's fixed rate is held to the screening default.
+    expect(item("floating_rate").why).toContain("A floating quote on file is shown as stated; the OM's rate meets the screening default.");
+    expect(debt.limits.join(" ")).toContain("A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested");
     expect(src).not.toMatch(/termSofr|sofrSpread/);
   });
 

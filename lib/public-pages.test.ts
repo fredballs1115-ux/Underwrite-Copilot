@@ -75,7 +75,7 @@ describe("public pages — every market and sector page, named for itself (#430)
 
   it("catalogues the methodology page under its own name and address (2026-10-19)", () => {
     expect(HOW_WE_TEST_PAGE.canonical).toBe(HOW_WE_TEST_PATH);
-    expect(HOW_WE_TEST_PAGE.title).toBe("How each assumption is tested");
+    expect(HOW_WE_TEST_PAGE.title).toBe("How the stress test is struck");
     expect(HOW_WE_TEST_PAGE.description.length).toBeLessThanOrEqual(200);
     expect(HOW_WE_TEST_PAGE.image).toEqual(SITE_CARD);
   });

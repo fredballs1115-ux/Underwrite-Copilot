@@ -1423,7 +1423,7 @@ export default async function Home() {
               </li>
               <li>
                 <Link href="/how-we-test" className="text-muted transition-colors hover:text-ink">
-                  How each assumption is tested
+                  How the stress test is struck
                 </Link>
               </li>
               <li>

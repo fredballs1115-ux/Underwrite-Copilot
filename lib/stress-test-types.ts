@@ -470,6 +470,7 @@ export const HEADLINE_METHOD = {
     "An insurance premium the T-12's decides moves it only where the OM states the premium as its pro forma's line.",
     "No tax bill moves it on a development, a conversion or a forward purchase: the finished building is not assessed at the price, so the reset is a floor.",
     "Vacancy and a premium both past their evidence overlap a little: the vacancy's gap is struck on a gross that carries the projected premium, and the headline does not net it out.",
+    "Vacancy and a market rent both past their evidence overlap the same way: the rent's gap is carried at the OM's own vacancy, and the vacancy's gap is struck on a gross carrying the OM's rent, so the two share a cross term the headline does not net out.",
     "A market rent beside a renovation premium past its evidence would carry the renovated doors' rent twice, so the market rent is left out of the split beside it.",
     "A re-run that moves the stabilized NOI to zero or under, or the yield to 25% or more, is struck nowhere: the figures do not tie.",
     "A row at its evidence whose re-run lowers the yield on cost 0.5 points or more reads stretched, as a 100-bps move in the levered IRR does on a stabilized deal.",
@@ -561,7 +562,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     limits: [
       "A benchmark is not a quote: only a rate a loan document states is treated as one, read off the model built from that term sheet; a model built before it carries none.",
       "The shared screen never reads the sender's documents, so a quote on file decides nothing there.",
-      "A floating rate (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
+      "A floating rate the OM states (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
+      "A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested: the row is held to the screening default, the index plus the class's spread, as where no quote is on file.",
     ],
   },
   {
@@ -629,7 +631,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "The memorandum's own lease comps as the comps step grades them: the median of three or more graded as supporting the rent, on the class's yardstick (a month a unit, else a square foot a year), the one figure that decides",
       "The deal's rent roll: its in-place rent on the same yardstick, the gap the OM claims to close, shown beside it and never deciding",
-      "Zillow's asking rent for the metro's apartments (all home types where that is not read), dated, the metro's and never the building's, shown beside it",
+      "Zillow's asking rent for the metro, dated, the metro's and never the building's, shown beside it: apartments' beside an apartment building's rent (else all home types), all home types beside a rented house's, none beside a bed's or a pad's",
     ],
     engine: "No return is re-run on a stabilized deal: the model runs today's rent, which the NOI row carries. A value-add's yield on cost is re-run with the gap carried to its stabilized NOI on every unit it counts.",
     limits: [
@@ -637,6 +639,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "A comp graded favorable or stretched is named and left out of the median; a comp's rent is read only as its line states it, never inferred.",
       "A comp's rent is for the unit it names, not the building's average mix, and no unit mix is weighted.",
       "How fast the in-place rent reaches the market rent is not tested.",
+      "On a class quoted by the foot, a comp's lease basis (net, full service, modified gross, gross) is read only as its line states it; comps graded clean on different bases strike no median, and the row stands unchecked.",
+      "A comp that states no basis is read as stated, and the OM's rent's own basis is not checked against the comps'.",
     ],
   },
   {
