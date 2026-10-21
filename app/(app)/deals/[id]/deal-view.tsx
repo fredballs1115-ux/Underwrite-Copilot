@@ -1901,7 +1901,7 @@ function ProgressRail({
     { key: "market", label: "Market" },
     // The last step strikes the stress test in code, then writes the call
     // on it: named as both, so the rail never hides the product.
-    { key: "verdict", label: "Stress test & verdict" },
+    { key: "verdict", label: "Verdict" },
   ];
   const cur = steps.findIndex((s) => s.key === job.step);
 

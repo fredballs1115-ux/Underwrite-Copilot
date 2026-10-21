@@ -914,8 +914,8 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Screening in progress");
     expect(text).toContain("The stress test fills in below as each step finishes; the verdict and the risk digest land last.");
-    // The rail's last step strikes the test in code, then writes the call.
-    expect(text).toContain("Stress test & verdict");
+    // The rail keeps the screen's one set of stage names (lib/screen-stages).
+    expect(text).toContain("Verdict");
     // The market check reads published figures where the address places
     // the deal, never only "market norms".
     expect(text).toContain("Checking the assumptions against the market’s published figures where the address places it, and rules of thumb");
