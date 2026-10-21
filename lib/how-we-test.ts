@@ -263,7 +263,7 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
   // price that buys no building (`basisWithheldOf`) re-runs nothing.
   {
     heading: "No levered return on a plan",
-    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: each assumption is set against its evidence, and the yield is re-run where the OM states its stabilized NOI and total cost, never a levered return.",
+    line: "A value-add, lease-up, conversion or development deal is judged on its yield on total cost: its key assumptions are set against their evidence, and the yield is re-run where the OM states its stabilized NOI and total cost, never a levered return.",
   },
   {
     heading: "No return is re-run on a figure nobody stated",

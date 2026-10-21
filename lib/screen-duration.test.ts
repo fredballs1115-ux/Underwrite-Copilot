@@ -51,7 +51,7 @@ describe("the homepage claims no duration it has not measured either", () => {
     // "a first read … lands in about half a minute" was labelled observed
     // in lib/marketing-constants, with nothing measured behind it.
     expect(home).not.toMatch(/half a minute|FIRST_READ_CLAIM|FULL_SCREEN_CLAIM/);
-    expect(home).toContain("the test runs on its own: the headline figures, the extraction, each assumption challenged, the broker's comps graded, the market check, a verdict.");
+    expect(home).toContain("the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict.");
     expect(Object.keys(marketing)).not.toContain("FIRST_READ_CLAIM");
     expect(Object.keys(marketing)).not.toContain("FULL_SCREEN_CLAIM");
   });

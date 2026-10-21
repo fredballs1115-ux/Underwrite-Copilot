@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { compactUsd, statesRange } from "@/lib/money";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import {
   entityLoanOf,
   entityLoanWords,
@@ -427,6 +427,40 @@ const CLASS_DEFAULTS: Record<
  *  Only a real page is ever used (never fabricated). */
 const pageOf = (m: unknown): string | undefined =>
   m && typeof m === "object" && "page" in m ? (m as { page?: string }).page : undefined;
+
+/** The memorandum's own replacement reserve row: the pro forma's capital
+ *  reserve, never a condition report's recommendation (lib/site-reports
+ *  reads "PCA replacement reserves"), a hotel's FF&E reserve, an
+ *  association's fund, a lender's escrow or an auction's reserve price. */
+const RESERVE_ROW = /\b(?:replacement|capital|capex|cap\s?ex)\s+reserves?\b|^reserves?\b(?!\s+price)/i;
+const RESERVE_NOT = /\bPCA\b|property condition|FF&E|\bFFE\b|association|\bHOA\b|lender|escrow|immediate|balance|\bprice\b|recommend/i;
+const PER_UNIT_WORDS = /(?:\/|\bper\s+|\ba\s+)(?:unit|door|apt|apartment|key|room|pad|bed|home|site|space)s?\b/i;
+const PER_SF_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:sf|sq\.?\s*ft|square\s+f(?:oo|ee)t)\b|\bpsf\b/i;
+const PER_MONTH_WORDS = /(?:\/|\bper\s+|\ba\s+)\s*(?:mo|month)\b|\bmonthly\b/i;
+
+/**
+ * The replacement reserve the OM states, as a year's figure on its own
+ * basis — a unit's, a square foot's or the building's — read only from one
+ * figure (a range is none) and never from a row the words above set apart.
+ * Null where no such row states one.
+ */
+export function statedReserveOf(
+  metrics: readonly { label: string; value: string }[],
+): { row: { label: string; value: string }; amount: number; basis: "unit" | "sf" | "total" } | null {
+  for (const row of metrics) {
+    if (!RESERVE_ROW.test(row.label) || RESERVE_NOT.test(row.label) || RESERVE_NOT.test(row.value)) continue;
+    const v = row.value;
+    if (statesRange(v)) continue;
+    const basis = PER_SF_WORDS.test(v) ? "sf" : PER_UNIT_WORDS.test(v) ? "unit" : "total";
+    // A foot's reserve is cents (`parseUsd` reads whole dollars).
+    const cents = basis === "sf" ? /^\s*\$\s*(\d+(?:\.\d+)?)\b/.exec(v) : null;
+    const figure = basis === "sf" ? (cents ? Number(cents[1]) : null) : parseUsd(v, basis === "unit" ? 1 : 100);
+    if (figure == null || figure <= 0) continue;
+    const amount = PER_MONTH_WORDS.test(v) ? figure * 12 : figure;
+    return { row, amount, basis };
+  }
+  return null;
+}
 
 /** A cap the OM states as a range — "5.25% - 5.75%", "5.25% to 5.75%" — as
  *  its two ends, either order written; null for one figure (research pass
@@ -1682,7 +1716,37 @@ export function deriveUnderwriteInputs(
           : `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
-  mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
+  // The model runs the class's reserve whatever the OM states (the figure
+  // is the owner's call); where the memorandum states its own replacement
+  // reserve, the note names it beside the default, so the two are read
+  // together and the OM's can be entered (words only).
+  {
+    const omReserve = statedReserveOf(metrics);
+    const perSfText = (psf: number) => `$${psf.toFixed(2)}/SF`;
+    const aboutPerUnit =
+      units != null && units > 0 && rsf > 0
+        ? ` (about ${compactUsd((cd.reservesPsf * rsf) / units)} ${withArticle(unitNoun.one)} a year)`
+        : "";
+    let omSaid = "";
+    if (omReserve) {
+      if (omReserve.basis === "unit") {
+        const asPsf = units != null && units > 0 && rsf > 0 ? `, about ${perSfText((omReserve.amount * units) / rsf)} here` : "";
+        omSaid = `; the OM states ${compactUsd(omReserve.amount)} ${withArticle(unitNoun.one)} a year${asPsf} — enter it to run the OM's`;
+      } else if (omReserve.basis === "sf") {
+        omSaid = `; the OM states ${perSfText(omReserve.amount)} a year — enter it to run the OM's`;
+      } else {
+        const asPsf = rsf > 0 ? `, about ${perSfText(omReserve.amount / rsf)} here` : "";
+        omSaid = `; the OM states ${compactUsd(omReserve.amount)} a year${asPsf} — enter it to run the OM's`;
+      }
+    }
+    mark(
+      "reservesPsf",
+      "assumption",
+      omReserve
+        ? `${classWord} default, ${perSfText(cd.reservesPsf)}/yr${aboutPerUnit}${omSaid}`
+        : `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`,
+    );
+  }
   if (budgetRead) {
     mark(
       "capitalImprovementsYr1",

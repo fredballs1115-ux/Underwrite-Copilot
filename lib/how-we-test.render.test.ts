@@ -50,6 +50,7 @@ import { DECISION_SCORES, NOT_YET_SCORABLE, RECORD_FLOOR, RESCREEN_RULE, SCORED_
 import { HOW_WE_TEST_PAGE, HOW_WE_TEST_PATH } from "./public-pages";
 import { isPlanDeal } from "./deal-strategy";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
+import { NOT_TESTED, NOT_TESTED_HEADING, NOT_TESTED_ID, NOT_TESTED_LINK } from "./not-tested";
 
 const html = renderToStaticMarkup(React.createElement(HowWeTestView));
 const text = visibleText(html);
@@ -420,5 +421,39 @@ describe("/how-we-test opens on a worked example and closes on the sign-up", () 
     expect(html).toMatch(/<a [^>]*href="\/login\?mode=signup"[^>]*>Get started free<\/a>/);
     expect(html).toMatch(/<a [^>]*href="\/demo"[^>]*>Sample test<\/a>/);
     expect(text).not.toContain("Sample screen");
+  });
+});
+
+describe("/how-we-test says what the test does not check yet", () => {
+  const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+  it("draws every item of lib/not-tested after the methods, linked from the intro in one line", () => {
+    const at = html.indexOf(`id="${NOT_TESTED_ID}"`);
+    expect(at).toBeGreaterThan(html.indexOf(`id="${STRESS_METHODS[STRESS_METHODS.length - 1].key}"`));
+    expect(at).toBeLessThan(html.indexOf('id="sources"'));
+    expect(flat).toContain(NOT_TESTED_HEADING);
+    expect(html).toMatch(new RegExp(`<a [^>]*href="#${NOT_TESTED_ID}"[^>]*>${NOT_TESTED_LINK}</a>`));
+    // The link sits in the intro, before the first section.
+    expect(html.indexOf(`href="#${NOT_TESTED_ID}"`)).toBeLessThan(html.indexOf('data-qa="who-does-what"'));
+    expect((html.match(/data-not-tested="/g) ?? []).length).toBe(NOT_TESTED.length);
+    for (const i of NOT_TESTED) {
+      expect(flat, i.id).toContain(i.title);
+      expect(flat, i.id).toContain(i.why);
+      if (i.beside) expect(flat, i.id).toContain(i.beside.line);
+    }
+    // Each "beside it" links to the row (or the headline) that shows it.
+    for (const i of NOT_TESTED.filter((n) => n.beside)) {
+      const from = html.indexOf(`data-not-tested="${i.id}"`);
+      const tile = html.slice(from, html.indexOf("</li>", from));
+      expect(tile, i.id).toContain(`href="#${i.beside!.key}"`);
+    }
+    const section = html.slice(at, html.indexOf("</section>", at));
+    // The whole page's links land (a section alone has no row to land on).
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(section))).toEqual([]);
+  });
+
+  it("no longer says every one of a memorandum's assumptions is tested", () => {
+    expect(flat).toContain("A memorandum's key assumptions are each set against evidence a buyer can check.");
+    expect(flat).not.toMatch(/A memorandum's assumptions are each set/);
   });
 });

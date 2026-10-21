@@ -361,7 +361,7 @@ const SAMPLE_FIT: SampleFit = {
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, each assumption challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and actuals beat the pro forma. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and actuals beat the pro forma. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
@@ -389,7 +389,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: `On Pro: the screening model as a live-formula workbook. ${SCREENING_BUILT_ON} ${SCREENING_GROWTH_EXIT_LINE}; /how-we-test has the whole rule. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets each assumption the OM or a default set against them, and names a figure the model was set from as the figure it runs, never as a check.`,
+    a: `On Pro: the screening model as a live-formula workbook. ${SCREENING_BUILT_ON} ${SCREENING_GROWTH_EXIT_LINE}; /how-we-test has the whole rule. It has a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. An OM Facts tab lists every figure the screen read out of the memorandum, as stated, with its page and whether it was flagged. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's rent growth, expense growth, vacancy and exit cap against them, and names a figure the model was set from as the figure it runs, never as a check.`,
   },
   {
     q: "Can my team share one pipeline?",
@@ -435,7 +435,7 @@ const JSON_LD = {
       operatingSystem: "Web",
       // The layout's own description (app/layout.tsx), word for word.
       description:
-        "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
+        "Upload an offering memorandum. Its key assumptions are each set against the deal's own documents, dated published figures or the rule of thumb they are asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },

@@ -31,7 +31,7 @@ export const viewport: Viewport = {
 // The link preview's one sentence (Open Graph and Twitter alike), beside the
 // card app/opengraph-image.tsx draws with the same words.
 const OG_DESCRIPTION =
-  "Each assumption the memorandum makes, set against the evidence with its date and source. The model is included.";
+  "The OM's key assumptions, each set against the evidence with its date and source. The model is included.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Upload an offering memorandum. Each assumption it makes is set against the deal's own documents, dated published figures and the rule of thumb it is asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
+    "Upload an offering memorandum. Its key assumptions are each set against the deal's own documents, dated published figures or the rule of thumb they are asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",
