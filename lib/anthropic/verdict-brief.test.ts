@@ -598,6 +598,18 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).not.toContain("South Census region: 9.5% (Q2 2026) (FRED; the metro's figure)");
   });
 
+  it("keeps a lender's quote out of the brief: the row says a quote decided it, never its rate", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const { LOAN_QUOTE_LABEL } = await import("@/lib/stress-deciders");
+    const { LOAN_QUOTE_WITHHELD } = await import("./verdict");
+    const test = sampleStressTest("2026-10-19");
+    const quote = { kind: "document" as const, label: LOAN_QUOTE_LABEL, text: "6.37% fixed, 10-year term", value: 6.37, asOf: "2026-10-01", publisher: "the deal's loan terms" };
+    const brief = buildBrief({ extraction: null, ...none, stressTest: { ...test, rows: test.rows.map((r) => (r.key === "debt" ? { ...r, evidence: [quote, ...r.evidence] } : r)) } });
+    expect(brief).toContain(LOAN_QUOTE_WITHHELD);
+    expect(brief).not.toContain("6.37%");
+    expect(brief).not.toContain(LOAN_QUOTE_LABEL);
+  });
+
   it("says the impacts are withheld, and why, where no model could be built", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");

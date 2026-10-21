@@ -1,4 +1,5 @@
 import "server-only";
+import { LOAN_QUOTE_LABEL } from "@/lib/stress-deciders";
 import { compactUsd } from "@/lib/money";
 import { z } from "zod";
 import { screenOutputFormat } from "./output-format";
@@ -138,6 +139,11 @@ export const STRESS_SECTION_HEADING = "## STRESS TEST, STRUCK IN CODE";
  * swapped) and the challenger's question — then the instruction: the moves
  * are the engine's, cited by figure and date and never estimated.
  */
+/** What the brief says of a debt row a lender's quote decided: the quote is
+ *  the buyer's, and the call's words reach the shared screen. */
+export const LOAN_QUOTE_WITHHELD =
+  "Decided by the buyer's own lender quote on file; its rate, its terms and the row's figures are kept out of this brief because the call's words can reach a shared screen. Never cite a loan rate, a spread or this row's move.";
+
 export function stressSection(test: StressTest): string[] {
   const lines: string[] = [stressReadLine(test)];
   // The headline, struck in code: the OM's case against the evidence's,
@@ -147,6 +153,14 @@ export function stressSection(test: StressTest): string[] {
   else if (test.impactsWithheld) lines.push(`HEADLINE: ${HEADLINE_WITHHELD}`);
   for (const r of test.rows) {
     const page = r.omSays.page != null ? ` [p. ${r.omSays.page}]` : "";
+    // A lender's quote is the buyer's own financing: the call's words reach
+    // the shared screen, so its terms never enter this brief (the buy box's
+    // 1031 clock is kept out for the same reason). The row says only that a
+    // quote decided it.
+    if (r.evidence.some((e) => e.label === LOAN_QUOTE_LABEL)) {
+      lines.push(`- ${r.title} (${r.key}) [${VERDICT_WORD[r.verdict].toUpperCase()}] — ${LOAN_QUOTE_WITHHELD}`);
+      continue;
+    }
     const evidence = r.evidence.length
       ? r.evidence
           .map((e, i) => {
