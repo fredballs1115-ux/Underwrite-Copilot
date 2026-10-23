@@ -195,6 +195,30 @@ describe("the screening model's growth and exit, never more optimistic than the 
     expect(row.impact!.note).toContain("The model itself already runs at it.");
   });
 
+  it("with a pro forma cap and no going-in cap, the model runs the row's own decider, never the tracker as the stress test's deciding figure", () => {
+    // The OM states a 4.90% pro forma cap and a 4.75% exit, no going-in cap:
+    // the stress test's exit row is struck on the pro forma cap, the
+    // tracker's 5.00% low end beside it. The model runs the row's decider,
+    // the OM's own figure, and its note never calls the tracker the stress
+    // test's deciding figure.
+    const proFormaOnly = withRow("Exit cap", "4.75%", withRow("Pro forma cap", "4.90%", without(/going-in/i), "p. 8"));
+    const mvm = modelVsMarketFor({ derived: null, extraction: proFormaOnly, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS });
+    const row = buildStressTest({ extraction: proFormaOnly, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: null, storedAssetClass: SAMPLE_DEAL.asset_class, readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap")!;
+    expect(row.evidence[row.decidedBy!].label).toBe("The OM's pro forma cap");
+    const evidence = evidenceOf(proFormaOnly, READS);
+    expect(evidence.exitCap.decided).toBeNull();
+    expect(evidence.exitCap.stated).toMatchObject({ label: "Pro forma cap", pct: 4.9 });
+    const d = derive(proFormaOnly, evidence);
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.049, 10);
+    expect(d.sources.exitCapPct?.note).not.toContain("the stress test's deciding figure for the exit");
+    expect(d.sources.exitCapPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 8",
+      note: "4.90% — the OM's pro forma cap as stated: the OM states no going-in cap, so the stress test's exit row is decided by the OM's own 4.90% pro forma cap (p. 8), and the model runs no exit tighter than it; the model's own year-1 NOI over its price is 5.45%: 55 bps of compression ride in these returns — set your exit view",
+    });
+    expect(decidingFigureOf(row)?.figure).toBe(d.inputs.exitCapPct * 100);
+  });
+
   it("with no reads, the memorandum's own figures, with the true reason no published figure stands", () => {
     const evidence = evidenceOf(ex, null);
     expect(evidence.rentGrowth.decided).toBeNull();

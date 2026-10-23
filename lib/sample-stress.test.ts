@@ -25,7 +25,7 @@ import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
-import { HOLDS_CAUTIOUS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
+import { HOLDS_CAUTIOUS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText, stressReadLine } from "./stress-test-words";
 import { stressSection } from "./anthropic/verdict";
 import { keptRows } from "@/app/stress-test-panel";
 
@@ -214,18 +214,14 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(demo(READS)!.headline).toEqual(page.headline);
     const h = page.headline!;
     const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
-    // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
-    // vacancy, its 4.0% rent growth, its tax bill and its $310k premium.
-    // The premium sits $75k under the seller's own $385k T-12 premium, so
-    // the T-12's decides it — a working floor and a rule of thumb, never a
-    // quote — and the evidence's case runs it (the review of 2026-10-21).
     // The price row stands unchecked on two clean comps (too few for a
     // median, the review of 2026-10-23), so it is in neither case; both pay
     // the ask. The OM's case: its 5.25% exit, its NOI at its own 6.0%
     // vacancy, its 4.0% rent growth, its tax bill and its $310k premium. The
     // premium sits $75k under the seller's own $385k T-12 premium, so the
-    // T-12's decides it — a working floor and a rule of thumb, never a quote
-    // — and the evidence's case runs it (the review of 2026-10-21).
+    // T-12's decides it — the seller's actual premium, the building's own
+    // history, never a new owner's quote — and the evidence's case runs it
+    // (the review of 2026-10-21).
     expect(h.omKeys).toEqual(["exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
     expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 9.7]);
     const insRow = page.rows.find((r) => r.key === "insurance")!;
@@ -340,7 +336,7 @@ describe("the sample's stress test, one build on every surface", () => {
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
-    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 9.7% with the evidence (the screening model as it runs, its own figure on every input: 9.3%); the report splits the gap by assumption.");
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 9.7% with stretched and unsupported rows at the evidence (the screening model as it runs, its own figure on every input: 9.3%); the report splits the gap.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
     expect(rerunWords(page, row("taxes").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");
@@ -590,5 +586,17 @@ describe("the sample's printed figures", () => {
       ];
       for (const s of texts) expect(s, s).not.toMatch(HYPHEN_MINUS);
     }
+  });
+
+  it("say what the OM states the same way whether today's figures were read or the read failed", () => {
+    // The expense-growth row exists only where the CPI is read, so the rows
+    // read move with the feed (12 with it, 11 without) while what the OM
+    // states does not: the line counts what it states and never says how
+    // many it leaves out, which would move with the feed (3 against 2).
+    const withReads = stressReadLine(sampleStressTest({ today: TODAY, reads: READS }));
+    const failed = stressReadLine(sampleStressTest({ today: TODAY, reads: null }));
+    expect(withReads).toMatch(/^12 assumptions read, 9 stated in the OM — 7 tested \(2 unsupported, 3 stretched, 2 hold\), 5 unchecked; /);
+    expect(failed).toMatch(/^11 assumptions read, 9 stated in the OM — 6 tested \(2 unsupported, 3 stretched, 1 holds\), 5 unchecked; /);
+    for (const line of [withReads, failed]) expect(line).not.toMatch(/leaves \d+ out/);
   });
 });

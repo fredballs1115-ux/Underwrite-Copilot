@@ -1411,12 +1411,14 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
  * What the account's record does with a stabilized vacancy, said where it is
  * drawn (audit M5). A stress-test row kept with its verdict says which kind
  * of evidence decided it, so a later rent roll or T-12 is held back only
- * where the market's figure did. A screen whose test was not kept has only
+ * where the market's figure decided a vacancy counted by doors; an economic
+ * one the market's doors held only as a floor is scored by a later T-12
+ * (`scoreTestRow`'s `heldToMarket`). A screen whose test was not kept has only
  * its challenges, and the account's record builds no stress test for each
  * deal, so it holds every stated stabilized vacancy back as the market's.
  */
 export const ACCOUNT_VACANCY_NOTE =
-  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors; one the OM states as economic, dollars, is not the market's to decide, and a later T-12, the same measure, scores it outside a plan deal. Its deal's own page scores a vacancy by doors where the documents decided it.";
+  "A vacancy counted by doors that the market's figure decided is never scored by a later rent roll or T-12; one the OM states as economic, dollars, which the market's doors hold only as a floor, is scored by a later T-12, its own measure, outside a plan deal. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors as the market's; its deal's own page holds one back only where the market's figure decided its row.";
 
 export interface KeyRecord {
   key: StressKey;

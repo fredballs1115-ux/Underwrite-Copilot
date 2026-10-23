@@ -329,7 +329,7 @@ export const TRACK_RECORD = {
     // lib/track-record `laterFor` / `otherMeasure`: the stress test's own
     // doors-and-dollars rule, scored the same way.
     `${VACANCY_MEASURE_RULE} A document of the other measure is named on the row, with why; an older screen's challenge is read in the OM figure's measure.`,
-    "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
+    "A stabilized vacancy in doors the market's figure decided is not scored by a later rent roll or T-12, the building today; one in dollars, held to the market only as a floor, is scored by a later T-12, its own measure.",
     "A decision is a direction, not a verdict on the OM's figure: it is counted apart and in no share.",
     // lib/track-record `gapCaptured` and `accountRecord`'s base rate: shown,
     // never scored (the owner's decision of 2026-10-21).

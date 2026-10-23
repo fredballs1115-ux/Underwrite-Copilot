@@ -578,8 +578,8 @@ export interface MemoStressBlock {
   /** "1 unsupported · 2 stretched" — the count beside the title */
   count: string;
   /** the headline (lib/stress-test-words `memoHeadline`): "Levered IRR on
-   *  the OM's figures 16.7% to 11.5% with the evidence: …", or "" where the
-   *  test carries none (the read line already says why no return is re-run) */
+   *  the OM's figures 16.7% to 11.5% with the stretched and unsupported
+   *  rows at the evidence: …", or "" where the test carries none (the read line already says why no return is re-run) */
   headline?: string;
   /** what each row's re-run is (lib/stress-test-words `rerunWords`): "from
    *  the model's own 9.3% levered IRR, this input alone set to the OM's

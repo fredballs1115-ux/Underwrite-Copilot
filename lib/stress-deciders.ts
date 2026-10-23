@@ -335,10 +335,10 @@ export const TAXES_ORDER: readonly DeciderStep[] = [
   // The seller's own bill decides only where the row hands it in as one that
   // may (lib/stress-test: no reset bill, no abatement ending in the hold, and
   // the OM's line under it past SAME_SHARE on a building already delivered):
-  // a working floor and a rule of thumb, never the bill a new owner pays.
+  // the building's own history, never the bill a new owner pays.
   {
     name: "the deal's T-12 tax line",
-    why: "the seller's own bill, where the OM's sits under it and no reset bill can be struck: a working floor and a rule of thumb, not a new owner's bill",
+    why: "the seller's actual bill, where the OM's sits under it and no reset bill can be struck: the building's own history, not a new owner's bill",
     is: isLabel(T12_TAX_LABEL),
   },
 ];

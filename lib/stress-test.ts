@@ -561,8 +561,12 @@ const EXIT_CAP_ROW = /\b(?:exit|terminal|reversion(?:ary)?|residual|disposition|
 /** The OM's pro forma cap: its stabilized NOI over the price ("Pro forma
  *  cap", "Stabilized cap rate", "Cap rate (pro forma)") — never an exit, a
  *  cap on cost, a yield, a cap at delivery or a later year's. */
-const PRO_FORMA_CAP_ROW = /\b(?:pro ?forma|stabili[sz]ed)\b[^,;]*\bcap(?:italization)?\b|\bcap(?:italization)?(?:\s+rate)?\b[^,;]*\b(?:pro ?forma|stabili[sz]ed)\b/i;
-const PRO_FORMA_CAP_NOT = /exit|terminal|reversion|residual|disposition|\bsale\b|\bcost\b|yield|deliver|forward|going[- ]?in|in[- ]place|current|actual|t-?12|ttm|trailing|year ?[2-9]|yr\.? ?[2-9]|\bper\b|\bcap\s*ex\b|rate\s+of\s+return/i;
+const PRO_FORMA_CAP_ROW = /\b(?:pro[\s-]?forma|stabili[sz]ed)\b[^,;]*\bcap(?:italization)?\b|\bcap(?:italization)?(?:\s+rate)?\b[^,;]*\b(?:pro[\s-]?forma|stabili[sz]ed)\b/i;
+// A later year's cap is no pro forma cap on the price: "Year-3 Pro Forma
+// Cap Rate", "Pro Forma Cap Rate (Year 10)", "Yr. 2", "Stabilized Cap Rate
+// (2029)" — a numbered year past the first, or a calendar year, names one.
+const PRO_FORMA_CAP_NOT =
+  /exit|terminal|reversion|residual|disposition|\bsale\b|\bcost\b|yield|deliver|forward|going[- ]?in|in[- ]place|current|actual|t-?12|ttm|trailing|\byear[\s-]*(?:[2-9]|\d{2,})|\byr[\s.-]*(?:[2-9]|\d{2,})|\b(?:19|20)\d\d\b|\bper\b|\bcap\s*ex\b|rate\s+of\s+return/i;
 const RENT_GROWTH_ROW = /\b(?:rent|rental|income|revenue|rents?)\s+growth\b|\bgrowth\b[^,;]*\brents?\b/i;
 const RENT_GROWTH_NOT = /expense|opex|\bnoi\b|population|job|employment|supply/i;
 const EXPENSE_GROWTH_ROW = /\b(?:expense|opex|operating[- ]expense)s?\s+(?:growth|escalation|inflation)\b/i;
@@ -572,7 +576,7 @@ const EXPENSE_GROWTH_ROW = /\b(?:expense|opex|operating[- ]expense)s?\s+(?:growt
 const VACANCY_ROW = /\bvacancy\b/i;
 const VACANCY_NOT = /\$|market vacancy|submarket|metro|physical|economic/i;
 const VACANCY_VALUE_NOT = /\$/;
-const VACANCY_PLAN = /stabili[sz]ed|pro ?forma|underwritten|year ?\d|yr\.? ?\d/i;
+const VACANCY_PLAN = /stabili[sz]ed|pro[\s-]?forma|underwritten|year[\s-]?\d|yr\.?[\s-]?\d/i;
 // A combined "Taxes & insurance" row is neither line alone: the tax finder
 // refuses a label naming insurance, the insurance finder one naming a tax,
 // and the T-12 line finders the same (`T12_TAX_NOT`, `T12_INSURANCE_NOT`).
@@ -658,7 +662,7 @@ const VACANCY_TODAY = /\b(?:current|in[- ]place|actual|t-?12|ttm|trailing|today)
 export type VacancyMeasure = "physical" | "economic";
 const ECONOMIC_WORDS = /\beconomic\b|\bcredit\b|\bcollection\b|\bbad\s+debt\b|\bconcession|\bloss\b/i;
 const PHYSICAL_WORDS = /\boccupan(?:cy|t)\b|\bunits?\b|\bdoors?\b|\bphysical\b/i;
-const PRO_FORMA_LINE = /\bpro ?forma\b|\bunderwrit|\bbudget|\byear ?\d|\byr\.? ?\d/i;
+const PRO_FORMA_LINE = /\bpro[\s-]?forma\b|\bunderwrit|\bbudget|\byear[\s-]?\d|\byr\.?[\s-]?\d/i;
 const ECONOMIC_ROW = /\beconomic\s+(?:vacancy|occupancy)\b/i;
 /** A vacancy read off the trailing statement ("T-12 vacancy", "TTM
  *  vacancy") is the statement's loss over its gross potential rent: dollars. */
@@ -734,7 +738,7 @@ export const CHALLENGE_KEYWORDS: readonly { key: Exclude<StressKey, "other">; re
   // A market or pro forma rent, and the loss to lease it claims to close,
   // are the market-rent row's; a rent's growth rate is the rent growth row's
   // ("Market rent growth of 4% a year", "Pro forma rent growth").
-  { key: "market_rent", re: /loss[- ]to[- ]lease|mark[- ]to[- ]market|market rents?\b(?!\s+growth)|pro ?forma rents?\b(?!\s+growth)|lease comps?\b/i },
+  { key: "market_rent", re: /loss[- ]to[- ]lease|mark[- ]to[- ]market|market rents?\b(?!\s+growth)|pro[\s-]?forma rents?\b(?!\s+growth)|lease comps?\b/i },
   { key: "rent_growth", re: /\b(?:rent|rental|income|revenue)s?\s+growth|\bgrowth\b[^,;]*\brents?\b/i },
   // A growth rate only: an expense ratio or load is a share of income, which
   // the growth row's CPI test does not speak to (`expenseLevelNotGrowth`).
@@ -824,7 +828,7 @@ const irrRuns = (ctx: Ctx): boolean => ctx.derived != null && ctx.impactsWithhel
 /** A row label that names the plan's own figure: the stabilized or pro
  *  forma one, never a year's (a value-add's year one is the building before
  *  the plan is done). */
-const PLAN_FIGURE = /stabili[sz]ed|pro ?forma/i;
+const PLAN_FIGURE = /stabili[sz]ed|pro[\s-]?forma/i;
 
 /**
  * A plan deal's re-run: its yield on total cost twice (lib/plan-sensitivity
@@ -1166,12 +1170,28 @@ export function leaseUpNotModelled(todayPct: number, stabilizedPct: number): str
   return `The lease-up from today's ${pct1(todayPct)} to the stabilized ${pct1(stabilizedPct)} is not modelled in either case: each runs its vacancy from year one.`;
 }
 
-/** The T-12's economic vacancy beside a figure counted by doors, said on its
- *  evidence line. */
+/** The T-12's economic vacancy beside a figure for today counted by doors,
+ *  said on its evidence line: dollars, not doors, the true reason it never
+ *  decides an in-place figure the rent roll's count does. */
 export const T12_ECONOMIC_BESIDE = "dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it";
 
-/** The rent roll's count beside a figure the OM states as economic. */
+/** The T-12 beside a stabilized assumption counted by doors: the building as
+ *  it has run first — a trailing year never decides a stabilized figure,
+ *  whatever it counts (lib/stress-deciders `VACANCY_ORDER.stabilized`) —
+ *  and dollars too. */
+export const T12_TODAY_BESIDE = "the building as it has run, and dollars, not doors: shown beside the stabilized assumption and never deciding it";
+
+/** The rent roll's count beside a figure for today the OM states as
+ *  economic, which the T-12 decides: doors, not dollars. */
 export const ROLL_PHYSICAL_BESIDE = "doors, not dollars: shown beside the OM's economic figure and never deciding it";
+
+/** The rent roll beside a stabilized assumption, whatever its measure: the
+ *  building today, never the test of a stabilized figure — the market's
+ *  published figure decides (lib/stress-deciders `VACANCY_ORDER.stabilized`),
+ *  so the reason it never decides is its date, not its doors. */
+export function rollTodayBeside(plan: boolean | undefined): string {
+  return `the building today, which ${plan ? "the plan" : "a lease-up"} starts from: shown beside the stabilized assumption and never deciding it`;
+}
 
 /** Why a vacancy counted by doors stands unchecked where the deal's T-12 is
  *  the only figure on file: its loss is dollars. */
@@ -1357,7 +1377,12 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   const ownMeasure = (p: Piece) => (economic ? p === t12p : p === roll);
   if (om) {
     for (const d of docs) {
-      if (!ownMeasure(d)) d.e = { ...d.e, text: `${d.e.text}; ${economic ? ROLL_PHYSICAL_BESIDE : T12_ECONOMIC_BESIDE}` };
+      // A document of the other measure beside a stabilized figure is the
+      // building today first: the market decides a stabilized figure
+      // whatever it counts, so its measure is not why it never decides —
+      // the rent roll beside an economic one is today's doors, the T-12
+      // beside one counted by doors its trailing year, in dollars too.
+      if (!ownMeasure(d)) d.e = { ...d.e, text: `${d.e.text}; ${economic ? (stabilized ? rollTodayBeside(ctx.plan) : ROLL_PHYSICAL_BESIDE) : stabilized ? T12_TODAY_BESIDE : T12_ECONOMIC_BESIDE}` };
       else if (docsBeside) d.e = { ...d.e, text: `${d.e.text}; today's, ${todayWords(d.e.value!, om.pct, "the stabilized assumption")}` };
     }
   }
@@ -1367,10 +1392,12 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // the counts of doors beside it.
   const otherMeasure =
     om && !economic && t12p
-      ? ` The deal's T-12 ran ${pct1(t12p.e.value!)} economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`
+      ? stabilized
+        ? ` The deal's T-12 ran ${pct1(t12p.e.value!)} economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent: the building as it has run, never the test of a stabilized figure, and dollars, not doors, so it is shown beside the stabilized assumption and never decides it.`
+        : ` The deal's T-12 ran ${pct1(t12p.e.value!)} economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`
       : om && economic && stabilized
         ? roll
-          ? ` The deal's rent roll counts doors today, ${pct1(roll.e.value!)} vacant, so it is shown beside the OM's economic figure and never decides it.`
+          ? ` The deal's rent roll runs ${pct1(roll.e.value!)} vacant by its doors: the building today, which ${ctx.plan ? "the plan" : "a lease-up"} starts from, so it is shown beside the stabilized assumption and never decides it.`
           : ""
         : om && economic && (roll || market.some((m) => m.e.value != null))
           ? " The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it."
@@ -1475,8 +1502,10 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         ? ` ${econSaid}, so it is held to the deal's T-12, the same measure.`
         : stabilized && !ctx.plan && best.e.kind === "rule_of_thumb"
           ? // Today's T-12 never decides a stabilized figure: it is the gap
-            // a lease-up has to close, said so beside the norm.
-            ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
+            // a lease-up has to close, said so beside the norm. Why the
+            // figure is economic is said first, so the floor the market
+            // would have been is read as one.
+            ` ${econSaid}, and no fresh published vacancy figure for this market could be held to the stabilized assumption as a floor, so the class's norm decides${
               doc
                 ? `; ${T12_NOT_STABILIZED}: ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
                     doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
@@ -2401,7 +2430,7 @@ function quotedDebtRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEv
 
 // — NOI —
 
-const PRO_FORMA_RENT_ROW = /\b(?:pro ?forma|market|projected|stabili[sz]ed)\s+(?:avg\.?\s+|average\s+)?rents?\b/i;
+const PRO_FORMA_RENT_ROW = /\b(?:pro[\s-]?forma|market|projected|stabili[sz]ed)\s+(?:avg\.?\s+|average\s+)?rents?\b/i;
 const RENT_NOT = /growth|psf|\/\s*sf|per\s+sf|comp/i;
 
 /** A stored day as a sentence writes it: "May 31, 2026" (lib/debt-index
@@ -2894,9 +2923,8 @@ function taxesRow(ctx: Ctx): StressRow | null {
   // The T-12's own tax line: the seller's actual bill. It decides only where
   // nothing above does — no reset bill and no abatement ending in the hold —
   // and the OM's line sits under it past SAME_SHARE on a building already
-  // delivered: the OM against its own building's history, a working floor
-  // and a rule of thumb, never the bill a new owner pays (the insurance
-  // row's rule).
+  // delivered: the OM against its own building's history, never the bill
+  // a new owner pays (the insurance row's rule).
   const t12 = ctx.actuals?.t12;
   const t12Tax = t12TaxLineOf(t12);
   const t12Bill = t12Tax && t12Tax.amount > 0 ? t12Tax.amount : null;
@@ -3036,7 +3064,7 @@ export const TAX_T12_FLOOR = "the seller's own bill, the building's own history,
 
 /** What a re-run at the T-12's tax bill is, said wherever its part of the
  *  headline is (`StressHeadlinePart.conditional`). */
-export const TAX_T12_FLOOR_CONDITION = "at the seller's own T-12 bill, a working floor, not a new owner's bill";
+export const TAX_T12_FLOOR_CONDITION = "at the seller's actual T-12 bill, not a new owner's bill";
 
 /**
  * The taxes row where the seller's T-12 bill decides it: no reset bill can be
@@ -3055,7 +3083,7 @@ function t12TaxRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEviden
     unit: "usd",
     text: `The OM's ${money(bill)} tax line is ${money(floor - bill)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. ${noAssessed ? "With no assessed value stated, no reset bill is struck" : "No reset bill is struck"}; the T-12's is the building's own history, not the bill a new owner pays, so the row reads stretched at most.`,
   };
-  const words = { what: "the tax line", om: money(bill), alt: `the seller's ${money(floor)} T-12 bill, a working floor and a rule of thumb, not a new owner's bill`, evidence: "" };
+  const words = { what: "the tax line", om: money(bill), alt: `the seller's actual ${money(floor)} T-12 bill (the building's own history, not a new owner's bill)`, evidence: "" };
   const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, bill, floor, floor, "tax line", evidenceIndex, words) : null;
   let planImpact: StressImpact | null = null;
   let noRerun: string | null = null;
@@ -3358,7 +3386,7 @@ const OPEX_NOT =
 const OPEX_RATIO_ROW = /\b(?:operating\s+)?expense\s+ratio\b|\bopex\s+ratio\b/i;
 const OPEX_RATIO_NOT = /t-?12|ttm|trailing|in[- ]place|actual|historical|current|market|class|industry|typical|comp|gross potential|potential gross|\bgpr\b|year ?[2-9]|yr\.? ?[2-9]/i;
 /** The pro forma's own figure first. */
-const OPEX_PRO_FORMA = /stabili[sz]ed|pro ?forma|underwrit|budget|year ?1\b|yr\.? ?1\b/i;
+const OPEX_PRO_FORMA = /stabili[sz]ed|pro[\s-]?forma|underwrit|budget|year ?1\b|yr\.? ?1\b/i;
 const EGI_NOT = /\bper\b|\/|psf|month|\bmo\b|growth|t-?12|ttm|trailing|in[- ]place|current|actual|year ?[2-9]|yr\.? ?[2-9]/i;
 
 /** The OM's own expense lines, each read as stated and set beside the T-12's
@@ -3699,12 +3727,15 @@ interface BasisComparable {
   on: Per;
 }
 
-/** What the comps step's grades mean, as its prompt defines them
- *  (lib/anthropic/prompts `brokerCompsInstruction`): by comparability to
- *  the subject, never by whether the comp's price is over or under the ask. */
+/** Why a comp graded favorable or stretched is left out, in words true of
+ *  every grade on file: the comps step grades by comparability to the
+ *  subject now (lib/anthropic/prompts `brokerCompsInstruction`), but a
+ *  screen kept from before that prompt graded otherwise, and either way a
+ *  grade other than `supports` is no clean comparison — never a claim of
+ *  what made it one. */
 const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
-  favorable: "favorable by the comps step (less comparable, in a way that flatters the ask)",
-  stretched: "stretched by the comps step (not comparable to the subject)",
+  favorable: "favorable by the comps step (not a clean comparison)",
+  stretched: "stretched by the comps step (not a clean comparison)",
 };
 
 /** Why the price stands unchecked where fewer than MEDIAN_FLOOR comps graded

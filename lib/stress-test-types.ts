@@ -542,7 +542,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
       "Under three comps graded clean and no recorded sales' median, the row stands unchecked: one or two trades are sightings, not a market, the comps' own floor.",
       "The grades are the comps step's reading of each comp's comparability, the AI's; code takes the set it grades clean and strikes the median.",
-      "A comp graded favorable (less comparable, in a way that flatters the ask) or stretched (not comparable) is named and left out of the median.",
+      "A comp graded favorable or stretched is not a clean comparison, and is named and left out of the median; the comps step grades by comparability now, and a screen made before may have meant the two words otherwise.",
       "Your past screens' asks are never read on a shared screen or in the verdict's brief.",
       "Replacement cost only where the memorandum states one.",
       "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
@@ -687,7 +687,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     against: [
       "A scenario on the memorandum's own figures, not the OM contradicting itself: its bill over its assessed value is today's rate, and that rate on the price is the bill if the sale resets the assessment, the one figure that decides where both are stated",
       "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck",
-      "The deal's T-12 tax line, the seller's own bill: it decides only where nothing above does and the OM's line sits more than 2% under it, a working floor, stretched at most; else it is shown beside it",
+      "The deal's T-12 tax line, the seller's actual bill: it decides only where nothing above does and the OM's line sits more than 2% under it, the OM against its own building's history, stretched at most; else it is shown beside it",
     ],
     engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures, else at the T-12's bill where it decides. A plan's yield on cost is re-run on its pro forma line; not on a development, conversion or forward purchase.",
     limits: [

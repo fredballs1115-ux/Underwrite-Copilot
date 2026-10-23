@@ -101,13 +101,13 @@ export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
 export const omStatesIt = (row: StressRow): boolean => row.key === "other" || row.omSays.value != null;
 
 /**
- * The read line over the rows: "12 assumptions: the OM states 9 and leaves
- * 3 out — 7 tested (2 unsupported, 3 stretched, 2 hold), 5 unchecked; the
- * levered return re-run with one input swapped for the evidence's, in
- * code." The counts of what the OM states and leaves out are read off the
- * rows (`omStatesIt`). An unchecked row was read and not tested, so it is never counted among the
- * tested. Where no return was re-run, why; where nothing is withheld and no
- * row draws a re-run, the counts alone, never a re-run the rows do not make.
+ * The read line over the rows: "12 assumptions read, 9 stated in the OM — 7
+ * tested (2 unsupported, 3 stretched, 2 hold), 5 unchecked; the levered
+ * return re-run with one input swapped for the evidence's, in code." What
+ * the OM states is counted off the rows (`omStatesIt`). An unchecked row was
+ * read and not tested, so it is never counted among the tested. Where no
+ * return was re-run, why; where nothing is withheld and no row draws a
+ * re-run, the counts alone, never a re-run the rows do not make.
  */
 export function stressReadLine(test: StressTest): string {
   const c = verdictCounts(test);
@@ -119,17 +119,21 @@ export function stressReadLine(test: StressTest): string {
     c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
   ].filter(Boolean);
   const testedPart = tested > 0 ? `${tested} tested (${parts.join(", ")})` : "none tested";
-  // What the memorandum states and what it leaves out, counted off the rows:
-  // a row whose OM side is no figure is an assumption the model still makes
-  // (its own figure, said on the row), never one the OM stated.
+  // What the memorandum states, counted off the rows: a row whose OM side is
+  // no figure is an assumption the model still makes (its own figure, said
+  // on the row), never one the OM stated. How many it leaves out is never
+  // said: a row the OM states no figure for is built only where some
+  // evidence is read (an expense growth row only where the CPI is), so that
+  // count would move with the day's feeds — the sample's read 3 left out
+  // with the figures read and 2 without — while the OM had left out no
+  // fewer. The rows read are said as read; the stated count stands whatever
+  // the feeds do.
   const stated = test.rows.filter(omStatesIt).length;
-  const unstated = n - stated;
-  const statedPart =
-    unstated === 0 ? (n === 1 ? "the OM states it" : `the OM states all ${n}`) : stated === 0 ? "the OM states none" : `the OM states ${stated} and leaves ${unstated} out`;
+  const statedPart = stated === n ? (n === 1 ? "stated in the OM" : "all stated in the OM") : stated === 0 ? "none stated in the OM" : `${stated} stated in the OM`;
   const head =
     n === 0
       ? "No assumption of the memorandum's could be tested in code."
-      : `${n} assumption${n === 1 ? "" : "s"}: ${statedPart} — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
+      : `${n} assumption${n === 1 ? "" : "s"} read, ${statedPart} — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
   // The withheld reason is a whole sentence that already says no return is
   // re-run (lib/stress-test), printed as it stands. The re-run clause is
   // said only where a row draws one; with none, the line ends on its counts.
@@ -519,8 +523,12 @@ export function basisMoveWords(impact: StressImpact): string | null {
   if (base == null || alt == null || !Number.isFinite(base) || !Number.isFinite(alt)) return null;
   const show = (v: number) => (yoc ? pct2(v) : irrText(v));
   const name = yoc ? "yield on cost" : "levered IRR";
-  const cost = alt - base;
-  const pts = yoc ? cost.toFixed(2) : cost.toFixed(1);
+  // The cost is the difference of the two figures as printed beside it, each
+  // rounded first: 9.25% and 13.64% print 9.3% and 13.6%, so the ask costs
+  // 4.3 points, never the 4.4 the unrounded difference rounds to.
+  const places = yoc ? 2 : 1;
+  const shown = (v: number) => Number(v.toFixed(places));
+  const pts = (shown(alt) - shown(base)).toFixed(places);
   if (!(Number(pts) > 0)) return `${upperFirst(name)} ${show(base)} at the ask, ${show(alt)} at the evidence's price`;
   return `The ask costs ${pts} pts of ${name}: ${show(base)} at it, ${show(alt)} at the evidence's price`;
 }
@@ -738,9 +746,15 @@ export function shownHeadline(h: StressHeadline): { om: number | null; evidence:
   return { om, evidence, gap: Math.abs(target) / f, parts };
 }
 
+/** The evidence's case as the headline's line says it, in the bars' own
+ *  words (`HEADLINE_EVIDENCE_CASE_LABEL`): only the rows read stretched or
+ *  unsupported move to their evidence, so the line never says "with the
+ *  evidence" as if every row ran at it. */
+export const WITH_EVIDENCE_CASE = "with stretched and unsupported rows at the evidence";
+
 /**
  * The headline's one line: "Levered IRR on the OM's figures 16.7% to 11.5%
- * with the evidence". `arrow` is "to" on paper (WinAnsi has no arrow) and
+ * with stretched and unsupported rows at the evidence". `arrow` is "to" on paper (WinAnsi has no arrow) and
  * "→" on the page. Where nothing is past its evidence, the OM's case alone
  * and why the evidence's is the same run — said as nothing the headline
  * swaps where a row past its evidence is left out of it (the price, a
@@ -760,18 +774,18 @@ export function headlineLine(test: StressTest, arrow = "to"): string | null {
         ? `Yield on cost on the OM's figures ${pct2(s.om)}, with nothing past its evidence that the headline moves, so the evidence moves nothing`
         : `Yield on cost on the OM's figures ${pct2(s.om)}; no figure the plan's yield is struck on is past its evidence, so the evidence moves nothing`;
     }
-    return `Yield on cost on the OM's figures ${pct2(s.om)} ${arrow} ${pct2(s.evidence)} with the evidence`;
+    return `Yield on cost on the OM's figures ${pct2(s.om)} ${arrow} ${pct2(s.evidence)} ${WITH_EVIDENCE_CASE}`;
   }
   const om = irrText(h.omIrrPct);
-  if (h.omIrrPct == null && h.evidenceIrrPct == null) return "The levered IRR does not solve on the OM's figures or with the evidence";
-  if (h.evidenceIrrPct == null) return `Levered IRR on the OM's figures ${om}; with the evidence it does not solve`;
-  if (h.omIrrPct == null) return `The levered IRR does not solve on the OM's figures; with the evidence it is ${irrText(h.evidenceIrrPct)}`;
+  if (h.omIrrPct == null && h.evidenceIrrPct == null) return `The levered IRR does not solve on the OM's figures or ${WITH_EVIDENCE_CASE}`;
+  if (h.evidenceIrrPct == null) return `Levered IRR on the OM's figures ${om}; ${WITH_EVIDENCE_CASE} it does not solve`;
+  if (h.omIrrPct == null) return `The levered IRR does not solve on the OM's figures; ${WITH_EVIDENCE_CASE} it is ${irrText(h.evidenceIrrPct)}`;
   if (h.parts.length === 0 && Math.abs(h.evidenceIrrPct - h.omIrrPct) < 1e-9) {
     return h.omitted.length > 0
       ? `Levered IRR on the OM's figures ${om}, with nothing past its evidence that the headline swaps, so the evidence moves nothing`
       : `Levered IRR on the OM's figures ${om}; no figure the model takes is past its evidence, so the evidence moves nothing`;
   }
-  return `Levered IRR on the OM's figures ${om} ${arrow} ${irrText(h.evidenceIrrPct)} with the evidence`;
+  return `Levered IRR on the OM's figures ${om} ${arrow} ${irrText(h.evidenceIrrPct)} ${WITH_EVIDENCE_CASE}`;
 }
 
 /** "the price +3.7 pts, vacancy −3.2 pts, the taxes −3.0 pts (if the sale
@@ -920,11 +934,13 @@ function joinAnd(parts: string[]): string {
  * The headline in one short clause, for the one-page memo, which has no
  * line to spare (measured on the sample: the line alone fits beside the
  * read line, the split does not): "Levered IRR on the OM's figures 16.7%
- * to 11.5% with the evidence; the report splits the gap by assumption."
+ * to 11.5% with stretched and unsupported rows at the evidence; the
+ * report splits the gap." (the evidence's case in the bars' own words,
+ * `WITH_EVIDENCE_CASE`, kept to two lines beside the read line).
  * The report prints `headlineSentence`, the split and what is left out
  * with why. Where a swap in the evidence's case was struck against a rule
  * of thumb alone (the loan rate against a screening default), the line says
- * so in its brackets, as the split marks the part ("…with the evidence (the
+ * so in its brackets, as the split marks the part ("…at the evidence (the
  * loan rate against a screening default; …)"); on a plan deal the OM's own
  * stated yield on cost rides there too, from the reader the panel's
  * sentence reads (`statedYoc`: "the OM states 7.10%, p. 24"). Null with no
@@ -941,7 +957,7 @@ export function headlineShort(test: StressTest, withModel = true): string | null
   if (stated && Number.isFinite(stated.pct)) notes.push(`the OM states ${pct2(stated.pct)}${stated.page != null ? `, p. ${stated.page}` : ""}`);
   const model = withModel ? modelClause(h) : "";
   if (model) notes.push(model);
-  return `${line}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
+  return `${line}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}${h.parts.length > 0 ? "; the report splits the gap." : "."}`;
 }
 
 // ── The headline's three figures, each said as what it is ──────────────
@@ -955,9 +971,11 @@ export const HEADLINE_EVIDENCE_CASE_LABEL = "Stretched and unsupported rows at t
 export const HEADLINE_MODEL_LABEL = "The screening model as it runs";
 /** Why the screening model's figure is neither case, short: the model runs
  *  its own figure on every input, the cases put the re-run rows at the
- *  OM's, and differ from each other only on the rows past their evidence. */
+ *  OM's, and differ from each other only on the rows past their evidence.
+ *  Published figures are said as read only where the model reads them: the
+ *  sample's model is pinned and reads none (lib/model-market). */
 export const HEADLINE_MODEL_WHY =
-  "The screening model runs its own figure on every input: published figures, the deal's documents, its defaults. Both cases put each re-run row at the OM's figure instead; the second then moves only the rows past their evidence.";
+  "The screening model runs its own figure on every input: the deal's documents and its defaults, and published figures where it reads them. Both cases put each re-run row at the OM's figure instead; the second then moves only the rows past their evidence.";
 
 // ── The model as it runs: the base every re-run starts from ─────────────
 

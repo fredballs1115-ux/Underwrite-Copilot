@@ -272,8 +272,12 @@ describe("/how-we-test draws every method from the table", () => {
     expect(snapshotThreshold("noi")).toEqual({ value: 0.05, unit: "share" });
     expect(snapshotThreshold("basis")).toEqual({ value: 0.05, unit: "share" });
     for (const line of TRACK_RECORD.lines) expect(line.length, line).toBeLessThanOrEqual(260);
-    // A stabilized vacancy the market decided is not scored by a later document (audit L5).
-    expect(TRACK_RECORD.lines).toContain("A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.");
+    // A stabilized vacancy in doors the market decided is not scored by a
+    // later document (audit L5); one in dollars it held only as a floor is
+    // scored by a later T-12 (lib/track-record `scoreTestRow`).
+    expect(TRACK_RECORD.lines).toContain(
+      "A stabilized vacancy in doors the market's figure decided is not scored by a later rent roll or T-12, the building today; one in dollars, held to the market only as a floor, is scored by a later T-12, its own measure.",
+    );
     // The marker keeps the sentence live-verify greps, whole.
     expect(HOW_WE_TEST_MARKER).toContain("The arithmetic is run in code, never by the AI.");
     expect(readFileSync(".github/workflows/live-verify.yml", "utf8")).toContain("The arithmetic is run in code, never by the AI.");

@@ -500,7 +500,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
  * graded clean (supports): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
  * mi $261k/unit — two graded clean, too few for a median (3 or more), so
  * none is set against the ask; left out, graded stretched by the comps step
- * (not comparable to the subject): Vue at Girard — 4.0 mi $298k/unit")
+ * (not a clean comparison): Vue at Girard — 4.0 mi $298k/unit")
  * read back into its parts — the count, each comp with its figure and its
  * grade, and what is struck over the clean ones — so the panel draws a list.
  * Null where the text is not that sentence; the panel then prints it whole.

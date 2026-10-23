@@ -585,7 +585,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(hh).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(a11yIssues(hh)).toEqual([]);
     expect(gluedWords(visibleText(hh))).toEqual([]);
-    expect(t).toContain("Levered IRR on the OM's figures 16.7% → 12.3% with the evidence");
+    expect(t).toContain("Levered IRR on the OM's figures 16.7% → 12.3% with stretched and unsupported rows at the evidence");
     // Above the rows.
     expect(hh.indexOf('data-qa="stress-headline"')).toBeLessThan(hh.indexOf('data-qa="stress-rows"'));
     // A bar for each case, a segment an assumption, each signed and labelled.
@@ -717,7 +717,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const none = visibleText(render({ ...TEST, headline: { ...base, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } }))
       .replace(/&#x27;/g, "'")
       .replace(/\s+/g, " ");
-    expect(none).toContain("Levered IRR on the OM's figures 13.1%; with the evidence it does not solve");
+    expect(none).toContain("Levered IRR on the OM's figures 13.1%; with stretched and unsupported rows at the evidence it does not solve");
     expect(none).not.toContain("to does not solve");
     expect(none).toContain("One of the two runs has no levered IRR, so the gap is not split.");
     expect(none).not.toContain("at the OM's in both runs");
@@ -803,7 +803,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
     ]);
     expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
-    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Stretched, left out: not comparable to the subject");
+    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Stretched, left out: not a clean comparison");
     expect(t).not.toContain("graded clean (supports): The Brixton");
   });
 

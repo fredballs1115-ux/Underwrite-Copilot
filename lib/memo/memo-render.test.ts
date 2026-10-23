@@ -1568,12 +1568,12 @@ describe("the memo leads with the stress test", () => {
       return `IRR ${i.baseIrrPct!.toFixed(1)}% to ${i.altIrrPct!.toFixed(1)}%`;
     };
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("11 assumptions: the OM states 9 and leaves 2 out — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("11 assumptions read, 9 stated in the OM — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The headline, in the read line's paragraph: the OM's case against the
     // evidence's (lib/stress-test `stressHeadline`); the split is the
     // report's, since the one page has no line to spare for it.
     expect(text).toContain(`in code. ${test.headline ? "Levered IRR on the OM's figures" : ""}`);
-    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
+    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with stretched and unsupported rows at the evidence; the report splits the gap.`);
     // The insurance row: the OM's premium, the seller's T-12 premium, the
     // gap in dollars, and the IRR — the engine at the OM's premium against
     // the engine at the T-12's, one input apart, the engine's move spelled,
@@ -1650,7 +1650,7 @@ describe("the memo leads with the stress test", () => {
     expect(pdfPageCount(pdf)).toBe(1);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with the evidence; the report splits the gap by assumption.`);
+    expect(text).toContain(`Levered IRR on the OM's figures ${test.headline!.omIrrPct!.toFixed(1)}% to ${test.headline!.evidenceIrrPct!.toFixed(1)}% with stretched and unsupported rows at the evidence; the report splits the gap.`);
     // The lead row, unsupported first, is on the page.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (OM p. 25) · gap $60");
     expect(text).toContain("BUY BOX");
@@ -1688,7 +1688,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest?.count).toBe("none past the evidence");
     expect(data.dealKillers.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text).toContain("11 assumptions: the OM states 9 and leaves 2 out — 11 tested (11 hold).");
+    expect(text).toContain("11 assumptions read, 9 stated in the OM — 11 tested (11 hold).");
     expect(text).not.toContain("Ticks:");
   }, 60000);
 

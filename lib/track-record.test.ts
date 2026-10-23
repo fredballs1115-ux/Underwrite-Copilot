@@ -1084,9 +1084,9 @@ describe("what can score a row — the words held to the scorer, key by key (the
     // SCORED_BY names the three, NOT_YET_SCORABLE every row nothing can score.
     // The vacancy row here counts doors: the rent roll scored it, never the T-12.
     expect(r.rows.find((x) => x.key === "vacancy")!.later?.source).toBe("rent_roll");
-    expect(SCORED_BY).toContain("a vacancy by a rent roll (doors or area) or T-12 (dollars), dated after the verdict, unless the market decided it");
+    expect(SCORED_BY).toContain("a vacancy by a rent roll (doors or area) or T-12 (dollars) dated after the verdict, not one in doors the market decided");
     expect(SCORED_BY).toContain("the NOI by a T-12, neither on a plan deal");
-    expect(CARD_SCOPE).toContain("a rent roll for a vacancy counted by doors, a T-12 for an economic vacancy, unless the market's figure decided it, or the NOI, neither on a plan deal");
+    expect(CARD_SCOPE).toContain("a rent roll for a vacancy counted by doors, unless the market's figure decided it, a T-12 for an economic vacancy, even one held to the market's doors as a floor, or the NOI, neither on a plan deal");
     // No surface says a T-12 scores a vacancy counted by doors.
     for (const s of [CARD_SCOPE, SCORED_BY]) expect(s).not.toMatch(/a vacancy by a rent roll or (?:a )?T-12/);
     expect(SCORED_BY).toContain("the price by a reported trade");

@@ -2973,12 +2973,12 @@ describe("the report's stress-test page", () => {
     expect(`${h.lead.slice(0, -1)}: ${headlineSplit(test)}, ${lower(h.splitNote)}${h.after.map((t) => ` ${t}`).join("")}`).toBe(headlineSentence(test));
     const flat = (t: string) => pdfSafe(t).replace(/\s+/g, " ");
     expect(page).toContain(flat(h.lead));
-    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple [^)]+\)\.$/);
+    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with stretched and unsupported rows at the evidence \(equity multiple [^)]+\)\.$/);
     expect(page).toContain(flat(h.splitNote));
     for (const p of h.parts) expect(page).toContain(flat(`${p.name} ${p.pts}${p.note ? ` ${p.note}` : ""}`));
     for (const t of h.after) expect(page).toContain(flat(t));
     // No longer one bold paragraph: the split is not printed inline.
-    expect(page).not.toContain(flat(`with the evidence: ${headlineSplit(test)}`));
+    expect(page).not.toContain(flat(`with stretched and unsupported rows at the evidence: ${headlineSplit(test)}`));
     // The sample is read as stabilized: its re-runs say so, as the deal
     // page says it, under the read line and before the headline.
     expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
@@ -3016,7 +3016,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("Decides: Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
     expect(page).toContain("Beside it, not deciding: The deal's document — The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic");
     expect(page).toContain("today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close (the deal's T-12)");
-    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); doors, not dollars: shown beside the OM's economic figure and never deciding it (the deal's rent roll)");
+    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); the building today, which a lease-up starts from: shown beside the stabilized assumption and never deciding it (the deal's rent roll)");
     expect(page).toContain("Gap: The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side.");
     expect(page).toContain("the deal's T-12 is the building today, never the test of a stabilized figure");
     // A row that holds draws no re-run.

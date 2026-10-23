@@ -561,7 +561,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("11 assumptions: the OM states 9 and leaves 2 out — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
+    expect(brief).toContain("11 assumptions read, 9 stated in the OM — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
@@ -594,7 +594,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // The headline, one line under the read line, in the words the memo and
     // the report read, and the instruction that its runs are the engine's.
     expect(brief).toContain(`5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
-    expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence/);
+    expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with stretched and unsupported rows at the evidence/);
     expect(brief).toContain("The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
     // None handed, no section.

@@ -78,6 +78,7 @@ import {
   vacancyEconomicStated,
   vacancyDecidedBy,
   stressHeadline,
+  T12_TODAY_BESIDE,
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
@@ -87,7 +88,7 @@ import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
 import { stressSection } from "./anthropic/verdict";
 import { CANNOT, VERDICT_WORDS } from "./how-we-test";
-import { SAMPLE_PLAN_NOTE } from "./stress-test-words";
+import { SAMPLE_PLAN_NOTE, basisMoveWords } from "./stress-test-words";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StressTestPanel } from "@/app/stress-test-panel";
@@ -840,7 +841,7 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
   };
   /** What the gap says of the T-12 beside a figure counted by doors. */
   const T12_BESIDE =
-    " The deal's T-12 ran 9.1% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.";
+    " The deal's T-12 ran 9.1% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent: the building as it has run, never the test of a stabilized figure, and dollars, not doors, so it is shown beside the stabilized assumption and never decides it.";
 
   it("holds it to the metro's survey inside its margin, the rent roll beside it as today's gap and the T-12's dollars beside it as dollars", () => {
     const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), {}, { roll: true })), "vacancy");
@@ -856,11 +857,11 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
       ["rule_of_thumb", "Multifamily vacancy, a rule of thumb"],
     ]);
     // The rent roll counts doors, as the OM's figure does: today's gap. The
-    // T-12 counts dollars: said so, never a gap to close.
+    // T-12 is the building as it has run, and dollars too: said so, never a
+    // gap to close — the reason it never decides a stabilized figure is its
+    // date first, not only its measure.
     expect(v.evidence[2].text).toBe("9.2% vacant (by count, 139 of 153 units occupied, as of Jul 1, 2026); today's, 3.2 points over the stabilized assumption — the gap a lease-up has to close");
-    expect(v.evidence[3].text).toBe(
-      "9.1% economic ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it",
-    );
+    expect(v.evidence[3].text).toBe(`9.1% economic ($400k of $4.4M gross potential rent: the rent line, which the stated EGI nets the vacancy from; TTM to Jun 30, 2026); ${T12_TODAY_BESIDE}`);
     // 6.0% against 6.2% ±2.2: inside the margin, so it holds.
     expect(v.gap).toEqual({
       value: 0.2,
@@ -939,17 +940,33 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(measureOf("Vacancy")).toBe("physical");
     expect(measureOf("Pro forma vacant units")).toBe("physical");
     expect(measureOf("Physical vacancy (pro forma)")).toBe("physical");
+    // "Pro-forma" hyphenated, or run together, is the pro forma's own line,
+    // and so is a numbered year written with a hyphen.
+    expect(measureOf("Pro-forma vacancy")).toBe("economic");
+    expect(measureOf("Proforma vacancy")).toBe("economic");
+    expect(measureOf("Year-1 vacancy")).toBe("economic");
     const withRead = rowOf(buildStressTest(argsFor(pf, {}, { roll: true })), "vacancy");
     expect(withRead.measure).toBe("economic");
     expect(withRead.evidence[0]).toMatchObject({ kind: "published", label: METRO_VACANCY_LABEL });
     // 6.0% against the 6.2% ±2.2 floor: inside its margin, it holds.
     expect(withRead.verdict).toBe("holds");
     expect(withRead.gap!.text).toBe(
-      `The OM's 6.0% is a stabilized assumption. The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, and ${ECONOMIC_FLOOR}: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. Today the deal's T-12 ran 9.1% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.1, 6)} The deal's rent roll counts doors today, 9.2% vacant, so it is shown beside the OM's economic figure and never decides it.`,
+      `The OM's 6.0% is a stabilized assumption. The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, and ${ECONOMIC_FLOOR}: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. Today the deal's T-12 ran 9.1% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.1, 6)} The deal's rent roll runs 9.2% vacant by its doors: the building today, which a lease-up starts from, so it is shown beside the stabilized assumption and never decides it.`,
     );
-    // The T-12 is today's gap, the rent roll's doors beside it.
+    // The T-12 is today's gap, the rent roll beside it as the building
+    // today: on a stabilized row its date, not its doors, is why it never
+    // decides (the market's doors decide).
     expect(withRead.evidence.find((e) => e.publisher === "the deal's T-12")!.text).toMatch(/; today's, 3\.1 points over the stabilized assumption — the gap a lease-up has to close$/);
-    expect(withRead.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/doors, not dollars: shown beside the OM's economic figure and never deciding it$/);
+    expect(withRead.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/; the building today, which a lease-up starts from: shown beside the stabilized assumption and never deciding it$/);
+    expect(withRead.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).not.toContain("doors, not dollars");
+    // With the market read failed, the class's norm decides, and the gap
+    // still says why the OM's figure is economic before it says the norm
+    // stands where the market's floor would have.
+    const failed = rowOf(buildStressTest(argsFor(pf, { modelVsMarket: null }, { roll: true })), "vacancy");
+    expect(failed.evidence[failed.decidedBy!].kind).toBe("rule_of_thumb");
+    expect(failed.gap!.text).toContain(
+      "The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, and no fresh published vacancy figure for this market could be held to the stabilized assumption as a floor, so the class's norm decides; ",
+    );
     // Under the floor past its margin is no economic figure a building runs at.
     const under = rowOf(buildStressTest(argsFor(withVacancy("3.0%", "stabilized", "Vacancy (pro forma)"))), "vacancy");
     expect(under.verdict).toBe("stretched");
@@ -1192,9 +1209,25 @@ describe("the exit cap row", () => {
     expect(flat.verdict).toBe("holds");
     expect(flat.gap!.text).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
     // An exit, a cap on cost or a later year's cap is no pro forma cap.
-    for (const label of ["Pro forma exit cap", "Stabilized yield on cost", "Pro forma cap rate (Year 3)", "Stabilized cap on cost"]) {
+    for (const label of [
+      "Pro forma exit cap",
+      "Stabilized yield on cost",
+      "Pro forma cap rate (Year 3)",
+      "Stabilized cap on cost",
+      // A later year named any way: a hyphen, two digits, "Yr.", a calendar year.
+      "Year-3 Pro Forma Cap Rate",
+      "Pro Forma Cap Rate (Year 10)",
+      "Pro forma cap rate (Yr. 2)",
+      "Stabilized Cap Rate (2029)",
+    ]) {
       const r = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "6.50%", label) })), "exit_cap");
       expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(false);
+    }
+    // "Pro-forma", hyphenated or run together, is a pro forma label too, and
+    // a first year's cap is the pro forma's own.
+    for (const label of ["Pro-forma cap rate", "Proforma cap rate", "Year 1 pro forma cap rate"]) {
+      const r = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%", label) })), "exit_cap");
+      expect(r.evidence[r.decidedBy!].label, label).toBe("The OM's pro forma cap");
     }
     // The screening model keeps its exit reader's own pieces: the going-in cap
     // (lib/model-evidence reads them with `proForma: false`).
@@ -1346,9 +1379,9 @@ describe("a value-add plan deal", () => {
     expect(h.parts.reduce((s, x) => s + x.pts, 0)).toBeCloseTo(h.evidenceYocPct! - h.omYocPct!, 9);
     // The taxes are past their evidence and carry no re-run: left out, why said.
     expect(h.omitted.map((o) => o.key)).toContain("taxes");
-    expect(headlineLine(test, "→")).toBe("Yield on cost on the OM's figures 6.05% → 5.85% with the evidence");
+    expect(headlineLine(test, "→")).toBe("Yield on cost on the OM's figures 6.05% → 5.85% with stretched and unsupported rows at the evidence");
     const sentence = headlineSentence(test)!;
-    expect(sentence).toMatch(/^Yield on cost on the OM's figures 6\.05% to 5\.85% with the evidence: the renovation premium −0\.20 pts, the one assumption past its evidence that the plan's yield is struck on\./);
+    expect(sentence).toMatch(/^Yield on cost on the OM's figures 6\.05% to 5\.85% with stretched and unsupported rows at the evidence: the renovation premium −0\.20 pts, the one assumption past its evidence that the plan's yield is struck on\./);
     expect(sentence).toContain("Left out: the loan rate (the yield on cost is struck before debt); rent growth (a growth rate has no yield-on-cost meaning); ");
     expect(sentence).toContain("the taxes (the OM states no tax bill as its pro forma's line");
     expect(sentence).not.toMatch(/levered/i);
@@ -1444,9 +1477,10 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     expect(v.verdict).toBe("holds");
     expect(v.impact).toMatchObject({ measure: "yield_on_cost", input: "stabilizedNoi" });
     expect(v.noRerun).toBeUndefined();
-    // The T-12's 9.1% is dollars, not doors: shown beside the stabilized
-    // figure as that, never as a gap the plan closes in doors.
-    expect(v.evidence.find((e) => e.publisher === "the deal's T-12")!.text).toMatch(/dollars, not doors: shown beside the OM's figure, which counts doors, and never deciding it$/);
+    // The T-12's 9.1% is the building as it has run, in dollars, not doors:
+    // shown beside the stabilized figure as that, never as a gap the plan
+    // closes in doors.
+    expect(v.evidence.find((e) => e.publisher === "the deal's T-12")!.text.endsWith(`; ${T12_TODAY_BESIDE}`)).toBe(true);
     expect(PLAN_VACANCY_DOCUMENT).toBe("Today's vacancy is the gap the plan closes, not evidence of the stabilized figure, so no yield on cost is re-run on it.");
     // Taxes: the rate is today's bill over today's assessment, $380k / $30M,
     // and its reset on the price, $532k, is set against the pro forma's line
@@ -1521,7 +1555,7 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
     );
     // The memo's one line carries the OM's own stated figure too, from the
     // same reader.
-    expect(headlineShort(test)).toContain("with the evidence (the OM states 7.10%, p. 24");
+    expect(headlineShort(test)).toContain("with stretched and unsupported rows at the evidence (the OM states 7.10%, p. 24");
     expect(headlineSentence(test)).toContain("-point gap averaged over every order the swaps could be made in.");
   });
 
@@ -1595,7 +1629,7 @@ describe("a value-add's yield on cost, re-run row by row and split by Shapley va
   it("draws the panel in yield-on-cost terms, its unit said", () => {
     const html = renderToStaticMarkup(createElement(StressTestPanel, { test }));
     expect(html).toContain('data-qa="stress-headline" data-measure="yield_on_cost"');
-    expect(html).toMatch(/Yield on cost on the OM&#x27;s figures 6\.\d\d% → \d\.\d\d% with the evidence/);
+    expect(html).toMatch(/Yield on cost on the OM&#x27;s figures 6\.\d\d% → \d\.\d\d% with stretched and unsupported rows at the evidence/);
     expect(html).toContain("The OM&#x27;s stated yield on cost");
     expect(html).toContain('data-measure="yield_on_cost"');
     expect(html).toMatch(/Yield on cost \d\.\d\d% → \d\.\d\d%/);
@@ -2439,7 +2473,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (less comparable, in a way that flatters the ask): Park Place $261k/unit; left out, graded stretched by the comps step (not comparable to the subject): Vue $298k/unit",
+      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
@@ -2451,7 +2485,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (not comparable to the subject): Vue $298k/unit",
+      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
@@ -3063,7 +3097,7 @@ describe("the headline", () => {
     expect(withPremium.omitted.map((o) => o.key)).toContain("renovation_premium");
     expect(HEADLINE_METHOD.limits[0]).toMatch(/renovation premium/);
     const sentence = headlineSentence(test)!;
-    expect(sentence).toMatch(/^Levered IRR on the OM's figures [-−]?\d+\.\d% to [-−]?\d+\.\d% with the evidence \(equity multiple \d\.\d\dx to \d\.\d\dx\): /);
+    expect(sentence).toMatch(/^Levered IRR on the OM's figures [-−]?\d+\.\d% to [-−]?\d+\.\d% with stretched and unsupported rows at the evidence \(equity multiple \d\.\d\dx to \d\.\d\dx\): /);
     expect(sentence).toContain("Left out: the NOI (");
   });
 
@@ -3132,16 +3166,16 @@ describe("the headline", () => {
 
   it("says a case whose IRR does not solve in a clause of its own, never as a figure (audit M1)", () => {
     const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
-    expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
-    expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\.( This headline does not test [^.]*\.)? Left out: /);
-    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the screening model as it runs, its own figure on every input: ${h.modelIrrPct!.toFixed(1)}%).`);
+    expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with stretched and unsupported rows at the evidence it does not solve`);
+    expect(headlineSentence(evNull)).toMatch(/; with stretched and unsupported rows at the evidence it does not solve, so the gap is not split\.( This headline does not test [^.]*\.)? Left out: /);
+    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with stretched and unsupported rows at the evidence it does not solve (the screening model as it runs, its own figure on every input: ${h.modelIrrPct!.toFixed(1)}%).`);
     // The one-page memo's line leaves the model to its legend.
-    expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
+    expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with stretched and unsupported rows at the evidence it does not solve.`);
     const omNull = { ...test, headline: { ...h, omIrrPct: null, omMultiple: null, parts: [], unsolved: 0 } };
-    expect(headlineLine(omNull)).toBe(`The levered IRR does not solve on the OM's figures; with the evidence it is ${h.evidenceIrrPct!.toFixed(1).replace("-", "\u2212")}%`);
+    expect(headlineLine(omNull)).toBe(`The levered IRR does not solve on the OM's figures; with stretched and unsupported rows at the evidence it is ${h.evidenceIrrPct!.toFixed(1).replace("-", "\u2212")}%`);
     const both = { ...test, headline: { ...h, omIrrPct: null, evidenceIrrPct: null, parts: [], unsolved: 0 } };
-    expect(headlineLine(both)).toBe("The levered IRR does not solve on the OM's figures or with the evidence");
-    for (const t of [evNull, omNull, both]) expect(headlineSentence(t)).not.toMatch(/does not solve with the evidence|to does not solve/);
+    expect(headlineLine(both)).toBe("The levered IRR does not solve on the OM's figures or with stretched and unsupported rows at the evidence");
+    for (const t of [evNull, omNull, both]) expect(headlineSentence(t)).not.toMatch(/does not solve with stretched and unsupported rows at the evidence|to does not solve/);
   });
 
   it("with only a row the headline leaves out past its evidence, says nothing past its evidence is swapped, never that nothing is past it (audit M3)", () => {
@@ -3172,8 +3206,8 @@ describe("the headline", () => {
     expect(headlineSentence(test)).toContain(`the loan rate ${ptsText(shownDebt.shown)} (against a screening default)`);
     for (const p of h.parts.filter((x) => x.key !== "debt")) expect(p.ruleOfThumb, p.key).toBeUndefined();
     // The memo's one line says so too: it carries the evidence's case whole.
-    expect(headlineShort(test)).toMatch(/ with the evidence \(the loan rate against a screening default; the screening model as it runs, its own figure on every input: [\d.]+%\); the report splits the gap by assumption\.$/);
-    expect(headlineShort(test, false)).toMatch(/ with the evidence \(the loan rate against a screening default\); the report splits/);
+    expect(headlineShort(test)).toMatch(/ with stretched and unsupported rows at the evidence \(the loan rate against a screening default; the screening model as it runs, its own figure on every input: [\d.]+%\); the report splits the gap\.$/);
+    expect(headlineShort(test, false)).toMatch(/ with stretched and unsupported rows at the evidence \(the loan rate against a screening default\); the report splits/);
   });
 
   it("names in the method every assumption the OM's case can hold", () => {
@@ -3527,7 +3561,7 @@ describe("the taxes row is held to the seller's T-12 bill where no reset bill ca
     // The headline marks the part as a floor, and the NOI is left out for its
     // components, the taxes among them.
     const part = test.headline!.parts.find((p) => p.key === "taxes")!;
-    expect(part.conditional).toBe("at the seller's own T-12 bill, a working floor, not a new owner's bill");
+    expect(part.conditional).toBe("at the seller's actual T-12 bill, not a new owner's bill");
     expect(test.headline!.omitted.find((o) => o.key === "noi")?.why).toBe(HEADLINE_NOI_LEFT_OUT);
     if (test.headline!.noiRest) expect(test.headline!.noiRest.components).toContain("taxes");
   });
@@ -3805,7 +3839,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     const decider = r.evidence[r.decidedBy!];
     expect(decider).toMatchObject({ kind: "om_internal", label: "The memorandum's lease comps", value: 2_250, page: 16 });
     expect(decider.text).toBe(
-      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (not comparable to the subject): The Vue $2,900/mo",
+      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (not a clean comparison): The Vue $2,900/mo",
     );
     // 4.4% over the median: inside the comps' 5%, a hold.
     expect(r.gap).toMatchObject({ value: 4.4, unit: "pct" });
@@ -4046,5 +4080,21 @@ describe("a term sheet on file decides the debt row (the owner's decision of 202
     for (const f of ["app/(app)/deals/[id]/page.tsx", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts", "app/api/deals/[id]/underwrite.xlsx/route.ts", "lib/anthropic/pipeline.ts"]) {
       expect(readFileSync(f, "utf8"), f).toMatch(/loanQuote: /);
     }
+  });
+});
+
+describe("a price row's cost is the difference of the figures printed beside it", () => {
+  it("rounds each figure first, so the points add up on the page", () => {
+    const impact = { input: "purchasePrice", evidenceIndex: 0, omValue: 68e6, altValue: 60e6, baseIrrPct: 9.25, altIrrPct: 13.64, baseMultiple: null, altMultiple: null, note: "" } as const;
+    // 13.64 − 9.25 is 4.39, which rounds to 4.4; the page prints 9.3% and
+    // 13.6%, 4.3 apart.
+    expect(basisMoveWords({ ...impact })).toBe("The ask costs 4.3 pts of levered IRR: 9.3% at it, 13.6% at the evidence's price");
+    // A yield on cost at two places, the same way: 6.104 and 6.996 print
+    // 6.10% and 7.00%, 0.90 apart (the unrounded 0.892 would print 0.89).
+    expect(
+      basisMoveWords({ ...impact, measure: "yield_on_cost", baseIrrPct: null, altIrrPct: null, baseYocPct: 6.104, altYocPct: 6.996 }),
+    ).toBe("The ask costs 0.90 pts of yield on cost: 6.10% at it, 7.00% at the evidence's price");
+    // Two figures that print alike cost nothing, said as the two figures.
+    expect(basisMoveWords({ ...impact, baseIrrPct: 9.26, altIrrPct: 9.34 })).toBe("Levered IRR 9.3% at the ask, 9.3% at the evidence's price");
   });
 });
