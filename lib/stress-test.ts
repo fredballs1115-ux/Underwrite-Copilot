@@ -3031,8 +3031,8 @@ function taxesRow(ctx: Ctx): StressRow | null {
 }
 
 /** What the T-12's tax line is where it decides the row: the seller's own
- *  bill, a working floor and a rule of thumb, never the bill a new owner pays. */
-export const TAX_T12_FLOOR = "the seller's own bill, a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays";
+ *  bill, the building's own history, never the bill a new owner pays. */
+export const TAX_T12_FLOOR = "the seller's own bill, the building's own history, not the bill a new owner pays";
 
 /** What a re-run at the T-12's tax bill is, said wherever its part of the
  *  headline is (`StressHeadlinePart.conditional`). */
@@ -3042,9 +3042,8 @@ export const TAX_T12_FLOOR_CONDITION = "at the seller's own T-12 bill, a working
  * The taxes row where the seller's T-12 bill decides it: no reset bill can be
  * struck (no assessed value stated) and no abatement ends inside the hold, and
  * the OM's line sits under the T-12's past SAME_SHARE. The OM against its own
- * building's history, read stretched at most: the T-12's bill is a floor (a
- * sale rarely lowers a bill, and a reset would raise it), never the bill a new
- * owner pays. The return is re-run at it, the expense line as `expenseImpact`
+ * building's history, read stretched at most: the T-12's bill is the
+ * building's own history, never the bill a new owner pays. The return is re-run at it, the expense line as `expenseImpact`
  * sets it — swapped, never added to a line that already carries it; a plan
  * deal's yield on cost only where the OM states its bill as its pro forma's
  * line.
@@ -3054,7 +3053,7 @@ function t12TaxRow(ctx: Ctx, omSays: StressRow["omSays"], evidence: StressEviden
   const gap: StressRow["gap"] = {
     value: Math.round(floor - bill),
     unit: "usd",
-    text: `The OM's ${money(bill)} tax line is ${money(floor - bill)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. ${noAssessed ? "With no assessed value stated, no reset bill is struck" : "No reset bill is struck"}; the T-12's is a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays, so the row reads stretched at most.`,
+    text: `The OM's ${money(bill)} tax line is ${money(floor - bill)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. ${noAssessed ? "With no assessed value stated, no reset bill is struck" : "No reset bill is struck"}; the T-12's is the building's own history, not the bill a new owner pays, so the row reads stretched at most.`,
   };
   const words = { what: "the tax line", om: money(bill), alt: `the seller's ${money(floor)} T-12 bill, a working floor and a rule of thumb, not a new owner's bill`, evidence: "" };
   const impact = ctx.derived && irrRuns(ctx) ? expenseImpact(ctx, bill, floor, floor, "tax line", evidenceIndex, words) : null;

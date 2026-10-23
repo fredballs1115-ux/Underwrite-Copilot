@@ -3514,7 +3514,7 @@ describe("the taxes row is held to the seller's T-12 bill where no reset bill ca
     const t = rowOf(test, "taxes");
     const decider = t.evidence[t.decidedBy!];
     expect(decider).toMatchObject({ kind: "document", label: "The deal's T-12 tax line", value: 380_000 });
-    expect(decider.text).toContain("; the seller's own bill, a working floor and a rule of thumb (a sale rarely lowers the bill), not the bill a new owner pays");
+    expect(decider.text).toContain("; the seller's own bill, the building's own history, not the bill a new owner pays");
     expect(t.verdict).toBe("stretched");
     expect(t.gap).toMatchObject({ value: 80_000, unit: "usd" });
     expect(t.gap!.text).toContain("With no assessed value stated, no reset bill is struck");

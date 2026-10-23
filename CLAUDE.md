@@ -157,6 +157,25 @@ tested and whether that is right. So:
   built with no quote, and the snapshot kept with the verdict is that test.
   /how-we-test lists what the test does not check yet (`lib/not-tested.ts`,
   held to the code by its test).
+- **An investor's review, answered** (2026-10-23, under the owner's "if it
+  was questioned keep working so it won't be"): a STABILIZED vacancy is
+  decided by the market's published figure, then the class norm, never by
+  today's rent roll or T-12 (drawn beside as today's gap); a vacancy in
+  dollars (`measureOf`: a pro forma income line, or one naming credit or
+  loss) meets the market's doors as a floor, since economic is never under
+  physical; an in-place one stays measure-matched. The exit cap is held to
+  the higher of the going-in cap and the OM's own pro forma cap
+  (`omProFormaCap`), no expansion added and said. Growth decides on the
+  cautious of the trailing year and the stored longer average
+  (`cautiousGrowth`). The price row decides only on a median of three or
+  more trades (`basisFloorWhy`), comps graded by comparability, never
+  direction (the sample's Parkside is clean, so its price row is
+  unchecked). And the words: the headline's cases are "At the OM's
+  figures" / "Stretched and unsupported rows at the evidence" beside the
+  screening model's own IRR (`HEADLINE_MODEL_WHY`); a seller's T-12 bill or
+  premium is the building's own history, never a rule of thumb; a tax reset
+  is "A scenario" (`RESET_BILL_LABEL`); the memo leads by severity then
+  Shapley share; transfer taxes are on the not-tested list.
 
 ## Architecture
 

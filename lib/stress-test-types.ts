@@ -693,7 +693,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     limits: [
       "No assessment ratio or millage is assumed: with no bill and assessed value stated, the line says the rate is the assessor's to give.",
       "A bill over its assessed value past 5% is read as a misread or an assessment at a fraction of value, and no reset bill is struck on it.",
-      "The seller's T-12 bill is history, not a new owner's bill: a sale rarely lowers a bill, so a line under it reads stretched at most, and on a development or a conversion it decides nothing.",
+      "The seller's T-12 bill is the building's own history, not a new owner's bill, so a line under it reads stretched at most, and on a development or a conversion it decides nothing.",
     ],
   },
   {
