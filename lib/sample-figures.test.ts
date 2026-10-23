@@ -114,11 +114,12 @@ describe("the sample's stress test", () => {
     const { derived } = sampleModelReads({ today: "2026-10-20", reads: null });
     expect(ins.altIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
     expect(ins.baseIrrPct!).toBeGreaterThan(ins.altIrrPct!);
-    expect(ins.note).toContain("a working floor and a rule of thumb, not a quote");
+    expect(ins.note).toContain("the seller's actual $385k T-12 premium (the building's own history, not a new owner's quote)");
+    expect(ins.note).not.toMatch(/rule of thumb|rarely/);
     // The premium is in none of the model's inputs: a gap, no re-run.
     expect(row("renovation_premium").impact).toBeNull();
     expect(row("renovation_premium").gap?.text).toBe(
-      "The projected $200 is $60 a month (42.9%) over the achieved $140. An $18,000 door needs $82 a month to pay for itself at the model's 5.45% exit cap: the break-even, what the program needs, not evidence of what a door earns.",
+      "The projected $200 is $60 a month (42.9%) over the achieved $140. An $18,000 door needs $82 a month to pay for itself at the model's 5.45% exit cap: the break-even, what the program needs, not evidence of what a door earns. At the achieved $140 the program still pays for itself: it clears the $82 break-even, so the gap is in how much it earns, not whether.",
     );
     // The break-even is said beside the row, never filed as its evidence.
     expect(row("renovation_premium").evidence.map((e) => e.kind)).not.toContain("rule_of_thumb");
@@ -206,6 +207,15 @@ describe("the sample's documents tie to one another", () => {
     const ltv = SAMPLE_DEAL.model.metrics.find((m) => m.key === "ltv")!;
     expect(ltv.sources).toEqual([{ doc: "OM", value: metric("Loan-to-value").value, locator: "p.44", basis: "pro forma" }]);
     expect(JSON.stringify(SAMPLE_DEAL.model.metrics)).not.toMatch(/term sheet/i);
+    // The rate's note and the verdict's debt read say one schedule, the
+    // model's own: 30 years amortizing from the first month, no IO.
+    const { inputs } = sampleDerivedInputs();
+    expect(inputs.ioMonths).toBe(0);
+    expect(inputs.amortMonths).toBe(360);
+    expect(rate.rationale).toContain("30-yr amortizing from the first month, no interest-only period");
+    const debt = SAMPLE_DEAL.verdict.screen!.dealKillers.find((p) => p.lever === "debt")!;
+    expect(debt.read).toContain("30-yr amortizing");
+    expect(JSON.stringify(SAMPLE_DEAL)).not.toMatch(/after one IO year|one year of IO/i);
   });
 
   it("says the comps, the vacancy and the exit as the stress test reads them", () => {

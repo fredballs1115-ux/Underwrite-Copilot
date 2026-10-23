@@ -373,11 +373,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, each headline assumption is set against a dated published figure, the deal's own documents or a rule of thumb named as one, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, each headline assumption is set against a dated published figure, the deal's own documents or a rule of thumb named as one where one is on file — an assumption with nothing on file to set it against is shown as unchecked, never as passed — and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
   },
   {
     q: "Does the test make me more accurate?",
-    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether each of its rows was right is scored only when a later document, your decision or a trade arrives, and the track record counts exactly those: it scores the test's rows, never your own calls.",
+    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day, names each one it could not check, and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether each of its rows was right is scored only when a later document, your decision or a trade arrives, and the track record counts exactly those: it scores the test's rows, never your own calls.",
   },
   {
     q: "Are my documents private?",

@@ -29,6 +29,18 @@ import {
   type StressVerdict,
 } from "@/lib/stress-test-types";
 
+/** A piece of evidence that is a scenario struck on the OM's own figures
+ *  (the tax bill at today's rate on the price, if the sale resets the
+ *  assessment) rather than the OM contradicting itself: its label says so
+ *  ("A scenario: …", lib/stress-deciders `RESET_BILL_LABEL`), and every
+ *  surface marks it as one in its kind's place. */
+export const SCENARIO_KIND_WORD = "A scenario on the OM's figures";
+export const isScenarioPiece = (e: Pick<StressEvidence, "kind" | "label">): boolean => e.kind === "om_internal" && /^A scenario:/.test(e.label);
+/** The kind's word for one piece, from a surface's own table of words. */
+export function evidenceKindWord(e: Pick<StressEvidence, "kind" | "label">, words: Record<StressEvidence["kind"], string>): string {
+  return isScenarioPiece(e) ? SCENARIO_KIND_WORD : words[e.kind];
+}
+
 /** The verdict words, as every document prints them. */
 export const VERDICT_WORD: Record<StressVerdict, string> = {
   holds: "holds",
@@ -49,16 +61,30 @@ export function moveSize(row: StressRow): number | null {
 }
 
 /** The rows a document leads with: unsupported first, then stretched;
- *  within each, the larger move of the return first, a row with no re-run
- *  after every row with one, and the test's own order between equals; at
- *  most `max`. */
+ *  within each, by the row's share of the headline's gap (its Shapley part,
+ *  in the measure's points) — the price row, which the headline leaves out
+ *  because both cases pay the ask, by its own re-run in the same points —
+ *  then a row the headline leaves out for another reason by its own move,
+ *  then a row with no re-run, and the test's own order between equals; at
+ *  most `max`. Without a headline, by each row's own move. */
 export function leadRows(test: StressTest, max = 4): StressRow[] {
   const rank: Record<StressVerdict, number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+  const h = liveHeadline(test);
+  const share = new Map<StressKey, number>((h?.parts ?? []).map((p) => [p.key, Math.abs(p.pts)]));
+  // The tier a row is weighed in: 0 the headline's split (and the price row
+  // beside it), 1 a row the split leaves out with its own re-run, 2 none.
+  const weigh = (r: StressRow): { tier: number; size: number | null } => {
+    const own = moveSize(r);
+    if (h && share.has(r.key)) return { tier: 0, size: share.get(r.key)! };
+    if (h && r.key === "basis" && own != null) return { tier: 0, size: own };
+    if (!h) return { tier: own == null ? 2 : 0, size: own };
+    return { tier: own == null ? 2 : 1, size: own };
+  };
   const bySize = (a: number | null, b: number | null) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : b - a);
   return test.rows
     .filter((r) => r.verdict === "unsupported" || r.verdict === "stretched")
-    .map((r, i) => ({ r, i, size: moveSize(r) }))
-    .sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || bySize(a.size, b.size) || a.i - b.i)
+    .map((r, i) => ({ r, i, w: weigh(r) }))
+    .sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.w.tier - b.w.tier || bySize(a.w.size, b.w.size) || a.i - b.i)
     .slice(0, max)
     .map((x) => x.r);
 }
@@ -70,11 +96,16 @@ export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
   return counts;
 }
 
+/** Whether the memorandum states the row's assumption: a figure on its OM
+ *  side, or a challenge the challenger read out of it ("other"). */
+export const omStatesIt = (row: StressRow): boolean => row.key === "other" || row.omSays.value != null;
+
 /**
- * The read line over the rows: "9 of the memorandum's assumptions read in
- * code — 4 tested (1 unsupported, 2 stretched, 1 holds), 5 unchecked; the
- * levered return re-run with one input swapped for the evidence's." An
- * unchecked row was read and not tested, so it is never counted among the
+ * The read line over the rows: "12 assumptions: the OM states 9 and leaves
+ * 3 out — 7 tested (2 unsupported, 3 stretched, 2 hold), 5 unchecked; the
+ * levered return re-run with one input swapped for the evidence's, in
+ * code." The counts of what the OM states and leaves out are read off the
+ * rows (`omStatesIt`). An unchecked row was read and not tested, so it is never counted among the
  * tested. Where no return was re-run, why; where nothing is withheld and no
  * row draws a re-run, the counts alone, never a re-run the rows do not make.
  */
@@ -88,10 +119,17 @@ export function stressReadLine(test: StressTest): string {
     c.holds ? `${c.holds} ${c.holds === 1 ? "holds" : "hold"}` : "",
   ].filter(Boolean);
   const testedPart = tested > 0 ? `${tested} tested (${parts.join(", ")})` : "none tested";
+  // What the memorandum states and what it leaves out, counted off the rows:
+  // a row whose OM side is no figure is an assumption the model still makes
+  // (its own figure, said on the row), never one the OM stated.
+  const stated = test.rows.filter(omStatesIt).length;
+  const unstated = n - stated;
+  const statedPart =
+    unstated === 0 ? (n === 1 ? "the OM states it" : `the OM states all ${n}`) : stated === 0 ? "the OM states none" : `the OM states ${stated} and leaves ${unstated} out`;
   const head =
     n === 0
       ? "No assumption of the memorandum's could be tested in code."
-      : `${n} of the memorandum's assumptions read in code — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
+      : `${n} assumption${n === 1 ? "" : "s"}: ${statedPart} — ${testedPart}${c.unchecked ? `, ${c.unchecked} unchecked` : ""}`;
   // The withheld reason is a whole sentence that already says no return is
   // re-run (lib/stress-test), printed as it stands. The re-run clause is
   // said only where a row draws one; with none, the line ends on its counts.
@@ -465,11 +503,41 @@ export function moveShort(impact: StressImpact | null): string {
   return `IRR ${irrText(impact.baseIrrPct)} to ${irrText(impact.altIrrPct)}`;
 }
 
+/** Whether a row's re-run swaps the price (the basis row): its evidence's
+ *  run is what a lower price would earn, never good news about the deal,
+ *  so it is said as what the ask costs and never drawn in the pass tone. */
+export const isPriceImpact = (row: Pick<StressRow, "key" | "impact">): boolean => row.key === "basis" && row.impact != null;
+
+/** A price row's re-run in words, as what the ask costs the return: "The ask
+ *  costs 4.3 pts of levered IRR: 9.3% at it, 13.6% at the evidence's price";
+ *  where the evidence's price earns no more, the two figures alone. Null
+ *  where either run has no figure. */
+export function basisMoveWords(impact: StressImpact): string | null {
+  const yoc = isYieldImpact(impact);
+  const base = yoc ? (impact.baseYocPct ?? null) : impact.baseIrrPct;
+  const alt = yoc ? (impact.altYocPct ?? null) : impact.altIrrPct;
+  if (base == null || alt == null || !Number.isFinite(base) || !Number.isFinite(alt)) return null;
+  const show = (v: number) => (yoc ? pct2(v) : irrText(v));
+  const name = yoc ? "yield on cost" : "levered IRR";
+  const cost = alt - base;
+  const pts = yoc ? cost.toFixed(2) : cost.toFixed(1);
+  if (!(Number(pts) > 0)) return `${upperFirst(name)} ${show(base)} at the ask, ${show(alt)} at the evidence's price`;
+  return `The ask costs ${pts} pts of ${name}: ${show(base)} at it, ${show(alt)} at the evidence's price`;
+}
+
 /** What a row that holds prints in its re-run's place. Its re-run at the
  *  evidence's figure is the favourable side (an office rent growth holding at
  *  +7.2% re-runs to 24.7%), which no surface draws as a return; the impact
  *  stays on the row for the headline's cases. */
-export const HOLDS_NO_RERUN = "The OM's figure is within the evidence; no re-run.";
+export const HOLDS_NO_RERUN = "The OM's figure is within the row's margin of the evidence; no re-run.";
+/** The same, where the OM's figure sits on the cautious side of the
+ *  evidence (its signed gap at or under zero: the OM less optimistic). */
+export const HOLDS_CAUTIOUS_NO_RERUN = "The OM's figure is on the cautious side of the evidence; no re-run.";
+
+/** What a row that holds prints in its re-run's place, read off its own
+ *  signed gap: on the cautious side where the OM is no more optimistic than
+ *  the evidence, else within the row's margin. */
+export const holdsNoRerun = (row: Pick<StressRow, "gap">): string => (row.gap != null && row.gap.value < 0 ? HOLDS_CAUTIOUS_NO_RERUN : HOLDS_NO_RERUN);
 
 /** Whether a surface draws the row's re-run as a return: a row that holds
  *  draws none (`HOLDS_NO_RERUN`), an unchecked row carries none (nothing on
@@ -488,7 +556,7 @@ export const rerunsStand = (test: StressTest): boolean => !test.impactsWithheld 
  * return is re-run.
  */
 export function rowMoveText(test: StressTest, row: StressRow, lead?: string): string {
-  if (row.verdict === "holds") return HOLDS_NO_RERUN;
+  if (row.verdict === "holds") return holdsNoRerun(row);
   if (row.impact) return lead ? `${lead}. ${row.impact.note}` : row.impact.note;
   return noMoveWhy(test, row);
 }
@@ -531,7 +599,11 @@ export function tickPositions(row: StressRow): { om: number; evidence: number } 
  *  line to spare for it). */
 export function noMoveShort(row: StressRow): string {
   if (row.impact || row.verdict === "unchecked") return "";
-  return row.noRerunShort ?? "";
+  // A premium past the achieved one: whether the program still pays at the
+  // achieved premium, which the one-page memo would otherwise drop with the
+  // gap's sentence (`StressRow.paysAtAchieved`), after the short reason.
+  const pays = row.paysAtAchieved == null ? "" : row.paysAtAchieved ? "still pays at the achieved premium" : "does not pay at the achieved premium";
+  return [row.noRerunShort ?? "", pays].filter(Boolean).join("; ");
 }
 
 /** One row as a document prints it in short: the five cells and the ticks. */
@@ -575,7 +647,7 @@ const HEADLINE_NAME: Record<StressKey, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
-  market_rent: "the market rent",
+  market_rent: "the pro forma rent",
   expense_growth: "expense growth",
   taxes: "the taxes",
   insurance: "insurance",
@@ -872,15 +944,34 @@ export function headlineShort(test: StressTest, withModel = true): string | null
   return `${line}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}${h.parts.length > 0 ? "; the report splits the gap by assumption." : "."}`;
 }
 
+// ── The headline's three figures, each said as what it is ──────────────
+
+/** The headline's OM's case, as a bar or a cell labels it. */
+export const HEADLINE_OM_CASE_LABEL = "At the OM's figures";
+/** The headline's evidence's case: only the rows read stretched or
+ *  unsupported move, each to its evidence's figure. */
+export const HEADLINE_EVIDENCE_CASE_LABEL = "Stretched and unsupported rows at the evidence";
+/** The model as it runs, the third figure beside the two cases. */
+export const HEADLINE_MODEL_LABEL = "The screening model as it runs";
+/** Why the screening model's figure is neither case, short: the model runs
+ *  its own figure on every input, the cases put the re-run rows at the
+ *  OM's, and differ from each other only on the rows past their evidence. */
+export const HEADLINE_MODEL_WHY =
+  "The screening model runs its own figure on every input: published figures, the deal's documents, its defaults. Both cases put each re-run row at the OM's figure instead; the second then moves only the rows past their evidence.";
+
 // ── The model as it runs: the base every re-run starts from ─────────────
 
-/** "the screening model as it runs: 9.3%" — the derived model's own
+/** "the screening model as it runs, its own figure on every input: 9.3%" —
+ *  the derived model's own
  *  levered IRR, every input its own, as the headline carries it, named as
  *  the screening model (lib/screening-model-words) where a surface first
  *  meets it; "" on a headline struck before it was carried. */
 export function modelClause(h: StressHeadline): string {
   if (h.modelIrrPct === undefined) return "";
-  return h.modelIrrPct == null ? "the screening model as it runs: its levered IRR does not solve" : `the screening model as it runs: ${irrText(h.modelIrrPct)}`;
+  // Said as what it is, so the third figure never reads as an unexplained
+  // IRR beside the two cases: the model's own figure on every input.
+  const what = "the screening model as it runs, its own figure on every input";
+  return h.modelIrrPct == null ? `${what}: its levered IRR does not solve` : `${what}: ${irrText(h.modelIrrPct)}`;
 }
 
 /** The model's own levered IRR where the test's headline carries it: a
@@ -942,11 +1033,29 @@ const KEPT_LEAD: Record<StressKept["why"], string> = {
   same: "where the evidence is the OM's own figure",
 };
 
+/** What the kept rent line is struck at, read off the OM's case
+ *  (`StressKept.struckAt`): "the OM's vacancy, the OM's taxes and insurance,
+ *  and the model's other expenses at the T-12's expense ratio" — the model's
+ *  expense line is struck at the T-12's expense load where a T-12 set it,
+ *  else at the class's screening ratio, and the OM's case swaps into it only
+ *  the expense rows it carries. A headline struck before the field was
+ *  carried says it as it did. */
+export function struckAtWords(at: StressKept["struckAt"]): string {
+  if (!at) return "the OM's vacancy and expenses";
+  const vacancy = at.vacancy === "om" ? "the OM's vacancy" : "the model's vacancy";
+  const ratio = at.rest === "t12" ? " at the T-12's expense ratio" : at.rest === "default" ? " at the class's screening expense ratio" : "";
+  const name = (k: StressKey) => (k === "taxes" ? "taxes" : k === "insurance" ? "insurance" : k === "opex" ? "operating expenses" : headlineName(k));
+  const all = (["opex", "taxes", "insurance"] as const).every((k) => at.omExpenses.includes(k));
+  if (all) return `${vacancy} and the OM's expenses`;
+  if (at.omExpenses.length === 0) return `${vacancy} and the model's expenses${ratio}`;
+  return `${vacancy}, the OM's ${joinAnd(at.omExpenses.map(name))}, and the model's other expenses${ratio}`;
+}
+
 /** One kept figure with the model's beside it. The NOI row keeps the rent
  *  line that makes the OM's NOI, never the NOI itself, and is said so. */
 function keptText(test: StressTest, k: StressKept): string {
   if (k.key === "noi" && k.noi != null) {
-    return `the rent line ${money(k.om)} that makes the OM's ${money(k.noi)} NOI at the OM's vacancy and expenses (the model's rent line ${money(k.model)})`;
+    return `the rent line ${money(k.om)} that makes the OM's ${money(k.noi)} NOI at ${struckAtWords(k.struckAt)} (the model's rent line ${money(k.model)})`;
   }
   return `${headlineName(k.key)} ${figureText(k.key, k.om)} ${modelBeside(test, k.key, k.model)}`;
 }
@@ -959,8 +1068,9 @@ function keptText(test: StressTest, k: StressKept): string {
  * the screening model as it runs (9.3%), the evidence's case keeps the OM's figure
  * where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr
  * (the model's 3.0%/yr); and where a row is left out: the rent line $7.62M
- * that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the
- * model's rent line $7.15M). It runs the evidence's figure where the model
+ * that makes the OM's $3.88M NOI at the OM's vacancy, the OM's taxes and
+ * insurance, and the model's other expenses at the T-12's expense ratio
+ * (`struckAtWords`; the model's rent line $7.15M). It runs the evidence's figure where the model
  * runs another: the taxes $952k (the model's $728k)." Null where neither list
  * names a figure, or where the headline does not carry the model.
  */

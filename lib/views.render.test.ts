@@ -1526,7 +1526,7 @@ describe("ModelView — the sample model renders every panel", () => {
       // for rent growth, and its one lease comp, graded favorable, strikes no
       // median for the market rent. Its taxes, insurance and renovation
       // premium are tested.
-      expect(visibleText(html)).toContain("5 could not be checked: the basis, debt, rent growth, the market rent, the operating expenses");
+      expect(visibleText(html)).toContain("5 could not be checked: the basis, debt, rent growth, the pro forma rent, the operating expenses");
       expect(visibleText(html)).toContain("Read why (5)");
       // The insurance row is held to the seller's own T-12 premium, $385k,
       // which the pro forma's $310k sits under: stretched, re-run at it.

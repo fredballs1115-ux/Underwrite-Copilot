@@ -85,6 +85,11 @@ export const NOT_TESTED: readonly NotTested[] = [
     why: `The model runs its own ${HOLD_MONTHS / 12}-year hold and its default cost of sale, whatever the OM states; neither is a row.`,
   },
   {
+    id: "transfer_taxes",
+    title: "Transfer and recordation taxes",
+    why: "The screening model carries none on the purchase or in the cost of sale unless you enter them; no row tests them, and no jurisdiction's rate is stated.",
+  },
+  {
     id: "om_return",
     title: "The OM's own stated return",
     why: "The IRR or multiple a memorandum quotes is not re-run or set against the model's: every return the test prints is the engine's.",

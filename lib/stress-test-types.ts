@@ -211,6 +211,12 @@ export interface StressRow {
    *  month a unit, or "/SF", a square foot a year (the class's own). Absent
    *  elsewhere */
   yardstick?: "/mo" | "/SF";
+  /** on the renovation-premium row where the OM's projected premium is past
+   *  the achieved one: whether the program still pays for itself at the
+   *  achieved premium (it clears the break-even, a door's cost at the model's
+   *  exit cap). Display only — the verdict is struck as before. Absent
+   *  elsewhere */
+  paysAtAchieved?: boolean;
 }
 
 export interface StressTest {
@@ -266,9 +272,10 @@ export interface StressHeadlinePart {
   ruleOfThumb?: boolean;
   /** the condition the part's evidence rests on, where its figure holds only
    *  if something the screen cannot know comes true — the taxes' reset bill,
-   *  "if the sale resets the assessment" — or what it is where it is a floor
-   *  rather than the figure itself — the insurance premium "at the seller's
-   *  own T-12 premium, a working floor, not a quote" — said beside the part on every
+   *  "if the sale resets the assessment" — or what it is where it is the
+   *  seller's history rather than a new owner's figure — the insurance
+   *  premium "at the seller's actual T-12 premium, not a new owner's
+   *  quote" — said beside the part on every
    *  surface, as a rule-of-thumb part is marked; absent where it rests on none */
   conditional?: string;
 }
@@ -389,6 +396,14 @@ export interface StressKept {
    *  a vacancy, tax or insurance swap moves the evidence's case, its NOI
    *  moves from that rent line, so the NOI itself is not what is kept. */
   noi?: number;
+  /** on the NOI row only: what the kept rent line is struck at, read off the
+   *  OM's case — whose vacancy (the OM's where the vacancy row is in the
+   *  case, else the model's own), which expense rows run at the OM's own
+   *  figure, and where the rest of the model's expense line comes from
+   *  ("t12": the T-12's expense ratio; "default": the class's screening
+   *  ratio; null: not known). Display only; absent on a headline struck
+   *  before it was carried */
+  struckAt?: { vacancy: "om" | "model"; omExpenses: StressKey[]; rest: "t12" | "default" | null };
 }
 
 /** One row the evidence's case runs at the evidence's figure where the
@@ -432,13 +447,13 @@ export const HEADLINE_BASIS_LEFT_OUT = headlineBasisLeftOut(HEADLINE_ASK);
  *  lib/stress-test.test.ts holds it to `stressHeadline`. */
 export const HEADLINE_METHOD = {
   title: "The headline: the OM's case against the evidence's",
-  claim: "The return the memorandum's figures make, all of them at once.",
+  claim: "The site's own screening model, not the OM's: its own loan sizing, hold and cost of sale, and its own loan rate wherever the OM states none, run on the memorandum's tested figures all at once.",
   omCase: [
     "The OM's case: the deal's derived model with every assumption whose return is re-run at the OM's own figure, all at once.",
     "That is the exit cap, the loan rate, vacancy, rent growth, expense growth, the taxes, the insurance premium, the operating expenses and the NOI; the price is the model's own in both cases, below.",
     "The premium is re-run only where the seller's T-12 premium decides its row; else both cases keep the model's premium.",
     "The NOI is the one the NOI row tests, its stabilized or pro forma figure where the OM states one, else the first it states, run as year one.",
-    "It is struck as the rent line that makes that NOI at the OM's own vacancy and expenses.",
+    "It is struck as the rent line that makes that NOI at the case's own vacancy and expenses: the OM's figure for each such row in the case, the model's own for the rest (with a T-12, its expense ratio), each named beside the kept rent line.",
     "An assumption with no re-run keeps the model's own figure.",
   ],
   evidenceCase: [
@@ -455,7 +470,7 @@ export const HEADLINE_METHOD = {
     "That can differ from the row's own re-run, which starts from the model's own figures rather than the OM's.",
     "A part struck against a rule of thumb alone, such as the loan rate against a screening default, is marked so.",
     "So is a part whose evidence holds only on a condition: the taxes' reset bill, struck if the sale resets the assessment to the price, which is the jurisdiction's to say.",
-    "And the insurance part, struck at the seller's own T-12 premium: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote.",
+    "And the insurance part, struck at the seller's actual T-12 premium: the building's own history, not a new owner's quote.",
   ],
   overlap: [
     `The NOI is left out where the vacancy, taxes, insurance or operating-expense row is past its evidence too: ${HEADLINE_NOI_LEFT_OUT}.`,
@@ -635,7 +650,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
   },
   {
     key: "market_rent",
-    title: "Market rent",
+    title: "Pro forma rent against lease comps",
     claim: "The pro forma's market rent is what the building's units or space will lease for.",
     against: [
       "The memorandum's own lease comps as the comps step grades them: the median of three or more graded as supporting the rent, on the class's yardstick (a month a unit, else a square foot a year), the one figure that decides",
@@ -670,7 +685,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Real estate taxes",
     claim: "The tax line stays at the seller's bill.",
     against: [
-      "The memorandum's own bill over its own assessed value: the rate it implies, on the price, is the bill if the sale resets the assessment, the one figure that decides where both are stated",
+      "A scenario on the memorandum's own figures, not the OM contradicting itself: its bill over its assessed value is today's rate, and that rate on the price is the bill if the sale resets the assessment, the one figure that decides where both are stated",
       "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck",
       "The deal's T-12 tax line, the seller's own bill: it decides only where nothing above does and the OM's line sits more than 2% under it, a working floor, stretched at most; else it is shown beside it",
     ],
@@ -689,10 +704,10 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The deal's T-12 premium, the seller's own actual: it decides where the OM's premium sits more than 2% under it, the OM against its own building's history, stretched at most; at or over it, it is shown as the seller's history and nothing decides",
       "The producer price index for commercial multiple-peril premiums against a year ago, the nation's carriers, applied to the OM's premium as a national move, shown beside it and never deciding",
     ],
-    engine: "Where the T-12's premium decides, the return is re-run at it, a working floor and a rule of thumb, not a quote, swapped into the model's expense line, never added on top; where nothing decides, no return is re-run.",
+    engine: "Where the T-12's premium decides, the return is re-run at it, the seller's actual premium and not a new owner's quote, swapped into the model's expense line, never added on top; where nothing decides, no return is re-run.",
     limits: [
       "A new owner's quote is what finally decides the premium: no quote, binder or carrier's indication is read from the documents yet.",
-      "The seller's T-12 premium is history, not a quote: a rule of thumb says a new owner is rarely quoted under it, so a premium under it reads stretched at most, and the re-run at it is a working floor, not the premium a new owner will pay.",
+      "The seller's T-12 premium is the building's own history, not a new owner's quote: a premium under it reads stretched at most, and the re-run at it is the seller's actual premium, not the premium a new owner will pay.",
       "A premium at or over the T-12's stays unchecked: the seller's history cannot say a new owner will pay less, and the national index says nothing of this building.",
       "On a development or a conversion the T-12 insures the building before the plan delivers a new one, so it decides nothing.",
     ],

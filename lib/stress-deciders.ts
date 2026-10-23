@@ -60,13 +60,14 @@
 //     screening spread (the bare index sets how far under it reads
 //     unsupported); a floating quote is shown and decides nothing;
 //   - NOI: the deal's T-12, then the OM's own in-place NOI;
-//   - taxes: the bill the OM's own figures imply on the price, then the
+//   - taxes: a scenario, today's tax rate on the price, then the
 //     stated unabated bill an abatement ends into inside the hold;
 //   - renovation premium: the achieved premium the OM states;
 //   - insurance: a new owner's quote would decide it, and none is read yet;
 //     the deal's T-12 premium, the seller's own actual, decides only where
 //     the OM's premium sits under it past SAME_SHARE (the OM against its own
-//     building's history, a working floor and a rule of thumb, never a quote);
+//     building's history: the seller's actual premium, never a new owner's
+//     quote);
 //     at or over it nothing decides;
 //   - operating expenses: the deal's T-12 operating expenses less its taxes
 //     and insurance (the lines the OM states apart, each with its own row),
@@ -108,7 +109,7 @@ export const T12_NOI_LABEL = "The deal's T-12 NOI";
 export const T12_INSURANCE_LABEL = "The deal's T-12 insurance line";
 export const T12_TAX_LABEL = "The deal's T-12 tax line";
 export const OM_IN_PLACE_NOI_LABEL = "The OM's in-place NOI against its pro forma";
-export const RESET_BILL_LABEL = "The bill the OM's own figures imply on the price";
+export const RESET_BILL_LABEL = "A scenario: today's tax rate on the price, if the sale resets the assessment";
 export const ABATEMENT_LABEL = "The stated tax abatement and when it ends";
 export const ACHIEVED_PREMIUM_LABEL = "Achieved premium on the doors already renovated";
 export const PAST_SCREENS_PUBLISHER = "your past screens";
@@ -329,7 +330,7 @@ export function noiDecider(candidates: readonly DeciderCandidate[]): DecidingFig
 // — Taxes —
 
 export const TAXES_ORDER: readonly DeciderStep[] = [
-  { name: "the bill the OM's own figures imply on the price", why: "the bill if the sale resets the assessment to the price", is: isLabel(RESET_BILL_LABEL) },
+  { name: "a scenario: today's tax rate on the price", why: "the bill if the sale resets the assessment to the price, which is the jurisdiction's to say", is: isLabel(RESET_BILL_LABEL) },
   { name: "the unabated bill the OM states", why: "where an abatement ends inside the model's hold", is: isLabel(ABATEMENT_LABEL) },
   // The seller's own bill decides only where the row hands it in as one that
   // may (lib/stress-test: no reset bill, no abatement ending in the hold, and
@@ -362,12 +363,13 @@ export function renovationPremiumDecider(candidates: readonly DeciderCandidate[]
  *  documents yet. The deal's T-12 premium — the seller's own actual — decides
  *  only where the row hands it in as one that may (lib/stress-test: the OM's
  *  premium under it past SAME_SHARE, on a building already delivered): the
- *  OM against its own building's history, a working floor and a rule of
- *  thumb (a new owner is rarely quoted under it), never a quote. The index moves the OM's own figure and never decides. */
+ *  OM against its own building's history, the seller's actual premium,
+ *  never a new owner's quote. The index moves the OM's own figure and never
+ *  decides. */
 export const INSURANCE_ORDER: readonly DeciderStep[] = [
   {
     name: "the deal's T-12 premium",
-    why: "the seller's own premium, where the OM's sits under it: a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote",
+    why: "the seller's actual premium, where the OM's sits under it: the building's own history, not a new owner's quote",
     is: isLabel(T12_INSURANCE_LABEL),
   },
 ];

@@ -415,7 +415,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     const t = rowOf(test, "taxes");
     expect(t.omSays).toEqual({ text: "Real estate taxes: $380,000", value: 380_000, page: 15 });
     // $380k over $30M assessed is 1.27%, on $42M $532k.
-    expect(t.evidence[0]).toMatchObject({ kind: "om_internal", label: "The bill the OM's own figures imply on the price", value: 532_000, scope: "deal" });
+    expect(t.evidence[0]).toMatchObject({ kind: "om_internal", label: "A scenario: today's tax rate on the price, if the sale resets the assessment", value: 532_000, scope: "deal" });
     expect(t.evidence[1]).toMatchObject({ kind: "document", label: "The deal's T-12 tax line", value: 380_000 });
     expect(t.gap).toMatchObject({ value: 152_000, unit: "usd" });
     // Whether the sale resets the assessment is the jurisdiction's: the
@@ -434,7 +434,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     // review of 2026-10-21). The T-12's premium decides — the floor a new
     // owner can expect, never a quote — so the row reads stretched at most.
     expect(i.evidence[0]).toMatchObject({ kind: "document", label: "The deal's T-12 insurance line", value: 150_000 });
-    expect(i.evidence[0].text).toMatch(/; the seller's own premium, a working floor and a rule of thumb \(a new owner is rarely quoted under it\), not a quote$/);
+    expect(i.evidence[0].text).toMatch(/; the seller's actual premium, the building's own history, not a new owner's quote$/);
     expect(i.decidedBy).toBe(0);
     expect(i.evidence[1]).toMatchObject({ kind: "published", scope: "nation", publisher: "BLS via FRED", value: null });
     // The index's figure is the OM's own premium moved by it, labelled so —
@@ -446,7 +446,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.gap).toEqual({
       value: 30_000,
       unit: "usd",
-      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is a working floor and a rule of thumb (a new owner is rarely quoted under it), not a quote, and the row reads stretched at most.",
+      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is the seller's actual premium, the building's own history, not a new owner's quote, and the row reads stretched at most.",
     });
     expect(i.method).toBe(
       "The OM's insurance against the deal's T-12 insurance line, the one figure that decides; beside it, not deciding: the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED).",
@@ -458,7 +458,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(Math.round(i.impact!.omValue)).toBe(1_720_000);
     expect(Math.round(i.impact!.altValue)).toBe(1_750_000);
     expect(i.impact!.altIrrPct!).toBeLessThan(i.impact!.baseIrrPct!);
-    expect(i.impact!.note).toMatch(/^If the insurance line is the seller's \$150k T-12 premium, a working floor and a rule of thumb, not a quote, not the OM's \$120k, the levered IRR moves from .*\. The model itself already runs at it\.$/);
+    expect(i.impact!.note).toMatch(/^If the insurance line is the seller's actual \$150k T-12 premium \(the building's own history, not a new owner's quote\), not the OM's \$120k, the levered IRR moves from .*\. The model itself already runs at it\.$/);
     expect(i.noRerun ?? null).toBeNull();
     // In the headline it is a player, marked as the floor it is, and the NOI
     // is left out for it (`HEADLINE_NOI_LEFT_OUT`).
@@ -1220,7 +1220,7 @@ describe("a 49% share", () => {
     expect(derived.inputs.purchasePrice).toBeCloseTo(20_000_000 / 0.49, 0);
     const t = rowOf(test, "taxes");
     // $380k over $30M is 1.27%; on the $40.8M whole, $517k — not on $83.3M.
-    expect(t.evidence[0]).toMatchObject({ label: "The bill the OM's own figures imply on the price", value: 517_007 });
+    expect(t.evidence[0]).toMatchObject({ label: "A scenario: today's tax rate on the price, if the sale resets the assessment", value: 517_007 });
     expect(t.evidence[0].text).toContain("on the $40.82M price is $517k a year");
   });
 
@@ -1386,8 +1386,13 @@ describe("a value-add plan deal", () => {
     expect(p.gap).toEqual({
       value: 60,
       unit: "usd",
-      text: "The projected $250 is $60 a month (31.6%) over the achieved $190. A $15,000 door needs $71 a month to pay for itself at the model's 5.71% exit cap: the break-even, what the program needs, not evidence of what a door earns.",
+      text: "The projected $250 is $60 a month (31.6%) over the achieved $190. A $15,000 door needs $71 a month to pay for itself at the model's 5.71% exit cap: the break-even, what the program needs, not evidence of what a door earns. At the achieved $190 the program still pays for itself: it clears the $71 break-even, so the gap is in how much it earns, not whether.",
     });
+    // The verdict is the achieved premium's against the OM's, as struck; the
+    // program still paying at the achieved premium rides beside it, and the
+    // one-page memo's move cell says it.
+    expect(p.paysAtAchieved).toBe(true);
+    if (!p.impact) expect(rowWords(p).move).toBe("still pays at the achieved premium");
     expect(p.ruleOfThumbOnly).toBeUndefined();
     expect(p.verdict).toBe("unsupported");
     // The premium is no model input; on a plan deal it moves the yield on cost.
@@ -2197,7 +2202,7 @@ const AGAINST_SOURCES: Record<StressKey, string[]> = {
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
   rent_growth: ["Asking rent, apartments", "Asking rent, all home types", "sitting tenants", "Rents charged by", "allowance on the regulated units"],
   expense_growth: ["Consumer prices", "Core CPI", "insurance premiums", "breakeven"],
-  taxes: ["The bill the OM's own figures imply", "The stated tax abatement", "The deal's T-12 tax line"],
+  taxes: ["A scenario: today's tax rate on the price", "The stated tax abatement", "The deal's T-12 tax line"],
   insurance: ["moved by the national premium index", "The deal's T-12 insurance line"],
   market_rent: ["The memorandum's lease comps", "The rent roll's in-place rent", "Asking rent, apartments, metro area"],
   opex: ["The deal's T-12 operating expenses", "The deal's T-12 expense lines", "The class's expense ratio, a rule of thumb"],
@@ -2560,26 +2565,36 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(stressReadLine(held)).not.toContain("re-run");
   });
 
-  it("leads a document with the larger move within a verdict, a row with no re-run after", () => {
+  it("leads a document by severity, then by the headline's Shapley share, the price row by its own re-run, a row with no re-run after", () => {
     const t = buildStressTest(apartmentArgs());
     const led = leadRows(t, 10);
     const rank = { unsupported: 0, stretched: 1 } as Record<string, number>;
+    const share = new Map((t.headline?.parts ?? []).map((p) => [p.key, Math.abs(p.pts)]));
+    // The weight a row is led by: its share of the headline's gap, the
+    // price row its own re-run beside them; every other row after them.
+    const weight = (r: StressRow) => share.get(r.key) ?? (r.key === "basis" ? moveSize(r) : null);
     for (let i = 1; i < led.length; i++) {
       const [a, b] = [led[i - 1], led[i]];
       if (rank[a.verdict] !== rank[b.verdict]) {
         expect(rank[a.verdict]).toBeLessThan(rank[b.verdict]);
         continue;
       }
-      const [sa, sb] = [moveSize(a), moveSize(b)];
-      if (sa == null) expect(sb).toBeNull();
-      else if (sb != null) expect(sa).toBeGreaterThanOrEqual(sb);
+      const [wa, wb] = [weight(a), weight(b)];
+      if (wa == null) expect(wb).toBeNull();
+      else if (wb != null) expect(wa).toBeGreaterThanOrEqual(wb);
     }
-    // A synthetic pair: the larger move first, whatever the test's order.
+    // Without a headline, the larger move first, whatever the test's order.
     const small = { ...rowOf(t, "rent_growth"), verdict: "stretched" as const };
     const big = { ...small, key: "vacancy" as const, impact: { ...small.impact!, baseIrrPct: 12, altIrrPct: 6 } };
     const none = { ...small, key: "noi" as const, impact: null };
     const s2 = { ...small, impact: { ...small.impact!, baseIrrPct: 12, altIrrPct: 11 } };
-    expect(leadRows({ ...t, rows: [none, s2, big] }).map((r) => r.key)).toEqual(["vacancy", "rent_growth", "noi"]);
+    expect(leadRows({ ...t, headline: null, rows: [none, s2, big] }).map((r) => r.key)).toEqual(["vacancy", "rent_growth", "noi"]);
+    // With one, the Shapley share leads over the row's own re-run: a row
+    // whose own move is small but whose share of the gap is large comes
+    // first (the exit cap the verdict leads with is never dropped for a row
+    // the headline leaves out).
+    const headline = { ...t.headline!, parts: [{ key: "rent_growth" as const, label: "Rent growth", pts: -4, multiple: null }, { key: "vacancy" as const, label: "Vacancy", pts: -1, multiple: null }] };
+    expect(leadRows({ ...t, headline, rows: [none, big, s2] }).map((r) => r.key)).toEqual(["rent_growth", "vacancy", "noi"]);
   });
 
   it("names one or two clean comps with their count, never a figure: under three, and with no recorded sales' median, the price stands unchecked on the comps' own floor (the review of 2026-10-23)", () => {
@@ -3015,7 +3030,7 @@ describe("the headline", () => {
   it("keeps the price at the ask in both cases, a reset tax bill struck on the ask, and names the price as left out", () => {
     const taxes = rowOf(test, "taxes");
     const reset = taxes.evidence[taxes.impact!.evidenceIndex];
-    expect(reset.label).toMatch(/^The bill the OM's own figures imply/);
+    expect(reset.label).toMatch(/^A scenario: today's tax rate on the price/);
     const price = model.purchasePrice;
     const basis: StressRow = {
       key: "basis",
@@ -3119,7 +3134,7 @@ describe("the headline", () => {
     const evNull = { ...test, headline: { ...h, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } };
     expect(headlineLine(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve`);
     expect(headlineSentence(evNull)).toMatch(/; with the evidence it does not solve, so the gap is not split\.( This headline does not test [^.]*\.)? Left out: /);
-    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the screening model as it runs: ${h.modelIrrPct!.toFixed(1)}%).`);
+    expect(headlineShort(evNull)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve (the screening model as it runs, its own figure on every input: ${h.modelIrrPct!.toFixed(1)}%).`);
     // The one-page memo's line leaves the model to its legend.
     expect(headlineShort(evNull, false)).toBe(`Levered IRR on the OM's figures ${h.omIrrPct!.toFixed(1)}%; with the evidence it does not solve.`);
     const omNull = { ...test, headline: { ...h, omIrrPct: null, omMultiple: null, parts: [], unsolved: 0 } };
@@ -3157,7 +3172,7 @@ describe("the headline", () => {
     expect(headlineSentence(test)).toContain(`the loan rate ${ptsText(shownDebt.shown)} (against a screening default)`);
     for (const p of h.parts.filter((x) => x.key !== "debt")) expect(p.ruleOfThumb, p.key).toBeUndefined();
     // The memo's one line says so too: it carries the evidence's case whole.
-    expect(headlineShort(test)).toMatch(/ with the evidence \(the loan rate against a screening default; the screening model as it runs: [\d.]+%\); the report splits the gap by assumption\.$/);
+    expect(headlineShort(test)).toMatch(/ with the evidence \(the loan rate against a screening default; the screening model as it runs, its own figure on every input: [\d.]+%\); the report splits the gap by assumption\.$/);
     expect(headlineShort(test, false)).toMatch(/ with the evidence \(the loan rate against a screening default\); the report splits/);
   });
 
@@ -3532,7 +3547,7 @@ describe("the taxes row is held to the seller's T-12 bill where no reset bill ca
 
   it("leaves the reset bill deciding where the OM states its assessed value", () => {
     const t = rowOf(buildStressTest(apartmentArgs()), "taxes");
-    expect(t.evidence[t.decidedBy!].label).toBe("The bill the OM's own figures imply on the price");
+    expect(t.evidence[t.decidedBy!].label).toBe("A scenario: today's tax rate on the price, if the sale resets the assessment");
   });
 });
 
@@ -3798,7 +3813,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     expect(r.verdict).toBe("holds");
     expect(r.impact).toBeNull();
     expect(r.noRerun).toBe(MARKET_RENT_NO_RERUN);
-    expect(r.method).toBe("The OM's market rent against the memorandum's lease comps (the offering memorandum), the one figure that decides.");
+    expect(r.method).toBe("The OM's pro forma rent against the memorandum's lease comps (the offering memorandum), the one figure that decides.");
   });
 
   it("reads unsupported past 15% over the median, and the headline names it as no model input", () => {

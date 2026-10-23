@@ -18,8 +18,8 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * (lib/stress-deciders' orders): a T-12's NOI decides the NOI row, its
  * expenses less its tax and insurance lines the operating-expense row, and its
  * insurance line decides the insurance row where the OM's premium sits more
- * than 2% under it (the seller's own premium, a working floor and a rule of
- * thumb, not a quote), and stands beside it otherwise; on
+ * than 2% under it (the seller's actual premium, the building's own
+ * history, not a new owner's quote), and stands beside it otherwise; on
  * a vacancy counted by doors the rent roll decides, and the T-12, dollars
  * not doors, decides only one the OM states as economic; beside a
  * stabilized vacancy they are the gap to close, the rent roll deciding only
@@ -54,8 +54,8 @@ export function ActualsPrompt({
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
         A T-12 tests the OM&apos;s NOI and its operating expenses, and
         tests the OM&apos;s insurance
-        premium where it sits under the T-12&apos;s, a working floor, not a
-        quote; a rent roll tests the OM&apos;s occupancy today, by
+        premium where it sits under the T-12&apos;s, the seller&apos;s actual
+        premium, not a new owner&apos;s quote; a rent roll tests the OM&apos;s occupancy today, by
         its doors, and the T-12 an economic vacancy, in dollars. Beside a
         stabilized vacancy they show the gap to close, and the rent roll
         tests it only where no market figure is fresh, never on a plan.

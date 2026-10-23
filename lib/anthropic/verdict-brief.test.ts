@@ -561,7 +561,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("11 of the memorandum's assumptions read in code — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
+    expect(brief).toContain("11 assumptions: the OM states 9 and leaves 2 out — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
@@ -577,7 +577,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain(
       "[BESIDE IT, NOT DECIDING] The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic",
     );
-    expect(brief).toContain("Against a rule of thumb only. The levered IRR: The OM's figure is within the evidence; no re-run.");
+    expect(brief).toContain("Against a rule of thumb only. The levered IRR: The OM's figure is on the cautious side of the evidence; no re-run.");
     expect(brief).not.toContain(moves("vacancy"));
     // Two comps graded clean are too few for a median: the price stands
     // unchecked, said why, with no move.

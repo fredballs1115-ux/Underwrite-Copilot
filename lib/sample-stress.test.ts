@@ -25,7 +25,7 @@ import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
-import { HOLDS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
+import { HOLDS_CAUTIOUS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
 import { stressSection } from "./anthropic/verdict";
 import { keptRows } from "@/app/stress-test-panel";
 
@@ -184,11 +184,14 @@ describe("the sample's stress test, one build on every surface", () => {
     // verdict's brief print the one line in its place (its impact stays for
     // the headline's cases).
     expect(row("vacancy").impact).not.toBeNull();
-    expect(rowMoveText(page, row("vacancy"))).toBe(HOLDS_NO_RERUN);
+    // Both sit on the cautious side of their evidence (the gap signed under
+    // zero), so neither is said to be merely "within" it.
+    expect(row("vacancy").gap!.value).toBeLessThan(0);
+    expect(rowMoveText(page, row("vacancy"))).toBe(HOLDS_CAUTIOUS_NO_RERUN);
     expect(row("rent_growth").impact).not.toBeNull();
-    expect(rowMoveText(page, row("rent_growth"), "from the model")).toBe(HOLDS_NO_RERUN);
+    expect(rowMoveText(page, row("rent_growth"), "from the model")).toBe(HOLDS_CAUTIOUS_NO_RERUN);
     const brief = stressSection(page).find((l) => l.startsWith("- Rent growth (rent_growth)"))!;
-    expect(brief).toContain(`The levered IRR: ${HOLDS_NO_RERUN}`);
+    expect(brief).toContain(`The levered IRR: ${HOLDS_CAUTIOUS_NO_RERUN}`);
     expect(brief).not.toContain("the levered IRR moves from");
     expect(row("rent_growth")).toMatchObject({ verdict: "holds", gap: { value: -1, unit: "pts" } });
     expect(row("rent_growth").gap!.text).toMatch(/^Held to the rent sitting tenants pay \(CPI rent\)/);
@@ -310,7 +313,7 @@ describe("the sample's stress test, one build on every surface", () => {
     // evidence's case runs the reset tax bill where the model runs the
     // seller's (M4), so the sentence says every figure the two differ on.
     const kept =
-      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the exit cap 5.70% (the sample's model is pinned at 5.45%) and the taxes $952k (the model's $728k).";
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy, the OM's taxes and insurance, and the model's other expenses at the T-12's expense ratio (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the exit cap 5.70% (the sample's model is pinned at 5.45%) and the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
     // The panel's table says the pinned figure as pinned, as the sentence does.
     expect(keptRows(page).map((r) => [r.key, r.model])).toEqual([
@@ -337,7 +340,7 @@ describe("the sample's stress test, one build on every surface", () => {
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
-    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 9.7% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 9.7% with the evidence (the screening model as it runs, its own figure on every input: 9.3%); the report splits the gap by assumption.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
     expect(rerunWords(page, row("taxes").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");

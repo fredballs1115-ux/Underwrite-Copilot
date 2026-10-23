@@ -121,6 +121,20 @@ describe("what the test does not check yet", () => {
     expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
   });
 
+  it("says the screening model carries no transfer or recordation tax unless entered, and states no jurisdiction's rate", () => {
+    for (const k of STRESS_KEYS) expect(k).not.toMatch(/transfer|recordation/);
+    const { inputs } = sampleDerivedInputs();
+    expect(inputs.transferTaxPct).toBe(0);
+    expect(inputs.recordationTaxPct).toBe(0);
+    const src = readFileSync("lib/underwrite/inputs.ts", "utf8");
+    expect(src).toMatch(/transferTaxPct: 0,\s+recordationTaxPct: 0,/);
+    const why = item("transfer_taxes").why;
+    expect(why).toContain("carries none on the purchase or in the cost of sale unless you enter them");
+    // No rate, no figure: the item names no jurisdiction's tax.
+    expect(why).not.toMatch(/\d/);
+    expect(item("transfer_taxes").beside).toBeUndefined();
+  });
+
   it("names no stated return the engine re-runs: the stress test reads no IRR row of the OM's", () => {
     const src = readFileSync("lib/stress-test.ts", "utf8");
     expect(src).not.toMatch(/(?:stated|projected|target|quoted)\s*irr/i);

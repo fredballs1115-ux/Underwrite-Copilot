@@ -271,7 +271,10 @@ const modelMetrics: ReconciledMetric[] = [
     // no quote.
     sources: [{ doc: "Screening default", value: "6.00%", locator: "", basis: "assumption" }],
     authority: "Screening default",
-    rationale: "No document states a rate: a flat 6.00% screening default, 30-yr amortization after one IO year — enter your quote.",
+    // The model amortizes over 30 years from the first month, no
+    // interest-only period (lib/underwrite/inputs `ioMonths: 0`), as the
+    // verdict's debt read says.
+    rationale: "No document states a rate: a flat 6.00% screening default, 30-yr amortizing from the first month, no interest-only period — enter your quote.",
     confidence: "low",
     isConflict: false,
   },
@@ -282,7 +285,9 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "%",
     sources: [{ doc: "Market", value: "2.0%", locator: "", basis: "market norm" }],
     authority: "Market",
-    rationale: "Broker and transfer costs on disposition.",
+    // The model's cost of sale carries no transfer tax a seller may owe
+    // (lib/underwrite/cost-note `costAssumptionsLine`, lib/not-tested).
+    rationale: "Broker and closing costs on disposition; no transfer tax is modelled.",
     confidence: "medium",
     isConflict: false,
   },
@@ -375,8 +380,8 @@ const extraction: ExtractionResult = {
 
 /** The T-12's insurance line (the statement below carries it): the seller's
  *  own actual premium. The pro forma's $310,000 sits under it, so the stress
- *  test holds the pro forma to it — a working floor and a rule of thumb (a
- *  new owner is rarely quoted under it), never a quote; a new owner's quote would decide it, and the sample states none. */
+ *  test holds the pro forma to it — the seller's actual premium, the
+ *  building's own history, never a new owner's quote; a new owner's quote would decide it, and the sample states none. */
 const T12_INSURANCE = 385_000;
 
 /** The T-12's collected rent and its vacancy loss (the statement below

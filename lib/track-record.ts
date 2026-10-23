@@ -386,7 +386,7 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
-  market_rent: "Market rent",
+  market_rent: "Pro forma rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",

@@ -3020,7 +3020,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("Gap: The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side.");
     expect(page).toContain("the deal's T-12 is the building today, never the test of a stabilized figure");
     // A row that holds draws no re-run.
-    expect(page).toContain("Against a rule of thumb only. The return: The OM's figure is within the evidence; no re-run.");
+    expect(page).toContain("Against a rule of thumb only. The return: The OM's figure is on the cautious side of the evidence; no re-run.");
     expect(page).toMatch(/Method: The OM's stabilized vacancy against multifamily vacancy, a rule of thumb, the one figure that decides/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The memorandum's own pieces carry their validated page, as the panel's

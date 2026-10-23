@@ -126,7 +126,7 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     // Trades only: the reader's own past asks never decide the price.
     expect(basisDecider(held(piece("Other memoranda's asking prices in X (your past screens): asks, not trades", 300_000, { publisher: "your past screens" })))).toBeNull();
     expect(noiDecider(held(piece("The OM's in-place NOI against its pro forma", 2_400_000), piece("The deal's T-12 NOI", 2_350_000)))!.figure).toBe(2_350_000);
-    expect(taxesDecider(held(piece("The stated tax abatement and when it ends", 900_000), piece("The bill the OM's own figures imply on the price", 532_000)))!.figure).toBe(532_000);
+    expect(taxesDecider(held(piece("The stated tax abatement and when it ends", 900_000), piece("A scenario: today's tax rate on the price, if the sale resets the assessment", 532_000)))!.figure).toBe(532_000);
     expect(insuranceDecider()).toBeNull();
     // The seller's T-12 premium decides only where the row may hold the OM's
     // to it (the OM's under it); the index moving the OM's own figure never.
