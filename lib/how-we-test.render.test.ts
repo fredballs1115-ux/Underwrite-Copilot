@@ -221,7 +221,7 @@ describe("/how-we-test draws every method from the table", () => {
     // today's rent roll — doors by doors; the T-12's dollars decide an
     // economic figure, a pro forma's vacancy line among them (the reviews of
     // 2026-10-21 and 2026-10-23).
-    expect(VERDICT_RULES.vacancy).toContain("then the class's norm, never today's rent roll; a pro forma's vacancy line or a vacancy and credit loss is dollars, held to the T-12.");
+    expect(VERDICT_RULES.vacancy).toContain("then the class's norm, never the rent roll or T-12; one in dollars meets the market's doors as a floor.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");

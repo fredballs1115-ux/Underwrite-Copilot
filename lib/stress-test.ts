@@ -63,10 +63,12 @@
 //
 // The thresholds, each named here and read nowhere else:
 //   vacancy          VACANCY_UNSUPPORTED_PTS   3 pts past the deciding figure
-//                    (a stabilized assumption counted by doors: the
-//                    market's figure, past the survey's margin, else the
-//                    class's norm — never today's rent roll; an economic
-//                    one, a pro forma's vacancy line among them: the T-12)
+//                    (a stabilized assumption, whatever it counts: the
+//                    market's figure, past the survey's margin — a floor
+//                    for one in dollars, since economic vacancy is never
+//                    below physical — else the class's norm, never the
+//                    rent roll or the T-12; today's: its own measure's
+//                    document)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
 //                    trailing year's figure for the deal's own kind of rent
 //                    (lib/rent-growth-decider)
@@ -1103,9 +1105,10 @@ const NO_EVIDENCE = "No evidence with a figure could be read for this deal.";
  * the building runs at today (its plan is the gap). The track record reads
  * it too (lib/track-record `vacancyHeldToMarket`), so a later rent roll's
  * vacancy — today's again — never scores a challenge the stress test holds
- * to the market. An allowance the OM states as economic (a vacancy and
- * credit loss) is no such case: the market's vacancy counts doors, so the
- * row holds it to the T-12, the same measure, never to the market.
+ * to the market. An allowance the OM states as economic (a pro forma's
+ * vacancy line, a vacancy and credit loss) is held to the market's doors as
+ * a floor (`ECONOMIC_FLOOR`) and scored by a later T-12, its own measure (a
+ * later year of the building), so it is no such case.
  */
 export function stabilizedVacancyStated(extraction: ExtractionResult | null, firstSignal?: FirstSignal | null): boolean {
   const om = omVacancy(rowsOf(extraction));
@@ -1181,11 +1184,21 @@ export const VACANCY_NO_T12_ECONOMIC =
  *  as stabilized: no published figure and no class norm stands, and today's
  *  rent roll never decides it (the review of 2026-10-23). */
 export const STABILIZED_VACANCY_UNCHECKED =
-  "No fresh published vacancy figure for this market and no class norm could be held to the stabilized assumption, and the deal's rent roll is the building today, the gap a lease-up has to close, never the test of a stabilized figure.";
+  "No fresh published vacancy figure for this market and no class norm could be held to the stabilized assumption, and the deal's rent roll and T-12 are the building today, the gap a lease-up has to close, never the test of a stabilized figure.";
 
 /** What the rent roll is beside a stabilized assumption the market or the
  *  class's norm decides, said in the gap. */
 export const ROLL_NOT_STABILIZED = "the deal's rent roll is the building today, never the test of a stabilized figure";
+
+/** The T-12's twin of `ROLL_NOT_STABILIZED`: a trailing year is the building
+ *  as it has run (a lease-up, a renovation's downtime), never the building
+ *  stabilized (the review of 2026-10-23). */
+export const T12_NOT_STABILIZED = "the deal's T-12 is the building today, never the test of a stabilized figure";
+
+/** Why the market's doors are a floor for an economic stabilized figure,
+ *  said in the gap (the review of 2026-10-23). */
+export const ECONOMIC_FLOOR =
+  "economic vacancy, the doors empty plus credit and concession loss, is never below physical vacancy, so the market's published figure, a count of doors, is a floor for it";
 
 /** How the gap says why the OM's figure is economic: in its own words where
  *  its label names the measure or a loss, else as its pro forma's line. */
@@ -1306,8 +1319,10 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // then the published figures', then the class's norm's. Every piece counts
   // doors but the T-12's, whose vacancy and credit loss over gross potential
   // rent is dollars: it never decides a figure counted by doors, and decides
-  // a figure the OM states as economic, ahead of the class's norm, while the
-  // counts of doors are shown beside that one. Every other piece is shown
+  // an economic figure for today, ahead of the class's norm, while the counts
+  // of doors are shown beside that one; a stabilized economic figure is the
+  // market's to judge as a floor (`ECONOMIC_FLOOR`), the T-12 beside it as
+  // today's gap. Every other piece is shown
   // beside the one that decides, never in its place: a region's or a
   // state's figure beside the metro's, the T-12 beside the rent roll, a rule
   // of thumb beside a document.
@@ -1318,7 +1333,9 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     { stabilized, plan: ctx.plan, economic },
   );
   const best = decided ? pool[decided.index] : null;
-  const marketDecides = stabilized && !economic && best != null && best.e.kind === "published";
+  // A stabilized assumption is the market's to judge whatever it counts: an
+  // economic one is held to the market's doors as a floor (`ECONOMIC_FLOOR`).
+  const marketDecides = stabilized && best != null && best.e.kind === "published";
   // Where a stabilized assumption is decided by anything but a document, the
   // documents stand beside it as today's.
   const docsBeside = stabilized && best != null && best.e.kind !== "document";
@@ -1349,9 +1366,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   const otherMeasure =
     om && !economic && t12p
       ? ` The deal's T-12 ran ${pct1(t12p.e.value!)} economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`
-      : om && economic && (roll || market.some((m) => m.e.value != null))
-        ? " The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it."
-        : "";
+      : om && economic && stabilized
+        ? roll
+          ? ` The deal's rent roll counts doors today, ${pct1(roll.e.value!)} vacant, so it is shown beside the OM's economic figure and never decides it.`
+          : ""
+        : om && economic && (roll || market.some((m) => m.e.value != null))
+          ? " The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it."
+          : "";
   // The figure that decides first, then the rest in the order of the kind
   // that decides: the market's, then the documents', where the market (or,
   // on a plan deal, the class's norm) decides a stabilized assumption; else
@@ -1378,17 +1399,19 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     : { text: NO_FIGURE("vacancy or occupancy"), value: null, page: null };
   if (!om) return unchecked("vacancy", omSays, evidence, NO_FIGURE("vacancy or occupancy"));
   if (!best) {
-    const why = economic
-      ? t12p
-        ? NO_EVIDENCE
-        : VACANCY_NO_T12_ECONOMIC
-      : stabilized && ctx.plan && docs.length > 0
+    const why = stabilized
+      ? ctx.plan && docs.length > 0
         ? PLAN_VACANCY_UNCHECKED
-        : stabilized && roll
+        : docs.length > 0
           ? STABILIZED_VACANCY_UNCHECKED
-          : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
-            ? VACANCY_ECONOMIC_ONLY
-            : NO_EVIDENCE;
+          : NO_EVIDENCE
+      : economic
+        ? t12p
+          ? NO_EVIDENCE
+          : VACANCY_NO_T12_ECONOMIC
+        : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
+          ? VACANCY_ECONOMIC_ONLY
+          : NO_EVIDENCE;
     return { ...unchecked("vacancy", omSays, evidence, why, title), ...(economic ? { measure: "economic" as const } : {}) };
   }
   const bestValue = best.e.value!;
@@ -1406,12 +1429,13 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const moe = band || best.tolerance === SAME ? null : best.tolerance;
     const said = `${lowerFirst(stem(best.e.label))} (${best.e.publisher}), ${band ? `its low read ${pct1(band.lo)} (the band runs to ${pct1(band.hi)})` : `${pct1(bestValue)}${moe != null ? ` ±${moe} pts` : ""}`}`;
     const edge = bestValue - (moe ?? SAME);
-    // Today's gap is the rent roll's, by its doors, the OM's own measure —
-    // never the T-12's dollars, which carry credit loss a lease-up does not
-    // close (said apart, `otherMeasure`).
-    const doc = roll;
+    // Today's gap is the document of the OM's own measure: the rent roll's
+    // doors beside a figure counted by doors (never the T-12's dollars, which
+    // carry credit loss a lease-up does not close, said apart,
+    // `otherMeasure`); the T-12's dollars beside an economic one.
+    const doc = economic ? t12p : roll;
     const docLine = doc
-      ? ` Today the deal's rent roll runs ${pct1(doc.e.value!)} vacant, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+      ? ` Today ${doc === roll ? `the deal's rent roll runs ${pct1(doc.e.value!)} vacant` : `the deal's T-12 ran ${pct1(doc.e.value!)} economic vacancy over its trailing year`}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
           // Past the row's own threshold, the building today is materially
           // emptier than the stabilized figure the market holds: whatever
           // the verdict, neither run models getting from one to the other.
@@ -1431,12 +1455,14 @@ function vacancyRow(ctx: Ctx): StressRow | null {
               : gap > 0
                 ? `${pts(gap)} under it, inside its margin`
                 : `${pts(gap)} over it — the conservative side`;
-      return `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}${otherMeasure}`;
+      return economic
+        ? `The OM's ${pct1(om.pct)} is a stabilized assumption. ${economicSaid(om.row.label)}, and ${ECONOMIC_FLOOR}: ${said}. The OM is ${where}.${docLine}${otherMeasure}`
+        : `The OM's ${pct1(om.pct)} is a stabilized assumption, so it is held to the market's published figure: ${said}. The OM is ${where}.${docLine}${otherMeasure}`;
     });
   } else {
     // A stabilized assumption with no fresh published figure to hold it to:
-    // on a deal read as stabilized the rent roll decides, on a plan deal the
-    // class's norm, said so. A figure the OM states as economic is held to
+    // the class's norm decides, said so, the deal's documents beside it as
+    // today's gap. A figure for today the OM states as economic is held to
     // the T-12, its own measure, said so.
     const doc = economic ? t12p : roll;
     const docToday = (p: Piece) =>
@@ -1444,9 +1470,17 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const econSaid = economicSaid(om.row.label);
     const noMarket = economic
       ? best === t12p
-        ? ` ${econSaid}, so it is held to the deal's T-12, the same measure${
-            stabilized && !ctx.plan ? " on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors" : ""
-          }.`
+        ? ` ${econSaid}, so it is held to the deal's T-12, the same measure.`
+        : stabilized && !ctx.plan && best.e.kind === "rule_of_thumb"
+          ? // Today's T-12 never decides a stabilized figure: it is the gap
+            // a lease-up has to close, said so beside the norm.
+            ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
+              doc
+                ? `; ${T12_NOT_STABILIZED}: ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+                    doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
+                  }`
+                : "."
+            }`
         : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
           ? ` ${econSaid}, and the deal's T-12 is the building before the plan is done, so the class's norm decides${
               doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""

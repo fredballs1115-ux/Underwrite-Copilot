@@ -1493,25 +1493,33 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(text).toContain("Property actuals");
       expect(text).toContain("Risk digest");
       // The stress test (app/stress-test-panel) leads after the call and
-      // before the risk digest, on the sample's own documents: its 6%
-      // vacancy against the rent roll and the T-12, a document row with an
-      // impact, the model already running at the roll's occupancy.
+      // before the risk digest, on the sample's own documents: its NOI
+      // against the T-12's, a document row with an impact, the model already
+      // running at it; its stabilized 6% vacancy holds on the class's norm,
+      // the rent roll and the T-12 beside it as the building today.
       const panel = html.indexOf('data-qa="stress-test-panel"');
       expect(panel).toBeGreaterThan(0);
       expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
       expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
       expect(text).toContain("The OM's assumptions, tested");
-      const from = html.indexOf('data-qa="stress-row-vacancy"');
-      const row = html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
-      expect(row).toContain('data-verdict="unsupported"');
+      const rowOf = (key: string) => {
+        const from = html.indexOf(`data-qa="stress-row-${key}"`);
+        return html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+      };
+      const vacRow = rowOf("vacancy");
+      expect(vacRow).toContain('data-verdict="holds"');
+      expect(vacRow).toContain('data-evidence="rule_of_thumb"');
+      expect(visibleText(vacRow)).toContain("the deal's T-12");
+      expect(vacRow).toContain('data-qa="stress-no-rerun"');
+      const row = rowOf("noi");
+      expect(row).toContain('data-verdict="stretched"');
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
-      // The engine at the OM's 6.0% against the engine at the T-12's 9.1%,
-      // the same measure as the pro forma's vacancy line — the row's own two
-      // runs, never typed.
-      const vac = data.stressTest!.rows.find((r) => r.key === "vacancy")!.impact!;
-      expect(vac.baseIrrPct!).toBeGreaterThan(vac.altIrrPct!);
-      expect(visibleText(row)).toContain(`Levered IRR ${vac.baseIrrPct!.toFixed(1)}% → ${vac.altIrrPct!.toFixed(1)}%`);
+      // The engine at the OM's NOI against the engine at the T-12's — the
+      // row's own two runs, never typed.
+      const noiMove = data.stressTest!.rows.find((r) => r.key === "noi")!.impact!;
+      expect(noiMove.baseIrrPct!).toBeGreaterThan(noiMove.altIrrPct!);
+      expect(visibleText(row)).toContain(`Levered IRR ${noiMove.baseIrrPct!.toFixed(1)}% → ${noiMove.altIrrPct!.toFixed(1)}%`);
       // The sample's five unchecked rows are one folded group at the end:
       // two clean comps strike no median for the price, the memorandum
       // states no loan rate and no expense total, no figure was read today

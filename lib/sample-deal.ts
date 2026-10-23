@@ -632,10 +632,11 @@ const market: MarketResult = {
       assessment: "in-line",
       // The range is the market check's rule of thumb, never the stress
       // test's verdict: the stress test holds the 6% to the
-      // T-12's economic vacancy, the same measure as the pro forma's vacancy
-      // line (dollars over gross potential rent), whatever today's read
-      // holds (lib/sample-stress.test.ts).
-      note: `Inside the market check's rule-of-thumb range for a stabilized building, not a published figure — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it; the stress test is where the 6%, the pro forma's vacancy line, is held to the T-12's economic vacancy, the same measure.`,
+      // market's published vacancy as a floor for the pro forma's vacancy
+      // line (dollars, never below the doors empty), else the class's norm —
+      // never to the T-12 or the rent roll, the building today
+      // (lib/sample-stress.test.ts).
+      note: `Inside the market check's rule-of-thumb range for a stabilized building, not a published figure — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it; the stress test is where the 6%, the pro forma's vacancy line, is held to the market's published vacancy as a floor, else the class's norm, never to today's documents.`,
     },
   ],
   summary:

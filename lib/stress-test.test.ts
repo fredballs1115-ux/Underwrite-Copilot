@@ -44,6 +44,8 @@ import {
   INSURANCE_NOT_DELIVERED,
   VACANCY_ECONOMIC_ONLY,
   ROLL_NOT_STABILIZED,
+  T12_NOT_STABILIZED,
+  ECONOMIC_FLOOR,
   STABILIZED_VACANCY_UNCHECKED,
   measureOf,
   exitCapPieces,
@@ -290,14 +292,17 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(noT12.evidence[0].kind).toBe("rule_of_thumb");
     expect(noT12.ruleOfThumbOnly).toBe(true);
     expect(noT12.gap!.text).toContain("no T-12 is on file to hold it to, so the class's norm decides");
-    // "Vacancy & credit loss" is an economic allowance: held to the T-12, and
-    // the track record is told the market does not hold it.
+    // "Vacancy & credit loss" is a stabilized economic allowance: held to the
+    // market's doors as a floor, never to the T-12, today's building (the
+    // review of 2026-10-23); the track record is told the market's doors do
+    // not hold it as they hold a figure counted by doors.
     const vcl: ExtractionResult = { ...APARTMENT, metrics: [...APARTMENT.metrics, row("Vacancy & credit loss", "7.0%", "p. 21")] };
     const a = rowOf(buildStressTest(apartmentArgs({ extraction: vcl })), "vacancy");
     expect(a.title).toBe("Stabilized vacancy");
     expect(a.measure).toBe("economic");
-    expect(a.evidence[0].label).toBe("The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent)");
-    expect(a.verdict).toBe("stretched");
+    expect(a.evidence[0].label).toBe("Rental vacancy, metro area");
+    expect(a.gap!.text).toContain(ECONOMIC_FLOOR);
+    expect(a.verdict).toBe("holds");
     expect(stabilizedVacancyStated(vcl)).toBe(false);
     // …and is told the OM's figure counts dollars, so an older screen's
     // challenge on it is scored by a later T-12, never a rent roll's doors.
@@ -919,10 +924,12 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     );
   });
 
-  it("reads a pro forma's vacancy line as dollars, held to the T-12 on the same footing, whether or not the market read answers (the review of 2026-10-23)", () => {
+  it("reads a pro forma's vacancy line as dollars, a stabilized figure the market's doors hold as a floor, never the T-12, today's building (the review of 2026-10-23)", () => {
     // "Vacancy (pro forma)" is the pro forma's deduction from gross potential
-    // rent: dollars, not doors. The T-12 decides it, and the verdict does not
-    // move with the market read.
+    // rent: dollars, not doors. It is still a stabilized figure, so the
+    // deal's T-12 — a trailing year of the building as it stands — never
+    // decides it: the market's doors do, as a floor, since economic vacancy
+    // is never below physical; else the class's norm.
     const pf = withVacancy("6.0%", "stabilized", "Vacancy (pro forma)");
     expect(measureOf("Vacancy (pro forma)")).toBe("economic");
     expect(measureOf("Underwritten vacancy")).toBe("economic");
@@ -933,19 +940,32 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(measureOf("Pro forma vacant units")).toBe("physical");
     expect(measureOf("Physical vacancy (pro forma)")).toBe("physical");
     const withRead = rowOf(buildStressTest(argsFor(pf, {}, { roll: true })), "vacancy");
+    expect(withRead.measure).toBe("economic");
+    expect(withRead.evidence[0]).toMatchObject({ kind: "published", label: METRO_VACANCY_LABEL });
+    // 6.0% against the 6.2% ±2.2 floor: inside its margin, it holds.
+    expect(withRead.verdict).toBe("holds");
+    expect(withRead.gap!.text).toBe(
+      `The OM's 6.0% is a stabilized assumption. The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, and ${ECONOMIC_FLOOR}: rental vacancy, metro area (Census Bureau), 6.2% ±2.2 pts. The OM is 0.2 points under it, inside its margin. Today the deal's T-12 ran 9.1% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.1, 6)} The deal's rent roll counts doors today, 9.2% vacant, so it is shown beside the OM's economic figure and never decides it.`,
+    );
+    // The T-12 is today's gap, the rent roll's doors beside it.
+    expect(withRead.evidence.find((e) => e.publisher === "the deal's T-12")!.text).toMatch(/; today's, 3\.1 points over the stabilized assumption — the gap a lease-up has to close$/);
+    expect(withRead.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/doors, not dollars: shown beside the OM's economic figure and never deciding it$/);
+    // Under the floor past its margin is no economic figure a building runs at.
+    const under = rowOf(buildStressTest(argsFor(withVacancy("3.0%", "stabilized", "Vacancy (pro forma)"))), "vacancy");
+    expect(under.verdict).toBe("stretched");
+    expect(under.gap!.text).toContain("The OM is 3.2 points under it, 1.0 point past its margin.");
+    // With no market read: the class's norm, the T-12 beside it as today's.
     const without = rowOf(buildStressTest(argsFor(pf, { modelVsMarket: null }, { roll: true })), "vacancy");
-    for (const v of [withRead, without]) {
-      expect(v.measure).toBe("economic");
-      expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", value: 9.1 });
-      expect(v.verdict).toBe("unsupported");
-      expect(v.gap!.text).toContain(
-        "The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, so it is held to the deal's T-12, the same measure on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors.",
-      );
-      // The rent roll's doors stand beside it, never deciding.
-      expect(v.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/doors, not dollars: shown beside the OM's economic figure and never deciding it$/);
-    }
-    expect(withRead.gap!.text).toBe(without.gap!.text);
-    // The track record scores it by a later T-12, its own measure.
+    expect(without.evidence[0].kind).toBe("rule_of_thumb");
+    expect(without.ruleOfThumbOnly).toBe(true);
+    expect(without.verdict).toBe("holds");
+    expect(without.gap!.text).toContain(
+      `so the class's norm decides; ${T12_NOT_STABILIZED}: the deal's T-12 ran 9.1% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.1, 6)}`,
+    );
+    // Neither surface lets a document decide it.
+    for (const v of [withRead, without]) expect(v.evidence[v.decidedBy!].kind).not.toBe("document");
+    // The track record scores it by a later T-12, its own measure — a later
+    // year of the building — never as a figure the market's doors held.
     expect(vacancyEconomicStated(pf)).toBe(true);
     expect(stabilizedVacancyStated(pf)).toBe(false);
   });
@@ -987,8 +1007,9 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     // No fresh published figure: the class's norm decided, never the rent
     // roll beside it (the review of 2026-10-23).
     expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })))).toBe("rule_of_thumb");
-    // A pro forma's vacancy line is dollars: the T-12 decided it, the same measure.
-    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%", "stabilized", "Vacancy (pro forma)"))))).toBe("document");
+    // A pro forma's vacancy line is dollars, still stabilized: the market's
+    // doors decided it, as a floor, never the T-12.
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%", "stabilized", "Vacancy (pro forma)"))))).toBe("published");
     expect(vacancyDecidedBy(null)).toBeNull();
     // The deal page asks it of its own built test, never of the extraction alone.
     const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");

@@ -42,7 +42,7 @@ describe("the sample's stress test", () => {
   };
   const own = Number((computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
 
-  it("tests six of its eleven assumptions; the five unchecked are a price two clean comps cannot set a median for, the loan rate no document states, a rent growth no figure was read for, a market rent its one lease comp, graded favorable, cannot decide, and the operating expenses it states no total for", () => {
+  it("tests six of its eleven assumptions, the vacancy holding on the class's norm; the five unchecked are a price two clean comps cannot set a median for, the loan rate no document states, a rent growth no figure was read for, a market rent its one lease comp, graded favorable, cannot decide, and the operating expenses it states no total for", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
       // Two comps graded clean, The Brixton and Parkside: too few for a
@@ -54,8 +54,9 @@ describe("the sample's stress test", () => {
       // 4.7% over the T-12, inside the band, but the re-run moves the
       // levered IRR 239 bps: never a holds.
       ["noi", "stretched"],
-      // The pro forma's vacancy line is dollars: held to the T-12's 9.1%.
-      ["vacancy", "unsupported"],
+      // The pro forma's vacancy line is a stabilized figure: with no read,
+      // the class's norm decides it (never the T-12, today's building).
+      ["vacancy", "holds"],
       ["rent_growth", "unchecked"],
       // One lease comp, graded favorable: no median of three graded clean.
       ["market_rent", "unchecked"],
@@ -86,18 +87,19 @@ describe("the sample's stress test", () => {
     expect(irr("exit_cap")![1]).toBeLessThan(own);
     expect(irr("noi")).toEqual(rerun("noi"));
     expect(irr("noi")![1]).toBe(own);
-    // At the T-12's 9.1%: "Vacancy (pro forma)" is the pro forma's deduction
-    // from gross potential rent, dollars, so the T-12's economic vacancy, the
-    // same measure on a trailing year, decides it — whatever the market read
-    // holds (the review of 2026-10-23); the rent roll's 9.3% by count (225 of
-    // 248 doors) is doors, beside it.
+    // "Vacancy (pro forma)" is the pro forma's deduction from gross
+    // potential rent, dollars, and a stabilized figure: with no published
+    // figure read, the class's norm decides it, a rule of thumb; the T-12's
+    // 9.1% is the building today, mid-renovation, beside it as today's gap,
+    // never the test of the building stabilized (the review of 2026-10-23);
+    // the rent roll's 9.3% by count (225 of 248 doors) is doors, beside it.
     const t12 = SAMPLE_DEAL.t12.summary;
     const t12Pct = ((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 100).toFixed(1);
     expect(irr("vacancy")).toEqual(rerun("vacancy"));
-    expect(irr("vacancy")![0]).toBeGreaterThan(irr("vacancy")![1]);
     expect(row("vacancy").measure).toBe("economic");
+    expect(row("vacancy").ruleOfThumbOnly).toBe(true);
     expect(row("vacancy").gap?.text).toBe(
-      `The OM's 6.0% is 3.1 points under the evidence's ${t12Pct}%. The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, so it is held to the deal's T-12, the same measure on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors. The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it.`,
+      `The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides; the deal's T-12 is the building today, never the test of a stabilized figure: the deal's T-12 ran ${t12Pct}% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close. The lease-up from today's ${t12Pct}% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one. The deal's rent roll counts doors today, 9.3% vacant, so it is shown beside the OM's economic figure and never decides it. Against a rule of thumb only.`,
     );
     expect(irr("taxes")).toEqual(rerun("taxes"));
     expect(irr("taxes")![0]).toBe(own);

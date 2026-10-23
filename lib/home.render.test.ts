@@ -642,15 +642,25 @@ describe("the walkthrough's tabs are the sample deal's own", () => {
     expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
     expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
     expect(t).toContain("The OM's assumptions, tested");
-    // The sample's 6% vacancy against its rent roll and T-12: a document
-    // row with an impact, drawn on the homepage from the same build /demo
-    // draws (lib/sample-stress), with no figure read today.
-    const from = html.indexOf('data-qa="stress-row-vacancy"');
-    const row = html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
-    expect(row).toContain('data-verdict="unsupported"');
-    expect(row).toContain('data-evidence="document"');
+    // Drawn on the homepage from the same build /demo draws
+    // (lib/sample-stress), with no figure read today: the sample's
+    // stabilized 6% vacancy holds on the class's norm, its rent roll and
+    // T-12 beside it as the building today, no re-run drawn; its NOI against
+    // the T-12's is a document row with an impact.
+    const rowOf = (key: string) => {
+      const from = html.indexOf(`data-qa="stress-row-${key}"`);
+      return html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+    };
+    const row = rowOf("vacancy");
+    expect(row).toContain('data-verdict="holds"');
+    expect(row).toContain('data-evidence="rule_of_thumb"');
     expect(visibleText(row)).toContain("the deal's T-12");
-    expect(row).toContain('data-qa="stress-impact"');
+    expect(row).toContain('data-qa="stress-no-rerun"');
+    const noi = rowOf("noi");
+    expect(noi).toContain('data-verdict="stretched"');
+    expect(noi).toContain('data-evidence="document"');
+    expect(visibleText(noi)).toContain("the deal's T-12");
+    expect(noi).toContain('data-qa="stress-impact"');
     expect(t).not.toContain("Published figures read");
     // The whole method, one link right under the panel (2026-10-20).
     const link = html.indexOf('data-qa="how-we-test-link"');

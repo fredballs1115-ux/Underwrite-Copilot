@@ -561,19 +561,24 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("11 of the memorandum's assumptions read in code — 6 tested (3 unsupported, 3 stretched), 5 unchecked");
+    expect(brief).toContain("11 of the memorandum's assumptions read in code — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
     expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
     expect(brief).toContain(moves("taxes"));
-    // The pro forma's vacancy line is dollars: the T-12's economic vacancy
-    // decides it, the rent roll's doors beside it (the review of 2026-10-23).
+    // The pro forma's vacancy line is a stabilized figure: with no figure
+    // read, the class's norm decides it, and the rent roll and the T-12 are
+    // the building today, beside it and never deciding (the review of
+    // 2026-10-23). It holds, so no move is printed.
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic",
+      "- Stabilized vacancy (vacancy) [HOLDS] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] Multifamily vacancy, a rule of thumb: 5.0%",
     );
-    // The engine at the OM's 6.0% against the engine at the T-12's 9.1%.
-    expect(brief).toContain(moves("vacancy"));
+    expect(brief).toContain(
+      "[BESIDE IT, NOT DECIDING] The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic",
+    );
+    expect(brief).toContain("Against a rule of thumb only. The levered IRR: The OM's figure is within the evidence; no re-run.");
+    expect(brief).not.toContain(moves("vacancy"));
     // Two comps graded clean are too few for a median: the price stands
     // unchecked, said why, with no move.
     expect(brief).toContain("- Basis (basis) [UNCHECKED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");

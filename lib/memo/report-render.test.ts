@@ -2960,7 +2960,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("11 assumptions · 3 unsupported · 3 stretched · 5 unchecked");
+    expect(page).toContain("11 assumptions · 2 unsupported · 3 stretched · 1 holds · 5 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, in its parts — the lead, what the
     // split is, a row a part, then each sentence after — every part the
@@ -3005,24 +3005,23 @@ describe("the report's stress-test page", () => {
     for (const r of test.rows) expect(page).toContain(`OM says: ${r.omSays.text}`);
     // The verdict word is the row's tag, printed in capitals.
     expect(page.indexOf("UNSUPPORTED Exit cap")).toBeGreaterThan(-1);
-    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeLessThan(page.indexOf("UNSUPPORTED Stabilized vacancy"));
-    expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeLessThan(page.indexOf("STRETCHED NOI"));
-    expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Basis"));
+    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeLessThan(page.indexOf("STRETCHED NOI"));
+    expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("HOLDS Stabilized vacancy"));
+    expect(page.indexOf("HOLDS Stabilized vacancy")).toBeLessThan(page.indexOf("UNCHECKED Basis"));
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
-    // The vacancy row, whole: the pro forma's vacancy line is dollars, held
-    // to the T-12's economic vacancy; the rent roll's doors beside it.
+    // The vacancy row, whole: the pro forma's vacancy line is a stabilized
+    // figure, so with no figure read the class's norm decides it; the T-12
+    // and the rent roll are the building today, beside it, never deciding.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
-    expect(page).toContain("The deal's document — The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic");
-    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); doors, not dollars: shown beside the OM's economic figure and never deciding it (the deal's rent roll)");
-    expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
-    expect(page).toContain("Gap: The OM's 6.0% is 3.1 points under the evidence's 9.1%.");
-    // The vacancy's two runs and the model's own IRR, read off the test,
-    // never typed.
-    const vac = test.rows.find((r) => r.key === "vacancy")!.impact!;
-    expect(page).toContain(
-      `The return: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's. If vacancy is the deal's T-12's 9.1%, not the OM's 6.0%, the levered IRR moves from ${vac.baseIrrPct!.toFixed(1)}% to ${vac.altIrrPct!.toFixed(1)}%`,
-    );
-    expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's T-12 economic vacancy/);
+    expect(page).toContain("Decides: Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
+    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic");
+    expect(page).toContain("today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close (the deal's T-12)");
+    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); doors, not dollars: shown beside the OM's economic figure and never deciding it (the deal's rent roll)");
+    expect(page).toContain("Gap: The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side.");
+    expect(page).toContain("the deal's T-12 is the building today, never the test of a stabilized figure");
+    // A row that holds draws no re-run.
+    expect(page).toContain("Against a rule of thumb only. The return: The OM's figure is within the evidence; no re-run.");
+    expect(page).toMatch(/Method: The OM's stabilized vacancy against multifamily vacancy, a rule of thumb, the one figure that decides/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The memorandum's own pieces carry their validated page, as the panel's
     // page chip and the memo's evidence cell do: the pro forma cap's.

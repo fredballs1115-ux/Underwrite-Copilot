@@ -14,30 +14,25 @@
 //     two years or more (lib/growth-average), the LOWER of its trailing year
 //     and its compound average a year decides — one hot year is not a rate
 //     for every year of a hold (the review of 2026-10-23) — the other beside;
-//   - vacancy: ONE measure decides its own kind (the review of 2026-10-21).
-//     A physical figure — doors, the units or the area empty: a stated
-//     occupancy, a stated vacancy rate — is decided only by a physical
-//     figure: a stabilized assumption (on a deal read as stabilized or on a
-//     plan deal alike) by the market's published figure (the metro survey,
-//     a commercial class's tracker band at its low read, the Census region,
-//     the state), then the class's norm, a rule of thumb named as one —
-//     never the deal's rent roll, which is the building TODAY, not the
-//     building stabilized (the investor's review of 2026-10-23: a 6% held
-//     against the survey read "holds", and with the read failed the rent
-//     roll's 9.3% lease-up gap decided it "unsupported" — one assumption,
-//     two verdicts, on whether a feed answered); the roll is shown beside
-//     it as today's gap, the one a lease-up (or the plan) has to close.
-//     Today's occupancy: the rent roll, then the published figures in the
-//     same order, then the class's norm. The T-12's vacancy and credit loss
-//     over gross potential rent is an economic figure — dollars, not doors —
-//     so it never decides a physical figure and is shown beside it,
-//     labelled economic. An economic figure the OM states (a pro forma's
-//     vacancy line, a deduction from gross potential rent; a vacancy and
-//     credit loss; an economic occupancy) is decided by the T-12, the same
-//     measure on the same footing, a trailing year rather than one day's
-//     count, then the class's norm (on a plan deal's stabilized figure, the
-//     norm alone); the rent roll and the published vacancy count doors and
-//     are shown beside it;
+//   - vacancy (the reviews of 2026-10-21 and 2026-10-23): a STABILIZED
+//     figure, whatever it counts and on a deal read as stabilized or a plan
+//     deal alike, is decided by the market's published figure (the metro
+//     survey, a commercial class's tracker band at its low read, the Census
+//     region, the state), then the class's norm, a rule of thumb named as
+//     one — never by the deal's rent roll or its T-12, which are the
+//     building TODAY (a lease-up, or the sample's renovation downtime), not
+//     the building stabilized: each is drawn beside it as today's gap (the
+//     investor's review: a 6% held to the survey read "holds", and with the
+//     read failed the rent roll's 9.3% decided it "unsupported" — one
+//     assumption, two verdicts, on whether a feed answered). The published
+//     figures count doors; an economic stabilized figure (a pro forma's
+//     vacancy line, a vacancy and credit loss) adds credit and concession
+//     loss to the doors empty, so it is never below the physical vacancy:
+//     the market's doors are a FLOOR for it, and the row says so. A figure
+//     for TODAY is decided in its own measure: doors by the rent roll, then
+//     the published figures, then the class's norm; dollars by the T-12,
+//     then the class's norm. The T-12's dollars never decide a count of
+//     doors, nor the rent roll's doors a figure in dollars;
 //   - expense growth: all-items CPI (the broad price level the expense base
 //     moves with), then core CPI only where all-items is not fresh; where
 //     the deciding series' stored history holds two years or more, the
@@ -195,34 +190,31 @@ const T12_VACANCY: DeciderStep = {
 };
 const RULE_VACANCY: DeciderStep = { name: "the class's norm, a rule of thumb", why: "where nothing else carries a figure", is: (e) => e.kind === "rule_of_thumb" };
 
-/** Each order holds only figures of the OM figure's own measure: a physical
- *  figure (doors) is never decided by the T-12's economic loss (dollars), and
- *  an economic one never by a count of doors. And a stabilized figure is
- *  never decided by today's rent roll: one day's count of the building as it
- *  stands is the gap a lease-up has to close, not the building stabilized. */
+/** A stabilized figure is never decided by the deal's documents: the rent
+ *  roll and the T-12 are the building as it stands, the gap a lease-up (or
+ *  the plan) has to close, not the building stabilized. A figure for today
+ *  is decided in its own measure: a physical one (doors) never by the T-12's
+ *  economic loss (dollars), an economic one never by a count of doors. */
 export const VACANCY_ORDER = {
-  /** a stabilized physical assumption on a deal read as stabilized: the
-   *  market's, then the class's norm — the rent roll is today's, beside it */
+  /** a stabilized assumption, whatever its measure: the market's, then the
+   *  class's norm — the documents are today's, beside it (an economic one is
+   *  held to the market's doors as a floor) */
   stabilized: [...MARKET_VACANCY, RULE_VACANCY],
-  /** a plan deal's stated stabilized figure: the market's, then the class's
-   *  norm; the deal's documents are today's building, never its figure */
+  /** a plan deal's stated stabilized figure: the same order */
   plan: [...MARKET_VACANCY, RULE_VACANCY],
   /** an occupancy for today, by its doors */
   today: [RENT_ROLL_VACANCY, ...MARKET_VACANCY, RULE_VACANCY],
-  /** a figure the OM states as economic: the T-12, the same measure, then
-   *  the class's norm */
+  /** an economic figure for today: the T-12, the same measure, then the
+   *  class's norm */
   economic: [T12_VACANCY, RULE_VACANCY],
-  /** a plan deal's stated economic allowance: the class's norm alone — the
-   *  T-12 is the building before the plan is done */
-  economicPlan: [RULE_VACANCY],
 } as const;
 
 /** `stabilized`: the OM's figure is a stated stabilized vacancy; `plan`: on
  *  a value-add, lease-up, conversion or development deal; `economic`: the
  *  OM states its figure as economic (dollars, not doors). */
 export function vacancyDecider(candidates: readonly DeciderCandidate[], opts: { stabilized: boolean; plan?: boolean; economic?: boolean }): DecidingFigure | null {
-  if (opts.economic) return pickDecider(opts.stabilized && opts.plan ? VACANCY_ORDER.economicPlan : VACANCY_ORDER.economic, candidates);
-  return pickDecider(opts.stabilized ? (opts.plan ? VACANCY_ORDER.plan : VACANCY_ORDER.stabilized) : VACANCY_ORDER.today, candidates);
+  if (opts.stabilized) return pickDecider(opts.plan ? VACANCY_ORDER.plan : VACANCY_ORDER.stabilized, candidates);
+  return pickDecider(opts.economic ? VACANCY_ORDER.economic : VACANCY_ORDER.today, candidates);
 }
 
 // — Rent growth —

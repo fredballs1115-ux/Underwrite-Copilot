@@ -641,6 +641,29 @@ describe("scoreDeal — every row of the stress test kept with the verdict, hold
     expect(SCORABLE_SOURCES.filter((s) => r.scorable!.find((g) => g.key === "vacancy")!.by[s])).toEqual(["rent_roll"]);
   });
 
+  it("a stabilized economic vacancy the market's doors held as a floor is scored by a later T-12, a later year of the building, on the row's own margin (the review of 2026-10-23)", () => {
+    const floor = (verdict: "stretched" | "holds", om: number) =>
+      row({
+        key: "vacancy",
+        verdict,
+        om,
+        measure: "economic",
+        threshold: { value: 1.9, unit: "pts" },
+        evidence: { value: 5.8, label: "Rental vacancy, metro area", asOf: "2026-04-01", kind: "published", publisher: "Census Bureau" },
+      });
+    // Flagged under the floor; a later T-12 well past the OM's figure on the
+    // buyer's bad side: the flag was right.
+    const flagged = scoreDeal({ screenedAt: T, stressSnapshot: snap(floor("stretched", 3)), challenges: [], ...laterT12() });
+    expect(flagged.rows[0]).toMatchObject({ landing: "right", outcome: "flag_right", later: { source: "t12", value: T12_VAC } });
+    // Held at the floor; a later T-12 past the OM's by more than the row's
+    // margin: the hold was wrong, scored as before.
+    const held = scoreDeal({ screenedAt: T, stressSnapshot: snap(floor("holds", 6)), challenges: [], ...laterT12() });
+    expect(held.rows[0]).toMatchObject({ landing: "wrong", later: { source: "t12", value: T12_VAC } });
+    // Held, and a later T-12 inside the margin: the hold was right.
+    const inside = scoreDeal({ screenedAt: T, stressSnapshot: snap(floor("holds", 8)), challenges: [], ...laterT12() });
+    expect(inside.rows[0]).toMatchObject({ landing: "right", later: { source: "t12", value: T12_VAC } });
+  });
+
   it("an economic vacancy is scored by a later T-12's economic vacancy alone, never by a rent roll's count", () => {
     const economic = row({ key: "vacancy", title: "Economic vacancy", measure: "economic", evidence: { value: 9, label: "Apartment vacancy and credit loss, a rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" } });
     const r = scoreDeal({ screenedAt: T, stressSnapshot: snap(economic), challenges: [], ...laterT12() });

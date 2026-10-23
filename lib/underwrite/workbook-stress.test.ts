@@ -279,7 +279,9 @@ describe("the Stress Test tab", () => {
 
   it("prints a plan deal's re-runs and headline as yield on cost, at two places", async () => {
     const base = sampleStressTest({ today: TODAY });
-    const row = base.rows.find((r) => r.key === "vacancy")!;
+    // A row that draws a re-run (the sample's stabilized vacancy holds, and a
+    // row that holds prints none): its NOI against the T-12's.
+    const row = base.rows.find((r) => r.key === "noi")!;
     const plan: StressTest = {
       ...base,
       measure: "yield_on_cost",
@@ -299,8 +301,8 @@ describe("the Stress Test tab", () => {
         evidenceIrrPct: null,
         omMultiple: null,
         evidenceMultiple: null,
-        omKeys: ["vacancy"],
-        parts: [{ key: "vacancy", label: row.title, pts: -0.45, multiple: null }],
+        omKeys: ["noi"],
+        parts: [{ key: "noi", label: row.title, pts: -0.45, multiple: null }],
         omitted: [],
         unsolved: 0,
       },

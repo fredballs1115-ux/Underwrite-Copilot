@@ -936,8 +936,14 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   // label the measure is read off (lib/stress-test `measureOf`): it is read
   // as counted by doors, as it was struck.
   const econ = laterArgs.economic;
-  // The market decided a stabilized vacancy where its published figure did.
-  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published";
+  // The market decided a stabilized vacancy counted by doors where its
+  // published figure did. An economic one the market's doors held as a floor
+  // (lib/stress-test `ECONOMIC_FLOOR`) is scored by a later T-12, its own
+  // measure — a later year of the building — on the row's own margin and
+  // direction: a later economic vacancy at or past the OM's on the buyer's
+  // bad side makes a stretched or unsupported row right (the review of
+  // 2026-10-23).
+  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published" && r.measure !== "economic";
   const later = laterFor(key, laterArgs);
   if (!later) {
     // A vacancy is scored in its own measure: a document of the other one is
@@ -1387,7 +1393,10 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
     };
     // A vacancy is scored in its own measure: the deal's own row's, else
     // (the account's grid) a row of either measure.
-    const economic = row.key === "vacancy" ? ctx.vacancyEconomic : false;
+    // A vacancy the market's doors held is a row counted by doors (an
+    // economic one meets the market only as a floor, and a later T-12 scores
+    // it), so a grid told the market held it reads it as doors.
+    const economic = row.key === "vacancy" ? (ctx.vacancyHeldToMarket ? (ctx.vacancyEconomic ?? false) : ctx.vacancyEconomic) : false;
     const rows = economic === undefined ? [row, { ...row, measure: "economic" as const }] : economic ? [{ ...row, measure: "economic" as const }] : [row];
     const by = Object.fromEntries(
       SCORABLE_SOURCES.map((source) => [source, rows.some((r) => kinds[source].some((ev) => scoreTestRow(r, T, ev, args).landing !== "unscored"))]),

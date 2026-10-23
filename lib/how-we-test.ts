@@ -105,11 +105,10 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   exit_cap: `Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  // lib/stress-deciders' VACANCY_ORDER: one measure decides its own kind —
-  // doors by the market, then the class's norm, never today's rent roll;
-  // dollars (a pro forma's vacancy line among them) by the T-12, then the
-  // class's norm.
-  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the class's norm, never today's rent roll; a pro forma's vacancy line or a vacancy and credit loss is dollars, held to the T-12. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
+  // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
+  // then the class's norm, never the deal's documents (an economic one meets
+  // the market's doors as a floor); today's by its own measure's document.
+  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the class's norm, never the rent roll or T-12; one in dollars meets the market's doors as a floor. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
   // lib/rent-growth-decider's order, one line.
   // Where the series' history holds two years or more, the lower of its
   // trailing year and its average decides: said in the method's limits

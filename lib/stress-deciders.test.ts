@@ -76,15 +76,17 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(vacancyDecider(held(t12, region, rot), { stabilized: false })!.label).toBe("Rental vacancy, South Census region");
     expect(vacancyDecider(held(t12), { stabilized: false })).toBeNull();
     expect(vacancyDecider(held(t12), { stabilized: true })).toBeNull();
-    // A figure the OM states as economic is the T-12's to decide, the same
+    // An economic figure for today is the T-12's to decide, the same
     // measure, ahead of the market and the rent roll, which count doors; the
-    // class's norm stands in only with no T-12; on a plan's stabilized
-    // figure the norm alone, the T-12 being the building before the plan.
-    expect(vacancyDecider(all, { stabilized: true, economic: true })!.label).toBe(T12_VACANCY_LABEL);
+    // class's norm stands in only with no T-12. A stabilized economic figure
+    // is the market's, as a floor, then the class's norm — never the T-12,
+    // today's building (the review of 2026-10-23), on any deal.
     expect(vacancyDecider(all, { stabilized: false, economic: true })!.label).toBe(T12_VACANCY_LABEL);
     expect(vacancyDecider(held(rr, metro, rot), { stabilized: false, economic: true })!.label).toBe(rot.label);
-    expect(vacancyDecider(held(rr, metro), { stabilized: true, economic: true })).toBeNull();
-    expect(vacancyDecider(all, { stabilized: true, plan: true, economic: true })!.label).toBe(rot.label);
+    expect(vacancyDecider(all, { stabilized: true, economic: true })!.label).toBe(METRO_VACANCY_LABEL);
+    expect(vacancyDecider(held(t12, rr, rot), { stabilized: true, economic: true })!.label).toBe(rot.label);
+    expect(vacancyDecider(held(t12, rr), { stabilized: true, economic: true })).toBeNull();
+    expect(vacancyDecider(all, { stabilized: true, plan: true, economic: true })!.label).toBe(METRO_VACANCY_LABEL);
     // No metro figure: the region's, never the documents', on a stabilized assumption.
     expect(vacancyDecider(held(t12, region, rot), { stabilized: true })!.label).toBe("Rental vacancy, South Census region");
     expect(vacancyDecider(held(rot), { stabilized: true })!.label).toBe(rot.label);
