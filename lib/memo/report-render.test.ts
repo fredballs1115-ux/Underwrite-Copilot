@@ -2960,7 +2960,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("11 assumptions · 2 unsupported · 5 stretched · 4 unchecked");
+    expect(page).toContain("11 assumptions · 2 unsupported · 3 stretched · 1 holds · 5 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, in its parts — the lead, what the
     // split is, a row a part, then each sentence after — every part the
@@ -2973,17 +2973,17 @@ describe("the report's stress-test page", () => {
     expect(`${h.lead.slice(0, -1)}: ${headlineSplit(test)}, ${lower(h.splitNote)}${h.after.map((t) => ` ${t}`).join("")}`).toBe(headlineSentence(test));
     const flat = (t: string) => pdfSafe(t).replace(/\s+/g, " ");
     expect(page).toContain(flat(h.lead));
-    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence \(equity multiple [^)]+\)\.$/);
+    expect(h.lead).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with stretched and unsupported rows at the evidence \(equity multiple [^)]+\)\.$/);
     expect(page).toContain(flat(h.splitNote));
     for (const p of h.parts) expect(page).toContain(flat(`${p.name} ${p.pts}${p.note ? ` ${p.note}` : ""}`));
     for (const t of h.after) expect(page).toContain(flat(t));
     // No longer one bold paragraph: the split is not printed inline.
-    expect(page).not.toContain(flat(`with the evidence: ${headlineSplit(test)}`));
+    expect(page).not.toContain(flat(`with stretched and unsupported rows at the evidence: ${headlineSplit(test)}`));
     // The sample is read as stabilized: its re-runs say so, as the deal
     // page says it, under the read line and before the headline.
     expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
     expect(page.indexOf(flat(SAMPLE_PLAN_NOTE))).toBeLessThan(page.indexOf(flat(h.lead)));
-    expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Stabilized vacancy"));
+    expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Exit cap"));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
     expect(test.publishedRead).toBe(false);
@@ -3004,32 +3004,36 @@ describe("the report's stress-test page", () => {
     // Every row, unsupported first.
     for (const r of test.rows) expect(page).toContain(`OM says: ${r.omSays.text}`);
     // The verdict word is the row's tag, printed in capitals.
-    expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeGreaterThan(-1);
-    expect(page.indexOf("UNSUPPORTED Stabilized vacancy")).toBeLessThan(page.indexOf("STRETCHED Basis"));
-    expect(page.indexOf("STRETCHED Basis")).toBeLessThan(page.indexOf("STRETCHED NOI"));
+    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeGreaterThan(-1);
+    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeLessThan(page.indexOf("STRETCHED NOI"));
+    expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("HOLDS Stabilized vacancy"));
+    expect(page.indexOf("HOLDS Stabilized vacancy")).toBeLessThan(page.indexOf("UNCHECKED Basis"));
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
-    // The vacancy row, whole.
+    // The vacancy row, whole: the pro forma's vacancy line is a stabilized
+    // figure, so with no figure read the class's norm decides it; the T-12
+    // and the rent roll are the building today, beside it, never deciding.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
-    expect(page).toContain("The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll)");
-    expect(page).toContain("Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
-    expect(page).toContain("Gap: The OM's 6.0% is 3.3 points under the evidence's 9.3%.");
-    // The vacancy's two runs and the model's own IRR, read off the test,
-    // never typed.
-    const vac = test.rows.find((r) => r.key === "vacancy")!.impact!;
-    expect(page).toContain(
-      `The return: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's. If vacancy is the deal's rent roll's 9.3%, not the OM's 6.0%, the levered IRR moves from ${vac.baseIrrPct!.toFixed(1)}% to ${vac.altIrrPct!.toFixed(1)}%`,
-    );
-    expect(page).toMatch(/Method: The OM's stabilized vacancy against the deal's rent roll: the occupancy it runs at/);
+    expect(page).toContain("Decides: Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
+    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic");
+    expect(page).toContain("today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close (the deal's T-12)");
+    expect(page).toContain("Beside it, not deciding: The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); the building today, which a lease-up starts from: shown beside the stabilized assumption and never deciding it (the deal's rent roll)");
+    expect(page).toContain("Gap: The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side.");
+    expect(page).toContain("the deal's T-12 is the building today, never the test of a stabilized figure");
+    // A row that holds draws no re-run.
+    expect(page).toContain("Against a rule of thumb only. The return: The OM's figure is on the cautious side of the evidence; no re-run.");
+    expect(page).toMatch(/Method: The OM's stabilized vacancy against multifamily vacancy, a rule of thumb, the one figure that decides/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The memorandum's own pieces carry their validated page, as the panel's
-    // page chip and the memo's evidence cell do.
-    const clean = test.rows.find((r) => r.key === "basis")!.evidence.find((e) => e.page != null)!;
-    expect(clean.page).toBe(14);
-    expect(page).toContain(flat(`${clean.label}: ${clean.text} (OM p. 14)`));
-    // The basis row's move is the engine's, spelled.
+    // page chip and the memo's evidence cell do: the pro forma cap's.
+    const pf = test.rows.find((r) => r.key === "exit_cap")!.evidence.find((e) => e.page != null)!;
+    expect(pf.page).toBe(8);
+    expect(page).toContain(flat(`${pf.label}: ${pf.text} (OM p. 8)`));
+    // The exit row's move is the engine's, spelled.
     expect(page).toContain(
-      "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the price is the one comp graded clean (The Brixton — 2.1 mi), $62.5M ($252k/unit), at the model's loan-to-cost (the loan re-sizes with the price), not the OM's $68M ($274k/unit), the levered IRR moves from 9.3% to 13.6%",
+      "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the exit cap is the pro forma cap's 5.70%, not the OM's 5.25%, the levered IRR moves from 10.8% to 7.4%",
     );
+    // The price stands unchecked on two clean comps, on the comps' floor.
+    expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (2 of 3)");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the
     // jurisdiction's to say — and the engine's move on the gap.
@@ -3042,7 +3046,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("The return: No return is re-run: no figure to swap.");
     expect(page).not.toMatch(/→/);
     // Page one carries the memo's lead rows.
-    expect(pages[0]).toContain("UNSUPPORTED Stabilized vacancy OM 6.0% (p. 8)");
+    expect(pages[0]).toContain("UNSUPPORTED Exit cap OM 5.25% (p. 41)");
   }, 90000);
 
   it("draws each row's two ticks on a track (four fills a row: the track, the span and the ticks), and prints no page without a test", async () => {
@@ -3071,7 +3075,7 @@ describe("the report's stress-test page", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const text = (await pdfTextOf(await renderReportPdf(buildReportData(sampleRow(), "October 19, 2026", [], null, ...between, withheld)))).replace(/\s+/g, " ");
     // The reason is one whole sentence, never behind a second "No return re-run".
-    expect(text).toContain("4 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(text).toContain("5 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(text).not.toMatch(/No return (is )?re-run: no model was derived/i);
     expect(text).toContain("The return: No model was derived for this deal, so no return is re-run.");
     expect(text).not.toContain("levered IRR moves");

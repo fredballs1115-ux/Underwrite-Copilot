@@ -59,6 +59,7 @@ export const WHO_DOES_WHAT = {
       "the memorandum, the rent roll, the T-12 and the model you add",
       "names each assumption and the page it comes from",
       "names the question the figure raises for the broker",
+      "grades each of the memorandum's comps by how comparable it is to the subject, never by its price against the ask",
       "writes the call, its ranges and the critique: their figures are its reading of the documents, not the engine's",
     ],
   },
@@ -66,6 +67,7 @@ export const WHO_DOES_WHAT = {
     heading: "Code runs",
     items: [
       "the lookup: the one published figure, document or rule of thumb that decides it, the rest shown beside it",
+      "the median of the comps graded clean, three or more, or none",
       "the arithmetic: the gap in the assumption's own unit",
       "the verdict word, from the gap and the row's own threshold",
       "the re-run: the return again with the evidence's figure in the OM's place",
@@ -96,22 +98,25 @@ const pctOf = (share: number) => `${Math.round(share * 100)}%`;
  * each figure its constant.
  */
 export const VERDICT_RULES: Record<StressKey, string> = {
-  // lib/stress-test's price row: the first piece above that carries a
-  // figure. A median needs three; under three comps graded clean none is
-  // struck, and the row names what it holds the ask to by count.
-  basis: `Held to the first figure above that stands: a median of three or more; under three comps graded clean, no median, but the one comp or the two comps' midpoint, named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%, on one or two comps stretched at most.`,
-  exit_cap: `Held to the going-in cap alone, else the published cap range's low end; a cap range beside a going-in cap decides nothing. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
+  // lib/stress-test's price row: a median of three trades or more decides,
+  // the comps graded clean first, then the recorded sales; under three, no
+  // median, and the row stands unchecked, the comps named with their count.
+  basis: `Held to the median of three or more trades: the comps graded clean, else the recorded sales. Under three, unchecked, the comps named with their count; your past screens' asks never decide. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
+  exit_cap: `Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
-  // lib/stress-deciders' VACANCY_ORDER: one measure decides its own kind —
-  // doors by the market, then the rent roll (never on a plan), then the
-  // class's norm; dollars by the T-12, then the class's norm.
-  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the rent roll (never on a plan), then the class's norm; the T-12, dollars not doors, decides only an economic figure. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
+  // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
+  // then the class's norm, never the deal's documents (an economic one meets
+  // the market's doors as a floor); today's by its own measure's document.
+  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the class's norm, never the rent roll or T-12; one in dollars meets the market's doors as a floor. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
   // lib/rent-growth-decider's order, one line.
+  // Where the series' history holds two years or more, the lower of its
+  // trailing year and its average decides: said in the method's limits
+  // (GROWTH_HISTORY_LIMIT), this line held to one thought.
   rent_growth: `Held to the figure for its kind of rent: Zillow's apartment rents, else all-homes, else CPI rent; a house, all-homes first; a park, student or mixed-use building, the closest, named so; commercial, its lessors' index. Unsupported past ${RENT_GROWTH_UNSUPPORTED_PTS} points over it.`,
-  expense_growth: `Held to all-items CPI's trailing year; to core CPI only where all-items is not fresh. Core, the insurance index, the breakeven and the CPI's own average over the years its history holds are shown beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
+  expense_growth: `Held to all-items CPI, the higher of its year and its average where its history holds two years; to core CPI only where all-items is not fresh. Core, the insurance index and the breakeven are beside it. Unsupported past ${EXPENSE_GROWTH_UNSUPPORTED_PTS} points under it.`,
   taxes: `Held to the OM's implied reset bill, else its unabated bill, else the T-12's bill where the OM's is over ${pctOf(SAME_SHARE)} under it. Holds within ${pctOf(SAME_SHARE)} or over it; past ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill is unsupported; the reset bill and the T-12's read stretched at most.`,
-  insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more, since it is a working floor and a rule of thumb, not a quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
+  insurance: `Held to the seller's own T-12 premium where the OM's sits more than ${pctOf(SAME_SHARE)} under it: stretched, never more: it is the seller's history, not a new owner's quote. At or over it, unchecked: no new owner's quote is on file, and the index decides nothing.`,
   market_rent: `Held to the median of three or more of the memorandum's lease comps graded clean, on the class's yardstick; under three, unchecked, the comps named. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
   opex: `Held to the T-12's expenses on the OM figure's footing, less the taxes and insurance it states; with no T-12, to the class's ratio, a rule of thumb, stretched at most. Holds within ${pctOf(NOI_IN_LINE_BAND)} under it or over it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} under it.`,
   renovation_premium: `Held to the achieved premium: holds within ${pctOf(SAME_SHARE)}, unsupported past ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over it. With none stated, unchecked: the break-even is shown beside it, saying whether the program pays at the OM's own premium.`,
@@ -142,7 +147,7 @@ export function evidenceKindOf(item: string): EvidenceKind | null {
   }
   // "The going-in cap: …" is the memorandum's own figure; "a going-in cap
   // under the all-in rate" (negative leverage) is arithmetic, left unmarked.
-  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
+  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|^The higher of the OM's going-in cap\b|^The OM's pro forma cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
   if (/deal's own|deal's T-12|rent roll|T-12/i.test(item)) return "document";
   return null;
 }
@@ -324,7 +329,7 @@ export const TRACK_RECORD = {
     // lib/track-record `laterFor` / `otherMeasure`: the stress test's own
     // doors-and-dollars rule, scored the same way.
     `${VACANCY_MEASURE_RULE} A document of the other measure is named on the row, with why; an older screen's challenge is read in the OM figure's measure.`,
-    "A stabilized vacancy the market's figure decided is not scored by a later rent roll or T-12: a document's vacancy is the building's today, not a test of the assumption.",
+    "A stabilized vacancy in doors the market's figure decided is not scored by a later rent roll or T-12, the building today; one in dollars, held to the market only as a floor, is scored by a later T-12, its own measure.",
     "A decision is a direction, not a verdict on the OM's figure: it is counted apart and in no share.",
     // lib/track-record `gapCaptured` and `accountRecord`'s base rate: shown,
     // never scored (the owner's decision of 2026-10-21).

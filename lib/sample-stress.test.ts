@@ -17,7 +17,7 @@ import { modelEvidenceFor } from "./model-evidence";
 import { regulationForDeal } from "./rent-regulation";
 import { countyOf, placeDeal } from "./market-county";
 import { modelVsMarketFor } from "./model-vs-market";
-import { INSURANCE_FLOOR_CONDITION, PLAN_YIELD_LEAD, buildStressTest } from "./stress-test";
+import { ECONOMIC_FLOOR, INSURANCE_FLOOR_CONDITION, PLAN_YIELD_LEAD, T12_NOT_STABILIZED, buildStressTest } from "./stress-test";
 import { compactUsd } from "./money";
 import type { StressTest } from "./stress-test-types";
 import { stressSnapshotOf } from "./stress-snapshot";
@@ -25,7 +25,7 @@ import type { TodayReads } from "./model-vs-market-read";
 import { readValueAdd } from "./value-add";
 import { modelReadsWithheld } from "./underwrite/report-grid";
 import { computeUnderwrite } from "./underwrite/engine";
-import { HOLDS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText } from "./stress-test-words";
+import { HOLDS_CAUTIOUS_NO_RERUN, SAMPLE_PLAN_NOTE, headlineSentence, headlineShort, keptSentence, rerunWords, rowMoveText, stressReadLine } from "./stress-test-words";
 import { stressSection } from "./anthropic/verdict";
 import { keptRows } from "@/app/stress-test-panel";
 
@@ -157,27 +157,41 @@ describe("the sample's stress test, one build on every surface", () => {
     const row = (k: string) => page.rows.find((r) => r.key === k)!;
     expect(row("rent_growth").verdict).not.toBe("unchecked");
     expect(row("vacancy").evidence.map((e) => e.label)).toContain("Rental vacancy, metro area");
-    // The sample's 6.0% pro forma vacancy is a stabilized assumption on a
-    // stabilized deal: held to the metro's 5.8% ±1.9 survey, its rent roll's
-    // 9.3% shown beside it as today's. With no Zillow figure in this read,
-    // its 4.0% rent growth is held to the CPI rent's +5.0%.
-    expect(row("vacancy")).toMatchObject({ verdict: "holds", gap: { value: -0.2, unit: "pts" } });
-    // Kept with the verdict, the row carries the tolerance it held by: the
-    // survey's 1.9-point margin of error, never a stricter 0.05 points.
-    expect(stressSnapshotOf(page)!.rows.find((r) => r.key === "vacancy")!.threshold).toEqual({ value: 1.9, unit: "pts" });
-    expect(row("vacancy").evidence[0].label).toBe("Rental vacancy, metro area");
-    expect(row("vacancy").gap!.text).toContain("Today the deal's rent roll runs 9.3% vacant, 3.3 points over the assumption — the gap a lease-up has to close.");
-    // 3.3 points is past the row's own 3-point threshold: neither run
-    // models the lease-up, said so, whatever the verdict.
-    expect(row("vacancy").gap!.text).toContain("The lease-up from today's 9.3% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one.");
+    // The sample's 6.0% is its pro forma's vacancy line, a deduction from
+    // gross potential rent — dollars, not doors — and a stabilized figure: the
+    // market's doors decide it as a floor (economic vacancy is never below
+    // physical), never the deal's T-12 or rent roll, which are the building
+    // today, mid-renovation (the review of 2026-10-23). Against the metro's
+    // 5.8% ±1.9 survey it holds; with the read failed, the class's norm
+    // decides and it holds too — no document flips it. With no Zillow figure
+    // in this read, its 4.0% rent growth is held to the CPI rent's +5.0%.
+    expect(row("vacancy")).toMatchObject({ verdict: "holds", measure: "economic", gap: { value: -0.2, unit: "pts" } });
+    expect(row("vacancy").evidence[0]).toMatchObject({ kind: "published", label: "Rental vacancy, metro area", value: 5.8 });
+    expect(row("vacancy").gap!.text).toContain(ECONOMIC_FLOOR);
+    expect(row("vacancy").gap!.text).toContain("Today the deal's T-12 ran 9.1% economic vacancy over its trailing year, 3.1 points over the assumption — the gap a lease-up has to close.");
+    expect(row("vacancy").gap!.text).toContain("The lease-up from today's 9.1% to the stabilized 6.0% is not modelled in either case: each runs its vacancy from year one.");
+    const bareVacancy = signedInSample(null).rows.find((r) => r.key === "vacancy")!;
+    expect(bareVacancy).toMatchObject({ verdict: "holds", ruleOfThumbOnly: true });
+    expect(bareVacancy.evidence[0].kind).toBe("rule_of_thumb");
+    expect(bareVacancy.gap!.text).toContain(T12_NOT_STABILIZED);
+    // Kept with the verdict, the row carries the tolerance it held by — the
+    // survey's 1.9-point margin of error — and its measure, so a later T-12
+    // scores it.
+    const kept = stressSnapshotOf(page)!.rows.find((r) => r.key === "vacancy")!;
+    expect(kept.threshold).toEqual({ value: 1.9, unit: "pts" });
+    expect(kept.measure).toBe("economic");
     // A row that holds draws no re-run on any surface: the report and the
     // verdict's brief print the one line in its place (its impact stays for
     // the headline's cases).
     expect(row("vacancy").impact).not.toBeNull();
-    expect(rowMoveText(page, row("vacancy"))).toBe(HOLDS_NO_RERUN);
-    expect(rowMoveText(page, row("rent_growth"), "from the model")).toBe(HOLDS_NO_RERUN);
-    const brief = stressSection(page).find((l) => l.startsWith("- Stabilized vacancy (vacancy)"))!;
-    expect(brief).toContain(`The levered IRR: ${HOLDS_NO_RERUN}`);
+    // Both sit on the cautious side of their evidence (the gap signed under
+    // zero), so neither is said to be merely "within" it.
+    expect(row("vacancy").gap!.value).toBeLessThan(0);
+    expect(rowMoveText(page, row("vacancy"))).toBe(HOLDS_CAUTIOUS_NO_RERUN);
+    expect(row("rent_growth").impact).not.toBeNull();
+    expect(rowMoveText(page, row("rent_growth"), "from the model")).toBe(HOLDS_CAUTIOUS_NO_RERUN);
+    const brief = stressSection(page).find((l) => l.startsWith("- Rent growth (rent_growth)"))!;
+    expect(brief).toContain(`The levered IRR: ${HOLDS_CAUTIOUS_NO_RERUN}`);
     expect(brief).not.toContain("the levered IRR moves from");
     expect(row("rent_growth")).toMatchObject({ verdict: "holds", gap: { value: -1, unit: "pts" } });
     expect(row("rent_growth").gap!.text).toMatch(/^Held to the rent sitting tenants pay \(CPI rent\)/);
@@ -200,25 +214,29 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(demo(READS)!.headline).toEqual(page.headline);
     const h = page.headline!;
     const r1 = (n: number | null) => (n == null ? null : Math.round(n * 10) / 10);
-    // The OM's case: the ask, its 5.25% exit, its NOI at its own 6.0%
-    // vacancy, its 4.0% rent growth, its tax bill and its $310k premium.
-    // The premium sits $75k under the seller's own $385k T-12 premium, so
-    // the T-12's decides it — a working floor and a rule of thumb, never a
-    // quote — and the evidence's case runs it (the review of 2026-10-21).
-    expect(h.omKeys).toEqual(["basis", "exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
-    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 11.5]);
+    // The price row stands unchecked on two clean comps (too few for a
+    // median, the review of 2026-10-23), so it is in neither case; both pay
+    // the ask. The OM's case: its 5.25% exit, its NOI at its own 6.0%
+    // vacancy, its 4.0% rent growth, its tax bill and its $310k premium. The
+    // premium sits $75k under the seller's own $385k T-12 premium, so the
+    // T-12's decides it — the seller's actual premium, the building's own
+    // history, never a new owner's quote — and the evidence's case runs it
+    // (the review of 2026-10-21).
+    expect(h.omKeys).toEqual(["exit_cap", "noi", "vacancy", "rent_growth", "taxes", "insurance"]);
+    expect([r1(h.omIrrPct), r1(h.evidenceIrrPct)]).toEqual([16.7, 9.7]);
     const insRow = page.rows.find((r) => r.key === "insurance")!;
     expect(insRow.verdict).toBe("stretched");
     expect(insRow.impact).not.toBeNull();
     expect(insRow.evidence[insRow.decidedBy!]).toMatchObject({ kind: "document", value: 385_000 });
     expect(insRow.noRerunShort ?? null).toBeNull();
-    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.70"]);
-    // The split, largest first: the reset tax bill, the exit at the going-in
-    // cap and the premium at the seller's own lower it; the vacancy holds to
-    // the metro's survey and rent growth to CPI rent, so neither carries a part.
+    expect([h.omMultiple!.toFixed(2), h.evidenceMultiple!.toFixed(2)]).toEqual(["2.10", "1.57"]);
+    // The split, largest first: the exit at the OM's own 5.70% pro forma cap,
+    // the reset tax bill and the premium at the seller's own lower it; the
+    // vacancy holds at the market's floor and rent growth to CPI rent, so
+    // neither carries a part.
     expect(h.parts.map((p) => [p.key, r1(p.pts)])).toEqual([
+      ["exit_cap", -3.2],
       ["taxes", -2.8],
-      ["exit_cap", -1.4],
       ["insurance", -0.9],
     ]);
     // The reset bill holds only if the sale resets the assessment, and the
@@ -228,22 +246,22 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(h.parts.find((p) => p.key === "insurance")!.conditional).toBe(INSURANCE_FLOOR_CONDITION);
     expect(h.parts.find((p) => p.key === "exit_cap")!.conditional).toBeUndefined();
     expect(headlineSentence(page)).toContain(
-      `the taxes −2.8 pts (if the sale resets the assessment), the exit cap −1.4 pts and insurance −1.0 pts (${INSURANCE_FLOOR_CONDITION})`,
+      `the exit cap −3.2 pts, the taxes −2.8 pts (if the sale resets the assessment) and insurance −1.0 pts (${INSURANCE_FLOOR_CONDITION})`,
     );
     expect(Math.abs(h.parts.reduce((s, p) => s + p.pts, 0) - (h.evidenceIrrPct! - h.omIrrPct!))).toBeLessThan(1e-6);
-    // Both cases pay the ask; the NOI's T-12 figure holds the vacancy, taxes
-    // and insurance the rows move on their own; the premium is no model input.
-    expect(h.omitted.map((o) => o.key)).toEqual(["basis", "noi", "renovation_premium"]);
+    // The NOI's T-12 figure holds the vacancy, taxes and insurance the rows
+    // move on their own; the premium is no model input.
+    expect(h.omitted.map((o) => o.key)).toEqual(["noi", "renovation_premium"]);
     // The NOI is left out for the tax and insurance swaps, which move the
     // year-one NOI by the reset's and the premium's gaps, past the NOI row's
     // own gap over the T-12: said, never swapped — read off the rows' own
     // gaps, never typed.
     const gapOf = (k: string) => page.rows.find((r) => r.key === k)!.gap!.value;
     expect(h.noiRest).toEqual({ usd: gapOf("noi") - gapOf("taxes") - gapOf("insurance"), components: ["taxes", "insurance"] });
-    // The memorandum states no loan rate, so the debt row stands unchecked
-    // and the headline says it does not test it.
-    expect(h.untested).toEqual({ keys: ["debt"], roll: null });
-    expect(headlineSentence(page)).toContain(" This headline does not test the loan rate. ");
+    // The price stands unchecked on two comps and the memorandum states no
+    // loan rate, so the headline says it tests neither.
+    expect(h.untested).toEqual({ keys: ["basis", "debt"], roll: null });
+    expect(headlineSentence(page)).toContain(" This headline does not test the price or the loan rate. ");
     // Both figures said, struck from the rows' own: the two swaps' moves off
     // year-one NOI, and how far past the NOI row's gap over the T-12.
     const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
@@ -253,12 +271,12 @@ describe("the sample's stress test, one build on every surface", () => {
     const noi = page.rows.find((r) => r.key === "noi")!;
     const gap = noi.omSays.value! - noi.evidence[noi.decidedBy!].value!;
     expect(gap - h.noiRest!.usd).toBeCloseTo(gapOf("taxes") + gapOf("insurance"), -1);
-    // With the read failed: the published rows unchecked, rent growth out of
-    // both cases, and the vacancy held to the deal's own rent roll.
+    // With the read failed: the published rows unchecked and rent growth out
+    // of both cases; every other part is the same row on the same figure.
     const bare = signedInSample(null).headline!;
     expect(bare.omKeys).not.toContain("rent_growth");
-    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 3.6]);
-    expect(bare.parts.map((p) => p.key)).toEqual(["vacancy", "taxes", "exit_cap", "insurance"]);
+    expect([r1(bare.omIrrPct), r1(bare.evidenceIrrPct)]).toEqual([13.1, 5.5]);
+    expect(bare.parts.map((p) => p.key)).toEqual(["exit_cap", "taxes", "insurance"]);
   });
 
   it("names the model as it runs beside the two cases, and why the evidence's case is not it, on every surface (the investor's walkthrough)", () => {
@@ -267,14 +285,16 @@ describe("the sample's stress test, one build on every surface", () => {
     expect(homepage(READS)!.headline).toEqual(h);
     expect(demo(READS)!.headline).toEqual(h);
     // The model as it runs: the derived model's own run, every input its
-    // own — the base each row's re-run changes one input of. The price row's
-    // re-run starts at it, since the model runs the ask, and the exit cap's
-    // lands on it, since the model runs the going-in cap.
+    // own — the base each row's re-run changes one input of. The NOI row's
+    // re-run lands on it, since the model runs the T-12's NOI; the exit
+    // cap's lands under it, at the OM's own 5.70% pro forma cap over the
+    // 5.45% going-in cap the pinned model runs.
     expect(h.modelIrrPct!).toBeCloseTo(computeUnderwrite(derived.inputs).returns.leveredIrrPct! * 100, 9);
     expect(Math.round(h.modelIrrPct! * 10) / 10).toBe(9.3);
     const row = (k: string) => page.rows.find((r) => r.key === k)!;
-    expect(row("basis").impact!.baseIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
-    expect(row("exit_cap").impact!.altIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
+    expect(row("basis").impact).toBeNull();
+    expect(row("noi").impact!.altIrrPct!).toBeCloseTo(h.modelIrrPct!, 9);
+    expect(row("exit_cap").impact!.altIrrPct!).toBeLessThan(h.modelIrrPct!);
     // The evidence's case sits above it because it keeps the OM's figure
     // where a row holds or is left out: read off the rows,
     // never typed.
@@ -289,23 +309,26 @@ describe("the sample's stress test, one build on every surface", () => {
     // evidence's case runs the reset tax bill where the model runs the
     // seller's (M4), so the sentence says every figure the two differ on.
     const kept =
-      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy and expenses (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the taxes $952k (the model's $728k).";
+      "Against the screening model as it runs (9.3%), the evidence's case keeps the OM's figure where a row holds: vacancy 6.0% (the model's 9.1%) and rent growth 4.0%/yr (the sample's model is pinned at 3.0%/yr); and where a row is left out: the rent line $7.33M that makes the OM's $3.88M NOI at the OM's vacancy, the OM's taxes and insurance, and the model's other expenses at the T-12's expense ratio (the model's rent line $7.47M). It runs the evidence's figure where the model runs another: the exit cap 5.70% (the sample's model is pinned at 5.45%) and the taxes $952k (the model's $728k).";
     expect(keptSentence(page)).toBe(kept);
     // The panel's table says the pinned figure as pinned, as the sentence does.
     expect(keptRows(page).map((r) => [r.key, r.model])).toEqual([
       ["vacancy", "9.1%"],
       ["rent_growth", "pinned at 3.0%/yr"],
       ["noi", "$7.47M"],
+      ["exit_cap", "pinned at 5.45%"],
       ["taxes", "$728k"],
     ]);
-    expect(h.atEvidence!.map((e) => e.key)).toEqual(["taxes"]);
+    expect(h.atEvidence!.map((e) => e.key)).toEqual(["exit_cap", "taxes"]);
     // Complete: the model with the kept figures and the evidence's figures
     // set, and nothing else, IS the evidence's case, to the engine's figure.
     const fig = (k: string) => h.keptAtOm!.find((x) => x.key === k)!.om;
     const tax = h.atEvidence!.find((e) => e.key === "taxes")!;
+    const exitAt = h.atEvidence!.find((e) => e.key === "exit_cap")!;
     const m = derived.inputs;
     const rebuilt = {
       ...m,
+      exitCapPct: exitAt.evidence / 100,
       vacancyPct: fig("vacancy") / 100,
       rentGrowthPct: fig("rent_growth") / 100,
       inPlaceRentAnnual: fig("noi"),
@@ -313,7 +336,7 @@ describe("the sample's stress test, one build on every surface", () => {
     };
     expect(computeUnderwrite(rebuilt).returns.leveredIrrPct! * 100).toBeCloseTo(h.evidenceIrrPct!, 6);
     expect(headlineSentence(page)!.endsWith(kept)).toBe(true);
-    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 11.5% with the evidence (the screening model as it runs: 9.3%); the report splits the gap by assumption.");
+    expect(headlineShort(page)).toBe("Levered IRR on the OM's figures 16.7% to 9.7% with stretched and unsupported rows at the evidence (the screening model as it runs, its own figure on every input: 9.3%); the report splits the gap.");
     // Each re-run is the model at 9.3% with one input changed, the figure
     // named as the levered IRR it is (M3).
     expect(rerunWords(page, row("taxes").impact)).toBe("from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's");
@@ -563,5 +586,17 @@ describe("the sample's printed figures", () => {
       ];
       for (const s of texts) expect(s, s).not.toMatch(HYPHEN_MINUS);
     }
+  });
+
+  it("say what the OM states the same way whether today's figures were read or the read failed", () => {
+    // The expense-growth row exists only where the CPI is read, so the rows
+    // read move with the feed (12 with it, 11 without) while what the OM
+    // states does not: the line counts what it states and never says how
+    // many it leaves out, which would move with the feed (3 against 2).
+    const withReads = stressReadLine(sampleStressTest({ today: TODAY, reads: READS }));
+    const failed = stressReadLine(sampleStressTest({ today: TODAY, reads: null }));
+    expect(withReads).toMatch(/^12 assumptions read, 9 stated in the OM — 7 tested \(2 unsupported, 3 stretched, 2 hold\), 5 unchecked; /);
+    expect(failed).toMatch(/^11 assumptions read, 9 stated in the OM — 6 tested \(2 unsupported, 3 stretched, 1 holds\), 5 unchecked; /);
+    for (const line of [withReads, failed]) expect(line).not.toMatch(/leaves \d+ out/);
   });
 });

@@ -20,7 +20,7 @@ import {
 import type { StressMethod, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 import { drawsRerun } from "@/lib/stress-test-words";
 import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
-import { SAMPLE_PLAN_NOTE } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, SCENARIO_KIND_WORD } from "@/lib/stress-test-words";
 import { STRESS_TEST_ANCHOR } from "@/app/(app)/deals/[id]/stress-chip";
 import { BarRow, BarRows, Key, KeyItem, Tick } from "@/app/panel-parts";
 import { NOT_TESTED, NOT_TESTED_HEADING, NOT_TESTED_ID, NOT_TESTED_LINK, type NotTested } from "@/lib/not-tested";
@@ -114,7 +114,9 @@ function KindMark({ item }: { item: string }) {
       className={`mr-2 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-medium ${KIND_TONE[kind]}`}
       data-kind={kind}
     >
-      {KIND_LABEL[kind]}
+      {/* A scenario struck on the memorandum's own figures is marked as one,
+          as the panel marks its piece (lib/stress-test-words). */}
+      {/^A scenario\b/.test(item) ? SCENARIO_KIND_WORD : KIND_LABEL[kind]}
     </span>
   );
 }

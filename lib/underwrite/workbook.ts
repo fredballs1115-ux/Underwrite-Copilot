@@ -21,12 +21,17 @@ import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { FLAG_RULE, SOURCE_NOT_LOCATED, type OmFacts } from "./om-facts";
 import { HEADLINE_METHOD, type EvidenceKind, type StressEvidence, type StressKey, type StressRow, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
 import {
+  HEADLINE_EVIDENCE_CASE_LABEL,
+  HEADLINE_MODEL_LABEL,
+  HEADLINE_MODEL_WHY,
+  HEADLINE_OM_CASE_LABEL,
   SAMPLE_PLAN_NOTE,
   VERDICT_WORD,
   bestEvidence,
   compsStruckOver,
   drawsRerun,
   evidenceDay,
+  evidenceKindWord,
   evidencePage,
   evidencePeriod,
   headlineSentence,
@@ -1568,7 +1573,7 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
     if (e) {
       wrapped(C("The figure that decides"), `${e.label}: ${e.text}`, 9);
       const grain = e.kind === "published" ? STRESS_GRAIN[e.scope] : undefined;
-      wrapped(C("Kind"), grain ? `${STRESS_KIND_WORD[e.kind]} (${grain})` : STRESS_KIND_WORD[e.kind], 9);
+      wrapped(C("Kind"), grain ? `${STRESS_KIND_WORD[e.kind]} (${grain})` : evidenceKindWord(e, STRESS_KIND_WORD), 9);
       // A growth row's published figure is a trailing year's change, signed
       // and never a rate a year (lib/stress-test-words `evidenceFigureText`).
       if (e.value != null && Number.isFinite(e.value)) number(C("Figure"), stressFigure(row.key, e.value, e.ownYardstick?.per ?? basisPer(row), true));
@@ -1723,14 +1728,14 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
     return r - 1;
   };
   const noSolve = yoc ? "not struck" : "does not solve";
-  const omRow = line("On the OM's figures", shown.om != null ? shown.om / 100 : null, caseFmt, shown.om == null ? noSolve : "", true);
+  const omRow = line(HEADLINE_OM_CASE_LABEL, shown.om != null ? shown.om / 100 : null, caseFmt, shown.om == null ? noSolve : "", true);
   const firstPart = r;
   for (const p of shown.parts) {
     const note = partNote(p);
     line(`${p.label}${note ? ` (${note})` : ""}`, p.shown, ptsFmt);
   }
   const lastPart = r - 1;
-  const evRow = line("With the evidence", shown.evidence != null ? shown.evidence / 100 : null, caseFmt, shown.evidence == null ? noSolve : "", true);
+  const evRow = line(HEADLINE_EVIDENCE_CASE_LABEL, shown.evidence != null ? shown.evidence / 100 : null, caseFmt, shown.evidence == null ? noSolve : "", true);
   if (shown.om != null && shown.evidence != null) {
     // The gap, a formula over the two cases above: the parts add up to it.
     const g = line("The gap, the evidence's case less the OM's", null, ptsFmt);
@@ -1746,7 +1751,7 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
   } else if (h.modelIrrPct !== undefined) {
     // The screening model as it runs, every input its own: the base every
     // row's re-run starts from, which neither case is.
-    line("The screening model as it runs", h.modelIrrPct != null ? h.modelIrrPct / 100 : null, FMT.pct1, h.modelIrrPct == null ? "its levered IRR does not solve" : "");
+    line(HEADLINE_MODEL_LABEL, h.modelIrrPct != null ? h.modelIrrPct / 100 : null, FMT.pct1, h.modelIrrPct == null ? "its levered IRR does not solve" : HEADLINE_MODEL_WHY);
   }
   for (const o of h.omitted) line(`Left out: ${o.label}`, null, "", o.why);
   if (shown.parts.length > 0) signedBars(`${cellA1(firstPart, 2)}:${cellA1(lastPart, 2)}`);

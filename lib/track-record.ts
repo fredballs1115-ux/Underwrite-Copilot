@@ -386,7 +386,7 @@ const TITLES: Record<StressKey, string> = {
   noi: "NOI",
   vacancy: "Stabilized vacancy",
   rent_growth: "Rent growth",
-  market_rent: "Market rent",
+  market_rent: "Pro forma rent",
   expense_growth: "Expense growth",
   taxes: "Real estate taxes",
   insurance: "Insurance",
@@ -936,8 +936,14 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   // label the measure is read off (lib/stress-test `measureOf`): it is read
   // as counted by doors, as it was struck.
   const econ = laterArgs.economic;
-  // The market decided a stabilized vacancy where its published figure did.
-  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published";
+  // The market decided a stabilized vacancy counted by doors where its
+  // published figure did. An economic one the market's doors held as a floor
+  // (lib/stress-test `ECONOMIC_FLOOR`) is scored by a later T-12, its own
+  // measure — a later year of the building — on the row's own margin and
+  // direction: a later economic vacancy at or past the OM's on the buyer's
+  // bad side makes a stretched or unsupported row right (the review of
+  // 2026-10-23).
+  const heldToMarket = key === "vacancy" && r.evidence?.kind === "published" && r.measure !== "economic";
   const later = laterFor(key, laterArgs);
   if (!later) {
     // A vacancy is scored in its own measure: a document of the other one is
@@ -1387,7 +1393,10 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
     };
     // A vacancy is scored in its own measure: the deal's own row's, else
     // (the account's grid) a row of either measure.
-    const economic = row.key === "vacancy" ? ctx.vacancyEconomic : false;
+    // A vacancy the market's doors held is a row counted by doors (an
+    // economic one meets the market only as a floor, and a later T-12 scores
+    // it), so a grid told the market held it reads it as doors.
+    const economic = row.key === "vacancy" ? (ctx.vacancyHeldToMarket ? (ctx.vacancyEconomic ?? false) : ctx.vacancyEconomic) : false;
     const rows = economic === undefined ? [row, { ...row, measure: "economic" as const }] : economic ? [{ ...row, measure: "economic" as const }] : [row];
     const by = Object.fromEntries(
       SCORABLE_SOURCES.map((source) => [source, rows.some((r) => kinds[source].some((ev) => scoreTestRow(r, T, ev, args).landing !== "unscored"))]),
@@ -1402,12 +1411,14 @@ export function scorableGrid(ctx: ScorableContext = {}): ScorableRow[] {
  * What the account's record does with a stabilized vacancy, said where it is
  * drawn (audit M5). A stress-test row kept with its verdict says which kind
  * of evidence decided it, so a later rent roll or T-12 is held back only
- * where the market's figure did. A screen whose test was not kept has only
+ * where the market's figure decided a vacancy counted by doors; an economic
+ * one the market's doors held only as a floor is scored by a later T-12
+ * (`scoreTestRow`'s `heldToMarket`). A screen whose test was not kept has only
  * its challenges, and the account's record builds no stress test for each
  * deal, so it holds every stated stabilized vacancy back as the market's.
  */
 export const ACCOUNT_VACANCY_NOTE =
-  "A stabilized vacancy the market's figure decided is never scored by a later rent roll or T-12. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors; one the OM states as economic, dollars, is not the market's to decide, and a later T-12, the same measure, scores it outside a plan deal. Its deal's own page scores a vacancy by doors where the documents decided it.";
+  "A vacancy counted by doors that the market's figure decided is never scored by a later rent roll or T-12; one the OM states as economic, dollars, which the market's doors hold only as a floor, is scored by a later T-12, its own measure, outside a plan deal. For a screen whose stress test was not kept, this record holds back every stated stabilized vacancy counted by doors as the market's; its deal's own page holds one back only where the market's figure decided its row.";
 
 export interface KeyRecord {
   key: StressKey;

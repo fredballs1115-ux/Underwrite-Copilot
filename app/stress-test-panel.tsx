@@ -3,9 +3,16 @@ import Link from "next/link";
 import { compactUsd } from "@/lib/money";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
 import {
+  HEADLINE_EVIDENCE_CASE_LABEL,
+  HEADLINE_MODEL_LABEL,
+  HEADLINE_MODEL_WHY,
+  HEADLINE_OM_CASE_LABEL,
   HEADLINE_WITHHELD,
-  HOLDS_NO_RERUN,
   UNCHECKED_COUNT_WORDS,
+  basisMoveWords,
+  evidenceKindWord,
+  holdsNoRerun,
+  isPriceImpact,
   decidesTag,
   drawsRerun,
   evidenceFigureText,
@@ -132,6 +139,9 @@ const KIND: Record<EvidenceKind, { word: string; chip: string; shape: string; ma
   rule_of_thumb: { word: "A rule of thumb", chip: "bg-faint text-muted", shape: "h-3 w-0 border-l-2 border-dashed", mark: "border-ink/50" },
   om_internal: { word: "The OM against itself", chip: "bg-caution/10 text-caution", shape: "size-2.5 rounded-full", mark: "border-2 border-caution bg-surface" },
 };
+/** Each kind's word alone, for `evidenceKindWord` (a scenario struck on the
+ *  OM's figures is said as one in its kind's place). */
+const KIND_WORDS = Object.fromEntries(Object.entries(KIND).map(([k, v]) => [k, v.word])) as Record<EvidenceKind, string>;
 
 /** The verdicts' fills for the tally under the heading and the read line's
  *  dots, in the chips' own hues. */
@@ -226,7 +236,7 @@ const UNCHECKED_NAME: Record<Exclude<StressKey, "other">, string> = {
   noi: "the NOI",
   vacancy: "vacancy",
   rent_growth: "rent growth",
-  market_rent: "the market rent",
+  market_rent: "the pro forma rent",
   expense_growth: "expense growth",
   taxes: "real estate taxes",
   insurance: "insurance",
@@ -395,7 +405,7 @@ function EvidenceTrack({ row, at }: { row: StressRow; at: (v: number) => string 
 /** The return's move: the pair in words, then the two runs as bars on one
  *  scale — the OM's figure, then the evidence's — each labelled with the
  *  input it ran on. Where the two runs are one, one bar. */
-function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }) {
+function ImpactView({ impact, test, price = false }: { impact: StressImpact; test: StressTest; price?: boolean }) {
   // A plan deal's re-run is its yield on total cost, at two places (the
   // precision every surface prints a yield on cost at); a stabilized deal's
   // the levered IRR, at one.
@@ -416,23 +426,30 @@ function ImpactView({ impact, test }: { impact: StressImpact; test: StressTest }
   const same = Math.abs(impact.altValue - impact.omValue) < (yoc ? 0.5 : 1e-9);
   // A re-run the evidence lifts is the OM's cushion, never a warning: only
   // a fall is drawn in the warning tone (`data-direction`).
-  const direction = base == null || alt == null || Math.abs(alt - base) < (yoc ? 0.005 : 0.05) ? "flat" : alt < base ? "down" : "up";
+  const moved = base == null || alt == null || Math.abs(alt - base) < (yoc ? 0.005 : 0.05) ? "flat" : alt < base ? "down" : "up";
+  // A price row's evidence run is what a lower price would earn, never good
+  // news about the deal: it is said as what the ask costs, the ask's bar in
+  // the warning tone where it earns less, the evidence's neutral — never the
+  // pass tone (`data-direction="ask"`).
+  const direction = price && moved !== "flat" ? "ask" : moved;
+  const askCosts = price && moved === "up";
+  const priceWords = price ? basisMoveWords(impact) : null;
   return (
     <div className="mt-2.5" data-qa="stress-impact" data-measure={yoc ? "yield_on_cost" : "levered_irr"}>
       <p className="text-sm font-semibold tabular-nums text-ink" data-qa="stress-impact-pair">
-        {same ? `${name} ${show(base)}, run at the evidence's figure` : `${name} ${show(base)} → ${show(alt)}`}
+        {same ? `${name} ${show(base)}, run at the evidence's figure` : (priceWords ?? `${name} ${show(base)} → ${show(alt)}`)}
       </p>
       <p className={`mt-0.5 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-impact-base">
         {upperFirst(rerunWords(test, impact))}
       </p>
       <BarRows className="mt-1.5 space-y-1 text-[11px]">
         {!same && (
-          <BarRow label="At the OM's figure" figure={show(base)}>
-            <div className="h-full rounded-full bg-ink/35" data-bar="stress-impact-om" style={{ width: widthOf(base) }} />
+          <BarRow label={price ? "At the ask" : "At the OM's figure"} figure={show(base)}>
+            <div className={`h-full rounded-full ${askCosts ? "bg-caution/70" : "bg-ink/35"}`} data-bar="stress-impact-om" style={{ width: widthOf(base) }} />
             {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
           </BarRow>
         )}
-        <BarRow label="At the evidence's figure" figure={show(alt)}>
+        <BarRow label={price ? "At the evidence's price" : "At the evidence's figure"} figure={show(alt)}>
           <div className={`h-full rounded-full ${direction === "down" ? "bg-caution/70" : direction === "up" ? "bg-pass/70" : "bg-muted/40"}`} data-direction={direction} data-bar="stress-impact" style={{ width: widthOf(alt) }} />
           {model != null && <Tick at={widthOf(model)} bar="stress-impact-model" tone="border-ink/70" dashed track="secondary" />}
         </BarRow>
@@ -480,9 +497,10 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 
 /**
  * The basis reader's sale-comps sentence ("3 of 3 state a figure /unit;
- * graded clean (supports): The Brixton — 2.1 mi $252k/unit — the one comp
- * graded clean, too few for a median; left out, graded favorable by the
- * comps step (it leans the seller's way): Parkside — 1.4 mi $261k/unit; …")
+ * graded clean (supports): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
+ * mi $261k/unit — two graded clean, too few for a median (3 or more), so
+ * none is set against the ask; left out, graded stretched by the comps step
+ * (not a clean comparison): Vue at Girard — 4.0 mi $298k/unit")
  * read back into its parts — the count, each comp with its figure and its
  * grade, and what is struck over the clean ones — so the panel draws a list.
  * Null where the text is not that sentence; the panel then prints it whole.
@@ -490,7 +508,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
   if (!/^The memorandum's sale comps/.test(e.label)) return null;
   const m = e.text.match(
-    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — the two graded clean, midpoint .*?, too few for a median| — the one comp graded clean, too few for a median|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
   );
   if (!m) return null;
   const entries = (list: string): { name: string; figure: string }[] | null => {
@@ -579,7 +597,7 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
               </span>
             )}
             <Body className={`min-w-0 ${MEASURE}`}>
-              <span className={`mr-1 inline-block rounded px-1 align-[1px] text-[9.5px] font-semibold uppercase leading-[14px] tracking-wide ${kind.chip}`}>{kind.word}</span>{" "}
+              <span className={`mr-1 inline-block rounded px-1 align-[1px] text-[9.5px] font-semibold uppercase leading-[14px] tracking-wide ${kind.chip}`}>{evidenceKindWord(e, KIND_WORDS)}</span>{" "}
               {tag && (
                 <>
                   <span
@@ -785,10 +803,10 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
               // favourable one (an office rent growth holding at +7.2% re-runs
               // to 24.7%), which is no return to show (lib/stress-test-words).
               <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-rerun">
-                {HOLDS_NO_RERUN}
+                {holdsNoRerun(row)}
               </p>
             ) : drawsRerun(row) ? (
-              <ImpactView impact={row.impact!} test={test} />
+              <ImpactView impact={row.impact!} test={test} price={isPriceImpact(row)} />
             ) : (
               <p className={`${row.gap || row.unchecked ? "mt-1.5 " : ""}${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-no-impact">
                 {/* One sentence a row: the reason once at the top where the whole
@@ -886,7 +904,7 @@ function ModelBarRow({ model, style, yoc = false }: { model: number; style: { le
   // On a plan deal the third mark is the yield on cost the OM states in a
   // row of its own, labelled as the OM's.
   return (
-    <BarRow label={yoc ? "The OM's stated yield on cost" : "The screening model as it runs"} figure={yoc ? yocText(model) : pctText(model)}>
+    <BarRow label={yoc ? "The OM's stated yield on cost" : HEADLINE_MODEL_LABEL} figure={yoc ? yocText(model) : pctText(model)}>
       <div
         className="absolute inset-y-0 rounded-full border border-dashed border-ink/60"
         data-bar={yoc ? "stress-headline-stated" : "stress-headline-model"}
@@ -1032,7 +1050,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
       {kept.length > 0 && <KeptTable rows={kept} model={h.modelIrrPct ?? null} />}
       {!(h.parts.length > 0 && om != null && ev != null) && om != null && model != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-cases">
-          <BarRow label="On the OM's figures" figure={fig(om)}>
+          <BarRow label={HEADLINE_OM_CASE_LABEL} figure={fig(om)}>
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
           <ModelBarRow model={model} style={bar(0, model)} yoc={yoc} />
@@ -1040,7 +1058,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
       )}
       {h.parts.length > 0 && om != null && ev != null && (
         <BarRows className="mt-2.5 space-y-1.5 text-[11px]" qa="stress-headline-bridge">
-          <BarRow label="On the OM's figures" figure={fig(om)}>
+          <BarRow label={HEADLINE_OM_CASE_LABEL} figure={fig(om)}>
             <div className="absolute inset-y-0 rounded-full bg-ink/40" data-bar="stress-headline-om" style={bar(0, om)} />
           </BarRow>
           {walk.map(({ part, from, to }) => {
@@ -1072,11 +1090,16 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
               </BarRow>
             );
           })}
-          <BarRow label="With the evidence" figure={fig(ev)}>
+          <BarRow label={HEADLINE_EVIDENCE_CASE_LABEL} figure={fig(ev)}>
             <div className="absolute inset-y-0 rounded-full bg-caution/70" data-bar="stress-headline-evidence" style={bar(0, ev)} />
           </BarRow>
           {model != null && <ModelBarRow model={model} style={bar(0, model)} yoc={yoc} />}
         </BarRows>
+      )}
+      {!yoc && model != null && om != null && (
+        <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-ink/85`} data-qa="stress-headline-model-why">
+          {HEADLINE_MODEL_WHY}
+        </p>
       )}
       <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
         {h.parts.length > 1

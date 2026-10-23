@@ -200,13 +200,26 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(html.indexOf(SAMPLE_DEAL.verdict.reason)).toBeLessThan(panel);
     expect(html.indexOf("Risk digest")).toBeGreaterThan(panel);
     expect(text).toContain("The OM's assumptions, tested");
-    // The sample's 6% vacancy against its rent roll and T-12, a document
-    // row, unsupported, the model already running at the roll's occupancy.
-    const row = html.slice(html.indexOf('data-qa="stress-row-vacancy"'), html.indexOf('data-qa="stress-row-', html.indexOf('data-qa="stress-row-vacancy"') + 10));
-    expect(row).toContain('data-verdict="unsupported"');
+    // The sample's stabilized 6% vacancy holds on the class's norm, no
+    // figure read today: its rent roll and T-12 are drawn beside it as the
+    // building today, never deciding, and a row that holds draws no re-run.
+    const rowOf = (key: string) => {
+      const from = html.indexOf(`data-qa="stress-row-${key}"`);
+      return html.slice(from, html.indexOf('data-qa="stress-row-', from + 10));
+    };
+    const row = rowOf("vacancy");
+    expect(row).toContain('data-verdict="holds"');
+    expect(row).toContain('data-evidence="rule_of_thumb"');
     expect(row).toContain('data-evidence="document"');
     expect(textOf(row)).toContain("the deal's T-12");
-    expect(row).toContain('data-qa="stress-impact"');
+    expect(row).toContain('data-qa="stress-no-rerun"');
+    expect(row).not.toContain('data-qa="stress-impact"');
+    // Its NOI against the T-12's: a document row, stretched, with its re-run.
+    const noi = rowOf("noi");
+    expect(noi).toContain('data-verdict="stretched"');
+    expect(noi).toContain('data-evidence="document"');
+    expect(textOf(noi)).toContain("the deal's T-12");
+    expect(noi).toContain('data-qa="stress-impact"');
     expect(html).toContain('href="/how-we-test#vacancy"');
     // Without a test, the Overview draws no panel.
     expect(html).toContain('data-qa="how-we-test-link"');
@@ -233,9 +246,9 @@ describe("DealView — the sample deal renders every section without a runtime e
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // Doors and dollars (lib/stress-deciders `VACANCY_ORDER`): the T-12 never
     // decides an occupancy counted by doors.
-    expect(words).toContain("A T-12 tests the OM's NOI and its operating expenses, and tests the OM's insurance premium where it sits under the T-12's, a working floor, not a quote; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy, in dollars.");
+    expect(words).toContain("A T-12 tests the OM's NOI and its operating expenses, and tests the OM's insurance premium where it sits under the T-12's, the seller's actual premium, not a new owner's quote; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy today, in dollars.");
     expect(words).not.toContain("a rent roll, else the T-12");
-    expect(words).toContain("Beside a stabilized vacancy they show the gap to close, and the rent roll tests it only where no market figure is fresh, never on a plan.");
+    expect(words).toContain("Beside a stabilized vacancy they show today's gap to close and never decide it: the market's published figure does, else the class's norm.");
     expect(words).not.toContain("vacancy and insurance against");
     expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows, each in its own measure.");
     // The T-12's tax line judges no row, so taxes are never promised.

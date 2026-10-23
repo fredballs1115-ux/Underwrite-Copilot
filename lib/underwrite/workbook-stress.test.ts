@@ -14,7 +14,10 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { buildStressTest } from "@/lib/stress-test";
 import { sortStressRows } from "@/app/stress-test-panel";
 import {
-  HOLDS_NO_RERUN,
+  HEADLINE_EVIDENCE_CASE_LABEL,
+  HEADLINE_MODEL_LABEL,
+  HEADLINE_OM_CASE_LABEL,
+  holdsNoRerun,
   SAMPLE_PLAN_NOTE,
   bestEvidence,
   compsStruckOver,
@@ -114,7 +117,7 @@ describe("the Stress Test tab", () => {
       const e = row.verdict === "unchecked" ? null : bestEvidence(row);
       if (e) {
         expect(at("The figure that decides")).toBe(`${e.label}: ${e.text}`);
-        expect(String(at("Kind"))).toMatch(/^(The deal's own document|A published figure|A rule of thumb|The OM against itself)/);
+        expect(String(at("Kind"))).toMatch(/^(The deal's own document|A published figure|A rule of thumb|The OM against itself|A scenario on the OM's figures)/);
         // The memorandum's comps in their count, else the publisher.
         expect(at("Publisher or source")).toBe(compsStruckOver(e, true) ?? e.publisher);
         expect(at("Its OM page")).toBe(evidencePage(e));
@@ -168,7 +171,7 @@ describe("the Stress Test tab", () => {
       } else {
         // A blank is null, never zero: no re-run drawn, no figure printed.
         for (const name of ["Re-run of", "At the OM's figure", "At the evidence's", "Move (pts)"] as const) expect(at(name), `${row.key} ${name}`).toBeNull();
-        if (row.verdict === "holds") expect(at("The re-run, or why none")).toBe(HOLDS_NO_RERUN);
+        if (row.verdict === "holds") expect(at("The re-run, or why none")).toBe(holdsNoRerun(row));
         if (row.verdict === "unchecked" && row.unchecked) expect(at("The re-run, or why none")).toBe(row.unchecked);
       }
       expect(at("How it was tested")).toBe(row.method || null);
@@ -191,8 +194,8 @@ describe("the Stress Test tab", () => {
       for (let r = from; r <= ws.rowCount; r++) if (ws.getCell(r, 1).value === text) return r;
       throw new Error(`no row ${text}`);
     };
-    expect(valueOf(ws.getCell(rowOf("On the OM's figures"), 2))).toBeCloseTo(shown.om! / 100, 10);
-    expect(valueOf(ws.getCell(rowOf("With the evidence"), 2))).toBeCloseTo(shown.evidence! / 100, 10);
+    expect(valueOf(ws.getCell(rowOf(HEADLINE_OM_CASE_LABEL), 2))).toBeCloseTo(shown.om! / 100, 10);
+    expect(valueOf(ws.getCell(rowOf(HEADLINE_EVIDENCE_CASE_LABEL), 2))).toBeCloseTo(shown.evidence! / 100, 10);
     for (const p of shown.parts) {
       const note = partNote(p);
       expect(valueOf(ws.getCell(rowOf(`${p.label}${note ? ` (${note})` : ""}`), 2))).toBeCloseTo(p.shown, 10);
@@ -202,7 +205,7 @@ describe("the Stress Test tab", () => {
     // The printed parts add up to the printed gap.
     const sum = shown.parts.reduce((s, p) => s + p.shown, 0);
     expect(valueOf(gap)).toBeCloseTo(sum, 6);
-    expect(valueOf(ws.getCell(rowOf("The screening model as it runs"), 2))).toBeCloseTo(h.modelIrrPct! / 100, 10);
+    expect(valueOf(ws.getCell(rowOf(HEADLINE_MODEL_LABEL), 2))).toBeCloseTo(h.modelIrrPct! / 100, 10);
     for (const o of h.omitted) expect(ws.getCell(rowOf(`Left out: ${o.label}`), 3).value).toBe(o.why);
     // The headline's whole sentences, the report's own.
     let said = false;
@@ -279,7 +282,9 @@ describe("the Stress Test tab", () => {
 
   it("prints a plan deal's re-runs and headline as yield on cost, at two places", async () => {
     const base = sampleStressTest({ today: TODAY });
-    const row = base.rows.find((r) => r.key === "vacancy")!;
+    // A row that draws a re-run (the sample's stabilized vacancy holds, and a
+    // row that holds prints none): its NOI against the T-12's.
+    const row = base.rows.find((r) => r.key === "noi")!;
     const plan: StressTest = {
       ...base,
       measure: "yield_on_cost",
@@ -299,8 +304,8 @@ describe("the Stress Test tab", () => {
         evidenceIrrPct: null,
         omMultiple: null,
         evidenceMultiple: null,
-        omKeys: ["vacancy"],
-        parts: [{ key: "vacancy", label: row.title, pts: -0.45, multiple: null }],
+        omKeys: ["noi"],
+        parts: [{ key: "noi", label: row.title, pts: -0.45, multiple: null }],
         omitted: [],
         unsolved: 0,
       },

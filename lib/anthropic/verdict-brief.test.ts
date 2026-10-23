@@ -561,19 +561,31 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("11 of the memorandum's assumptions read in code — 7 tested (2 unsupported, 5 stretched), 4 unchecked");
+    expect(brief).toContain("11 assumptions read, 9 stated in the OM — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
     expect(brief).toContain("- Real estate taxes (taxes) [STRETCHED] — OM says: Real estate taxes (2026): $727,896 [p. 27].");
     expect(brief).toContain(moves("taxes"));
+    // The pro forma's vacancy line is a stabilized figure: with no figure
+    // read, the class's norm decides it, and the rent roll and the T-12 are
+    // the building today, beside it and never deciding (the review of
+    // 2026-10-23). It holds, so no move is printed.
     expect(brief).toContain(
-      "- Stabilized vacancy (vacancy) [UNSUPPORTED] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026) (the deal's rent roll; the deal's own document)",
+      "- Stabilized vacancy (vacancy) [HOLDS] — OM says: Vacancy (pro forma): 6.0% [p. 8]. Set against: [DECIDES] Multifamily vacancy, a rule of thumb: 5.0%",
     );
-    // The engine at the OM's 6.0% against the engine at the rent roll's 9.3%, by count.
-    expect(brief).toContain(moves("vacancy"));
-    expect(brief).toContain("- Basis (basis) [STRETCHED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
-    expect(brief).toContain(moves("basis"));
+    expect(brief).toContain(
+      "[BESIDE IT, NOT DECIDING] The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic",
+    );
+    expect(brief).toContain("Against a rule of thumb only. The levered IRR: The OM's figure is on the cautious side of the evidence; no re-run.");
+    expect(brief).not.toContain(moves("vacancy"));
+    // Two comps graded clean are too few for a median: the price stands
+    // unchecked, said why, with no move.
+    expect(brief).toContain("- Basis (basis) [UNCHECKED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
+    expect(brief).toContain("so no median is struck: the comps' own floor. The levered IRR: No return is re-run: no figure to swap.");
+    // The exit at the OM's own pro forma cap, the higher of its two caps.
+    expect(brief).toContain("- Exit cap (exit_cap) [UNSUPPORTED] — OM says: Exit cap: 5.25% [p. 41]. Set against: [DECIDES] The OM's pro forma cap: 5.70% (Pro forma cap)");
+    expect(brief).toContain(moves("exit_cap"));
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
     expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");
     // The instruction: the moves are the engine's, cited by figure and date.
@@ -581,8 +593,8 @@ describe("the verdict is handed the stress test, struck in code", () => {
     expect(brief).toContain("cite it by figure and date and name its publisher");
     // The headline, one line under the read line, in the words the memo and
     // the report read, and the instruction that its runs are the engine's.
-    expect(brief).toContain(`4 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
-    expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with the evidence/);
+    expect(brief).toContain(`5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.\nHEADLINE (the engine's, two runs and a Shapley split): ${headlineSentence(test)}`);
+    expect(headlineSentence(test)).toMatch(/^Levered IRR on the OM's figures \d+\.\d% to \d+\.\d% with stretched and unsupported rows at the evidence/);
     expect(brief).toContain("The HEADLINE's two returns and its split are the engine's too: cite them as they stand, and never add the rows' moves up yourself");
     expect(ANALYST_SYSTEM).not.toContain("STRESS TEST");
     // None handed, no section.
@@ -616,7 +628,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const withheld = { ...test, impactsWithheld: "No model was derived for this deal, so no return is re-run.", rows: test.rows.map((r) => ({ ...r, impact: null })) };
     const brief = buildBrief({ extraction: null, ...none, stressTest: withheld });
     // One whole sentence, never behind a second "No return re-run".
-    expect(brief).toContain("4 unchecked. No model was derived for this deal, so no return is re-run.");
+    expect(brief).toContain("5 unchecked. No model was derived for this deal, so no return is re-run.");
     expect(brief).not.toMatch(/No return (is |was )?re-run[^.]*no model was derived/i);
     expect(brief).toContain("The levered IRR: No model was derived for this deal, so no return is re-run.");
     expect(brief).toContain("No model was derived for this deal, so no return is re-run. The rows carry the gaps alone: cite each gap by its figure and date, say in a reader's words that the return was not re-run for this deal and why, and never estimate a move.");

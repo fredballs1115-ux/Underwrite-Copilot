@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { METHOD_FOLD_LABEL, StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_WITHHELD, HOLDS_NO_RERUN, keptSentence, modelCellText, stressCountLine } from "./stress-test-words";
+import { HEADLINE_EVIDENCE_CASE_LABEL, HEADLINE_MODEL_LABEL, HEADLINE_MODEL_WHY, HEADLINE_OM_CASE_LABEL, HEADLINE_WITHHELD, HOLDS_CAUTIOUS_NO_RERUN, HOLDS_NO_RERUN, keptSentence, modelCellText, stressCountLine } from "./stress-test-words";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { sampleStressTest } from "./sample-stress";
@@ -124,7 +124,7 @@ const TAXES: StressRow = {
   evidence: [
     {
       kind: "om_internal",
-      label: "The bill the OM's own figures imply on the price",
+      label: "A scenario: today's tax rate on the price, if the sale resets the assessment",
       text: "$532k over $42M assessed is 1.27%, which on the $42M price is $532k a year if the sale resets the assessment to the price",
       value: 532_000,
       asOf: null,
@@ -136,7 +136,7 @@ const TAXES: StressRow = {
   verdict: "holds",
   impact: null,
   challenge: null,
-  method: "The OM's real estate taxes against the bill the OM's own figures imply on the price (the memorandum's own figures).",
+  method: "The OM's real estate taxes against a scenario: today's tax rate on the price, if the sale resets the assessment (the memorandum's own figures).",
 };
 
 /** An unchecked row: a growth rate with nothing fresh to read it against. */
@@ -404,7 +404,21 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // says so in one line, with no pair, no bars and no note.
     const held = render({ rows: [{ ...up, verdict: "holds" }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
     expect(visibleText(held).replace(/&#x27;/g, "'")).toContain(HOLDS_NO_RERUN);
-    expect(HOLDS_NO_RERUN).toBe("The OM's figure is within the evidence; no re-run.");
+    expect(HOLDS_NO_RERUN).toBe("The OM's figure is within the row's margin of the evidence; no re-run.");
+    // A price row's evidence run is what a lower price earns, never good
+    // news: it is said as what the ask costs, the ask's bar in the warning
+    // tone, the evidence's neutral — never the pass tone.
+    const price: StressRow = { ...VACANCY, key: "basis", title: "Basis", verdict: "stretched", impact: { ...VACANCY.impact!, input: "purchasePrice", omValue: 68_000_000, altValue: 62_500_000, baseIrrPct: 9.3, altIrrPct: 13.6 } };
+    const priceRow = render({ rows: [price], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(priceRow).replace(/&#x27;/g, "'")).toContain("The ask costs 4.3 pts of levered IRR: 9.3% at it, 13.6% at the evidence's price");
+    expect(visibleText(priceRow).replace(/\s+/g, " ")).toContain("At the ask 9.3%");
+    expect(priceRow).toContain('data-direction="ask"');
+    expect(priceRow).toContain('class="h-full rounded-full bg-caution/70" data-bar="stress-impact-om"');
+    expect(priceRow).not.toContain("bg-pass/70");
+    // On the cautious side of the evidence (the gap signed under zero), said so.
+    const cautious = render({ rows: [{ ...up, verdict: "holds", gap: { ...up.gap!, value: -0.5 } }], readOn: "2026-09-21", publishedRead: true, impactsWithheld: null });
+    expect(visibleText(cautious).replace(/&#x27;/g, "'")).toContain(HOLDS_CAUTIOUS_NO_RERUN);
+    expect(visibleText(cautious)).not.toContain("within the row");
     expect(held).not.toContain('data-qa="stress-impact"');
     expect(held).not.toContain('data-bar="stress-impact"');
     expect(held).not.toContain("data-bar=\"stress-impact-model\"");
@@ -571,7 +585,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const t = visibleText(hh).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(a11yIssues(hh)).toEqual([]);
     expect(gluedWords(visibleText(hh))).toEqual([]);
-    expect(t).toContain("Levered IRR on the OM's figures 16.7% → 12.3% with the evidence");
+    expect(t).toContain("Levered IRR on the OM's figures 16.7% → 12.3% with stretched and unsupported rows at the evidence");
     // Above the rows.
     expect(hh.indexOf('data-qa="stress-headline"')).toBeLessThan(hh.indexOf('data-qa="stress-rows"'));
     // A bar for each case, a segment an assumption, each signed and labelled.
@@ -581,7 +595,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // Each part printed so the three add up to the printed 4.4-point gap
     // (16.7% to 12.3%), by largest remainder: the exit cap's 1.35 prints
     // +1.3, never the +1.4 that left the printed parts summing to 4.3.
-    for (const s of ["−3.2 pts", "−2.5 pts", "+1.3 pts", "16.7%", "12.3%", "On the OM's figures", "With the evidence"]) expect(t).toContain(s);
+    for (const s of ["−3.2 pts", "−2.5 pts", "+1.3 pts", "16.7%", "12.3%", HEADLINE_OM_CASE_LABEL, HEADLINE_EVIDENCE_CASE_LABEL]) expect(t).toContain(s);
     expect(t).not.toContain("+1.4 pts");
     // The walk ends where the evidence's case does: the last segment's far
     // end and the evidence's bar's end are one x.
@@ -642,7 +656,9 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // The third mark: an outline from zero, its words beside it, after the
     // two filled cases.
     expect(hh.match(/data-bar="stress-headline-model"/g)).toHaveLength(1);
-    expect(t).toContain("With the evidence 11.5% The screening model as it runs 9.3%");
+    expect(t).toContain(`${HEADLINE_EVIDENCE_CASE_LABEL} 11.5% ${HEADLINE_MODEL_LABEL} 9.3%`);
+    // Why the model is neither case, in one line under the bars.
+    expect(t).toContain(HEADLINE_MODEL_WHY);
     expect(hh).toMatch(/class="absolute inset-y-0 rounded-full border border-dashed border-ink\/60" data-bar="stress-headline-model" style="left:0\.00%;width:[\d.]+%"/);
     // Why the evidence's case is not the model, under the line: a table of
     // three columns, in the sentence's own order (the sentence is the
@@ -701,7 +717,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     const none = visibleText(render({ ...TEST, headline: { ...base, evidenceIrrPct: null, evidenceMultiple: null, parts: [], unsolved: 0 } }))
       .replace(/&#x27;/g, "'")
       .replace(/\s+/g, " ");
-    expect(none).toContain("Levered IRR on the OM's figures 13.1%; with the evidence it does not solve");
+    expect(none).toContain("Levered IRR on the OM's figures 13.1%; with stretched and unsupported rows at the evidence it does not solve");
     expect(none).not.toContain("to does not solve");
     expect(none).toContain("One of the two runs has no levered IRR, so the gap is not split.");
     expect(none).not.toContain("at the OM's in both runs");
@@ -778,14 +794,16 @@ describe("StressTestPanel on the sample — each claim once", () => {
     const basis = test.rows.find((r) => r.key === "basis")!;
     const read = compLines(basis.evidence.find((e) => /^The memorandum's sale comps/.test(e.label))!)!;
     expect(read.head).toBe("3 of 3 state a figure /unit");
+    // Graded by comparability: Parkside, the closest and newest, is clean
+    // (the review of 2026-10-23), and two are too few for a median.
     expect(read.comps.map((c) => [c.name, c.figure, c.grade])).toEqual([
       ["The Brixton — 2.1 mi", "$252k/unit", "clean"],
-      ["Parkside — 1.4 mi", "$261k/unit", "favorable"],
+      ["Parkside — 1.4 mi", "$261k/unit", "clean"],
       ["Vue at Girard — 4.0 mi", "$298k/unit", "stretched"],
     ]);
-    expect(read.struck).toBe("The one comp graded clean, too few for a median");
+    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
-    expect(t).toContain("Parkside — 1.4 mi $261k/unit · Favorable, left out: leans the seller's way");
+    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Stretched, left out: not a clean comparison");
     expect(t).not.toContain("graded clean (supports): The Brixton");
   });
 
@@ -813,6 +831,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
     expect(modelCellText(test, "rent_growth", 3)).toBe("pinned at 3.0%/yr");
     expect(modelCellText({ ...test, sample: undefined }, "rent_growth", 3)).toBe("3.0%/yr");
     // An input the sample does not pin is the model's own figure, bare.
-    expect(rows.find((r) => r.key === "vacancy")?.model).toBe("9.1%");
+    expect(rows.find((r) => r.key === "taxes")?.model).toBe("$728k");
+    expect(modelCellText({ ...test, sample: undefined }, "exit_cap", 5.45)).toBe("5.45%");
   });
 });

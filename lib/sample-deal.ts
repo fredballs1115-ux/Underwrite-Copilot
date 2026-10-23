@@ -93,18 +93,23 @@ const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.
 /**
  * The stress test's re-run of the exit on the sample (lib/stress-test's
  * exit-cap row, on the sample's one derivation, lib/sample-derive): the
- * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.45%
- * going-in cap the derived model runs at — each levered IRR in percent.
- * The verdict's "breaks if" quotes these. They are written here because
- * this module cannot load the derivation (it imports this one, and the
- * homepage's client bundle loads this module), and lib/sample-stress.test.ts
- * holds each to the engine's own figure, so the sentence cannot drift from
- * the row printed beside it.
+ * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.70%
+ * pro forma cap that decides the row (the higher of the OM's own going-in
+ * and pro forma caps, the review of 2026-10-23) — each levered IRR in
+ * percent; and the model's own case, the 5.45% going-in cap the derived
+ * model exits at, with its levered IRR. The verdict's "breaks if" and its
+ * scenarios quote these. They are written here because this module cannot
+ * load the derivation (it imports this one, and the homepage's client bundle
+ * loads this module), and lib/sample-figures.test.ts holds each to the
+ * engine's own figure, so the sentence cannot drift from the row printed
+ * beside it.
  */
 export const SAMPLE_EXIT_RERUN = {
   omExitPct: 5.25,
-  goingInExitPct: 5.45,
+  proFormaExitPct: 5.7,
   omIrrPct: 10.75,
+  proFormaIrrPct: 7.42,
+  goingInExitPct: 5.45,
   goingInIrrPct: 9.25,
 } as const;
 
@@ -266,7 +271,10 @@ const modelMetrics: ReconciledMetric[] = [
     // no quote.
     sources: [{ doc: "Screening default", value: "6.00%", locator: "", basis: "assumption" }],
     authority: "Screening default",
-    rationale: "No document states a rate: a flat 6.00% screening default, 30-yr amortization after one IO year — enter your quote.",
+    // The model amortizes over 30 years from the first month, no
+    // interest-only period (lib/underwrite/inputs `ioMonths: 0`), as the
+    // verdict's debt read says.
+    rationale: "No document states a rate: a flat 6.00% screening default, 30-yr amortizing from the first month, no interest-only period — enter your quote.",
     confidence: "low",
     isConflict: false,
   },
@@ -277,7 +285,9 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "%",
     sources: [{ doc: "Market", value: "2.0%", locator: "", basis: "market norm" }],
     authority: "Market",
-    rationale: "Broker and transfer costs on disposition.",
+    // The model's cost of sale carries no transfer tax a seller may owe
+    // (lib/underwrite/cost-note `costAssumptionsLine`, lib/not-tested).
+    rationale: "Broker and closing costs on disposition; no transfer tax is modelled.",
     confidence: "medium",
     isConflict: false,
   },
@@ -370,8 +380,8 @@ const extraction: ExtractionResult = {
 
 /** The T-12's insurance line (the statement below carries it): the seller's
  *  own actual premium. The pro forma's $310,000 sits under it, so the stress
- *  test holds the pro forma to it — a working floor and a rule of thumb (a
- *  new owner is rarely quoted under it), never a quote; a new owner's quote would decide it, and the sample states none. */
+ *  test holds the pro forma to it — the seller's actual premium, the
+ *  building's own history, never a new owner's quote; a new owner's quote would decide it, and the sample states none. */
 const T12_INSURANCE = 385_000;
 
 /** The T-12's collected rent and its vacancy loss (the statement below
@@ -496,10 +506,12 @@ const challenges: ChallengerResult = {
     " and the $200 premium arrives only as renovated units lease, so a slow lease-up delays both and leaves less income in year five. That smaller income is what the 5.25% exit capitalises, and a buyer five years out has no stated reason to pay a tighter cap than today's 5.45%.",
 };
 
-/** The ask a unit over The Brixton's $252k, the one sale comp graded
- *  `supports` (p. 14), in percent to one place: the stress test's price
- *  row's own gap (lib/sample-figures.test.ts holds the two equal). */
-const CLEAN_COMP_GAP_PCT = ((TAX.price / numberOf(memoFact("Units").value) / 252_000 - 1) * 100).toFixed(1);
+/** The ask a unit over each of the two sale comps graded `supports` (p. 14),
+ *  The Brixton's $252k and Parkside's $261k, in percent to one place. Two
+ *  comps are too few for a median, so the stress test's price row strikes
+ *  no figure on them and stands unchecked (lib/sample-figures.test.ts). */
+const askOver = (perUnit: number) => ((TAX.price / numberOf(memoFact("Units").value) / perUnit - 1) * 100).toFixed(1);
+const CLEAN_COMP_GAP_PCT = { brixton: askOver(252_000), parkside: askOver(261_000) } as const;
 
 // The memorandum's three sale comps sit on its p. 14, the page the
 // verdict's basis range cites for the $252k and $261k trades.
@@ -522,13 +534,13 @@ const comps: BrokerCompsResult = {
     {
       name: "Parkside — 1.4 mi",
       detail: "$261k/unit · 5.4% cap · Q4'25",
-      support: "favorable",
-      // Graded favorable, so the stress test leaves it out of the figure the
-      // ask is held to and names it so (lib/stress-test, the comps graded
-      // clean): the note says why from its own figures against The
-      // Brixton's, the one comp graded clean (p. 14) — never a fact the
-      // memorandum does not state.
-      note: "Closest by distance and the newest trade, but priced richer than The Brixton — $261k against $252k a unit, a 5.4% cap against 5.6% — so it leans the seller's way.",
+      // Graded by comparability, never by its price against the ask or
+      // another comp (the review of 2026-10-23: it had been left out for
+      // trading richer than The Brixton, grading by direction): the closest
+      // and the newest of the three, so it supports. Every fact here is the
+      // memorandum's own (p. 14).
+      support: "supports",
+      note: "Closest by distance (1.4 mi) and the newest trade (Q4'25) — the most comparable of the three.",
       page: "p. 14",
     },
   ],
@@ -546,11 +558,10 @@ const comps: BrokerCompsResult = {
     // gap is read off its own dates (Q1'25 to Q4'25, p. 14).
     "The newest of the three trades is Q4'25: the set states no 2026 sale.",
   ],
-  // The ask against the one comp graded `supports`, the figure the stress
-  // test's price row holds it to: one comp, named, never a median, and
-  // Parkside, graded favorable, named apart (lib/sample-figures.test.ts
-  // holds the share to the row's own gap).
-  summary: `The comp set leans on its strongest trade — sell-side selections usually do. Against the one comp graded clean, The Brixton at $252k a unit, the $274k ask is ${CLEAN_COMP_GAP_PCT}% rich; Parkside's $261k, the closest, leans the seller's way.`,
+  // The ask against the two comps graded `supports`: two trades, too few for
+  // a median, so the stress test's price row strikes no verdict on them
+  // (lib/sample-figures.test.ts holds the shares to the comps' figures).
+  summary: `The comp set leans on its strongest trade — sell-side selections usually do. The $274k ask is ${CLEAN_COMP_GAP_PCT.brixton}% over The Brixton's $252k a unit and ${CLEAN_COMP_GAP_PCT.parkside}% over Parkside's $261k, the two comps graded clean: two trades, too few for a median.`,
 };
 
 /** The OM's stabilized vacancy (its p. 8 row), against which the first-draft
@@ -625,11 +636,12 @@ const market: MarketResult = {
       typicalRange: "5–7%",
       assessment: "in-line",
       // The range is the market check's rule of thumb, never the stress
-      // test's verdict: the stress test holds the 6% to the market's
-      // published vacancy where today's read has one and to the deal's own
-      // documents where it does not, so how the row reads moves with the
-      // read (lib/sample-stress.test.ts).
-      note: `Inside the market check's rule-of-thumb range for a stabilized building, not a published figure — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it; the stress test is where the 6% is held to the market's published vacancy, or to the deal's own documents when today's read has none.`,
+      // test's verdict: the stress test holds the 6% to the
+      // market's published vacancy as a floor for the pro forma's vacancy
+      // line (dollars, never below the doors empty), else the class's norm —
+      // never to the T-12 or the rent roll, the building today
+      // (lib/sample-stress.test.ts).
+      note: `Inside the market check's rule-of-thumb range for a stabilized building, not a published figure — but the building ran ${VACANCY.inPlace} vacant over the trailing twelve months (T-12) and has to lease up to it; the stress test is where the 6%, the pro forma's vacancy line, is held to the market's published vacancy as a floor, else the class's norm, never to today's documents.`,
     },
   ],
   summary:
@@ -640,13 +652,13 @@ const verdict: VerdictResult = {
   verdict: "caution",
   reason:
     // What the documents say, never a verdict a live feed decides: the ask
-    // over the one clean comp, the OM's exit tighter than its going-in cap,
-    // and the premium its pro forma rents carry past what the renovated
-    // doors achieve. The premium is in none of the model's returns (the
-    // model grows today's rent at one rate), so it is said of the rents.
-    `The basis is rich, the OM exits at an aggressive cap, and the pro forma's rents lean on an unproven ${dollarsOf(PREMIUM.priced)} premium. Worth a closer look only if the seller moves on price or the premium is proven.`,
+    // over both clean comps, the OM's exit tighter than its own caps, and
+    // the premium its pro forma rents carry past what the renovated doors
+    // achieve. The premium is in none of the model's returns (the model
+    // grows today's rent at one rate), so it is said of the rents.
+    `The ask sits over both clean comps, the OM exits under its own pro forma cap, and the pro forma's rents lean on an unproven ${dollarsOf(PREMIUM.priced)} premium. Worth a closer look only if the seller moves on price or the premium is proven.`,
   topRisks: [
-    "Exit cap of 5.25% sits 20 bps inside the 5.45% going-in cap, with no catalyst for the compression.",
+    "Exit cap of 5.25% sits 45 bps inside the OM's own 5.70% pro forma cap and 20 bps inside its 5.45% going-in cap.",
     // A condition, as the stress test's taxes row says it: whether the sale
     // resets the assessment is the jurisdiction's to say.
     `If the sale resets the assessment to the ${compactUsd(TAX.price, { trim: true })} price, the seller's ${dollarsOf(TAX.bill)} tax bill is ${dollarsOf(TAX.reset)} a year.`,
@@ -694,22 +706,22 @@ const verdict: VerdictResult = {
       },
       {
         label: "Basis / unit",
-        // The low and base are the one sale comp graded clean (p. 14), the
-        // figure the stress test's price row holds the ask to; the high is
-        // Parkside, graded favorable (it leans the seller's way). Never a
-        // trade the memorandum does not state.
+        // The low and the high are the two sale comps graded clean (p. 14);
+        // two trades are too few for a median, so the stress test's price
+        // row strikes no verdict on them. Never a trade the memorandum does
+        // not state.
         low: "$252k",
-        base: "$252k",
+        base: "$261k",
         high: "$261k",
-        source: "Trades $252k (clean), $261k (p. 14)",
-        basis: `The $274k ask sits ${CLEAN_COMP_GAP_PCT}% over the one clean comp, with no renovation premium yet.`,
-        confidence: "high",
+        source: "Trades $252k and $261k, both clean (p. 14)",
+        basis: `The $274k ask sits ${CLEAN_COMP_GAP_PCT.parkside}% over the closer, newer clean comp and ${CLEAN_COMP_GAP_PCT.brixton}% over the other, with no renovation premium yet.`,
+        confidence: "medium",
       },
     ],
     dealKillers: [
       {
         lever: "basis",
-        read: "Buying at ~$274k/unit — above the one clean comp.",
+        read: "Buying at ~$274k/unit — above both clean comps.",
         risk: "No renovation premium yet justifies the spread.",
       },
       {
@@ -718,9 +730,9 @@ const verdict: VerdictResult = {
         // The stress test's own figures (its exit-cap row), never the
         // first-draft model's: the first cut quoted "roughly 180 bps" off
         // that model at a 5.50% exit, beside a stress test whose engine
-        // moves 10.8% to 9.3% at the going-in cap.
+        // moves 10.8% to 7.4% at the pro forma cap that decides the row.
         // Short enough for the one-page memo's card (72 characters).
-        risk: `At the ${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% going-in cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%.`,
+        risk: `At the ${SAMPLE_EXIT_RERUN.proFormaExitPct.toFixed(2)}% pro forma cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.proFormaIrrPct.toFixed(1)}%.`,
       },
       {
         lever: "debt",
@@ -742,8 +754,8 @@ const verdict: VerdictResult = {
       // own: a softer exit or a tax reset each lowers the levered IRR from
       // it (a direction, no figure the engine has not run). The base IS the
       // model's own case — the exit at the going-in cap and the T-12's
-      // vacancy (lib/sample-derive), its levered IRR the stress test's exit
-      // re-run. The sponsor's is the OM's exit with the premium proven,
+      // vacancy (lib/sample-derive), its levered IRR the engine's on the
+      // model as it runs (SAMPLE_EXIT_RERUN.goingInIrrPct). The sponsor's is the OM's exit with the premium proven,
       // which the model's returns carry neither of.
       {
         scenario: "conservative",

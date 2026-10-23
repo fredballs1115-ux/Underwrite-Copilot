@@ -92,14 +92,19 @@ describe("the screening model's growth and exit, never more optimistic than the 
     expect(d.sources.expenseGrowthPct?.note).toBe(
       `${(Math.round(CPI.value * 100) / 100).toFixed(2)}%/yr — ${CPI_NOTE(`+${CPI.value.toFixed(1)}%`)}; the stress test's deciding figure, the OM stating no expense growth — enter your own`,
     );
-    // The exit: the 5.45% going-in cap over the OM's own 5.25% exit.
-    expect(d.inputs.exitCapPct).toBeCloseTo(0.0545, 10);
+    // The exit: the OM's own 5.70% pro forma cap, the higher of it and the
+    // 5.45% going-in cap that decides the stress test's exit row (the review
+    // of 2026-10-23), over the OM's own 5.25% exit — named as the OM's own
+    // figure, never as more.
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.057, 10);
     expect(d.sources.exitCapPct).toMatchObject({
-      provenance: "derived",
+      provenance: "extracted",
       page: "p. 8",
-      note: "5.45% — the OM's stated going-in cap, more cautious than the OM's exit cap of 5.25% (p. 41); the stress test's deciding figure for the exit, never tighter than the OM's own — set your exit view",
+      note: "5.70% — the OM's pro forma cap as stated, the more cautious of it and the OM's 5.45% going-in cap; the model runs no exit tighter than the OM's; the model's own year-1 NOI over its price is 5.45%: 25 bps of expansion ride in these returns — set your exit view",
     });
-    expect(d.sources.exitCapPct?.offGoingIn).toBeUndefined();
+    // Off the going-in cap, so the playground says the gap to the model's
+    // own entry, as the note does.
+    expect(d.sources.exitCapPct?.offGoingIn).toBe(true);
   });
 
   it("rent growth: the OM's lower figure runs where the published one is higher (the audit's office at 7.2% against 4.0%)", () => {
@@ -190,6 +195,30 @@ describe("the screening model's growth and exit, never more optimistic than the 
     expect(row.impact!.note).toContain("The model itself already runs at it.");
   });
 
+  it("with a pro forma cap and no going-in cap, the model runs the row's own decider, never the tracker as the stress test's deciding figure", () => {
+    // The OM states a 4.90% pro forma cap and a 4.75% exit, no going-in cap:
+    // the stress test's exit row is struck on the pro forma cap, the
+    // tracker's 5.00% low end beside it. The model runs the row's decider,
+    // the OM's own figure, and its note never calls the tracker the stress
+    // test's deciding figure.
+    const proFormaOnly = withRow("Exit cap", "4.75%", withRow("Pro forma cap", "4.90%", without(/going-in/i), "p. 8"));
+    const mvm = modelVsMarketFor({ derived: null, extraction: proFormaOnly, firstSignal: null, storedAssetClass: SAMPLE_DEAL.asset_class, metro, reads: READS });
+    const row = buildStressTest({ extraction: proFormaOnly, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: null, storedAssetClass: SAMPLE_DEAL.asset_class, readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap")!;
+    expect(row.evidence[row.decidedBy!].label).toBe("The OM's pro forma cap");
+    const evidence = evidenceOf(proFormaOnly, READS);
+    expect(evidence.exitCap.decided).toBeNull();
+    expect(evidence.exitCap.stated).toMatchObject({ label: "Pro forma cap", pct: 4.9 });
+    const d = derive(proFormaOnly, evidence);
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.049, 10);
+    expect(d.sources.exitCapPct?.note).not.toContain("the stress test's deciding figure for the exit");
+    expect(d.sources.exitCapPct).toMatchObject({
+      provenance: "extracted",
+      page: "p. 8",
+      note: "4.90% — the OM's pro forma cap as stated: the OM states no going-in cap, so the stress test's exit row is decided by the OM's own 4.90% pro forma cap (p. 8), and the model runs no exit tighter than it; the model's own year-1 NOI over its price is 5.45%: 55 bps of compression ride in these returns — set your exit view",
+    });
+    expect(decidingFigureOf(row)?.figure).toBe(d.inputs.exitCapPct * 100);
+  });
+
   it("with no reads, the memorandum's own figures, with the true reason no published figure stands", () => {
     const evidence = evidenceOf(ex, null);
     expect(evidence.rentGrowth.decided).toBeNull();
@@ -206,8 +235,9 @@ describe("the screening model's growth and exit, never more optimistic than the 
       provenance: "assumption",
       note: "Default 3.0%/yr — today's published figures were not read and the OM states none — set your view",
     });
-    // The going-in cap decides the exit with no read at all.
-    expect(d.inputs.exitCapPct).toBeCloseTo(0.0545, 10);
+    // The OM's own caps decide the exit with no read at all: the higher of
+    // its going-in and pro forma caps.
+    expect(d.inputs.exitCapPct).toBeCloseTo(0.057, 10);
     // With no going-in cap, the OM's stated exit, said why.
     const noGoingIn = without(NO_GOING_IN);
     const d2 = derive(noGoingIn, evidenceOf(noGoingIn, null));
@@ -272,7 +302,10 @@ describe("the screening model's growth and exit, never more optimistic than the 
     const mvm = modelVsMarketFor({ derived: null, extraction: land, firstSignal: null, storedAssetClass: "land", metro, reads: READS });
     const row = buildStressTest({ extraction: land, firstSignal: null, challenger: null, market: null, modelVsMarket: mvm, actuals: null, derived: null, storedAssetClass: "land", readOn: "2026-09-21" }).rows.find((r) => r.key === "exit_cap");
     const rowFigure = row ? decidingFigureOf(row)?.figure ?? null : null;
-    expect(evidence.exitCap.decided?.pct ?? null).toBe(rowFigure);
+    // The model runs the higher of its deciding going-in cap and the OM's
+    // own stated figure, here the pro forma cap that decides the row.
+    expect(Math.max(evidence.exitCap.decided?.pct ?? 0, evidence.exitCap.stated?.pct ?? 0)).toBe(rowFigure);
+    expect(evidence.exitCap.stated?.label).toBe("Pro forma cap");
     expect(evidence.exitCap.decided?.kind ?? "om_internal").toBe("om_internal");
   });
 
@@ -303,7 +336,7 @@ describe("the screening model's growth and exit, never more optimistic than the 
     expect(at("Rent Growth %").name).toBe("RentGrowth");
     expect(at("Rent Growth %").note).toBe(`Published — ${d.sources.rentGrowthPct!.note}`);
     expect(at("Expense Growth %").note).toBe(`Published — ${d.sources.expenseGrowthPct!.note}`);
-    expect(at("Exit Cap").note).toBe(`Derived — ${d.sources.exitCapPct!.note}`);
+    expect(at("Exit Cap").note).toBe(`OM p. 8 — ${d.sources.exitCapPct!.note}`);
     // The tracker's range: Research, never Published.
     const tight = withRow("Exit cap", "4.75%", without(NO_GOING_IN));
     const dt = derive(tight, evidenceOf(tight, READS));
