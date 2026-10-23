@@ -114,7 +114,8 @@ describe("/how-we-test draws every method from the table", () => {
       // stress test files them and the panel marks them; the rent roll and
       // the T-12 are the deal's own documents.
       basis: ["om_internal", "published", "rule_of_thumb"],
-      exit_cap: ["om_internal", "published", "published"],
+      // The OM's own two caps, then the 10-year and the tracker.
+      exit_cap: ["om_internal", "om_internal", "published", "published"],
       // The lender's quote is the deal's own loan terms.
       debt: ["document", "published", null, null],
       noi: ["document", "document", "om_internal", "document"],
@@ -216,10 +217,11 @@ describe("/how-we-test draws every method from the table", () => {
     for (const m of STRESS_METHODS) expect(text, m.key).toContain(VERDICT_RULES[m.key]);
     expect(VERDICT_RULES.vacancy).toContain(`${VACANCY_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.vacancy).toMatch(/^A stabilized vacancy is held to the market/);
-    // lib/stress-deciders' order: the market, the rent roll (not on a plan),
-    // the class's norm — doors by doors; the T-12's dollars decide only an
-    // economic figure (the review of 2026-10-21).
-    expect(VERDICT_RULES.vacancy).toContain("then the rent roll (never on a plan), then the class's norm; the T-12, dollars not doors, decides only an economic figure.");
+    // lib/stress-deciders' order: the market, then the class's norm, never
+    // today's rent roll — doors by doors; the T-12's dollars decide an
+    // economic figure, a pro forma's vacancy line among them (the reviews of
+    // 2026-10-21 and 2026-10-23).
+    expect(VERDICT_RULES.vacancy).toContain("then the class's norm, never today's rent roll; a pro forma's vacancy line or a vacancy and credit loss is dollars, held to the T-12.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
@@ -230,7 +232,9 @@ describe("/how-we-test draws every method from the table", () => {
     expect(VERDICT_RULES.expense_growth).not.toMatch(/lowest/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
-    expect(VERDICT_RULES.exit_cap).toMatch(/a cap range beside a going-in cap decides nothing/);
+    // The higher of the OM's own two caps decides; the published range only
+    // where the OM states neither (the review of 2026-10-23).
+    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added\./);
     expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);

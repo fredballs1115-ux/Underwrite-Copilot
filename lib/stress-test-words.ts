@@ -332,16 +332,13 @@ export function evidenceWhen(e: Pick<StressEvidence, "asOf" | "text" | "kind">):
 
 /** The memorandum's sale comps a basis figure is struck over, in their
  *  count, read off the reader's own sentence (lib/stress-test `basisRow`):
- *  "the one comp graded clean", "the midpoint of the two comps graded
- *  clean", "the median of the 4 comps graded clean"; null on any other
- *  piece, or a sentence that strikes no figure. `ofTheOm` names whose comps
- *  they are where no page beside them says so: "the OM's one comp graded
- *  clean". */
+ *  "the median of the 4 comps graded clean" — a figure is struck only over
+ *  three or more; null on any other piece, or a sentence that strikes no
+ *  figure. `ofTheOm` names whose comps they are where no page beside them
+ *  says so: "the median of the OM's 3 comps graded clean". */
 export function compsStruckOver(e: Pick<StressEvidence, "label" | "text" | "value">, ofTheOm = false): string | null {
   if (e.value == null || !/^The memorandum's sale comps\b/.test(e.label)) return null;
   const the = ofTheOm ? "the OM's" : "the";
-  if (/ — the one comp graded clean\b/.test(e.text)) return `${the} one comp graded clean`;
-  if (/ — the two graded clean, midpoint\b/.test(e.text)) return `the midpoint of ${the} two comps graded clean`;
   const m = e.text.match(/ — median .*? over the (\d+)\b/);
   return m ? `the median of ${the} ${m[1]} comps graded clean` : null;
 }
@@ -394,8 +391,8 @@ export function evidenceDateTime(e: Pick<StressEvidence, "asOf" | "text">): stri
  *  trailing year it is ("+1.1% over the year to Aug 2026 (Zillow
  *  Research)"), never as a rate a year; the memorandum's own figure carries
  *  its page ("(OM p. 14)") and, on a price struck over comps, their count
- *  ("(the one comp graded clean, OM p. 14)"; with no validated page, "(the
- *  OM's one comp graded clean)"). */
+ *  ("(the median of the 3 comps graded clean, OM p. 14)"; with no validated
+ *  page, "(the median of the OM's 3 comps graded clean)"). */
 export function evidenceShort(row: StressRow, e: StressEvidence | null): string {
   if (!e) return "no evidence with a figure";
   const period = evidencePeriod(e);

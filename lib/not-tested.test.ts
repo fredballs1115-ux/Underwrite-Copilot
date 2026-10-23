@@ -110,6 +110,17 @@ describe("what the test does not check yet", () => {
     expect(readFileSync("lib/stress-test.ts", "utf8")).toMatch(/const ECONOMIC_WORDS = .*concession/);
   });
 
+  it("says the comps' grades are the AI's and no expansion is added to the exit, each beside the row that shows it (the review of 2026-10-23)", () => {
+    const basis = STRESS_METHODS.find((m) => m.key === "basis")!;
+    expect(basis.limits.join(" ")).toContain("The grades are the comps step's reading of each comp's comparability, the AI's");
+    expect(item("comp_grades").beside?.key).toBe("basis");
+    expect(readFileSync("lib/anthropic/prompts.ts", "utf8")).toContain("rate it by its COMPARABILITY to the subject");
+    const exit = STRESS_METHODS.find((m) => m.key === "exit_cap")!;
+    expect(exit.limits.join(" ")).toContain("No expansion over the hold is added to the cap that decides");
+    expect(item("cap_expansion").beside?.key).toBe("exit_cap");
+    expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
+  });
+
   it("names no stated return the engine re-runs: the stress test reads no IRR row of the OM's", () => {
     const src = readFileSync("lib/stress-test.ts", "utf8");
     expect(src).not.toMatch(/(?:stated|projected|target|quoted)\s*irr/i);

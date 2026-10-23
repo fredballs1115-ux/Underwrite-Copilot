@@ -480,9 +480,10 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 
 /**
  * The basis reader's sale-comps sentence ("3 of 3 state a figure /unit;
- * graded clean (supports): The Brixton — 2.1 mi $252k/unit — the one comp
- * graded clean, too few for a median; left out, graded favorable by the
- * comps step (it leans the seller's way): Parkside — 1.4 mi $261k/unit; …")
+ * graded clean (supports): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
+ * mi $261k/unit — two graded clean, too few for a median (3 or more), so
+ * none is set against the ask; left out, graded stretched by the comps step
+ * (not comparable to the subject): Vue at Girard — 4.0 mi $298k/unit")
  * read back into its parts — the count, each comp with its figure and its
  * grade, and what is struck over the clean ones — so the panel draws a list.
  * Null where the text is not that sentence; the panel then prints it whole.
@@ -490,7 +491,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
   if (!/^The memorandum's sale comps/.test(e.label)) return null;
   const m = e.text.match(
-    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — the two graded clean, midpoint .*?, too few for a median| — the one comp graded clean, too few for a median|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
   );
   if (!m) return null;
   const entries = (list: string): { name: string; figure: string }[] | null => {

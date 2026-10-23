@@ -10,36 +10,56 @@
 //
 // The orders, a row each:
 //   - rent growth: lib/rent-growth-decider's, by the kind of rent the class
-//     collects (as it was);
+//     collects (as it was); where the deciding series' stored history holds
+//     two years or more (lib/growth-average), the LOWER of its trailing year
+//     and its compound average a year decides — one hot year is not a rate
+//     for every year of a hold (the review of 2026-10-23) — the other beside;
 //   - vacancy: ONE measure decides its own kind (the review of 2026-10-21).
 //     A physical figure — doors, the units or the area empty: a stated
-//     occupancy, a plain vacancy allowance — is decided only by a physical
-//     figure: on a stabilized assumption on a deal read as stabilized, the
-//     market's published figure first (the metro survey, a commercial
-//     class's tracker band at its low read, the Census region, the state),
-//     then the deal's rent roll, then the class's norm; a plan deal's stated
-//     stabilized vacancy, the market's figure in the same order, then the
-//     class's norm — never the rent roll, which is the building before the
-//     plan is done (shown beside it as the gap the plan closes); today's
-//     occupancy, the rent roll, then the published figures in the same
-//     order, then the class's norm. The T-12's vacancy and credit loss over
-//     gross potential rent is an economic figure — dollars, not doors: what
-//     the statement files in that line (credit loss, and concessions or loss
-//     to lease where it nets them there) rides in it — so it never decides a
-//     physical figure and is shown beside it, labelled economic. An economic
-//     figure the OM states (an economic occupancy, a vacancy and credit loss
-//     allowance) is decided by the T-12, the same measure, then the class's
-//     norm (on a plan deal's stabilized figure, the norm alone); the rent
-//     roll and the published vacancy count doors and are shown beside it;
+//     occupancy, a stated vacancy rate — is decided only by a physical
+//     figure: a stabilized assumption (on a deal read as stabilized or on a
+//     plan deal alike) by the market's published figure (the metro survey,
+//     a commercial class's tracker band at its low read, the Census region,
+//     the state), then the class's norm, a rule of thumb named as one —
+//     never the deal's rent roll, which is the building TODAY, not the
+//     building stabilized (the investor's review of 2026-10-23: a 6% held
+//     against the survey read "holds", and with the read failed the rent
+//     roll's 9.3% lease-up gap decided it "unsupported" — one assumption,
+//     two verdicts, on whether a feed answered); the roll is shown beside
+//     it as today's gap, the one a lease-up (or the plan) has to close.
+//     Today's occupancy: the rent roll, then the published figures in the
+//     same order, then the class's norm. The T-12's vacancy and credit loss
+//     over gross potential rent is an economic figure — dollars, not doors —
+//     so it never decides a physical figure and is shown beside it,
+//     labelled economic. An economic figure the OM states (a pro forma's
+//     vacancy line, a deduction from gross potential rent; a vacancy and
+//     credit loss; an economic occupancy) is decided by the T-12, the same
+//     measure on the same footing, a trailing year rather than one day's
+//     count, then the class's norm (on a plan deal's stabilized figure, the
+//     norm alone); the rent roll and the published vacancy count doors and
+//     are shown beside it;
 //   - expense growth: all-items CPI (the broad price level the expense base
-//     moves with), then core CPI only where all-items is not fresh; the
-//     insurance premium index and the breakeven never decide;
-//   - exit cap: the OM's own going-in cap (the cap the deal is bought at, and
-//     the model's own exit), then the research tracker's cap range at its low
-//     end where no going-in cap stands; the 10-year is a yield, never a cap;
-//   - basis: lib/stress-basis-evidence's order — the memorandum's comps
-//     graded clean (the class's yardstick, then per SF alone), then the
-//     recorded sales, then the reader's own past asks;
+//     moves with), then core CPI only where all-items is not fresh; where
+//     the deciding series' stored history holds two years or more, the
+//     HIGHER of its trailing year and its compound average a year decides
+//     (the cautious side for an expense grown every year of the hold, the
+//     review of 2026-10-23), the other beside it; the insurance premium
+//     index and the breakeven never decide;
+//   - exit cap: the HIGHER of the OM's own going-in cap (the cap the deal is
+//     bought at, on today's NOI) and its pro forma cap (the yield the price
+//     earns on the OM's own stabilized NOI — the income an exit sells, so an
+//     exit under it sells the stabilized building dearer than this buyer
+//     buys it), the other beside it; then the research tracker's cap range
+//     at its low end where neither stands; the 10-year is a yield, never a
+//     cap. No expansion over the hold is added: that is a rule of thumb the
+//     owner has not approved;
+//   - basis: lib/stress-basis-evidence's order — the median of the
+//     memorandum's comps graded clean, three or more (MEDIAN_FLOOR; the
+//     class's yardstick, then per SF alone), then the recorded sales'
+//     median, three or more — trades only: one or two comps graded clean
+//     are named beside it with their count and decide nothing, and the
+//     reader's own past screens are asks, not trades, shown beside it (the
+//     review of 2026-10-23); under the floor the row stands unchecked;
 //   - debt: the lender's quote on file (a term sheet's fixed rate, read off
 //     the model built from it), else today's index plus the class's
 //     screening spread (the bare index sets how far under it reads
@@ -84,6 +104,7 @@ export const METRO_VACANCY_LABEL = "Rental vacancy, metro area";
 export const CPI_ALL_ITEMS_LABEL = "Consumer prices (CPI, all items)";
 export const CORE_CPI_LABEL = "Core CPI";
 export const GOING_IN_CAP_LABEL = "The OM's going-in cap";
+export const PRO_FORMA_CAP_LABEL = "The OM's pro forma cap";
 export const SALE_COMPS_LABEL = "The memorandum's sale comps";
 export const SALE_COMPS_SF_LABEL = "The memorandum's sale comps stating a price per SF alone";
 export const SEEDED_RATE_LABEL = "The class's screening spread over it, a rule of thumb";
@@ -176,10 +197,13 @@ const RULE_VACANCY: DeciderStep = { name: "the class's norm, a rule of thumb", w
 
 /** Each order holds only figures of the OM figure's own measure: a physical
  *  figure (doors) is never decided by the T-12's economic loss (dollars), and
- *  an economic one never by a count of doors. */
+ *  an economic one never by a count of doors. And a stabilized figure is
+ *  never decided by today's rent roll: one day's count of the building as it
+ *  stands is the gap a lease-up has to close, not the building stabilized. */
 export const VACANCY_ORDER = {
-  /** a stabilized physical assumption on a deal read as stabilized */
-  stabilized: [...MARKET_VACANCY, RENT_ROLL_VACANCY, RULE_VACANCY],
+  /** a stabilized physical assumption on a deal read as stabilized: the
+   *  market's, then the class's norm — the rent roll is today's, beside it */
+  stabilized: [...MARKET_VACANCY, RULE_VACANCY],
   /** a plan deal's stated stabilized figure: the market's, then the class's
    *  norm; the deal's documents are today's building, never its figure */
   plan: [...MARKET_VACANCY, RULE_VACANCY],
@@ -224,25 +248,56 @@ export function expenseGrowthDecider(candidates: readonly DeciderCandidate[]): D
 
 // — Exit cap —
 
-export const EXIT_CAP_ORDER: readonly DeciderStep[] = [
-  { name: "the OM's going-in cap", why: "the cap the deal is bought at: an exit tighter than it is cap compression", is: isLabel(GOING_IN_CAP_LABEL) },
-  {
-    name: "the research tracker's cap range, at its low end",
-    why: "where no going-in cap stands",
-    is: (e) => /cap \(research tracker\)/i.test(e.label) && !/, high end$/.test(e.label),
-  },
-];
+/** The OM's own two caps, the HIGHER of which decides (`exitCapDecider`):
+ *  the going-in cap is today's NOI over the price, the pro forma cap the
+ *  OM's own stabilized NOI over the same price — the income an exit sells.
+ *  An exit under the higher of the two sells the building dearer, a dollar
+ *  of NOI, than this buyer buys it: cap compression. */
+const GOING_IN_CAP_STEP: DeciderStep = {
+  name: "the OM's going-in cap",
+  why: "the cap the deal is bought at, on today's NOI: an exit tighter than it is cap compression",
+  is: isLabel(GOING_IN_CAP_LABEL),
+};
+const PRO_FORMA_CAP_STEP: DeciderStep = {
+  name: "the OM's pro forma cap",
+  why: "the yield the price earns on the OM's own stabilized NOI, the income the exit sells: an exit tighter than it sells the stabilized building dearer than this buyer buys it",
+  is: isLabel(PRO_FORMA_CAP_LABEL),
+};
+const TRACKER_CAP_STEP: DeciderStep = {
+  name: "the research tracker's cap range, at its low end",
+  why: "where the OM states neither a going-in nor a pro forma cap that stands",
+  is: (e) => /cap \(research tracker\)/i.test(e.label) && !/, high end$/.test(e.label),
+};
 
+/** The exit's steps: the higher of the OM's own two caps, then the tracker's
+ *  low end. */
+export const EXIT_CAP_ORDER: readonly DeciderStep[] = [GOING_IN_CAP_STEP, PRO_FORMA_CAP_STEP, TRACKER_CAP_STEP];
+
+/** The higher of the OM's going-in and pro forma caps that may decide (a tie
+ *  is the going-in cap's), else the tracker's low end. */
 export function exitCapDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
-  return pickDecider(EXIT_CAP_ORDER, candidates);
+  const own = [GOING_IN_CAP_STEP, PRO_FORMA_CAP_STEP]
+    .map((step) => ({ step, index: candidates.findIndex((c) => usable(c) && step.is(c.evidence)) }))
+    .filter((x) => x.index >= 0);
+  if (own.length > 0) {
+    const top = own.reduce((a, b) => (candidates[b.index].evidence.value! > candidates[a.index].evidence.value! + 1e-9 ? b : a));
+    return found(candidates, top.index, top.step.name, top.step.why);
+  }
+  return pickDecider([TRACKER_CAP_STEP], candidates);
 }
 
 // — Basis —
 
+/** Each piece carries a figure only where it is a median of MEDIAN_FLOOR
+ *  (three) or more (lib/stress-test's basis row): one or two comps graded
+ *  clean are sightings, named beside, never a figure the ask is held to. */
 export const BASIS_ORDER: readonly DeciderStep[] = [
-  { name: "the memorandum's sale comps graded clean", why: "sales of the building's own kind the memorandum names", is: (e) => e.label === SALE_COMPS_LABEL || e.label === SALE_COMPS_SF_LABEL },
-  { name: "the recorded sales' median", why: "where the memorandum's comps carry no figure", is: (e) => e.label.startsWith("Recorded sales (") },
-  { name: "your past screens' asking prices", why: "asks, not trades, deciding only where nothing above carries a figure", is: (e) => e.publisher === PAST_SCREENS_PUBLISHER },
+  {
+    name: "the median of the memorandum's sale comps graded clean, three or more",
+    why: "sales of the building's own kind the memorandum names, graded comparable by the comps step",
+    is: (e) => e.label === SALE_COMPS_LABEL || e.label === SALE_COMPS_SF_LABEL,
+  },
+  { name: "the recorded sales' median, three or more", why: "where the memorandum's comps carry no median", is: (e) => e.label.startsWith("Recorded sales (") },
 ];
 
 export function basisDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
@@ -366,7 +421,7 @@ export function marketRentDecider(candidates: readonly DeciderCandidate[]): Deci
  *  class's own (lib/rent-growth-decider); the challenger's rows have none. */
 export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   basis: BASIS_ORDER.map((s) => s.name),
-  exit_cap: EXIT_CAP_ORDER.map((s) => s.name),
+  exit_cap: ["the higher of the OM's going-in cap and its pro forma cap", TRACKER_CAP_STEP.name],
   debt: DEBT_ORDER.map((s) => s.name),
   noi: NOI_ORDER.map((s) => s.name),
   vacancy: VACANCY_ORDER.stabilized.map((s) => s.name),

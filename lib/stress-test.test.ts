@@ -27,7 +27,7 @@ import { compactUsd } from "./money";
 import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
-import { GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
+import { AVERAGE_NOT_FORECAST, GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
@@ -43,6 +43,12 @@ import {
   INSURANCE_NO_RERUN_NO_T12,
   INSURANCE_NOT_DELIVERED,
   VACANCY_ECONOMIC_ONLY,
+  ROLL_NOT_STABILIZED,
+  STABILIZED_VACANCY_UNCHECKED,
+  measureOf,
+  exitCapPieces,
+  expenseGrowthPieces,
+  basisFloorWhy,
   SAME_SHARE,
   IRR_MOVE_STRETCH_BPS,
   leaseUpNotModelled,
@@ -74,7 +80,7 @@ import {
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
 import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
-import { METRO_VACANCY_LABEL } from "./stress-deciders";
+import { METRO_VACANCY_LABEL, VACANCY_ORDER } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
 import { stressSection } from "./anthropic/verdict";
@@ -813,11 +819,12 @@ describe("a deal with only published figures", () => {
 // ── A stabilized vacancy assumption ──────────────────────────────────────
 
 describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
-  /** The Maddox with a stated pro forma vacancy beside its occupancy today. */
-  const withVacancy = (pct: string, kind: "stabilized" | "value_add" = "stabilized"): ExtractionResult => ({
+  /** The Maddox with a stated stabilized vacancy rate beside its occupancy
+   *  today: a rate stated on its own counts doors (`measureOf`). */
+  const withVacancy = (pct: string, kind: "stabilized" | "value_add" = "stabilized", label = "Stabilized vacancy"): ExtractionResult => ({
     ...APARTMENT,
     strategy: { kind, summary: "", capitalBudget: kind === "value_add" ? "$1,800,000" : "", timeline: "" },
-    metrics: [...APARTMENT.metrics, row("Vacancy (pro forma)", pct, "p. 21")],
+    metrics: [...APARTMENT.metrics, row(label, pct, "p. 21")],
   });
   const argsFor = (ex: ExtractionResult, overrides: Partial<StressTestArgs> = {}, opts: { roll?: boolean } = {}): StressTestArgs => {
     const plan = ex.strategy?.kind !== "stabilized";
@@ -833,7 +840,7 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
   it("holds it to the metro's survey inside its margin, the rent roll beside it as today's gap and the T-12's dollars beside it as dollars", () => {
     const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), {}, { roll: true })), "vacancy");
     expect(v.title).toBe("Stabilized vacancy");
-    expect(v.omSays).toEqual({ text: "Vacancy (pro forma): 6.0%", value: 6, page: 21 });
+    expect(v.omSays).toEqual({ text: "Stabilized vacancy: 6.0%", value: 6, page: 21 });
     // The figure that decides first; the region's, the documents' and the
     // class's norm beside it.
     expect(v.evidence.map((e) => [e.kind, e.label])).toEqual([
@@ -884,23 +891,63 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
     expect(loose.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/; today's, 0\.3 points under the stabilized assumption — support for it$/);
   });
 
-  it("with no fresh published figure, the rent roll decides, and the row says so; the T-12's dollars never do", () => {
+  it("with no fresh published figure, the class's norm decides, never today's rent roll, which stays beside it as the lease-up gap; the T-12's dollars never decide either", () => {
+    // The investor's review of 2026-10-23: the rent roll had decided the
+    // stabilized 6.0% "unsupported" whenever the market read failed, against
+    // "holds" whenever it answered — one assumption, two verdicts on a feed.
     const v = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })), "vacancy");
-    expect(v.evidence.map((e) => e.kind)).toEqual(["document", "document", "rule_of_thumb"]);
-    expect(v.evidence[0].publisher).toBe("the deal's rent roll");
+    expect(v.evidence.map((e) => e.kind)).toEqual(["rule_of_thumb", "document", "document"]);
+    expect(v.evidence[1].publisher).toBe("the deal's rent roll");
+    expect(v.evidence[1].text).toMatch(/; today's, 3\.2 points over the stabilized assumption — the gap a lease-up has to close$/);
     expect(v.gap!.text).toBe(
-      `The OM's 6.0% is 3.2 points under the evidence's 9.2%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides.${T12_BESIDE}`,
+      `The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides; ${ROLL_NOT_STABILIZED}: today the deal's rent roll runs 9.2% vacant, 3.2 points over the assumption — the gap a lease-up has to close. ${leaseUpNotModelled(9.2, 6)}${T12_BESIDE} Against a rule of thumb only.`,
     );
-    expect(v.verdict).toBe("unsupported");
-    expect(v.impact!.altValue).toBeCloseTo(0.092, 6);
+    expect(v.verdict).toBe("holds");
+    expect(v.ruleOfThumbOnly).toBe(true);
+    expect(v.impact!.altValue).toBeCloseTo(0.05, 6);
+    // With no market figure and no class norm (land states none), nothing can
+    // decide: the row stands unchecked and says why, never on the rent roll.
+    expect(VACANCY_ORDER.stabilized.map((s) => s.name)).not.toContain("the deal's rent roll");
+    expect(STABILIZED_VACANCY_UNCHECKED).toContain("never the test of a stabilized figure");
     // With no rent roll either, the class's norm decides — never the T-12,
     // whose 9.1% carries credit loss the OM's 6.0% does not count.
     const bare = rowOf(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null })), "vacancy");
     expect(bare.evidence.map((e) => e.kind)).toEqual(["rule_of_thumb", "document"]);
     expect(bare.ruleOfThumbOnly).toBe(true);
     expect(bare.gap!.text).toBe(
-      `The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side. No fresh published vacancy figure for this market could be held to the stabilized assumption and no rent roll is on file, so the class's norm decides.${T12_BESIDE} Against a rule of thumb only.`,
+      `The OM's 6.0% is 1.0 point over the evidence's 5.0% — the conservative side. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides.${T12_BESIDE} Against a rule of thumb only.`,
     );
+  });
+
+  it("reads a pro forma's vacancy line as dollars, held to the T-12 on the same footing, whether or not the market read answers (the review of 2026-10-23)", () => {
+    // "Vacancy (pro forma)" is the pro forma's deduction from gross potential
+    // rent: dollars, not doors. The T-12 decides it, and the verdict does not
+    // move with the market read.
+    const pf = withVacancy("6.0%", "stabilized", "Vacancy (pro forma)");
+    expect(measureOf("Vacancy (pro forma)")).toBe("economic");
+    expect(measureOf("Underwritten vacancy")).toBe("economic");
+    expect(measureOf("Vacancy & credit loss")).toBe("economic");
+    expect(measureOf("Vacancy loss")).toBe("economic");
+    expect(measureOf("Stabilized vacancy")).toBe("physical");
+    expect(measureOf("Vacancy")).toBe("physical");
+    expect(measureOf("Pro forma vacant units")).toBe("physical");
+    expect(measureOf("Physical vacancy (pro forma)")).toBe("physical");
+    const withRead = rowOf(buildStressTest(argsFor(pf, {}, { roll: true })), "vacancy");
+    const without = rowOf(buildStressTest(argsFor(pf, { modelVsMarket: null }, { roll: true })), "vacancy");
+    for (const v of [withRead, without]) {
+      expect(v.measure).toBe("economic");
+      expect(v.evidence[0]).toMatchObject({ kind: "document", publisher: "the deal's T-12", value: 9.1 });
+      expect(v.verdict).toBe("unsupported");
+      expect(v.gap!.text).toContain(
+        "The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, so it is held to the deal's T-12, the same measure on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors.",
+      );
+      // The rent roll's doors stand beside it, never deciding.
+      expect(v.evidence.find((e) => e.publisher === "the deal's rent roll")!.text).toMatch(/doors, not dollars: shown beside the OM's economic figure and never deciding it$/);
+    }
+    expect(withRead.gap!.text).toBe(without.gap!.text);
+    // The track record scores it by a later T-12, its own measure.
+    expect(vacancyEconomicStated(pf)).toBe(true);
+    expect(stabilizedVacancyStated(pf)).toBe(false);
   });
 
   it("on a plan deal the market decides a stated stabilized vacancy too, the documents beside it as the gap the plan closes (the walkthrough of 2026-10-20)", () => {
@@ -937,9 +984,11 @@ describe("a stabilized vacancy assumption on a deal read as stabilized", () => {
   it("says which kind decided the vacancy row, so the track record holds back a later document only where the market decided (audit M5)", () => {
     // The survey held the stabilized 6.0%: the market decided.
     expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"))))).toBe("published");
-    // No fresh published figure: the rent roll decided, and a later rent roll
-    // or T-12 scores the challenge.
-    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })))).toBe("document");
+    // No fresh published figure: the class's norm decided, never the rent
+    // roll beside it (the review of 2026-10-23).
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%"), { modelVsMarket: null }, { roll: true })))).toBe("rule_of_thumb");
+    // A pro forma's vacancy line is dollars: the T-12 decided it, the same measure.
+    expect(vacancyDecidedBy(buildStressTest(argsFor(withVacancy("6.0%", "stabilized", "Vacancy (pro forma)"))))).toBe("document");
     expect(vacancyDecidedBy(null)).toBeNull();
     // The deal page asks it of its own built test, never of the extraction alone.
     const page = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
@@ -1091,6 +1140,44 @@ describe("the exit cap row", () => {
     expect(rowOf(buildStressTest(apartmentArgs({ extraction: withCaps("5.71%", "4.94%") })), "exit_cap").evidence[1].text).toBe(
       "4.94% on Sep 17, 2026 — the exit sits at it; the going-in cap's spread over it is 77 bps",
     );
+  });
+
+  it("is decided by the higher of the going-in cap and the OM's own pro forma cap, the other beside it, no expansion added (the review of 2026-10-23)", () => {
+    // An exit capitalizes a forward NOI: the pro forma cap is the price's
+    // yield on the OM's stabilized NOI, the income the exit sells.
+    const withProForma = (goingIn: string, exit: string, proForma: string, label = "Pro forma cap rate"): ExtractionResult => ({
+      ...withCaps(goingIn, exit),
+      metrics: [...withCaps(goingIn, exit).metrics, row(label, proForma, "p. 8")],
+    });
+    const x = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%") })), "exit_cap");
+    expect(x.decidedBy).toBe(0);
+    expect(x.evidence[0]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
+    expect(x.evidence[1]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
+    expect(x.gap).toMatchObject({ value: 45, unit: "bps" });
+    expect(x.verdict).toBe("unsupported");
+    expect(x.gap!.text).toBe(
+      "The OM's 5.25% exit is 45 bps tighter than its 5.70% pro forma cap — the price's yield on its own stabilized NOI, the income the exit sells — so it sells that income dearer than this buyer pays for it: cap compression. Its 5.45% going-in cap, on today's NOI, is beside it.",
+    );
+    expect(x.impact!.altValue).toBeCloseTo(0.057, 9);
+    expect(x.impact!.note).toMatch(/^If the exit cap is the pro forma cap's 5\.70%, not the OM's 5\.25%/);
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's pro forma cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: the OM's going-in cap/);
+    // A pro forma cap under the going-in cap: the going-in cap decides, the
+    // pro forma beside it.
+    const under = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.75%", "5.50%", "5.60%", "Stabilized cap rate") })), "exit_cap");
+    expect(under.evidence[under.decidedBy!].label).toBe("The OM's going-in cap");
+    expect(under.gap!.text).toBe("The OM's 5.50% exit is 25 bps tighter than its 5.75% going-in cap — cap compression. Its 5.60% pro forma cap, on its stabilized NOI, sits under it, shown beside it.");
+    // Flat to the pro forma cap holds, the expansion habit named, never held to.
+    const flat = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.70%", "5.70%") })), "exit_cap");
+    expect(flat.verdict).toBe("holds");
+    expect(flat.gap!.text).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
+    // An exit, a cap on cost or a later year's cap is no pro forma cap.
+    for (const label of ["Pro forma exit cap", "Stabilized yield on cost", "Pro forma cap rate (Year 3)", "Stabilized cap on cost"]) {
+      const r = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "6.50%", label) })), "exit_cap");
+      expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(false);
+    }
+    // The screening model keeps its exit reader's own pieces: the going-in cap
+    // (lib/model-evidence reads them with `proForma: false`).
+    expect(exitCapPieces(withProForma("5.45%", "5.25%", "5.70%"), false, null, null, { proForma: false }).decided!.label).toBe("The OM's going-in cap");
   });
 });
 
@@ -2083,7 +2170,7 @@ describe("the challenger's words ride beside the rows", () => {
  */
 const AGAINST_SOURCES: Record<StressKey, string[]> = {
   basis: ["The memorandum's sale comps", "Recorded sales (", "Other memoranda's asking prices in"],
-  exit_cap: ["The OM's going-in cap", "10-year Treasury", "cap (research tracker)"],
+  exit_cap: ["The OM's going-in cap", "The OM's pro forma cap", "10-year Treasury", "cap (research tracker)"],
   debt: ["The lender's quote on file", "The index the model prices off", "Lender tests at screening defaults", "Negative leverage"],
   noi: ["The deal's T-12 NOI", "The rent roll's in-place rent", "The OM's in-place NOI against its pro forma", "The OM's other income against the T-12's"],
   vacancy: ["Rental vacancy, metro area", "vacancy (research tracker)", "The deal's rent roll", "The deal's T-12 economic vacancy", "a rule of thumb"],
@@ -2120,6 +2207,8 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
       row("Management fee", "3.0%", "p. 9"),
       row("Payroll", "$590,000", "p. 9"),
       row("Other income", "$110,000", "p. 9"),
+      // Under the going-in cap, so the going-in cap decides and it is beside it.
+      row("Pro forma cap rate", "5.60%", "p. 6"),
     ],
   };
   const rentRoll = {
@@ -2260,19 +2349,23 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(b.evidence.map((e) => e.kind)).toEqual(["om_internal", "published", "rule_of_thumb"]);
     expect(b.evidence[2]).toMatchObject({ label: "Other memoranda's asking prices in Washington DC (your past screens): asks, not trades", publisher: "your past screens", scope: "metro", value: 255_000 });
     expect(b.evidence.some((e) => /band any market delivers in|Prices the class trades in/.test(`${e.label} ${e.text}`))).toBe(false);
-    // Park Place is graded favorable — it leans the seller's way — so The
-    // Ellery is the one comp graded clean, named, never called a median.
-    expect(b.evidence[0].value).toBe(252_000);
+    // Park Place is graded favorable — less comparable, in a way that
+    // flatters the ask — so The Ellery is the one comp graded clean: named,
+    // too few for a median, deciding nothing (the review of 2026-10-23). The
+    // recorded sales' median of four decides.
+    expect(b.evidence[0].value).toBeNull();
+    expect(b.evidence[0].text).toContain("The Ellery $252k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(b.evidence[1]).toMatchObject({ value: 240_000, href: "https://example.test/records", asOf: "2026-10-01" });
-    expect(b.gap).toMatchObject({ unit: "pct", value: 8.9 });
-    expect(b.gap!.text).toBe("The ask's $275k/unit is 8.9% over the one comp graded clean, The Ellery, $252k/unit.");
+    expect(b.decidedBy).toBe(1);
+    expect(b.gap).toMatchObject({ unit: "pct", value: 14.4 });
+    expect(b.gap!.text).toBe("The ask's $275k/unit is 14.4% over the median of recorded sales (Philadelphia OPA), $240k/unit.");
     expect(b.verdict).toBe("stretched");
     expect(b.impact!.input).toBe("purchasePrice");
-    expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 252_000) / 274_510, 0);
+    expect(b.impact!.altValue).toBeCloseTo((42_000_000 * 240_000) / 274_510, 0);
     // The note names whose figure the price is re-run at, and that the loan
-    // re-sizes with the price — the comp's, not "the OM's".
+    // re-sizes with the price — the recorded sales', not "the OM's".
     expect(b.impact!.note).toMatch(
-      /^If the price is the one comp graded clean \(The Ellery\), \$38\.56M \(\$252k\/unit\), at the model's loan-to-cost \(the loan re-sizes with the price\), not the OM's \$42M \(\$275k\/unit\), the levered IRR moves from/,
+      /^If the price is the recorded sales' median \(Philadelphia OPA\), \$36\.72M \(\$240k\/unit\), at the model's loan-to-cost \(the loan re-sizes with the price\), not the OM's \$42M \(\$275k\/unit\), the levered IRR moves from/,
     );
   });
 
@@ -2316,54 +2409,54 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     };
     const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps })), "basis");
     // Three graded supports make the median; Park Place, graded favorable
-    // (it leans the seller's way, lib/anthropic/prompts), is never clean.
+    // (less comparable, in a way that flatters the ask, lib/anthropic/
+    // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (it leans the seller's way): Park Place $261k/unit; left out, graded stretched by the comps step (it does not support the deal): Vue $298k/unit",
+      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (less comparable, in a way that flatters the ask): Park Place $261k/unit; left out, graded stretched by the comps step (not comparable to the subject): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
     expect(favorable.evidence[0]).toMatchObject({ value: null });
     expect(favorable.evidence[0].text).toContain("none graded clean (supports)");
     expect(favorable.verdict).toBe("unchecked");
-    expect(favorable.unchecked).toBe("No evidence above carries a figure the ask can be set against.");
+    expect(favorable.unchecked).toBe(basisFloorWhy(0, 1, "/unit"));
     // None graded clean: no figure, and the row has nothing to decide on.
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (it does not support the deal): Vue $298k/unit",
+      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (not comparable to the subject): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
 
-  it("carries the OM's own validated page on its own pieces and says a price struck on one comp as one comp's", () => {
-    const one = {
+  it("carries the OM's own validated page on its own pieces, a median's only where its comps share one", () => {
+    const three = {
       saleComps: [
         { name: "The Brixton", detail: "$252,000 per unit", support: "supports" as const, note: "", page: "p. 14" },
+        { name: "Hallam", detail: "$250,000 per unit", support: "supports" as const, note: "", page: "p. 14" },
+        { name: "The Rowan", detail: "$256,000 per unit", support: "supports" as const, note: "", page: "p. 14" },
         { name: "Vue", detail: "$298,000 per unit", support: "stretched" as const, note: "", page: "p. 15" },
       ],
       leaseComps: [],
       redFlags: [],
       summary: "",
     };
-    const t = buildStressTest(apartmentArgs({ brokerComps: one }));
+    const t = buildStressTest(apartmentArgs({ brokerComps: three }));
     const b = rowOf(t, "basis");
-    // The clean comp's own page, validated against the deck's 48 pages; the
+    // The clean comps' own page, validated against the deck's 48 pages; the
     // left-out comp's page is no page of the figure.
     expect(b.evidence[0]).toMatchObject({ kind: "om_internal", value: 252_000, page: 14 });
-    expect(rowWords(b).against).toBe("$252k/unit (the one comp graded clean, OM p. 14)");
+    expect(rowWords(b).against).toBe("$252k/unit (the median of the 3 comps graded clean, OM p. 14)");
     // The verdict's brief cites the same page on the piece's own line.
     const briefLine = stressSection(t).find((l) => l.startsWith("- ") && l.includes("(basis)"))!;
     expect(briefLine).toContain(`${b.evidence[0].label}: ${b.evidence[0].text} (OM p. 14; the memorandum's own figure)`);
     // A page past the deck's length is no page: nothing new is printed.
-    const past = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [{ ...one.saleComps[0], page: "p. 99" }] } })), "basis");
+    const past = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...three, saleComps: three.saleComps.map((c) => ({ ...c, page: "p. 99" })) } })), "basis");
     expect(past.evidence[0].page).toBeUndefined();
-    expect(rowWords(past).against).toBe("$252k/unit (the OM's one comp graded clean)");
-    // Two clean comps on two pages: their midpoint, no one page.
-    const two = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...one, saleComps: [one.saleComps[0], { ...one.saleComps[1], support: "supports" as const }] } })), "basis");
-    expect(two.evidence[0].page).toBeUndefined();
-    // With no page beside them, whose comps they are is said.
-    expect(rowWords(two).against).toMatch(/\(the midpoint of the OM's two comps graded clean\)$/);
+    // Clean comps on two pages: their median, no one page.
+    const split = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...three, saleComps: [three.saleComps[0], three.saleComps[1], { ...three.saleComps[2], page: "p. 15" }] } })), "basis");
+    expect(split.evidence[0].page).toBeUndefined();
     // The going-in cap's own row's page.
     const x = rowOf(t, "exit_cap");
     expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", page: 6 });
@@ -2468,21 +2561,32 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(leadRows({ ...t, rows: [none, s2, big] }).map((r) => r.key)).toEqual(["vacancy", "rent_growth", "noi"]);
   });
 
-  it("names one or two clean comps, never a median, and calls the basis no worse than stretched on them", () => {
+  it("names one or two clean comps with their count, never a figure: under three, and with no recorded sales' median, the price stands unchecked on the comps' own floor (the review of 2026-10-23)", () => {
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
-    const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" } })), "basis");
-    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (supports): The Ellery $232k/unit — the one comp graded clean, too few for a median");
-    // 18.3% over would be unsupported on a median; on one comp, stretched.
-    expect(one.verdict).toBe("stretched");
-    expect(one.gap!.text).toBe("The ask's $275k/unit is 18.3% over the one comp graded clean, The Ellery, $232k/unit. On one comp, no worse than stretched.");
+    const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
+    expect(one.evidence[0]).toMatchObject({ value: null });
+    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (supports): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.verdict).toBe("unchecked");
+    expect(one.unchecked).toBe(
+      "Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+    );
+    expect(one.impact).toBeNull();
     const two = rowOf(
-      buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" } })),
+      buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })),
       "basis",
     );
-    expect(two.evidence[0]).toMatchObject({ value: 234_000 });
-    expect(two.evidence[0].text).toContain("the two graded clean, midpoint $234k/unit, too few for a median");
-    expect(two.gap!.text).toMatch(/over the midpoint of the two comps graded clean \(The Ellery and Vue\), \$234k\/unit\. On two comps, no worse than stretched\.$/);
-    expect(two.verdict).toBe("stretched");
+    expect(two.evidence[0]).toMatchObject({ value: null });
+    expect(two.evidence[0].text).toContain("two graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(two.verdict).toBe("unchecked");
+    expect(two.unchecked).toBe(basisFloorWhy(2, 2, "/unit"));
+    // The floor's sentence is the market-rent row's own, word for word but the noun.
+    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(supports\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
+    // Two comps beside a recorded sales' median of four: the median decides.
+    const withSales = rowOf(
+      buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
+      "basis",
+    );
+    expect(withSales.evidence[withSales.decidedBy!].label).toMatch(/^Recorded sales \(/);
     // Three make a median, and a median can call the basis unsupported.
     const three = rowOf(
       buildStressTest(
@@ -2493,20 +2597,19 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(three.verdict).toBe("unsupported");
   });
 
-  it("judges the basis on the best kind present: the reader's own past asks never turn a stretched basis into one that holds", () => {
-    const comps = { saleComps: [{ name: "The Ellery", detail: "$256,500 per unit", support: "supports" as const, note: "" }], leaseComps: [], redFlags: [], summary: "" };
+  it("judges the basis on trades only: the reader's own past asks are shown beside it and never decide, not even alone", () => {
+    const comps = { saleComps: ["The Ellery", "Hallam", "The Rowan"].map((name) => ({ name, detail: "$256,500 per unit", support: "supports" as const, note: "" })), leaseComps: [], redFlags: [], summary: "" };
     const pastScreens = { count: 4, perUnitMedian: 300_000, perSfMedian: null, market: "Washington DC" };
     const b = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps, pastScreens })), "basis");
     // 7.0% over the comps; the asks at $300k would have read it under one.
     expect(b.verdict).toBe("stretched");
     expect(b.ruleOfThumbOnly).toBeUndefined();
     expect(b.method).toMatch(/against the memorandum's sale comps \(the offering memorandum\), the one figure that decides; beside it, not deciding: other memoranda's asking prices/);
-    // The asks alone decide only where nothing else carries a figure — and
-    // the row says it was held to a rule of thumb only.
-    const asksOnly = rowOf(buildStressTest(apartmentArgs({ pastScreens })), "basis");
-    expect(asksOnly.verdict).toBe("holds");
-    expect(asksOnly.ruleOfThumbOnly).toBe(true);
-    expect(asksOnly.gap!.text).toBe("The ask's $275k/unit is 8.5% under the median of your past screens' asking prices in Washington DC, $300k/unit — the conservative side. Against a rule of thumb only.");
+    // The asks alone are asks, not trades: the row stands unchecked, said so.
+    const asksOnly = rowOf(buildStressTest(apartmentArgs({ pastScreens, recordedSales: null })), "basis");
+    expect(asksOnly.verdict).toBe("unchecked");
+    expect(asksOnly.unchecked).toBe("No trade carries a figure the ask can be set against: your past screens' asking prices are asks, not trades, and decide nothing.");
+    expect(asksOnly.evidence.find((e) => e.publisher === "your past screens")).toMatchObject({ value: 300_000 });
   });
 
   it("strikes the basis verdict against the same median its sentence names, and prints no count it does not have", () => {
@@ -3198,6 +3301,44 @@ describe("a growth row's one trailing year stands beside the average its stored 
     expect(zillow.gap!.text).not.toContain("Beside it, not deciding");
   });
 
+  it("decides on the more cautious of the one year and the longer average: the higher for expenses, the lower for rent (the review of 2026-10-23)", () => {
+    const args = apartmentArgs();
+    // A cooler newest year after hotter ones: the CPI's average decides the
+    // expense growth, the trailing year beside it.
+    const hot = [5.5, 6.0, 4.5];
+    const national = readRates([...REAL_ROWS, ...CPI_BACK.map((r, i) => ({ ...r, value: hot[i] }))], FIXTURE_NOW);
+    const e = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { national }) }), "expense_growth");
+    const avgPct = Math.round(compound([newestCpi.value, ...hot]) * 100) / 100;
+    expect(avgPct).toBeGreaterThan(newestCpi.value);
+    expect(e.decidedBy).toBe(0);
+    expect(e.evidence.slice(0, 2).map((x) => x.label)).toEqual(["Consumer prices (CPI, all items): average a year over 4 years", "Consumer prices (CPI, all items)"]);
+    expect(e.impact!.altValue).toBeCloseTo(avgPct / 100, 9);
+    expect(e.gap!.text).toMatch(
+      /^Held to consumer prices, all items \(the CPI\), averaged a year over the 4 years its stored history holds, the higher of its trailing year and its longer average, the cautious side for a rate run every year of the hold: \+[\d.]+% a year over the four years to Aug 2026/,
+    );
+    expect(e.gap!.text).toContain(" Beside it, not deciding: its trailing year, +");
+    expect(e.gap!.text.endsWith(AVERAGE_NOT_FORECAST)).toBe(true);
+    expect(e.impact!.note).toMatch(/^If expense growth is \+[\d.]+% a year, its 4-year compound average \(BLS via FRED\), run each year of the hold, not the OM's 2\.5%\/yr/);
+    // The model's seed reads the same deciding figure (lib/model-evidence).
+    expect(expenseGrowthPieces(readFor(args.derived!, { national })).decided!.figure).toBeCloseTo(avgPct, 9);
+    // A hot newest year after cooler ones: the CPI rent's average decides the
+    // rent growth, so one hot year never carries a 4.0% a year for five.
+    const month = (k: number) => new Date(Date.UTC(2026, 7 - k, 1)).toISOString().slice(0, 10);
+    const level = (k: number) => (k >= 12 ? 400 * 1.02 ** ((HISTORY_ROWS - k) / 12) : 400 * 1.02 ** ((HISTORY_ROWS - 12) / 12) * 1.06 ** ((12 - k) / 12));
+    const levels: RateRow[] = Array.from({ length: HISTORY_ROWS }, (_, k) => ({ series_id: "CUURS35ASEHA", obs_date: month(k), value: Math.round(level(k) * 100) / 100 }));
+    const metro = readMetroRates("dc", [...METRO_ROWS.filter((r) => r.series_id !== "CUURS35ASEHA"), ...levels], FIXTURE_NOW);
+    const g = rowOf(buildStressTest({ ...args, modelVsMarket: readFor(args.derived!, { zori: null, rates: metro }) }), "rent_growth");
+    const decider = g.evidence[g.decidedBy!];
+    expect(decider.label).toBe("Rent paid by sitting tenants (CPI rent): average a year over 3 years");
+    const trailing = g.evidence.find((x) => x.label === "Rent paid by sitting tenants (CPI rent)")!;
+    expect(decider.value!).toBeLessThan(trailing.value!);
+    // 4.0% holds against the trailing 6.0%; against the average it is stretched.
+    expect(trailing.value!).toBeGreaterThan(4);
+    expect(g.verdict).toBe("stretched");
+    expect(g.gap!.text).toContain("the lower of its trailing year and its longer average, the cautious side for a rate run every year of the hold");
+    expect(g.gap!.text.endsWith(AVERAGE_NOT_FORECAST)).toBe(true);
+  });
+
   it("holds the insurance margin the methodology prints to the reader's own", () => {
     expect(STRESS_METHODS.find((m) => m.key === "insurance")!.against[0]).toContain(`more than ${SAME_SHARE * 100}% under it`);
   });
@@ -3628,7 +3769,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     const decider = r.evidence[r.decidedBy!];
     expect(decider).toMatchObject({ kind: "om_internal", label: "The memorandum's lease comps", value: 2_250, page: 16 });
     expect(decider.text).toBe(
-      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (it does not support the deal): The Vue $2,900/mo",
+      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (not comparable to the subject): The Vue $2,900/mo",
     );
     // 4.4% over the median: inside the comps' 5%, a hold.
     expect(r.gap).toMatchObject({ value: 4.4, unit: "pct" });

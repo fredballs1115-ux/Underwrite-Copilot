@@ -72,13 +72,16 @@ export interface StressEvidence {
  *  forecast of the hold. */
 export const TRAILING_YEAR_NOT_FORECAST = "A trailing year is what the assumption is asked to beat, not a forecast.";
 
+/** The same, where the series' longer average decides a growth row. */
+export const AVERAGE_NOT_FORECAST = "An average of published years is what the assumption is asked to beat, not a forecast.";
+
 /** What a growth row's one year stands beside (lib/growth-average), said on
- *  the methodology page: the deciding figure is a single year's change, run
- *  every year of the hold; where the site's stored history of that series
- *  holds two years or more, their compound average a year is shown beside
- *  it and decides nothing. */
+ *  the methodology page: the trailing year is a single draw of a rate run
+ *  every year of the hold, so where the site's stored history of that series
+ *  holds two years or more, the more cautious of the year and their compound
+ *  average a year decides (the review of 2026-10-23), the other beside it. */
 export const GROWTH_HISTORY_LIMIT =
-  "The deciding figure is one year's change, run every year of the hold: where the stored history of that series holds two years or more, their compound average a year is shown beside it, an average of published figures, not a forecast, deciding nothing.";
+  "One year is a single draw of a rate run every year of the hold: where the series' stored history holds two years, the more cautious of its trailing year and its compound average decides (the lower for rent, the higher for expenses), the other beside it.";
 
 /** What history is held for it (lib/growth-average; held to HISTORY_ROWS by
  *  lib/stress-test.test.ts). */
@@ -515,14 +518,16 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The price",
     claim: "The asking price per unit or per square foot is what the building is worth.",
     against: [
-      "The memorandum's own sale comps as the comps step grades them, the first of these with a figure deciding: a median over three or more graded as supporting the ask, one or two named, never a median",
-      "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five",
-      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb deciding only where nothing above carries a figure",
+      "The memorandum's own sale comps as the comps step grades them, by how comparable each is to the subject, never by price: the median of three or more graded as supporting the ask decides; one or two are named with their count, deciding nothing",
+      "Recorded sales from public property records where the site has them and the comps page sets the deal against their price a foot, a median only from three sales that state an area, said thin under five, deciding where the memorandum's comps carry no median",
+      "Other memoranda's asking prices from your own past screens in the same market and class, a median only from three that state a basis: asks, not trades, a rule of thumb shown beside the price and never deciding it",
     ],
-    engine: "The price is a direct input: the return is re-run at the evidence's price, each piece judged per unit where the class is, else per SF where it states only that. A plan deal's yield on cost is re-run at the evidence's all-in basis.",
+    engine: "The price is a direct input: the return is re-run at the median's price, each piece judged per unit where the class is, else per SF where it states only that. A plan deal's yield on cost is re-run at the median's all-in basis.",
     limits: [
       "No licensed sales or cap-rate database is read; a brokerage's published cap range speaks to the exit, not to the price.",
-      "A comp graded favorable (leaning the seller's way) or stretched is named and left out of the median.",
+      "Under three comps graded clean and no recorded sales' median, the row stands unchecked: one or two trades are sightings, not a market, the comps' own floor.",
+      "The grades are the comps step's reading of each comp's comparability, the AI's; code takes the set it grades clean and strikes the median.",
+      "A comp graded favorable (less comparable, in a way that flatters the ask) or stretched (not comparable) is named and left out of the median.",
       "Your past screens' asks are never read on a shared screen or in the verdict's brief.",
       "Replacement cost only where the memorandum states one.",
       "The price of a note, a preferred equity position, a leased fee, a master lease or a share of no stated percentage is not the building's, and no basis is struck on it.",
@@ -535,13 +540,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The exit cap",
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
-      "The going-in cap, the one figure that decides: an exit tighter than the entry is cap compression, said as such",
+      "The higher of the OM's going-in cap and its own pro forma cap decides, the other shown beside it: an exit tighter than either is cap compression, said as such",
+      "The OM's pro forma cap is its stabilized NOI over the price, the income an exit sells: an exit under it sells that income dearer than this buyer pays for it",
       "The exit's spread over the latest 10-year Treasury, dated, shown beside it and deciding nothing (a yield, not a cap), with the going-in cap's spread where the exit is held to it",
-      "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where no going-in cap stands, and beside a going-in cap it is shown, deciding nothing",
+      "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where the OM states neither cap, and beside one it is shown, deciding nothing",
     ],
-    engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
+    engine: "The exit cap is a direct input: the return is re-run at the cap that decides, or at the published cap range's low end where the OM states neither.",
     limits: [
       "No forecast of where caps go: the test asks what the exit assumes against today's figures.",
+      "No expansion over the hold is added to the cap that decides: an exit flat to it holds, and the common rule of thumb that adds some is named, never held to.",
       "A stale tracker figure (over a year old by its own period) is shown and held against nothing.",
     ],
   },
@@ -587,17 +594,18 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Stabilized vacancy",
     claim: "The building runs at the pro forma's occupancy.",
     against: [
-      "A stabilized vacancy the OM states is held to the market's published figure, the first present deciding: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
+      "A stabilized vacancy the OM states counted by doors is held to the market's published figure, the first present deciding: the Census Bureau's rental vacancy for the metro area, inside its own margin of error, else the Census region's, then the state's",
       "For a commercial class, the research tracker's vacancy band, with its period, where the market check holds the model to it",
-      "The deal's own rent roll, by its occupied doors (by area on a class priced by the foot): the building's occupancy today. It decides today's occupancy, and on a deal read as stabilized a stabilized assumption no fresh published figure speaks to, said so",
-      "The deal's T-12: its vacancy and credit loss over gross potential rent, an economic figure, dollars not doors. It decides only a figure the OM states as economic; beside one counted by doors it is shown, labelled economic, and never decides",
+      "The deal's own rent roll, by its occupied doors (by area on a class priced by the foot): the building's occupancy today. It decides today's occupancy only; beside a stabilized assumption it is today's gap, the one a lease-up has to close, and never decides it",
+      "The deal's T-12: its vacancy and credit loss over gross potential rent, an economic figure, dollars not doors, over a trailing year. It decides a figure the OM states in dollars, a pro forma's vacancy line among them; beside doors it is shown, never deciding",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above may",
     ],
     engine: "Vacancy is a direct input: the return is re-run at the deciding figure, of the OM's own measure. A plan's yield on cost moves by its stabilized gross times the gap to the market's figure, else the class's norm.",
     limits: [
       "Doors and dollars are two measures: an occupancy or a vacancy counted by doors is decided only by a count of doors, the rent roll or a published vacancy rate, and an economic figure only by the T-12.",
       "The T-12's economic vacancy runs over the physical one wherever rent is lost to credit loss, concessions or loss to lease, so holding one to the other would call a sound occupancy unsupported.",
-      "Beside a stabilized assumption the rent roll is today's gap, the one a lease-up has to close, or support where the building already runs at or under it.",
+      "Beside a stabilized assumption the rent roll is today's gap, the one a lease-up has to close, or support where the building already runs at or under it: one day's count of the building as it stands, never the test of the building stabilized.",
+      "What the OM's figure counts is read off its own label: an occupancy, units or physical count doors; a pro forma's or underwritten vacancy line, a loss or a credit loss is dollars; a vacancy rate stated on its own counts doors.",
       "On a value-add, lease-up, conversion or development deal the documents never decide the stabilized figure: they are the gap the plan closes.",
       "A survey's quarterly move inside its margin is noise and is said so.",
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
@@ -615,7 +623,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "For a commercial class, the national index of rents its kind of lessor charges (the BLS producer price indexes), said as the nation's",
       "A rent regulation's published allowance for the units it reaches, shown first and never the figure that decides",
     ],
-    engine: "Rent growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
+    engine: "Rent growth is a direct input: the return is re-run at the figure that decided, the trailing year or the series' longer average.",
     limits: [
       TRAILING_YEAR_NOT_FORECAST,
       GROWTH_HISTORY_LIMIT,
@@ -648,12 +656,12 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Expense growth",
     claim: "Expenses grow at the pro forma's rate.",
     against: [
-      "Consumer prices, all items, against a year ago (BLS via FRED): the one figure that decides, the broad price level the expense base moves with; beside it, the same series' compound average a year over the years its history holds",
+      "Consumer prices, all items, against a year ago (BLS via FRED): the broad price level the expense base moves with; where its history holds two years or more, the higher of its trailing year and its compound average a year decides, the other beside it",
       "Core CPI against a year ago, deciding only where the all-items figure is not fresh, else shown beside it and never the lower figure held to",
       "The producer price index for commercial property insurance premiums, shown beside the price indexes and never averaged into them",
       "The bond market's ten-year expected inflation (the breakeven), shown apart",
     ],
-    engine: "Expense growth is a direct input: the return is re-run at the trailing year of the figure that decided.",
+    engine: "Expense growth is a direct input: the return is re-run at the figure that decided, the trailing year or the series' longer average.",
     limits: [TRAILING_YEAR_NOT_FORECAST, GROWTH_HISTORY_LIMIT, GROWTH_HISTORY_HELD, "The insurance line's own repricing is read apart (below), not through the growth rate."],
   },
   {

@@ -42,15 +42,19 @@ describe("the sample's stress test", () => {
   };
   const own = Number((computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toFixed(1));
 
-  it("tests seven of its eleven assumptions; the four unchecked are the loan rate no document states, a rent growth no figure was read for, a market rent its one lease comp, graded favorable, cannot decide, and the operating expenses it states no total for", () => {
+  it("tests six of its eleven assumptions; the five unchecked are a price two clean comps cannot set a median for, the loan rate no document states, a rent growth no figure was read for, a market rent its one lease comp, graded favorable, cannot decide, and the operating expenses it states no total for", () => {
     expect(test.impactsWithheld).toBeNull();
     expect(test.rows.map((r) => [r.key, r.verdict])).toEqual([
-      ["basis", "stretched"],
-      ["exit_cap", "stretched"],
+      // Two comps graded clean, The Brixton and Parkside: too few for a
+      // median, so no verdict on the price (the review of 2026-10-23).
+      ["basis", "unchecked"],
+      // 45 bps under the OM's own 5.70% pro forma cap, the higher of its two.
+      ["exit_cap", "unsupported"],
       ["debt", "unchecked"],
       // 4.7% over the T-12, inside the band, but the re-run moves the
       // levered IRR 239 bps: never a holds.
       ["noi", "stretched"],
+      // The pro forma's vacancy line is dollars: held to the T-12's 9.1%.
       ["vacancy", "unsupported"],
       ["rent_growth", "unchecked"],
       // One lease comp, graded favorable: no median of three graded clean.
@@ -68,28 +72,32 @@ describe("the sample's stress test", () => {
       ["renovation_premium", "unsupported"],
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");
+    expect(row("basis").unchecked).toBe(
+      "Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (2 of 3), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+    );
   });
 
   it("re-runs the engine one input apart on every row whose figure is a model input", () => {
-    // At the one comp the comps step graded supports, The Brixton's $252k:
-    // Parkside, graded favorable, leans the seller's way and is left out.
-    expect(irr("basis")).toEqual(rerun("basis"));
-    expect(irr("basis")![0]).toBe(own);
-    expect(irr("basis")![1]).toBeGreaterThan(own);
+    // Two comps graded clean are no median: the price is re-run on nothing.
+    expect(row("basis").impact).toBeNull();
+    // The exit at the OM's own 5.70% pro forma cap, under the model's own
+    // exit at the 5.45% going-in cap.
     expect(irr("exit_cap")).toEqual(rerun("exit_cap"));
-    expect(irr("exit_cap")![1]).toBe(own);
+    expect(irr("exit_cap")![1]).toBeLessThan(own);
     expect(irr("noi")).toEqual(rerun("noi"));
     expect(irr("noi")![1]).toBe(own);
-    // At the rent roll's 9.3% by count (225 of 248 doors): with no published
-    // figure read, the rent roll decides the stabilized assumption, said so;
-    // the T-12's 9.1% is its vacancy and credit loss, dollars, beside it.
+    // At the T-12's 9.1%: "Vacancy (pro forma)" is the pro forma's deduction
+    // from gross potential rent, dollars, so the T-12's economic vacancy, the
+    // same measure on a trailing year, decides it — whatever the market read
+    // holds (the review of 2026-10-23); the rent roll's 9.3% by count (225 of
+    // 248 doors) is doors, beside it.
     const t12 = SAMPLE_DEAL.t12.summary;
     const t12Pct = ((t12.vacancyLoss! / (t12.collectedRent! + t12.vacancyLoss!)) * 100).toFixed(1);
-    const rollPct = (((SAMPLE_DEAL.rentRoll.summary.unitCount - SAMPLE_DEAL.rentRoll.summary.occupiedUnits) / SAMPLE_DEAL.rentRoll.summary.unitCount) * 100).toFixed(1);
     expect(irr("vacancy")).toEqual(rerun("vacancy"));
     expect(irr("vacancy")![0]).toBeGreaterThan(irr("vacancy")![1]);
+    expect(row("vacancy").measure).toBe("economic");
     expect(row("vacancy").gap?.text).toBe(
-      `The OM's 6.0% is 3.3 points under the evidence's ${rollPct}%. No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides. The deal's T-12 ran ${t12Pct}% economic vacancy over its trailing year, its vacancy and credit loss over gross potential rent — dollars, not doors — so it is shown beside the OM's figure, which counts doors, and never decides it.`,
+      `The OM's 6.0% is 3.1 points under the evidence's ${t12Pct}%. The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors, so it is held to the deal's T-12, the same measure on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors. The rent roll's count and the published vacancy count doors, not dollars, so they are shown beside the OM's economic figure and never decide it.`,
     );
     expect(irr("taxes")).toEqual(rerun("taxes"));
     expect(irr("taxes")![0]).toBe(own);
@@ -146,11 +154,14 @@ describe("the sample's stress test", () => {
   it("quotes the stress test's own exit re-run in the verdict's breaks-if, never the first-draft model's", () => {
     const exit = row("exit_cap").impact!;
     expect(exit.omValue).toBeCloseTo(SAMPLE_EXIT_RERUN.omExitPct / 100, 10);
-    expect(exit.altValue).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInExitPct / 100, 10);
+    expect(exit.altValue).toBeCloseTo(SAMPLE_EXIT_RERUN.proFormaExitPct / 100, 10);
     expect(exit.baseIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.omIrrPct, 2);
-    expect(exit.altIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInIrrPct, 2);
+    expect(exit.altIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.proFormaIrrPct, 2);
+    // The model's own case, the exit at the going-in cap it runs.
+    expect(model.inputs.exitCapPct).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInExitPct / 100, 10);
+    expect(computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInIrrPct, 2);
     const killer = SAMPLE_DEAL.verdict.screen!.dealKillers.find((k) => k.lever === "exit")!;
-    expect(killer.risk).toBe("At the 5.45% going-in cap, the stress test's IRR falls 10.8% to 9.3%.");
+    expect(killer.risk).toBe("At the 5.70% pro forma cap, the stress test's IRR falls 10.8% to 7.4%.");
     expect(killer.risk.length).toBeLessThanOrEqual(72);
   });
 });
@@ -199,16 +210,23 @@ describe("the sample's documents tie to one another", () => {
     const test = sampleStressTest({ today: "2026-10-20" });
     const row = (key: string) => test.rows.find((r) => r.key === key)!;
     const { inputs } = sampleDerivedInputs();
-    // The price: the ask against the one comp graded `supports`, the row's
-    // own figure and gap; Parkside, graded favorable, named apart.
+    // The price: two comps graded `supports`, graded by comparability, never
+    // by their price against the ask (Parkside, the closest and newest, had
+    // been left out for trading richer than The Brixton — the review of
+    // 2026-10-23); two are too few for a median, so the row stands unchecked
+    // and the summary says the ask against each.
     const clean = SAMPLE_DEAL.comps.saleComps.filter((c) => c.support === "supports");
-    expect(clean.map((c) => c.name)).toEqual(["The Brixton — 2.1 mi"]);
-    expect(row("basis").gap!.text).toContain("the one comp graded clean, The Brixton — 2.1 mi, $252k/unit");
-    expect(SAMPLE_DEAL.comps.summary).toContain(`the $274k ask is ${row("basis").gap!.value}% rich`);
-    expect(SAMPLE_DEAL.comps.summary).not.toMatch(/two clean trades/);
+    expect(clean.map((c) => c.name)).toEqual(["The Brixton — 2.1 mi", "Parkside — 1.4 mi"]);
+    expect(clean.map((c) => c.note).join(" ")).not.toMatch(/richer|leans the seller/);
+    expect(row("basis").verdict).toBe("unchecked");
+    expect(row("basis").evidence[0].text).toContain("two graded clean, too few for a median (3 or more)");
+    const ask = usd("Asking price") / Number(metric("Units").value.replace(/[^\d]/g, ""));
+    const over = (perUnit: number) => ((ask / perUnit - 1) * 100).toFixed(1);
+    expect(SAMPLE_DEAL.comps.summary).toContain(`The $274k ask is ${over(252_000)}% over The Brixton's $252k a unit and ${over(261_000)}% over Parkside's $261k`);
+    expect(SAMPLE_DEAL.comps.summary).toContain("too few for a median");
     const basis = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Basis / unit")!;
-    expect([basis.low, basis.base]).toEqual(["$252k", "$252k"]);
-    expect(basis.basis).toContain(`${row("basis").gap!.value}% over the one clean comp`);
+    expect([basis.low, basis.high]).toEqual(["$252k", "$261k"]);
+    expect(basis.basis).toContain(`${over(261_000)}% over the closer, newer clean comp and ${over(252_000)}% over the other`);
     // The exit: the range's base is the exit the model runs, the going-in cap.
     const exit = SAMPLE_DEAL.verdict.screen!.ranges.find((r) => r.label === "Exit cap")!;
     expect(exit.base).toBe(`${(inputs.exitCapPct * 100).toFixed(2)}%`);
@@ -227,7 +245,8 @@ describe("the sample's documents tie to one another", () => {
     // the model runs; the conservative case is under it; the sponsor's says
     // the model's returns carry neither the OM's exit nor the premium.
     const scenario = (k: string) => SAMPLE_DEAL.verdict.screen!.sensitivity.find((x) => x.scenario === k)!;
-    const modelIrr = row("exit_cap").impact!.altIrrPct!.toFixed(1);
+    const modelIrr = (computeUnderwrite(inputs).returns.leveredIrrPct! * 100).toFixed(1);
+    expect(modelIrr).toBe(SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1));
     expect(scenario("base").note).toContain(`is a ${modelIrr}% levered IRR`);
     expect(scenario("base").note).toContain(`the T-12's ${vacancy.base} vacancy`);
     expect(scenario("conservative").note).toContain(`under the model's ${modelIrr}%`);
@@ -244,7 +263,7 @@ describe("the sample's documents tie to one another", () => {
     expect(SAMPLE_DEAL.verdict.topRisks.find((r) => r.includes("bill"))).toMatch(/^If the sale resets/);
   });
 
-  it("names no trade the memorandum does not state, and the basis range's low end is the one comp graded clean", () => {
+  it("names no trade the memorandum does not state, and the basis range's low end is the lower comp graded clean", () => {
     // Every per-unit figure the comps step and the verdict's basis range
     // name is one of the memorandum's own sale comps (p. 14).
     const stated = SAMPLE_DEAL.comps.saleComps.map((c) => c.detail.match(/^\$(\d+)k\/unit/)![1]);

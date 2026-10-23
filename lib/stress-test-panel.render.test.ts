@@ -778,14 +778,16 @@ describe("StressTestPanel on the sample — each claim once", () => {
     const basis = test.rows.find((r) => r.key === "basis")!;
     const read = compLines(basis.evidence.find((e) => /^The memorandum's sale comps/.test(e.label))!)!;
     expect(read.head).toBe("3 of 3 state a figure /unit");
+    // Graded by comparability: Parkside, the closest and newest, is clean
+    // (the review of 2026-10-23), and two are too few for a median.
     expect(read.comps.map((c) => [c.name, c.figure, c.grade])).toEqual([
       ["The Brixton — 2.1 mi", "$252k/unit", "clean"],
-      ["Parkside — 1.4 mi", "$261k/unit", "favorable"],
+      ["Parkside — 1.4 mi", "$261k/unit", "clean"],
       ["Vue at Girard — 4.0 mi", "$298k/unit", "stretched"],
     ]);
-    expect(read.struck).toBe("The one comp graded clean, too few for a median");
+    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
-    expect(t).toContain("Parkside — 1.4 mi $261k/unit · Favorable, left out: leans the seller's way");
+    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Stretched, left out: not comparable to the subject");
     expect(t).not.toContain("graded clean (supports): The Brixton");
   });
 
@@ -813,6 +815,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
     expect(modelCellText(test, "rent_growth", 3)).toBe("pinned at 3.0%/yr");
     expect(modelCellText({ ...test, sample: undefined }, "rent_growth", 3)).toBe("3.0%/yr");
     // An input the sample does not pin is the model's own figure, bare.
-    expect(rows.find((r) => r.key === "vacancy")?.model).toBe("9.1%");
+    expect(rows.find((r) => r.key === "taxes")?.model).toBe("$728k");
+    expect(modelCellText({ ...test, sample: undefined }, "exit_cap", 5.45)).toBe("5.45%");
   });
 });

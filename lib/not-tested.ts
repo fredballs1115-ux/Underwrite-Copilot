@@ -54,6 +54,18 @@ export const NOT_TESTED: readonly NotTested[] = [
     beside: { key: "market_rent", line: "The rent roll's in-place rent is shown beside the row, said as the gap the OM claims to close." },
   },
   {
+    id: "comp_grades",
+    title: "How comparable each comp is",
+    why: "The comps step, an AI, grades each of the memorandum's comps by its comparability to the subject; code takes the set graded clean and strikes the median, but checks no grade against a record.",
+    beside: { key: "basis", line: "Every sale comp is named on the price row with its figure and its grade, the ones left out with what their grade means, so a grade can be questioned." },
+  },
+  {
+    id: "cap_expansion",
+    title: "Cap expansion over the hold",
+    why: "No row asks for an exit wider than the caps the OM states: what a buyer at the sale will pay is a forecast, and the screen adds no expansion of its own.",
+    beside: { key: "exit_cap", line: "The exit is held to the higher of the OM's going-in cap and its own pro forma cap; one flat to it holds, the expansion habit named, never held to." },
+  },
+  {
     id: "reserves",
     title: "Replacement reserves",
     why: "No row: the model runs the higher of the OM's stated replacement reserve and the class's default, its source note saying which; nothing sets either against a condition report.",

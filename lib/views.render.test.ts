@@ -1506,18 +1506,20 @@ describe("ModelView — the sample model renders every panel", () => {
       expect(row).toContain('data-verdict="unsupported"');
       expect(row).toContain('data-evidence="document"');
       expect(visibleText(row)).toContain("the deal's T-12");
-      // The engine at the OM's 6.0% against the engine at the roll's 9.3%,
-      // by count (225 of 248 doors) — the row's own two runs, never typed.
+      // The engine at the OM's 6.0% against the engine at the T-12's 9.1%,
+      // the same measure as the pro forma's vacancy line — the row's own two
+      // runs, never typed.
       const vac = data.stressTest!.rows.find((r) => r.key === "vacancy")!.impact!;
       expect(vac.baseIrrPct!).toBeGreaterThan(vac.altIrrPct!);
       expect(visibleText(row)).toContain(`Levered IRR ${vac.baseIrrPct!.toFixed(1)}% → ${vac.altIrrPct!.toFixed(1)}%`);
-      // The sample's four unchecked rows are one folded group at the end:
-      // the memorandum states no loan rate and no expense total, no figure
-      // was read today for rent growth, and its one lease comp, graded
-      // favorable, strikes no median for the market rent. Its taxes,
-      // insurance and renovation premium are tested.
-      expect(visibleText(html)).toContain("4 could not be checked: debt, rent growth, the market rent, the operating expenses");
-      expect(visibleText(html)).toContain("Read why (4)");
+      // The sample's five unchecked rows are one folded group at the end:
+      // two clean comps strike no median for the price, the memorandum
+      // states no loan rate and no expense total, no figure was read today
+      // for rent growth, and its one lease comp, graded favorable, strikes no
+      // median for the market rent. Its taxes, insurance and renovation
+      // premium are tested.
+      expect(visibleText(html)).toContain("5 could not be checked: the basis, debt, rent growth, the market rent, the operating expenses");
+      expect(visibleText(html)).toContain("Read why (5)");
       // The insurance row is held to the seller's own T-12 premium, $385k,
       // which the pro forma's $310k sits under: stretched, re-run at it.
       const ins = html.slice(html.indexOf('data-qa="stress-row-insurance"'));
@@ -3106,10 +3108,11 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).not.toContain("No return struck: The shared screen");
     expect(text).not.toContain("No model was derived");
     expect(html).not.toContain('data-bar="stress-impact"');
-    // The exit cap against the going-in cap, the OM against itself, stands
-    // without a model; the loader reads the challenger's words for it.
+    // The exit cap against the OM's own pro forma cap, the OM against
+    // itself, stands without a model; the loader reads the challenger's
+    // words for it.
     expect(html).toContain('data-qa="stress-row-exit_cap"');
-    expect(text).toContain("The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression.");
+    expect(text).toContain("The OM's 5.25% exit is 45 bps tighter than its 5.70% pro forma cap");
     // The loader selects the challenger result for it.
     expect(readFileSync("lib/share-resolve.ts", "utf8")).toMatch(/SHARED_DEAL_COLUMNS =\s*"[^"]*\bchallenges\b/);
     expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("challenger: (deal.challenges as ChallengerResult | null) ?? null");
@@ -3260,9 +3263,9 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // but still on the page.
     expect(html).toContain("<details");
     expect(text).toContain("sell-side selections usually do.");
-    // The ask against the one comp graded clean, the stress test's own
-    // figure: 8.8% over The Brixton, never "the two clean trades".
-    expect(text).toContain("the $274k ask is 8.8% rich");
+    // The ask against the two comps graded clean, each said: two trades,
+    // too few for a median.
+    expect(text).toContain("The $274k ask is 8.8% over The Brixton's $252k a unit and 5.1% over Parkside's $261k");
     // Nothing editable, nothing of the buyer's.
     expect(text).not.toMatch(/Buy box|Notes|Documents/);
     expect(html).not.toMatch(/<(button|input|textarea|select)\b/);

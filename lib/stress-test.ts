@@ -62,17 +62,20 @@
 //     text by the keyword table below; the rest become `other` rows.
 //
 // The thresholds, each named here and read nowhere else:
-//   vacancy          VACANCY_UNSUPPORTED_PTS   3 pts past the best evidence
-//                    (a stabilized assumption on a stabilized deal: the
-//                    market's figure, past the survey's margin; else the
-//                    deal's documents)
+//   vacancy          VACANCY_UNSUPPORTED_PTS   3 pts past the deciding figure
+//                    (a stabilized assumption counted by doors: the
+//                    market's figure, past the survey's margin, else the
+//                    class's norm — never today's rent roll; an economic
+//                    one, a pro forma's vacancy line among them: the T-12)
 //   rent growth      RENT_GROWTH_UNSUPPORTED_PTS 2 pts (200 bps) over the
 //                    trailing year's figure for the deal's own kind of rent
 //                    (lib/rent-growth-decider)
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under all-items
 //                    CPI (core CPI only where all-items is not fresh)
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
-//                    going-in cap (else the tracker cap range's low end)
+//                    higher of the going-in cap and the OM's own pro forma
+//                    cap (else the tracker cap range's low end); no
+//                    expansion over the hold is added
 //   debt             DEBT_UNSUPPORTED_BPS      50 bps under the lender's quote
 //                    on file (a term sheet's rate), else under the seeded
 //                    rate (stretched at most unless under the bare index)
@@ -96,10 +99,14 @@
 //                    a count of doors (lib/stress-deciders `VACANCY_ORDER`)
 //   growth history   a growth row's deciding figure is one trailing year;
 //                    where the stored history of that series holds two or
-//                    more years, their compound average a year is shown
-//                    beside it, deciding nothing (`GROWTH_AVERAGE_MIN_YEARS`)
+//                    more years, the more cautious of the year and their
+//                    compound average a year decides — the lower for rent,
+//                    the higher for expenses — the other beside it
+//                    (`GROWTH_AVERAGE_MIN_YEARS`, `cautiousGrowth`)
 //   basis            BASIS_STRETCH_PCT 5% / BASIS_UNSUPPORTED_PCT 15% over
-//                    the comps' median
+//                    the median of three or more (MEDIAN_FLOOR): the comps
+//                    graded clean, else the recorded sales; under three,
+//                    unchecked, the comps named beside it with their count
 //   premium          PREMIUM_UNSUPPORTED_SHARE 15% over the achieved premium
 //   any row          IRR_MOVE_STRETCH_BPS      a re-run that lowers the levered
 //                    IRR 100 bps or more never holds (`finishRow`); on a
@@ -182,6 +189,7 @@ import {
   type PlanYieldInput,
   TAX_RESET_CONDITION,
   TRAILING_YEAR_NOT_FORECAST,
+  AVERAGE_NOT_FORECAST,
 } from "@/lib/stress-test-types";
 import { attributeOverPlayers } from "@/lib/bridge/attribution";
 import { evidenceFigureText, evidencePeriod, isoDayOf } from "@/lib/stress-test-words";
@@ -189,6 +197,7 @@ import {
   ABATEMENT_LABEL,
   ACHIEVED_PREMIUM_LABEL,
   GOING_IN_CAP_LABEL,
+  PRO_FORMA_CAP_LABEL,
   LOAN_QUOTE_LABEL,
   OM_IN_PLACE_NOI_LABEL,
   PAST_SCREENS_PUBLISHER,
@@ -518,6 +527,8 @@ function pctImpact(
  */
 function trailingWords(key: "rent_growth" | "expense_growth", e: StressEvidence): { alt: string; altRun?: string } {
   if (e.value == null) return { alt: "not stated" };
+  const years = e.label.match(/: average a year over (\d+) years$/)?.[1];
+  if (years) return { alt: `${evidenceFigureText(key, e.value)} a year, its ${years}-year compound average`, altRun: "run each year of the hold" };
   if (!/\bover the year\b/.test(e.text)) return { alt: `${pct1(e.value)}/yr` };
   const p = evidencePeriod(e);
   return { alt: `${evidenceFigureText(key, e.value)} over the year${p ? ` to ${p.said}` : ""}`, altRun: "run each year of the hold" };
@@ -545,6 +556,11 @@ function rentForNoi(inputs: UnderwriteInputs, target: number): number | null {
 // ── The readers of what the OM says ──────────────────────────────────────
 
 const EXIT_CAP_ROW = /\b(?:exit|terminal|reversion(?:ary)?|residual|disposition|sale)\s+cap(?:italization)?(?:\s+rate)?\b/i;
+/** The OM's pro forma cap: its stabilized NOI over the price ("Pro forma
+ *  cap", "Stabilized cap rate", "Cap rate (pro forma)") — never an exit, a
+ *  cap on cost, a yield, a cap at delivery or a later year's. */
+const PRO_FORMA_CAP_ROW = /\b(?:pro ?forma|stabili[sz]ed)\b[^,;]*\bcap(?:italization)?\b|\bcap(?:italization)?(?:\s+rate)?\b[^,;]*\b(?:pro ?forma|stabili[sz]ed)\b/i;
+const PRO_FORMA_CAP_NOT = /exit|terminal|reversion|residual|disposition|\bsale\b|\bcost\b|yield|deliver|forward|going[- ]?in|in[- ]place|current|actual|t-?12|ttm|trailing|year ?[2-9]|yr\.? ?[2-9]|\bper\b|\bcap\s*ex\b|rate\s+of\s+return/i;
 const RENT_GROWTH_ROW = /\b(?:rent|rental|income|revenue|rents?)\s+growth\b|\bgrowth\b[^,;]*\brents?\b/i;
 const RENT_GROWTH_NOT = /expense|opex|\bnoi\b|population|job|employment|supply/i;
 const EXPENSE_GROWTH_ROW = /\b(?:expense|opex|operating[- ]expense)s?\s+(?:growth|escalation|inflation)\b/i;
@@ -622,19 +638,31 @@ const VACANCY_TODAY = /\b(?:current|in[- ]place|actual|t-?12|ttm|trailing|today)
  * physical figure counts doors — the units, or the area, empty — and an
  * economic one dollars — the rent not collected over gross potential rent,
  * with credit loss, and concessions or loss to lease where they are netted
- * there. A label that names the economic measure, or a credit or collection
- * loss, bad debt or concessions beside the vacancy, is economic; every other
- * vacancy or occupancy is physical. The two are different measures of one
- * building, and neither decides the other (lib/stress-deciders
- * `VACANCY_ORDER`).
+ * there. The two are different measures of one building, and neither
+ * decides the other (lib/stress-deciders `VACANCY_ORDER`). Read off the
+ * OM's own label, in this order (the review of 2026-10-23):
+ *   - economic where the label names the economic measure, a loss (a
+ *     "vacancy loss", a "vacancy & credit loss"), a credit or collection
+ *     loss, bad debt or concessions;
+ *   - physical where it names what it counts by the door: an occupancy,
+ *     units, doors, physical;
+ *   - economic where it names the pro forma's own line — "pro forma",
+ *     "underwritten", a budget, a numbered year: a deduction the pro forma
+ *     takes from gross potential rent in dollars, a line of its income
+ *     statement, not a count of empty doors;
+ *   - physical otherwise: a vacancy rate the OM states on its own
+ *     ("Stabilized vacancy", "Vacancy"), the share of the building empty.
  */
 export type VacancyMeasure = "physical" | "economic";
-const ECONOMIC_WORDS = /\beconomic\b|\bcredit\b|\bcollection\b|\bbad\s+debt\b|\bconcession/i;
+const ECONOMIC_WORDS = /\beconomic\b|\bcredit\b|\bcollection\b|\bbad\s+debt\b|\bconcession|\bloss\b/i;
+const PHYSICAL_WORDS = /\boccupan(?:cy|t)\b|\bunits?\b|\bdoors?\b|\bphysical\b/i;
+const PRO_FORMA_LINE = /\bpro ?forma\b|\bunderwrit|\bbudget|\byear ?\d|\byr\.? ?\d/i;
 const ECONOMIC_ROW = /\beconomic\s+(?:vacancy|occupancy)\b/i;
 /** A vacancy read off the trailing statement ("T-12 vacancy", "TTM
  *  vacancy") is the statement's loss over its gross potential rent: dollars. */
 const TRAILING_STATEMENT = /\b(?:t-?12|ttm|trailing)\b/i;
-export const measureOf = (label: string): VacancyMeasure => (ECONOMIC_WORDS.test(label) ? "economic" : "physical");
+export const measureOf = (label: string): VacancyMeasure =>
+  ECONOMIC_WORDS.test(label) ? "economic" : PHYSICAL_WORDS.test(label) ? "physical" : PRO_FORMA_LINE.test(label) ? "economic" : "physical";
 const vacancyMeasureOf = (label: string): VacancyMeasure => (ECONOMIC_WORDS.test(label) || TRAILING_STATEMENT.test(label) ? "economic" : "physical");
 
 type OmVacancy = { row: Row; pct: number; from: "vacancy" | "occupancy" | "today"; measure: VacancyMeasure };
@@ -1149,6 +1177,24 @@ export const VACANCY_ECONOMIC_ONLY =
 export const VACANCY_NO_T12_ECONOMIC =
   "The OM states its figure as economic, dollars, not doors, and no T-12 is on file to hold it to; a count of doors cannot decide it.";
 
+/** Why a stabilized vacancy counted by doors stands unchecked on a deal read
+ *  as stabilized: no published figure and no class norm stands, and today's
+ *  rent roll never decides it (the review of 2026-10-23). */
+export const STABILIZED_VACANCY_UNCHECKED =
+  "No fresh published vacancy figure for this market and no class norm could be held to the stabilized assumption, and the deal's rent roll is the building today, the gap a lease-up has to close, never the test of a stabilized figure.";
+
+/** What the rent roll is beside a stabilized assumption the market or the
+ *  class's norm decides, said in the gap. */
+export const ROLL_NOT_STABILIZED = "the deal's rent roll is the building today, never the test of a stabilized figure";
+
+/** How the gap says why the OM's figure is economic: in its own words where
+ *  its label names the measure or a loss, else as its pro forma's line. */
+function economicSaid(label: string): string {
+  return ECONOMIC_WORDS.test(label)
+    ? "The OM states its figure as economic, dollars, not doors"
+    : "The OM's figure is its pro forma's vacancy line, a deduction from gross potential rent: dollars, not doors";
+}
+
 /** The vacancy row's title where the OM's figure is today's economic
  *  occupancy (`OCCUPANCY_TITLE`'s economic twin). */
 const ECONOMIC_TITLE = "Economic occupancy today";
@@ -1246,16 +1292,17 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   }
   if (!om && docs.length + market.length === 0 && !rot) return null;
   // ONE figure decides (lib/stress-deciders `vacancyDecider`). A stated
-  // stabilized assumption is the market's to judge: the metro survey inside
-  // its margin, else a commercial class's tracker band at its low read, the
-  // Census region, the state; and the documents' vacancy is today's — shown
-  // beside it as the gap a lease-up has to close (on a plan deal, the gap
-  // the plan closes), or as support where the building already runs at or
-  // under the assumption. Where no published figure is fresh, on a deal read
-  // as stabilized the rent roll decides, and the row says so; on a plan deal
-  // the class's norm does, since the documents are the building before the
-  // plan is done (`planVacancyStated`, the track record's own rule: a later
-  // rent roll or T-12 scores neither). Today's occupancy is the rent roll's,
+  // stabilized assumption counted by doors is the market's to judge: the
+  // metro survey inside its margin, else a commercial class's tracker band at
+  // its low read, the Census region, the state; and the documents' vacancy
+  // is today's — shown beside it as the gap a lease-up has to close (on a
+  // plan deal, the gap the plan closes), or as support where the building
+  // already runs at or under the assumption. Where no published figure is
+  // fresh the class's norm decides, a rule of thumb named as one, on a deal
+  // read as stabilized and a plan deal alike: today's rent roll never does
+  // (the review of 2026-10-23 — it had decided a 6% "unsupported" on the
+  // day the market read failed, against "holds" on the day it answered).
+  // Today's occupancy is the rent roll's,
   // then the published figures', then the class's norm's. Every piece counts
   // doors but the T-12's, whose vacancy and credit loss over gross potential
   // rent is dollars: it never decides a figure counted by doors, and decides
@@ -1337,9 +1384,11 @@ function vacancyRow(ctx: Ctx): StressRow | null {
         : VACANCY_NO_T12_ECONOMIC
       : stabilized && ctx.plan && docs.length > 0
         ? PLAN_VACANCY_UNCHECKED
-        : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
-          ? VACANCY_ECONOMIC_ONLY
-          : NO_EVIDENCE;
+        : stabilized && roll
+          ? STABILIZED_VACANCY_UNCHECKED
+          : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
+            ? VACANCY_ECONOMIC_ONLY
+            : NO_EVIDENCE;
     return { ...unchecked("vacancy", omSays, evidence, why, title), ...(economic ? { measure: "economic" as const } : {}) };
   }
   const bestValue = best.e.value!;
@@ -1392,25 +1441,34 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     const doc = economic ? t12p : roll;
     const docToday = (p: Piece) =>
       p === roll ? `today the deal's rent roll runs ${pct1(p.e.value!)} vacant` : `the deal's T-12 ran ${pct1(p.e.value!)} economic vacancy over its trailing year`;
+    const econSaid = economicSaid(om.row.label);
     const noMarket = economic
       ? best === t12p
-        ? " The OM states its figure as economic, dollars, not doors, so it is held to the deal's T-12, the same measure."
+        ? ` ${econSaid}, so it is held to the deal's T-12, the same measure${
+            stabilized && !ctx.plan ? " on the same footing: on a deal read as stabilized, a trailing year of what the building collected, not one day's count of doors" : ""
+          }.`
         : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
-          ? ` The OM states its figure as economic, and the deal's T-12 is the building before the plan is done, so the class's norm decides${
+          ? ` ${econSaid}, and the deal's T-12 is the building before the plan is done, so the class's norm decides${
               doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""
             }.`
           : best.e.kind === "rule_of_thumb"
-            ? " The OM states its figure as economic, dollars, not doors, and no T-12 is on file to hold it to, so the class's norm decides."
+            ? ` ${econSaid}, and no T-12 is on file to hold it to, so the class's norm decides.`
             : ""
-      : stabilized && best.e.kind === "document"
-        ? " No fresh published vacancy figure for this market could be held to the stabilized assumption, so the deal's rent roll decides."
-        : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
-          ? ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
-              doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""
-            }.`
-          : stabilized && best.e.kind === "rule_of_thumb"
-            ? " No fresh published vacancy figure for this market could be held to the stabilized assumption and no rent roll is on file, so the class's norm decides."
-            : "";
+      : stabilized && ctx.plan && best.e.kind === "rule_of_thumb"
+        ? ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
+            doc ? `; ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}, never the figure the plan's NOI runs at` : ""
+          }.`
+        : stabilized && best.e.kind === "rule_of_thumb"
+          ? // Today's rent roll never decides a stabilized figure: it is
+            // the gap a lease-up has to close, said so beside the norm.
+            ` No fresh published vacancy figure for this market could be held to the stabilized assumption, so the class's norm decides${
+              doc
+                ? `; ${ROLL_NOT_STABILIZED}: ${docToday(doc)}, ${todayWords(doc.e.value!, om.pct, "the assumption")}.${
+                    doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}` : ""
+                  }`
+                : "."
+            }`
+          : "";
     // A survey's margin, where the figure that decides carries one (today's
     // occupancy held to the metro's survey), is said as the reach of "at it".
     const margin = best.tolerance !== SAME ? best.tolerance : null;
@@ -1511,6 +1569,15 @@ export function omExpenseGrowth(ex: ExtractionResult | null): { row: Row; pct: n
   return statedPct(rowsOf(ex), EXPENSE_GROWTH_ROW);
 }
 
+/** The OM's stated pro forma cap, percent — its stabilized NOI over the
+ *  price ("Pro forma cap", "Stabilized cap rate") — as the exit-cap row
+ *  reads it; never an exit, a cap on cost, a yield or a later year's. */
+export function omProFormaCap(ex: ExtractionResult | null): { row: Row; pct: number } | null {
+  const row = rowsOf(ex).find((m) => PRO_FORMA_CAP_ROW.test(m.label) && !PRO_FORMA_CAP_NOT.test(m.label) && parsePct(m.value) != null) ?? null;
+  const pct = row ? parsePct(row.value) : null;
+  return row && pct != null ? { row, pct } : null;
+}
+
 /** The OM's stated exit cap, percent (a range at its first figure), as the
  *  exit-cap row reads it. */
 export function omExitCap(ex: ExtractionResult | null): { row: Row; pct: number } | null {
@@ -1536,11 +1603,50 @@ export function rentGrowthPieces(mvm: ModelVsMarket | null, assetClass: string |
   });
   const decided = rentGrowthDeciding(assetClass, candidatesOf(market));
   const found = decided ? market[decided.index] : null;
-  // The deciding series' own average over the years its history holds,
-  // last and never a candidate (`averagePiece`).
+  // The deciding series' own average over the years its history holds:
+  // where it is LOWER than the trailing year, it decides (`cautiousGrowth`),
+  // the trailing year beside it; else it is shown last, deciding nothing.
   const average = found ? averagePiece(check, found, mvm) : null;
-  const evidence = [...apart, ...(found ? [found] : []), ...market.filter((m) => m !== found), ...(average ? [average] : [])];
-  return { evidence, decided: decided && found ? { ...decided, index: apart.length } : null, apart: apart.length, market: market.length };
+  const pick = decided && found ? cautiousGrowth({ ...decided, index: apart.length }, found, average, "lower") : null;
+  const lead = pick?.averageDecides ? [average!, found!] : found ? [found] : [];
+  const evidence = [...apart, ...lead, ...market.filter((m) => m !== found), ...(average && !pick?.averageDecides ? [average] : [])];
+  return { evidence, decided: pick?.decided ?? null, apart: apart.length, market: market.length };
+}
+
+/**
+ * A growth row's ONE deciding figure against the same series' longer view
+ * (the review of 2026-10-23): a growth rate is run every year of the hold,
+ * and one trailing year is a single draw of it. Where the stored history of
+ * the very series that decides holds two years or more (lib/growth-average),
+ * the more cautious of its trailing year and its compound average a year
+ * decides — the LOWER for a rent growth, the HIGHER for an expense growth —
+ * the other shown beside it; with no average stored, the trailing year
+ * decides alone, as before. `decided` is the trailing year's, its index
+ * where the deciding piece is drawn.
+ */
+function cautiousGrowth(
+  decided: DecidingFigure,
+  trailing: StressEvidence,
+  average: StressEvidence | null,
+  side: "lower" | "higher",
+): { decided: DecidingFigure; averageDecides: boolean } {
+  const a = average?.value;
+  const t = trailing.value;
+  const averageDecides = a != null && t != null && Number.isFinite(a) && (side === "lower" ? a < t - 1e-9 : a > t + 1e-9);
+  if (!averageDecides) return { decided, averageDecides: false };
+  const years = average!.label.match(/: average a year over (\d+) years$/)?.[1] ?? "";
+  return {
+    averageDecides: true,
+    decided: {
+      index: decided.index,
+      figure: a!,
+      label: average!.label,
+      source: average!.publisher,
+      asOf: average!.asOf,
+      name: `${decided.name}, averaged a year over the ${years} years its stored history holds`,
+      why: `the ${side} of its trailing year and its longer average, the cautious side for a rate run every year of the hold`,
+    },
+  };
 }
 
 /**
@@ -1558,20 +1664,35 @@ function averagePiece(check: ModelCheck | null, decider: StressEvidence, mvm: Mo
   return published(check, a, mvm?.grain ?? null);
 }
 
+/** Whether a growth row's piece is the series' longer average
+ *  (`averagePiece`'s label). */
+const isAverage = (e: StressEvidence | undefined): boolean => !!e && /: average a year over \d+ years$/.test(e.label);
+
 /** "Held to consumer prices, all items (the CPI), …: +3.4% over the year to
  *  Aug 2026 (BLS via FRED), a single year's change." — the gap's first
- *  sentence on a growth row, which says the decider is one year. */
+ *  sentence on a growth row, which says the decider is one year; where the
+ *  series' longer average decides, it is said as the average it is. */
 function heldGrowth(name: string, why: string, decider: StressEvidence): string {
-  return `Held to ${name}, ${why}: ${decider.text} (${decider.publisher}), a single year's change.`;
+  return isAverage(decider) ? `Held to ${name}, ${why}: ${decider.text} (${decider.publisher}).` : `Held to ${name}, ${why}: ${decider.text} (${decider.publisher}), a single year's change.`;
 }
+
+/** The last sentence of a growth row's gap: a trailing year is what the
+ *  assumption is asked to beat (`TRAILING_YEAR_NOT_FORECAST`), and so is an
+ *  average of published years where it decides (`AVERAGE_NOT_FORECAST`). */
+const notForecast = (decider: StressEvidence): string => (isAverage(decider) ? AVERAGE_NOT_FORECAST : TRAILING_YEAR_NOT_FORECAST);
 
 /** The longer average beside a growth row's one year, as the gap says it:
  *  "Beside it, not deciding: its average a year over the four years to Aug
  *  2026, +3.9%, compounded from its published changes — an average of
  *  published figures, not a forecast." "" with none. */
-function averageSentence(evidence: StressEvidence[]): string {
-  const a = evidence.find((e) => /: average a year over \d+ years$/.test(e.label));
+function averageSentence(evidence: StressEvidence[], decider?: StressEvidence): string {
+  const a = evidence.find(isAverage);
   if (!a || a.value == null) return "";
+  // Where the average decides, the trailing year is the one beside it.
+  if (decider === a) {
+    const t = evidence[evidence.indexOf(a) + 1];
+    return t && t.value != null ? ` Beside it, not deciding: its trailing year, ${t.text} (${t.publisher}), a single year's change.` : "";
+  }
   const over = a.text.match(/^[+−-]?\d+(?:\.\d+)?% a year (over the \S+ years to [^,]+),/)?.[1];
   return over ? ` Beside it, not deciding: the same series averaged ${evidenceFigureText("rent_growth", a.value)} a year ${over}, compounded from its published changes against a year earlier — an average of published figures, not a forecast.` : "";
 }
@@ -1597,14 +1718,16 @@ function rentGrowthRow(ctx: Ctx): StressRow | null {
   const held = heldGrowth(name, pick.d.why!, decider);
   // The OM's figure is a rate a year; the evidence's is a trailing year's
   // change, said as one, and never as a forecast (`TRAILING_YEAR_NOT_FORECAST`);
-  // where the series' history holds more years, their average is beside it.
-  const longer = averageSentence(evidence);
+  // where the series' history holds more years, the lower of the year and
+  // their average decides and the other is beside it.
+  const longer = averageSentence(evidence, decider);
+  const tail = notForecast(decider);
   const judged = judge(om.pct, bestValue, "high", "pts", RENT_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${tail}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.${longer} ${TRAILING_YEAR_NOT_FORECAST}`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it.${longer} ${tail}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it — the conservative side.${longer} ${tail}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
@@ -1637,9 +1760,15 @@ export function expenseGrowthPieces(mvm: ModelVsMarket | null): RowPieces {
   const check = checkOf(mvm, "expense_growth");
   if (check) for (const f of check.published) evidence.push(published(check, f, mvm?.grain ?? null));
   const decided = expenseGrowthDecider(candidatesOf(evidence));
-  // The deciding series' own average over the years its history holds, last
-  // and never a candidate (`averagePiece`).
+  // The deciding series' own average over the years its history holds:
+  // where it is HIGHER than the trailing year, it decides (`cautiousGrowth`),
+  // drawn first with the trailing year beside it; else it is shown last,
+  // deciding nothing.
   const average = decided ? averagePiece(check, evidence[decided.index], mvm) : null;
+  if (!decided) return { evidence, decided };
+  const trailing = evidence[decided.index];
+  const pick = cautiousGrowth({ ...decided, index: 0 }, trailing, average, "higher");
+  if (pick.averageDecides) return { evidence: [average!, trailing, ...evidence.filter((e) => e !== trailing)], decided: pick.decided };
   return { evidence: average ? [...evidence, average] : evidence, decided };
 }
 
@@ -1657,13 +1786,14 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
   // "Held to consumer prices, all items (the CPI), the broad price level the
   // expense base moves with: +3.4% over the year to Aug 2026 (BLS via FRED)."
   const held = heldGrowth(decided.name!, decided.why!, evidence[evidenceIndex]);
-  const longer = averageSentence(evidence);
+  const longer = averageSentence(evidence, evidence[evidenceIndex]);
+  const tail = notForecast(evidence[evidenceIndex]);
   const judged = judge(om.pct, bestValue, "low", "pts", EXPENSE_GROWTH_UNSUPPORTED_PTS, SAME, (gap) =>
     Math.abs(gap) < SAME
-      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
+      ? `${held} The OM's ${pct1(om.pct)}/yr is at it.${longer} ${tail}`
       : gap > 0
-        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it.${longer} ${TRAILING_YEAR_NOT_FORECAST}`
-        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side.${longer} ${TRAILING_YEAR_NOT_FORECAST}`,
+        ? `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} under it.${longer} ${tail}`
+        : `${held} The OM's ${pct1(om.pct)}/yr is ${pts(gap)} over it — the conservative side.${longer} ${tail}`,
   );
   const impact =
     ctx.derived && irrRuns(ctx)
@@ -1689,15 +1819,21 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
  * carries no figure), and the tracker's cap range where one is on file,
  * held to only where the read holds the model to it (fresh, dated, the
  * whole stock) — and the one figure that decides (`exitCapDecider`): the
- * going-in cap, else the tracker's range at its low end. `exitPct` is the
- * exit the 10-year's spread is said for (none: the figure alone).
+ * higher of the going-in cap and the OM's own pro forma cap (its stabilized
+ * NOI over the same price, the income an exit sells — the review of
+ * 2026-10-23: an exit capitalizes a forward NOI, so a cap struck on today's
+ * alone lets an exit under the stabilized yield pass as no compression), the
+ * other beside it; else the tracker's range at its low end. No expansion over
+ * the hold is added to either. `exitPct` is the exit the 10-year's spread is
+ * said for (none: the figure alone).
  */
 export function exitCapPieces(
   ex: ExtractionResult | null,
   plan: boolean,
   mvm: ModelVsMarket | null,
   exitPct: number | null,
-): RowPieces & { goingIn: number | null; rangeRead: boolean } {
+  opts: { proForma?: boolean } = {},
+): RowPieces & { goingIn: number | null; proForma: number | null; rangeRead: boolean } {
   const rows = rowsOf(ex);
   const evidence: StressEvidence[] = [];
   const goingRow = findGoingInCap(rows);
@@ -1711,6 +1847,26 @@ export function exitCapPieces(
       label: GOING_IN_CAP_LABEL,
       text: `${pct2(goingIn!)} (${goingRow!.label}): an exit tighter than it is cap compression`,
       value: goingIn!,
+      asOf: null,
+      publisher: "the offering memorandum",
+      scope: "deal",
+      ...(page != null ? { page } : {}),
+    });
+  }
+  // The OM's pro forma cap: its stabilized NOI over the same price — the
+  // income an exit capitalizes — on the same terms as the going-in cap (no
+  // plan deal, a price that buys the building), inside the band a cap may be.
+  const pfHit = omProFormaCap(ex);
+  const proFormaRow = pfHit?.row ?? null;
+  const proForma = pfHit?.pct ?? null;
+  const proFormaOk = opts.proForma !== false && proForma != null && proForma > 0 && proForma < IMPLIED_CAP_CEILING * 100 && !plan && buildingPriceOf(ex, 1) != null;
+  if (proFormaOk) {
+    const page = pageOf(proFormaRow, ex);
+    evidence.push({
+      kind: "om_internal",
+      label: PRO_FORMA_CAP_LABEL,
+      text: `${pct2(proForma!)} (${proFormaRow!.label}): the yield the price earns on the OM's own stabilized NOI, the income an exit sells`,
+      value: proForma!,
       asOf: null,
       publisher: "the offering memorandum",
       scope: "deal",
@@ -1748,19 +1904,27 @@ export function exitCapPieces(
       }
     }
   }
-  // ONE figure decides (lib/stress-deciders `exitCapDecider`): the OM's own
-  // going-in cap — the cap the deal is bought at, and the model's own exit —
-  // else the tracker's cap range at its low end. A tracker range beside a
-  // going-in cap is shown and decides nothing: it had turned an unsupported
-  // compression into a stretched one wherever its low end reached the exit.
-  const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || trackerHeld.has(e)));
-  return { evidence, decided, goingIn, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
+  // ONE figure decides (lib/stress-deciders `exitCapDecider`): the higher of
+  // the OM's own going-in cap — the cap the deal is bought at — and its pro
+  // forma cap — the stabilized NOI over the same price — else the tracker's
+  // cap range at its low end. A tracker range beside either is shown and
+  // decides nothing: it had turned an unsupported compression into a
+  // stretched one wherever its low end reached the exit.
+  const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || e.label === PRO_FORMA_CAP_LABEL || trackerHeld.has(e)));
+  // The pro forma cap, where it decides, is drawn first, the going-in cap
+  // beside it.
+  if (decided && decided.label === PRO_FORMA_CAP_LABEL && decided.index > 0) {
+    const [d] = evidence.splice(decided.index, 1);
+    evidence.unshift(d);
+    return { evidence, decided: { ...decided, index: 0 }, goingIn, proForma: proFormaOk ? proForma : null, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
+  }
+  return { evidence, decided, goingIn, proForma: proFormaOk ? proForma : null, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
 }
 
 function exitCapRow(ctx: Ctx): StressRow | null {
   const om = statedPct(ctx.rows, EXIT_CAP_ROW);
   const exit = om?.pct ?? (ctx.derived ? ctx.derived.inputs.exitCapPct * 100 : null);
-  const { evidence, decided, goingIn, rangeRead } = exitCapPieces(ctx.ex, ctx.plan, ctx.mvm, exit);
+  const { evidence, decided, goingIn, proForma, rangeRead } = exitCapPieces(ctx.ex, ctx.plan, ctx.mvm, exit);
   if (!om && evidence.length === 0) return null;
   const omSays: StressRow["omSays"] = om
     ? { text: `${om.row.label}: ${om.row.value}${statesRange(om.row.value) ? " (a range, read at its first figure)" : ""}`, value: om.pct, page: pageOf(om.row, ctx.ex) }
@@ -1771,10 +1935,10 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     // OM states: on a value-add, lease-up, conversion or development deal
     // the going-in cap is struck on today's income, not the stabilized one
     // the exit sells; on a price that buys no building it is no building's.
-    const stated = goingIn != null && goingIn > 0;
+    const stated = (goingIn != null && goingIn > 0) || proForma != null;
     const range = rangeRead ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
     const why = !stated
-      ? `The OM states no going-in cap, and ${range}.`
+      ? `The OM states no going-in or pro forma cap, and ${range}.`
       : ctx.plan
         ? `On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and ${range}.`
         : `The price buys no building, so its going-in cap is no building's to hold the exit to; and ${range}.`;
@@ -1782,6 +1946,19 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   }
   const alt = decided.figure;
   const onGoingIn = decided.label === GOING_IN_CAP_LABEL;
+  const onProForma = decided.label === PRO_FORMA_CAP_LABEL;
+  // The OM's other cap, beside the one that decides: the going-in cap beside
+  // a pro forma cap that decides, the pro forma cap beside a going-in cap at
+  // or over it.
+  const besideCap =
+    onProForma && goingIn != null && goingIn > 0
+      ? ` Its ${pct2(goingIn)} going-in cap, on today's NOI, is beside it.`
+      : onGoingIn && proForma != null
+        ? ` Its ${pct2(proForma)} pro forma cap, on its stabilized NOI, ${Math.abs(proForma - alt) < SAME ? "is the same" : "sits under it"}, shown beside it.`
+        : "";
+  // No expansion over the hold is added to either cap: said where the exit
+  // is flat to the cap that decides.
+  const noExpansion = "adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to";
   // The figures are percent points here; the threshold is in bps. At or over
   // the figure holds; tighter is stretched, and by 25 bps or more
   // unsupported (the threshold inclusive, below).
@@ -1794,11 +1971,20 @@ function exitCapRow(ctx: Ctx): StressRow | null {
         // none is invented here; the sentence names the habit as the rule of
         // thumb it is, held to nothing.
         Math.abs(diffBps) < SAME * 100
-        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to.`
+        ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} going-in cap; ${noExpansion}.${besideCap}`
         : diffBps > 0
-          ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} going-in cap — cap compression.`
-          : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} going-in cap — the conservative side.`
-      : Math.abs(gap) < SAME
+          ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} going-in cap — cap compression.${besideCap}`
+          : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} going-in cap — the conservative side.${besideCap}`
+      : onProForma
+        ? // The pro forma cap is the price's yield on the stabilized NOI the
+          // exit sells: an exit under it sells that income dearer than this
+          // buyer pays for it.
+          Math.abs(diffBps) < SAME * 100
+          ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} pro forma cap, the price's yield on its own stabilized NOI; ${noExpansion}.${besideCap}`
+          : diffBps > 0
+            ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} pro forma cap — the price's yield on its own stabilized NOI, the income the exit sells — so it sells that income dearer than this buyer pays for it: cap compression.${besideCap}`
+            : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} pro forma cap, the price's yield on its own stabilized NOI — the conservative side.${besideCap}`
+        : Math.abs(gap) < SAME
         ? `The OM's ${pct2(om.pct)} exit sits at the published cap range's low end, ${pct2(alt)}.`
         : gap > 0
           ? `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} under the published cap range's low end, ${pct2(alt)}.`
@@ -1816,7 +2002,7 @@ function exitCapRow(ctx: Ctx): StressRow | null {
           what: "the exit cap",
           om: pct2(om.pct),
           alt: pct2(alt),
-          evidence: onGoingIn ? "the going-in cap" : evidence[evidenceIndex].publisher,
+          evidence: onGoingIn ? "the going-in cap" : onProForma ? "the pro forma cap" : evidence[evidenceIndex].publisher,
           model: pct2(ctx.derived.inputs.exitCapPct * 100),
         })
       : null;
@@ -3470,23 +3656,28 @@ function opexRow(ctx: Ctx): StressRow | null {
 /** A basis is struck per unit (the class's noun) or per foot. */
 type Per = "unit" | "sf";
 
-/** One piece of the basis row's evidence with a figure: its figure, the
- *  yardstick it states it on, and — for the memorandum's comps — the names
- *  of the comps graded clean behind it where fewer than three are (no median
- *  is struck on them). */
+/** One piece of the basis row's evidence with a figure: its figure — a
+ *  median of three or more, never fewer — and the yardstick it states it on. */
 interface BasisComparable {
   e: StressEvidence;
   value: number;
   on: Per;
-  few: { count: 1 | 2; names: string[] } | null;
 }
 
 /** What the comps step's grades mean, as its prompt defines them
- *  (lib/anthropic/prompts `brokerCompsInstruction`). */
+ *  (lib/anthropic/prompts `brokerCompsInstruction`): by comparability to
+ *  the subject, never by whether the comp's price is over or under the ask. */
 const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
-  favorable: "favorable by the comps step (it leans the seller's way)",
-  stretched: "stretched by the comps step (it does not support the deal)",
+  favorable: "favorable by the comps step (less comparable, in a way that flatters the ask)",
+  stretched: "stretched by the comps step (not comparable to the subject)",
 };
+
+/** Why the price stands unchecked where fewer than MEDIAN_FLOOR comps graded
+ *  clean state a figure and no recorded sales' median stands: the comps'
+ *  own floor, as the market-rent row says it. */
+export function basisFloorWhy(clean: number, listed: number, perWord: string): string {
+  return `Fewer than ${MEDIAN_FLOOR} of the memorandum's sale comps graded clean (supports) state a figure ${perWord} (${clean} of ${listed}), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.`;
+}
 
 function basisRow(ctx: Ctx): StressRow | null {
   const ex = ctx.ex;
@@ -3548,17 +3739,20 @@ function basisRow(ctx: Ctx): StressRow | null {
     pick(c, per) != null && omOn(per) != null ? per : per === "unit" && c.perSf != null && omSf != null ? "sf" : pick(c, per) != null ? per : null;
   const evidence: StressEvidence[] = [];
   const comparables: BasisComparable[] = [];
-  const pushComparable = (e: StressEvidence, on: Per, few: BasisComparable["few"] = null) => {
+  const pushComparable = (e: StressEvidence, on: Per) => {
     evidence.push(e);
-    if (e.value != null) comparables.push({ e, value: e.value, on, few });
+    if (e.value != null) comparables.push({ e, value: e.value, on });
   };
 
-  // The memorandum's own sale comps, each graded by the comps step: a figure
-  // is struck only over the comps it graded `supports`. One it graded
-  // `favorable` leans the seller's way and one graded `stretched` does not
-  // support the deal: each is named and left out. Three or more clean comps
-  // make a median; one or two are named, never called a median (the
-  // recorded sales' own floor, lib/public-comps `MEDIAN_FLOOR`).
+  // The memorandum's own sale comps, each graded by the comps step by its
+  // comparability to the subject (lib/anthropic/prompts): a figure is struck
+  // only over the comps it graded `supports`. One it graded `favorable` is
+  // less comparable in a way that flatters the ask and one graded
+  // `stretched` is not comparable: each is named and left out. Three or more
+  // clean comps make a median, the one figure that may decide; one or two
+  // are named with their count beside it and decide nothing (the recorded
+  // sales' own floor, lib/public-comps `MEDIAN_FLOOR`; the review of
+  // 2026-10-23 — a price held to ONE comp is a sighting, not a market).
   const sale = ctx.brokerComps?.saleComps ?? [];
   type Stating = { comp: (typeof sale)[number]; on: Per; figure: number };
   const stating: Stating[] = [];
@@ -3581,19 +3775,16 @@ function basisRow(ctx: Ctx): StressRow | null {
         return cs.length > 0 ? `; left out, graded ${LEFT_OUT_GRADE[grade]}: ${named(cs)}` : "";
       })
       .join("");
-    const figure =
-      clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : clean.length === 2 ? (clean[0].figure + clean[1].figure) / 2 : clean.length === 1 ? clean[0].figure : null;
+    const figure = clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : null;
     const head =
       on === per ? `${group.length} of ${sale.length} state a figure ${pw}` : `${group.length} of ${sale.length} state a figure ${pw} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
     const graded = clean.length > 0 ? `; graded clean (supports): ${named(clean)}` : "";
     const struck =
       clean.length >= MEDIAN_FLOOR
         ? ` — median ${money(figure!)}${pw} over the ${clean.length}`
-        : clean.length === 2
-          ? ` — the two graded clean, midpoint ${money(figure!)}${pw}, too few for a median`
-          : clean.length === 1
-            ? " — the one comp graded clean, too few for a median"
-            : ", none graded clean (supports), so none is set against the ask";
+        : clean.length > 0
+          ? ` — ${clean.length === 1 ? "one" : "two"} graded clean, too few for a median (${MEDIAN_FLOOR} or more), so none is set against the ask`
+          : ", none graded clean (supports), so none is set against the ask";
     // The page the figure is read off: the clean comps' own page, each
     // validated against the deck (lib/facts `locatedPage`), where they all
     // sit on one; none where they sit on several or any states none.
@@ -3611,9 +3802,11 @@ function basisRow(ctx: Ctx): StressRow | null {
         ...(compsPage != null ? { page: compsPage } : {}),
       },
       on,
-      clean.length === 1 || clean.length === 2 ? { count: clean.length as 1 | 2, names: clean.map((c) => c.comp.name) } : null,
     );
   }
+  // How many comps graded clean state a figure on the yardstick, for the
+  // floor's sentence (`basisFloorWhy`).
+  const cleanOn = stating.filter((c) => c.comp.support === "supports" && c.on === per).length;
   // Recorded sales from public records, a median only from three sales up —
   // the comps page's own floor, applied by the caller. A per-unit median is
   // struck on no recorded sales (a record states no unit count), and a $/SF
@@ -3723,8 +3916,12 @@ function basisRow(ctx: Ctx): StressRow | null {
   // The yardstick the verdict is struck on: the first comparable's, the
   // best kind present (below); the OM's figure on the other yardstick rides
   // beside it where a piece is judged on that one.
+  // Only trades decide (the review of 2026-10-23): the memorandum's comps
+  // graded clean and the recorded sales, each a median of three or more.
+  // The reader's own past screens are asks, not trades, and are shown beside
+  // the price, never deciding it.
   const asks = comparables.filter((c) => c.e.publisher === PAST_SCREENS_PUBLISHER);
-  const judgedOn = comparables.length > asks.length ? comparables.filter((c) => !asks.includes(c)) : asks;
+  const judgedOn = comparables.filter((c) => !asks.includes(c));
   const lead: Per = judgedOn[0]?.on ?? per;
   const other: Per | null = judgedOn.some((c) => c.on !== lead) ? (lead === "unit" ? "sf" : "unit") : null;
   const omLead = omOn(lead);
@@ -3752,36 +3949,41 @@ function basisRow(ctx: Ctx): StressRow | null {
   if (withheld) return unchecked("basis", omSays, evidence, omSays.text);
   if (outOfBand) return unchecked("basis", omSays, evidence, `The plausibility check finds the basis outside the band any market trades at: ${outOfBand.title}. ${outOfBand.detail}`);
   if (omLead == null) return unchecked("basis", omSays, evidence, planWhy ?? omSays.text);
-  // The verdict is struck on the best kind of evidence present: the
-  // memorandum's graded comps and the recorded sales before the reader's
-  // own past asking prices, which decide only where nothing else carries a
-  // figure — another memorandum's ask never turns a stretched basis into
-  // one that holds.
+  // The verdict is struck on a median of three trades or more: the
+  // memorandum's comps graded clean, else the recorded sales. Under that
+  // floor the row stands unchecked and says why — the comps' own floor,
+  // never a verdict on one or two sightings, and never on another
+  // memorandum's ask.
   if (judgedOn.length === 0) {
+    const asksOnly = asks.length > 0 ? " Your past screens' asking prices are asks, not trades, and decide nothing." : "";
     return unchecked(
       "basis",
       omSays,
       evidence,
-      evidence.some((e) => e.publisher !== "past screens") ? "No evidence above carries a figure the ask can be set against." : "No comp with a figure could be read for this deal.",
+      sale.length > 0 && stating.length > 0
+        ? `${basisFloorWhy(cleanOn, sale.length, perWord)}${asksOnly}`
+        : rs && rs.count > 0
+          ? `The recorded sales are too few for a median (${MEDIAN_FLOOR} or more) and the memorandum's comps carry none, so no median is struck: the comps' own floor.${asksOnly}`
+          : asks.length > 0
+            ? "No trade carries a figure the ask can be set against: your past screens' asking prices are asks, not trades, and decide nothing."
+            : evidence.some((e) => e.publisher !== "past screens")
+              ? "No evidence above carries a figure the ask can be set against."
+              : "No comp with a figure could be read for this deal.",
     );
   }
   // ONE figure decides (lib/stress-deciders `basisDecider`, the order
-  // lib/stress-basis-evidence builds the pieces in): the memorandum's comps
-  // graded clean, else the recorded sales, else the reader's own past asks;
-  // every other piece is shown beside it.
+  // lib/stress-basis-evidence builds the pieces in): the median of the
+  // memorandum's comps graded clean, else the recorded sales' median; every
+  // other piece is shown beside it.
   const decided = basisDecider(candidatesOf(evidence));
   const best = (decided && comparables.find((c) => c.e === evidence[decided.index])) || judgedOn[0];
   const decidedBy = evidence.indexOf(best.e);
   const bestOm = omOn(best.on)!;
   const pw = perWordOf(best.on);
-  // "the median of …": every basis comparable with three figures behind it
-  // is a median, and its label is a phrase no possessive fits ("Recorded
-  // sales (Philadelphia OPA)"); one or two comps graded clean are named.
-  const ofBest = best.few
-    ? best.few.count === 1
-      ? `the one comp graded clean, ${best.few.names[0]}, ${money(best.value)}${pw}`
-      : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")}), ${money(best.value)}${pw}`
-    : `the median of ${asks.includes(best) && ps ? `your past screens' asking prices in ${ps.market}` : lowerFirst(best.e.label)}, ${money(best.value)}${pw}`;
+  // "the median of …": every basis comparable is a median of three figures
+  // or more, and its label is a phrase no possessive fits ("Recorded sales
+  // (Philadelphia OPA)").
+  const ofBest = `the median of ${lowerFirst(best.e.label)}, ${money(best.value)}${pw}`;
   const subject = plan ? (plan.forward ? "The price's" : "The all-in cost's") : "The ask's";
   // The verdict is read in percent of the best figure, so the gap's unit is
   // a share, not a dollar. The verdict, the sentence and the re-run are all
@@ -3794,16 +3996,8 @@ function basisRow(ctx: Ctx): StressRow | null {
       : sharePct > 0
         ? `${subject} ${money(bestOm)}${pw} is ${pct1(sharePct)} over ${ofBest}.`
         : `${subject} ${money(bestOm)}${pw} is ${pct1(-sharePct)} under ${ofBest} — the conservative side.`;
-  let verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
-  // One or two comps are sightings, not a market: they can stretch a basis,
-  // never call it unsupported.
-  const capped = verdict === "unsupported" && best.few != null;
-  if (capped) verdict = "stretched";
-  const gap = {
-    value: Math.round(sharePct * 10) / 10,
-    unit: "pct" as const,
-    text: capped ? `${gapText} On ${best.few!.count === 1 ? "one comp" : "two comps"}, no worse than stretched.` : gapText,
-  };
+  const verdict: StressVerdict = sharePct <= BASIS_STRETCH_PCT ? "holds" : sharePct > BASIS_UNSUPPORTED_PCT ? "unsupported" : "stretched";
+  const gap = { value: Math.round(sharePct * 10) / 10, unit: "pct" as const, text: gapText };
   const evidenceIndex = evidence.indexOf(best.e);
   // The price is a direct input: re-run at the evidence's basis — only
   // where the model's price is the building's own as stated (not a share
@@ -3814,11 +4008,7 @@ function basisRow(ctx: Ctx): StressRow | null {
   // sales' or the reader's past screens'.
   const whose =
     best.e.kind === "om_internal"
-      ? best.few
-        ? best.few.count === 1
-          ? `the one comp graded clean (${best.few.names[0]})`
-          : `the midpoint of the two comps graded clean (${best.few.names.join(" and ")})`
-        : "the memorandum's sale comps' median"
+      ? "the memorandum's sale comps' median"
       : best.e.label.startsWith("Recorded sales")
         ? `the recorded sales' median (${best.e.publisher})`
         : "the median of your past screens' asking prices";
@@ -3868,7 +4058,6 @@ function basisRow(ctx: Ctx): StressRow | null {
     ...(noRerun ? { noRerun } : {}),
     challenge: null,
     method: methodSentence("basis", evidence, decidedBy),
-    ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
   };
 }
 
