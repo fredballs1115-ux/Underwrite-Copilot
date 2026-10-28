@@ -417,10 +417,18 @@ export function recordFigure(key: StressKey, n: number, per: string | null = nul
  *  by doors, "6.0% economic vacancy" in dollars over gross potential rent. */
 const cardFigure = (key: StressKey, figure: string, economic = false) => (key === "vacancy" ? (economic ? `${figure} economic vacancy` : `${figure} vacant`) : figure);
 
-/** A stress-test row's margin in words: "0.05-point", "5%". */
+/** A stress-test row's margin in words: "0.05-point", "5%"; a vacancy's
+ *  margin of one door's share at two places, "0.40-point" (`doorWords` says
+ *  the doors beside it). */
 export function marginWords(t: NonNullable<StressSnapshotRow["threshold"]>): string {
-  if (t.unit === "pts") return `${Number(t.value.toFixed(2))}-point`;
+  if (t.unit === "pts") return t.doors != null ? `${t.value.toFixed(2)}-point` : `${Number(t.value.toFixed(2))}-point`;
   return `${Number((t.value * 100).toFixed(1))}%`;
+}
+
+/** The doors beside a margin of one door's share: " (one door of 248)";
+ *  "" on every other margin. */
+export function doorWords(t: NonNullable<StressSnapshotRow["threshold"]>): string {
+  return t.doors != null ? ` (one door of ${t.doors.toLocaleString("en-US")})` : "";
 }
 
 const parseTime = (iso: string | null | undefined): number | null => {
@@ -984,7 +992,7 @@ function scoreTestRow(r: StressSnapshotRow, T: number | null, ev: Admitted, args
   const move = (r.worse === "higher" ? v - r.om : r.om - v) / (r.threshold.unit === "share" ? Math.abs(r.om) : 1);
   const past = move > r.threshold.value + 1e-9;
   const outcome: RowOutcome = flagged ? (past ? "flag_right" : "flag_wrong") : past ? "false_hold" : "hold_right";
-  const margin = `the row's ${marginWords(r.threshold)} margin`;
+  const margin = `the row's ${marginWords(r.threshold)} margin${doorWords(r.threshold)}`;
   if (later.purchase) {
     // A Closed deal's own price: the buyer's, negotiated with the screen in
     // hand — a decision that points by its figure, never a market's verdict

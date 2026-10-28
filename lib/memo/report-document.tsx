@@ -143,6 +143,7 @@ import {
   sourceWithPage,
 } from "@/lib/stress-test-words";
 import { BREAKS_IF_ESTIMATE } from "@/lib/stress-snapshot";
+import { compRating } from "@/lib/comp-rating";
 
 const C = {
   brand: "#114e54",
@@ -3200,7 +3201,7 @@ export function ReportDocument({
                 <View style={s.tableHead} fixed>
                   <Text style={[s.headText, { width: "26%" }]}>Comp</Text>
                   <Text style={[s.headText, { width: "30%" }]}>Detail</Text>
-                  <Text style={[s.headText, { width: "14%" }]}>Support</Text>
+                  <Text style={[s.headText, { width: "14%" }]}>Comparability</Text>
                   <Text style={[s.headText, { width: "22%" }]}>Why</Text>
                   <Text style={[s.headText, { width: "8%" }]}>Page</Text>
                 </View>
@@ -3258,7 +3259,7 @@ export function ReportDocument({
                     </View>
                     <View style={{ width: "14%", paddingRight: 3 }}>
                       <RateChip
-                        word={str(cp?.support)}
+                        word={cp?.support ? compRating(str(cp.support)).short : ""}
                         color={SUPPORT_COLOR[str(cp?.support)] ?? C.muted}
                       />
                     </View>

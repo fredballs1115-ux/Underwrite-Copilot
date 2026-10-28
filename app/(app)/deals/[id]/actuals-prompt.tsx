@@ -24,13 +24,25 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * dollars not doors, decides only one the OM states as economic; beside a
  * stabilized vacancy they show today's gap to close and never decide it
  * (lib/stress-deciders' VACANCY_ORDER.stabilized: the market's published
- * figure, then the class norm). The T-12's tax
- * line is shown beside the taxes row and judges nothing, so taxes are not
- * named. And a document dated after the screen's verdict (and uploaded
- * after it) is what the track record scores the screen's stress-test rows
- * against (lib/track-record), in the same measures — never its taxes or
- * insurance, which a seller's T-12 cannot show for a new owner.
+ * figure, then the class norm). The T-12's tax line decides the taxes row
+ * where the OM's bill sits more than 2% under it and no reset bill can be
+ * struck (lib/stress-deciders' TAXES_ORDER, its third step), stretched at
+ * most: the seller's bill, the building's history. And a document dated
+ * after the screen's verdict (and uploaded after it) is what the track
+ * record scores the screen's stress-test rows against (lib/track-record),
+ * in the same measures — never its taxes or insurance, which a seller's
+ * T-12 cannot show for a new owner.
  */
+const ACTUALS_TESTS = [
+  { doc: "T-12", tests: "The OM's NOI and its operating expenses; and its tax bill and insurance premium where either sits more than 2% under the seller's own (a tax bill only where no reset bill can be struck): the building's history, not a new owner's bill or quote." },
+  { doc: "Rent roll", tests: "The OM's occupancy today, by its doors. (The T-12 tests an economic vacancy today, in dollars.)" },
+] as const;
+/** The rule the documents never decide. */
+const ACTUALS_STABILIZED =
+  "A stabilized vacancy is held to the market's published figure, else the class's norm; beside it the documents show today's gap to close, and never decide it.";
+/** What the documents do for the track record. */
+const ACTUALS_RECORD =
+  "Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows, each in its own measure.";
 export function ActualsPrompt({
   dealId,
   rentRoll,
@@ -52,19 +64,18 @@ export function ActualsPrompt({
         Test the OM against the building&apos;s own figures{" "}
         <span className="font-normal text-muted">(optional)</span>
       </h2>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        A T-12 tests the OM&apos;s NOI and its operating expenses, and
-        tests the OM&apos;s insurance
-        premium where it sits under the T-12&apos;s, the seller&apos;s actual
-        premium, not a new owner&apos;s quote; a rent roll tests the OM&apos;s occupancy today, by
-        its doors, and the T-12 an economic vacancy today, in dollars. Beside
-        a stabilized vacancy they show today&apos;s gap to close and never
-        decide it: the market&apos;s published figure does, else the
-        class&apos;s norm.
-        Dated after this screen (the roll&apos;s as-of, the T-12&apos;s
-        period end), either one lets the track record score the stress
-        test&apos;s rows, each in its own measure.
-      </p>
+      {/* What each document turns into a test, one line a document, and
+          the one rule the documents never decide (lib/stress-deciders). */}
+      <ul className="mt-1 space-y-1 text-xs leading-relaxed text-muted" data-qa="actuals-tests">
+        {ACTUALS_TESTS.map((t) => (
+          <li key={t.doc} className="flex items-start gap-2">
+            <span className="mt-px inline-block w-16 shrink-0 rounded bg-brand/10 px-1.5 py-0.5 text-center text-[10px] font-medium text-brand">{t.doc}</span>{" "}
+            <span>{t.tests}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted">{ACTUALS_STABILIZED}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted">{ACTUALS_RECORD}</p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Slot dealId={dealId} kind="rent_roll" label="Rent roll" state={rentRoll} />

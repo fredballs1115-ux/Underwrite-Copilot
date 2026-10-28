@@ -24,22 +24,38 @@
 //     (`rowThreshold`): the survey's margin of error where a survey's figure
 //     decided a vacancy (lib/stress-test's vacancy judge reads it off the
 //     figure's own text, "6.2% ±2.2 pts", and holds a 6.0% inside it), else
-//     the key's own (`snapshotThreshold`). A later figure is scored against
-//     the OM's by that margin (lib/track-record), so a stretched row is right
-//     only where the later figure lands past it, and a hold wrong only where
-//     the later figure lands past it on the buyer's bad side;
+//     the key's own (`snapshotThreshold`); a vacancy's never finer than one
+//     door's share of the units the OM states (`doorShare`: 0.40 points on
+//     248 units), the smallest move a vacancy can make, so a held 6.0% is
+//     never a false hold at 6.1% (the second review, 2026-10-28). A later
+//     figure is scored against the OM's by that margin (lib/track-record), so
+//     a stretched row is right only where the later figure lands past it, and
+//     a hold wrong only where the later figure lands past it on the buyer's
+//     bad side;
 //   - which way a figure moving is worse for the buyer is the key's own
 //     (`worse`): a vacancy, an exit cap or a rate rising, an NOI, a rent
 //     growth or a price (a trade under the ask) falling;
 //   - a stored snapshot is read back through `readStressSnapshot`, which
-//     refuses anything that is not one — a blank is null, never a hold.
+//     refuses anything that is not one — a blank is null, never a hold;
+//   - since 2026-10-28 (lib/stress-drift, what moved since the call) the
+//     snapshot is version 2: it is stamped with the rules its verdicts were
+//     struck by (`rules`, lib/stress-test-types `STRESS_RULES_V`), a row
+//     whose evidence is its own `decidedBy` piece says so (`decided`), the
+//     piece keeps its period as the panel said it (`period`), and the
+//     headline's two cases are kept (`headline`). A version-1 snapshot,
+//     kept before, reads without them and carries no rules version, so the
+//     drift sets none of it against today's.
 
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { BASIS_STRETCH_PCT, SAME, SAME_SHARE } from "@/lib/stress-test";
-import { STRESS_KEYS, type EvidenceKind, type StressKey, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
+import { STRESS_KEYS, STRESS_RULES_V, type EvidenceKind, type StressKey, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
+import { evidencePeriod, liveHeadline } from "@/lib/stress-test-words";
 
-/** The snapshot's shape version: a reader refuses one it does not know. */
-export const STRESS_SNAPSHOT_V = 1;
+/** The snapshot's shape version: a reader refuses one it does not know. 2
+ *  (2026-10-28) carries the rules version, each row's `decided` and its
+ *  piece's period, and the headline; 1 carries none of them. */
+export const STRESS_SNAPSHOT_V = 2;
+const READ_VERSIONS: readonly number[] = [1, 2];
 
 export interface StressSnapshotEvidence {
   /** in the key's own unit (a percent as a percent, a dollar as a dollar) */
@@ -50,6 +66,11 @@ export interface StressSnapshotEvidence {
   asOf: string | null;
   kind: EvidenceKind;
   publisher: string;
+  /** the period the figure is for, said by its own cadence as the panel
+   *  said it at the call (lib/stress-test-words `evidencePeriod`: "Aug
+   *  2026", "Q2 2026"); absent with no date, and on a snapshot kept before
+   *  it was carried */
+  period?: string;
 }
 
 export interface StressSnapshotRow {
@@ -66,8 +87,11 @@ export interface StressSnapshotRow {
   /** the yardstick's word where the evidence was judged on one of its own ("/SF") */
   per: string | null;
   /** inside this of the OM's figure, a figure is AT it: points, or a share of
-   *  the OM's figure; null on a key nothing scores (insurance, other) */
-  threshold: { value: number; unit: "pts" | "share" } | null;
+   *  the OM's figure; null on a key nothing scores (insurance, other). On a
+   *  vacancy whose margin is one door's share of the units the OM states,
+   *  `doors` is that count, so every surface says the doors beside the
+   *  points */
+  threshold: { value: number; unit: "pts" | "share"; doors?: number } | null;
   /** which way a figure moving is worse for the buyer */
   worse: "higher" | "lower";
   /** what the row's re-run measured at the verdict: the derived model's
@@ -86,13 +110,35 @@ export interface StressSnapshotRow {
    *  scored on the same footing (lib/stress-test-types `StressRow.footing`);
    *  absent elsewhere, and on a row kept before it was carried */
   less?: ("taxes" | "insurance")[];
+  /** true where `evidence` is the row's own deciding piece (`decidedBy`,
+   *  lib/stress-deciders), the one figure its verdict was struck on; absent
+   *  where it was a fallback, and on a snapshot kept before it was carried —
+   *  such a row's figure is never set against a later one (lib/stress-drift) */
+  decided?: true;
+}
+
+/** The headline's two cases at the call, in percent: the levered IRR, or on a
+ *  plan deal the yield on total cost; null where that case did not solve. */
+export interface StressSnapshotHeadline {
+  measure: "levered_irr" | "yield_on_cost";
+  om: number | null;
+  evidence: number | null;
 }
 
 export interface StressSnapshot {
-  v: typeof STRESS_SNAPSHOT_V;
+  /** the shape version it was kept under (`STRESS_SNAPSHOT_V` today) */
+  v: 1 | 2;
+  /** the rules its verdicts were struck by (lib/stress-test-types
+   *  `STRESS_RULES_V`); absent on a version-1 snapshot, kept before it was
+   *  stamped, whose rules are unknown */
+  rules?: number;
   /** the day the test's published figures were read (the test's `readOn`) */
   readOn: string;
   rows: StressSnapshotRow[];
+  /** the headline as it stood at the call; absent where the test struck none
+   *  (or its re-runs were withheld), and on a snapshot kept before it was
+   *  carried */
+  headline?: StressSnapshotHeadline;
 }
 
 /** Which way a figure moving is worse for the buyer, a key at a time. */
@@ -151,6 +197,14 @@ function marginOfError(text: string): number | null {
   return m && finite(Number(m[1])) ? Number(m[1]) : null;
 }
 
+/** One door's share of a count of units, in points: the smallest move a
+ *  vacancy counted by doors can make (one door empty or let), and in dollars
+ *  the smallest economic one (one door's rent of the gross potential rent).
+ *  Null where no whole count of one or more is stated. */
+export function doorShare(doors: number | null | undefined): number | null {
+  return doors != null && Number.isInteger(doors) && doors >= 1 ? 100 / doors : null;
+}
+
 /**
  * The tolerance the row's own verdict was struck by, kept so a later figure
  * is scored by the margin the verdict drew, never a stricter one. On a
@@ -160,14 +214,19 @@ function marginOfError(text: string): number | null {
  * margin is the row's; on every other row, the key's own
  * (`snapshotThreshold`) — the judges of the rent growth, the expense growth,
  * the exit cap and the debt strike at `SAME`, the NOI, the basis, a tax bill
- * and a premium at their own lines.
+ * and a premium at their own lines. A vacancy's margin is never finer than
+ * one door's share of the units the OM states (`doors`, the row's own count;
+ * in doors or in dollars alike): a 0.05-point margin on 248 units is a
+ * tenth of one door, so a held 6.0% read a false hold at 6.1%.
  */
-export function rowThreshold(key: StressKey, decider: { kind: EvidenceKind; text: string } | null): StressSnapshotRow["threshold"] {
-  if (key === "vacancy" && decider?.kind === "published") {
-    const moe = marginOfError(decider.text);
-    if (moe != null) return { value: moe, unit: "pts" };
-  }
-  return snapshotThreshold(key);
+export function rowThreshold(key: StressKey, decider: { kind: EvidenceKind; text: string } | null, doors?: number | null): StressSnapshotRow["threshold"] {
+  const base: StressSnapshotRow["threshold"] =
+    key === "vacancy" && decider?.kind === "published" && marginOfError(decider.text) != null
+      ? { value: marginOfError(decider.text)!, unit: "pts" }
+      : snapshotThreshold(key);
+  const door = key === "vacancy" ? doorShare(doors) : null;
+  if (base && base.unit === "pts" && door != null && door > base.value + 1e-9) return { value: door, unit: "pts", doors: doors! };
+  return base;
 }
 
 /** The stress test as it stood at the verdict; null with no test or no rows. */
@@ -191,20 +250,41 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       verdict: r.verdict,
       om,
       page: finite(r.omSays.page) ? r.omSays.page : null,
-      evidence: decider
-        ? { value: decider.value as number, label: decider.label, asOf: decider.asOf ?? null, kind: decider.kind, publisher: decider.publisher }
-        : null,
+      evidence: decider ? keptEvidence(decider) : null,
       // A market rent's yardstick, "/mo" or "/SF", so a later rent roll is
       // read on the same one.
       per: own ? own.per : (r.yardstick ?? null),
-      threshold: rowThreshold(r.key, decider),
+      threshold: rowThreshold(r.key, decider, r.doors),
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
       ...(r.footing ? { less: [...r.footing.less] } : {}),
+      ...(decider && r.decidedBy != null && picked === r.evidence[r.decidedBy] ? { decided: true as const } : {}),
     };
   });
-  return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows };
+  const h = liveHeadline(test);
+  const headline: StressSnapshotHeadline | null = h
+    ? h.measure === "yield_on_cost"
+      ? { measure: "yield_on_cost", om: finiteOrNull(h.omYocPct), evidence: finiteOrNull(h.evidenceYocPct) }
+      : { measure: "levered_irr", om: finiteOrNull(h.omIrrPct), evidence: finiteOrNull(h.evidenceIrrPct) }
+    : null;
+  return { v: STRESS_SNAPSHOT_V, rules: STRESS_RULES_V, readOn: test.readOn, rows, ...(headline ? { headline } : {}) };
+}
+
+const finiteOrNull = (n: unknown): number | null => (finite(n) ? n : null);
+
+/** The deciding piece as kept: its figure, whose it is, and its period as the
+ *  panel said it. */
+function keptEvidence(e: StressTest["rows"][number]["evidence"][number]): StressSnapshotEvidence {
+  const period = evidencePeriod(e)?.said;
+  return {
+    value: e.value as number,
+    label: e.label,
+    asOf: e.asOf ?? null,
+    kind: e.kind,
+    publisher: e.publisher,
+    ...(period ? { period } : {}),
+  };
 }
 
 const VERDICTS: readonly StressVerdict[] = ["holds", "stretched", "unsupported", "unchecked"];
@@ -218,8 +298,9 @@ const str = (v: unknown): v is string => typeof v === "string";
  */
 export function readStressSnapshot(raw: unknown): StressSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
-  const s = raw as { v?: unknown; readOn?: unknown; rows?: unknown };
-  if (s.v !== STRESS_SNAPSHOT_V || !Array.isArray(s.rows)) return null;
+  const s = raw as { v?: unknown; rules?: unknown; readOn?: unknown; rows?: unknown };
+  if (typeof s.v !== "number" || !READ_VERSIONS.includes(s.v) || !Array.isArray(s.rows)) return null;
+  const v = s.v as 1 | 2;
   const rows: StressSnapshotRow[] = [];
   for (const x of s.rows as unknown[]) {
     if (!x || typeof x !== "object") continue;
@@ -229,9 +310,16 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
     const e = r.evidence as Record<string, unknown> | null | undefined;
     const evidence =
       e && typeof e === "object" && finite(e.value) && str(e.label) && KINDS.includes(e.kind as EvidenceKind)
-        ? { value: e.value, label: e.label, asOf: str(e.asOf) ? e.asOf : null, kind: e.kind as EvidenceKind, publisher: str(e.publisher) ? e.publisher : "" }
+        ? {
+            value: e.value,
+            label: e.label,
+            asOf: str(e.asOf) ? e.asOf : null,
+            kind: e.kind as EvidenceKind,
+            publisher: str(e.publisher) ? e.publisher : "",
+            ...(str(e.period) && e.period ? { period: e.period } : {}),
+          }
         : null;
-    const t = r.threshold as { value?: unknown; unit?: unknown } | null | undefined;
+    const t = r.threshold as { value?: unknown; unit?: unknown; doors?: unknown } | null | undefined;
     rows.push({
       key,
       title: r.title,
@@ -240,17 +328,28 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       page: finite(r.page) ? r.page : null,
       evidence,
       per: str(r.per) ? r.per : null,
-      threshold: t && finite(t.value) && (t.unit === "pts" || t.unit === "share") ? { value: t.value, unit: t.unit } : null,
+      threshold:
+        t && finite(t.value) && (t.unit === "pts" || t.unit === "share")
+          ? { value: t.value, unit: t.unit, ...(t.unit === "pts" && finite(t.doors) && doorShare(t.doors) != null ? { doors: t.doors } : {}) }
+          : null,
       worse: r.worse === "higher" || r.worse === "lower" ? r.worse : WORSE_WHEN[key],
       // Kept only as one of its two words or a stored null; anything else,
       // or a snapshot kept before it was carried, is left absent (unknown).
       ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
       ...(Array.isArray(r.less) ? { less: (r.less as unknown[]).filter((x): x is "taxes" | "insurance" => x === "taxes" || x === "insurance") } : {}),
+      // Carried from version 2 on: a version-1 row's mark is not one.
+      ...(v >= 2 && r.decided === true && evidence ? { decided: true as const } : {}),
     });
   }
   if (rows.length === 0) return null;
-  return { v: STRESS_SNAPSHOT_V, readOn: str(s.readOn) ? s.readOn : "", rows };
+  const h = (raw as { headline?: unknown }).headline as Record<string, unknown> | null | undefined;
+  const headline: StressSnapshotHeadline | null =
+    h && typeof h === "object" && (h.measure === "levered_irr" || h.measure === "yield_on_cost")
+      ? { measure: h.measure, om: finiteOrNull(h.om), evidence: finiteOrNull(h.evidence) }
+      : null;
+  const rules = v >= 2 && finite(s.rules) && Number.isInteger(s.rules) ? s.rules : null;
+  return { v, ...(rules != null ? { rules } : {}), readOn: str(s.readOn) ? s.readOn : "", rows, ...(v >= 2 && headline ? { headline } : {}) };
 }
 
 /** The deal-killer card's label where the call cites the engine's figures. */

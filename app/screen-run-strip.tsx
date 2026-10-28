@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { CompSupport, DealKiller, MarketAssessment } from "@/lib/anthropic/types";
 import { PausableTicker } from "./pausable-ticker";
+import { COMP_RATING } from "@/lib/comp-rating";
 
 /** The trace's animation-play-state: running until its pause button says. */
 const PLAY = "var(--screenrun-play, running)";
@@ -14,7 +15,8 @@ const PLAY = "var(--screenrun-play, running)";
  *  lib/home.render.test.ts holds these words to the product's maps. */
 export const STRIP_WORDS = {
   lever: { basis: "basis", exit: "exit", debt: "debt" } satisfies Record<DealKiller["lever"], string>,
-  comp: { stretched: "stretched", favorable: "leans favorable", supports: "supports" } satisfies Record<CompSupport, string>,
+  // The one display map's short words (lib/comp-rating, no imports).
+  comp: { stretched: COMP_RATING.stretched.short, favorable: COMP_RATING.favorable.short, supports: COMP_RATING.supports.short } satisfies Record<CompSupport, string>,
   market: { aggressive: "aggressive", conservative: "conservative", "in-line": "in-line" } satisfies Record<MarketAssessment, string>,
 };
 

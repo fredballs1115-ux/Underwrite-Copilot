@@ -164,8 +164,16 @@ tested and whether that is right. So:
   dollars (`measureOf`: a pro forma income line, or one naming credit or
   loss) meets the market's doors as a floor, since economic is never under
   physical; an in-place one stays measure-matched. The exit cap is held to
-  the higher of the going-in cap and the OM's own pro forma cap
-  (`omProFormaCap`), no expansion added and said. Growth decides on the
+  the going-in cap, then the tracker range's low end (2026-10-28: a second
+  review showed the OM's pro forma cap is a yield on price that carries the
+  OM's projected NOI growth, so it is drawn beside, never deciding, and
+  "compression" is said only against the going-in cap; with no going-in cap
+  the tracker range's low end decides where one is held to, and with neither
+  the row is unchecked, the pro forma cap beside it), no expansion added and
+  said.
+  The track record scores a vacancy by the larger of the row's tolerance and
+  one door's share of the stated count (`StressRow.doors`, "one door of
+  248"). Growth decides on the
   cautious of the trailing year and the stored longer average
   (`cautiousGrowth`). The price row decides only on a median of three or
   more trades (`basisFloorWhy`), comps graded by comparability, never

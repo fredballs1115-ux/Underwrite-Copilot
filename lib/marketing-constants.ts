@@ -31,8 +31,9 @@ export const SPREAD_BPS = (SPREAD_HIGH_IRR_PCT - SPREAD_LOW_IRR_PCT) * 100; // 4
 // challenge, comps, market, verdict (lib/screen-stages, held to the rail by
 // its test; reconciling the buyer's model is a run of its own).
 export const ANALYSIS_STAGES = 6;
-// The three deal-killers the challenger stresses first: basis, exit, debt.
-export const DEAL_KILLERS = 3;
+// (The "3 deal-killers named first" stat is retired, the review of
+// 2026-10-28: the homepage's strip counts the sample's own stress test —
+// rows tested against evidence and rows named unchecked — from its build.)
 // The IC memo is laid out for one page (lib/memo/memo-document.tsx); a memo
 // that cannot fit flows to a second rather than over its footer, so no
 // surface promises one page.

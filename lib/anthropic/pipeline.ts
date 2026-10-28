@@ -84,6 +84,7 @@ import { actualsFromRows } from "@/lib/actuals/actuals-read";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { buildStressTest, type StressTestArgs } from "@/lib/stress-test";
 import { stressSnapshotOf } from "@/lib/stress-snapshot";
+import { stressTestAtCall } from "@/lib/stress-at-call";
 import { PAST_SCREENS_IN_BRIEF, compsCallSubjectOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { readLoanQuote } from "@/lib/loan-quote-read";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
@@ -694,7 +695,9 @@ async function screenStressTest(
       readOn: today,
     };
     const full = buildStressTest(args);
-    return { full, brief: args.loanQuote ? buildStressTest({ ...args, loanQuote: null }) : full };
+    // The call's test through the one builder the deal page's "since the
+    // call" also reads (lib/stress-at-call), so the two cannot diverge.
+    return { full, brief: stressTestAtCall(args, full) };
   } catch (err) {
     console.warn(`[pipeline] the stress test was not built for deal ${dealId}:`, err instanceof Error ? err.message : err);
     return null;

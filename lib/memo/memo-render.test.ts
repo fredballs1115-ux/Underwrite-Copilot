@@ -1340,7 +1340,7 @@ describe("MemoDocument (redesigned)", () => {
     // The sample's exit killer quotes the stress test's own re-run (its call
     // is written on its own test), so the card takes the plain label — never
     // "the screen's estimate" over the engine's.
-    expect(text).toMatch(/Breaks if: At the 5\.70% pro forma cap, the stress test's IRR falls 10\.8% to 7\.4%\./);
+    expect(text).toMatch(/Breaks if: At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
     expect(text).not.toContain("Breaks if (the screen's estimate)");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
     // Any other deal's call is the verdict step's words: "Breaks if:" plain
@@ -1542,18 +1542,17 @@ describe("the memo leads with the stress test", () => {
     const { sampleStressTest, sampleActualsLine, sampleDocumentChecks } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
     const data = { ...buildMemoData(dealOf(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test), actualsLine: sampleActualsLine() };
-    // The four rows the memo has room for, unsupported first — the exit
-    // under the OM's own pro forma cap, the largest share of the headline's
-    // gap, then the premium, no model input — then the stretched rows by
-    // their share of the headline's gap (the taxes, then the insurance held
-    // to the seller's own T-12 premium); the NOI, which the headline leaves
+    // The four rows the memo has room for, unsupported first — the premium,
+    // no model input — then the stretched rows by their share of the
+    // headline's gap (the taxes, the exit 20 bps under the going-in cap, then
+    // the insurance held to the seller's own T-12 premium); the NOI, which the headline leaves
     // out for its components, is the report's, the pro forma's stabilized
     // vacancy holds on the class's norm (the T-12 is today's building, never
     // its test), and the price stands unchecked on two clean comps.
     expect(data.stressTest?.rows.map((r) => [r.key, r.verdict])).toEqual([
-      ["exit_cap", "unsupported"],
       ["renovation_premium", "unsupported"],
       ["taxes", "stretched"],
+      ["exit_cap", "stretched"],
       ["insurance", "stretched"],
     ]);
     const pdf = await renderMemoPdf(data);
@@ -1568,7 +1567,7 @@ describe("the memo leads with the stress test", () => {
       return `IRR ${i.baseIrrPct!.toFixed(1)}% to ${i.altIrrPct!.toFixed(1)}%`;
     };
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("11 assumptions read, 9 stated in the OM — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
+    expect(text).toContain("11 assumptions read, 9 stated in the OM — 6 tested (1 unsupported, 4 stretched, 1 holds), 5 unchecked; the levered return re-run with one input swapped for the evidence's, in code.");
     // The headline, in the read line's paragraph: the OM's case against the
     // evidence's (lib/stress-test `stressHeadline`); the split is the
     // report's, since the one page has no line to spare for it.
@@ -1582,13 +1581,16 @@ describe("the memo leads with the stress test", () => {
     expect(text).not.toContain("STRETCHED NOI");
     // The stabilized vacancy holds: no row of the memo's.
     expect(text).not.toContain("Stabilized vacancy OM");
-    // The exit row: the OM's exit against its own pro forma cap.
-    expect(text).toContain(`UNSUPPORTED Exit cap OM 5.25% (p. 41) · against 5.70% (OM p. 8) · gap 45 bps · ${move("exit_cap")}`);
+    // The exit row: the OM's exit against its going-in cap, the one figure
+    // that decides (the pro forma cap is beside it, never deciding).
+    expect(text).toContain(`STRETCHED Exit cap OM 5.25% (p. 41) · against 5.45% (OM p. 8) · gap 20 bps · ${move("exit_cap")}`);
     // The price stands unchecked on two clean comps: no row of the memo's.
     expect(text).not.toContain("STRETCHED Basis");
     // Within a verdict the headline's larger share leads (lib/stress-test-words
-    // `leadRows`): the exit cap, unsupported and the largest share, first.
-    expect(text.indexOf("UNSUPPORTED Exit cap")).toBeLessThan(text.indexOf("UNSUPPORTED Renovation premium"));
+    // `leadRows`): the taxes before the exit cap, the premium, unsupported,
+    // before both.
+    expect(text.indexOf("UNSUPPORTED Renovation premium")).toBeLessThan(text.indexOf("STRETCHED Real estate taxes"));
+    expect(text.indexOf("STRETCHED Real estate taxes")).toBeLessThan(text.indexOf("STRETCHED Exit cap"));
     expect(text).toContain(`STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · ${move("taxes")}`);
     expect(text).not.toContain("UNSUPPORTED Insurance");
     // The key says what each of a row's two IRRs is run at — the one-page
@@ -1622,7 +1624,7 @@ describe("the memo leads with the stress test", () => {
     // line, as the deal page says it under the panel.
     expect(text).toContain(pdfSafe(SAMPLE_PLAN_NOTE).replace(/\s+/g, " "));
     expect(text.indexOf("in code. Levered IRR on the OM's figures")).toBeLessThan(text.indexOf("Read as stabilized, the sample's re-runs"));
-    expect(text.indexOf("Read as stabilized, the sample's re-runs")).toBeLessThan(text.indexOf("UNSUPPORTED Exit cap"));
+    expect(text.indexOf("Read as stabilized, the sample's re-runs")).toBeLessThan(text.indexOf("UNSUPPORTED Renovation premium"));
     expect(text).toContain("T-12 NOI");
   }, 60000);
 
@@ -1727,10 +1729,10 @@ describe("the memo leads with the stress test", () => {
     const pdf = await renderMemoPdf(data);
     const text = pdfTextOf(pdf).replace(/\s+/g, " ");
     // It fit by giving something back — the actuals line first — and the
-    // lead row, the unsupported exit cap, is the last thing to go.
+    // lead row, the unsupported premium, is the last thing to go.
     expect(pdfPageCount(pdf)).toBe(1);
     expect(text).toContain("THE OM'S ASSUMPTIONS, TESTED");
-    expect(text).toContain("UNSUPPORTED Exit cap OM 5.25% (p. 41)");
+    expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25)");
     expect(text).not.toContain("T-12 NOI");
     expect(text).toContain("SUBMARKET CHECKS OVERRIDDEN");
   }, 60000);
@@ -1756,8 +1758,8 @@ describe("the memo leads with the stress test", () => {
     expect(tight.sensitivity).toEqual([]);
     expect(MEMO_FIT_STEPS[3](tight)).toBeNull();
     // The block's count, beside its title.
-    expect(data.stressTest?.count).toBe("2 unsupported · 3 stretched");
+    expect(data.stressTest?.count).toBe("1 unsupported · 4 stretched");
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
-    expect(text.toLowerCase()).toContain("the om's assumptions, tested 2 unsupported · 3 stretched");
+    expect(text.toLowerCase()).toContain("the om's assumptions, tested 1 unsupported · 4 stretched");
   }, 60000);
 });

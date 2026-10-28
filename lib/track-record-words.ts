@@ -81,9 +81,17 @@ export const DECISION_SCORES =
 export const NOT_YET_SCORABLE =
   "Rent growth, a market rent, expense growth, the exit cap, taxes, insurance and a renovation premium have nothing yet that can score them, so those rows stay unscored.";
 
-/** What the deal page's card scores against, in one sentence. */
-export const CARD_SCOPE =
-  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict: a rent roll or T-12 dated after it (its as-of or period end, not only its upload) — a rent roll for a vacancy counted by doors, unless the market's figure decided it, a T-12 for an economic vacancy, even one held to the market's doors as a floor, or the NOI, neither on a plan deal, or the operating expenses; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them. A document the screen read is not evidence of it.";
+/** What the deal page's card scores against: its first line in the open
+ *  (`CARD_SCOPE_LEAD`), the rest folded under it (`CARD_SCOPE_REST`, the
+ *  panels' PanelFold), whole in the HTML. `CARD_SCOPE` is the three read
+ *  together. */
+export const CARD_SCOPE_LEAD =
+  "Each row of the stress test, holds included, is scored where a later figure can speak to it, and only against what arrived after the verdict.";
+export const CARD_SCOPE_REST = [
+  "A rent roll or T-12 counts only where dated after it (its as-of or period end, not only its upload): a rent roll for a vacancy counted by doors, unless the market's figure decided it, a T-12 for an economic vacancy, even one held to the market's doors as a floor, or the NOI, neither on a plan deal, or the operating expenses; a trade reported after it on a deal moved to Dead, and not dated on or before its day, for the price; your decision, a Closed deal's own price among them.",
+  "A document the screen read is not evidence of it.",
+] as const;
+export const CARD_SCOPE = [CARD_SCOPE_LEAD, ...CARD_SCOPE_REST].join(" ");
 
 /** Under this many scored rows the record is a start, and no share is
  *  printed (the owner's decision of 2026-10-20: five, not the comps' three).

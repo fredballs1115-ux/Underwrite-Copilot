@@ -803,8 +803,10 @@ describe("StressTestPanel on the sample — each claim once", () => {
     ]);
     expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
-    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Stretched, left out: not a clean comparison");
-    expect(t).not.toContain("graded clean (supports): The Brixton");
+    expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Not comparable, left out: not a clean comparison");
+    // The sale comps are the list above, never a sentence too (the lease
+    // comp of the same name, "The Brixton (renovated)", is another row's).
+    expect(t).not.toMatch(/graded clean \(comparable\): The Brixton(?! \(renovated\))/);
   });
 
   it("draws a range's two ends as one line, its caption said once", () => {

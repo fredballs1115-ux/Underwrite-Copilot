@@ -83,14 +83,8 @@ describe("the screening model, as its words say it", () => {
 
   it("runs the exit at the higher of the going-in cap and the stated exit, the one that stands alone, and the named default where neither is stated", () => {
     const goingIn = Number(SAMPLE_DEAL.extraction.metrics.find((m) => m.label === "Going-in cap")!.value.replace("%", "")) / 100;
-    // The sample's own 5.70% pro forma cap, the higher of it and the 5.45%
-    // going-in cap (the stress test's exit row), over its 5.25% stated exit.
-    const proForma = Number(SAMPLE_DEAL.extraction.metrics.find((m) => m.label === "Pro forma cap")!.value.replace("%", "")) / 100;
-    expect(proForma).toBeGreaterThan(goingIn);
-    expect(real(SAMPLE_DEAL.extraction).inputs.exitCapPct).toBeCloseTo(proForma, 10);
-    // With no pro forma cap stated, the going-in cap.
-    const noProForma: ExtractionResult = { ...SAMPLE_DEAL.extraction, metrics: SAMPLE_DEAL.extraction.metrics.filter((m) => !/pro forma cap/i.test(m.label)) };
-    expect(real(noProForma).inputs.exitCapPct).toBeCloseTo(goingIn, 10);
+    // The sample's 5.45% going-in cap over its 5.25% stated exit.
+    expect(real(SAMPLE_DEAL.extraction).inputs.exitCapPct).toBeCloseTo(goingIn, 10);
     // A 5.75% stated exit over the going-in cap runs instead.
     const wide: ExtractionResult = {
       ...SAMPLE_DEAL.extraction,

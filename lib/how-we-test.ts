@@ -28,9 +28,13 @@ import {
   VACANCY_UNSUPPORTED_PTS,
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
-import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
+import { STRESS_METHODS, type AgainstRole, type EvidenceKind, type StressKey, type StressReruns, type StressVerdict } from "@/lib/stress-test-types";
+import { DECIDER_NAMES } from "@/lib/stress-deciders";
+import { BESIDE_TAG, DECIDES_TAG } from "@/lib/stress-test-words";
+import { scorableGrid } from "@/lib/track-record";
+import { scoredByWords } from "@/lib/scorable-summary";
 import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, SCORED_BY_TOO, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
-import { snapshotThreshold } from "@/lib/stress-snapshot";
+import { doorShare, snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
 
@@ -102,7 +106,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // the comps graded clean first, then the recorded sales; under three, no
   // median, and the row stands unchecked, the comps named with their count.
   basis: `Held to the median of three or more trades: the comps graded clean, else the recorded sales. Under three, unchecked, the comps named with their count; your past screens' asks never decide. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
-  exit_cap: `Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
+  exit_cap: `Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the OM's projected NOI growth, so it never decides; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
@@ -147,7 +151,7 @@ export function evidenceKindOf(item: string): EvidenceKind | null {
   }
   // "The going-in cap: …" is the memorandum's own figure; "a going-in cap
   // under the all-in rate" (negative leverage) is arithmetic, left unmarked.
-  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|^The higher of the OM's going-in cap\b|^The OM's pro forma cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
+  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|^The OM's pro forma cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
   if (/deal's own|deal's T-12|rent roll|T-12/i.test(item)) return "document";
   return null;
 }
@@ -161,10 +165,135 @@ export const KIND_LABEL: Record<EvidenceKind, string> = {
   om_internal: "The OM against itself",
 };
 
-/** Whether the engine runs the return again on this method's evidence —
- *  the table's own words say "re-run" where it does. */
-export function engineReruns(method: Pick<StressMethod, "engine">): boolean {
-  return /\bre-run\b/.test(method.engine);
+/** The intro's lines (the review of 2026-10-28): all four kinds of evidence
+ *  named, each as the panel names it, and the re-run said where it is made —
+ *  only where the gap moves a model input (`StressMethod.reruns`). */
+export const HOW_WE_TEST_INTRO = [
+  "A memorandum's key assumptions are each set against evidence a buyer can check.",
+  "A dated published figure, the deal's own documents (its rent roll and T-12), the OM against its own figures, or a rule of thumb named as one.",
+  "Then, where the gap moves a model input, the return is run again with the evidence's figure in the OM's place: the levered IRR, or on a plan the yield on cost.",
+] as const;
+
+/** What the engine re-runs on a method's evidence, in words a table cell and
+ *  a picture's label say: the method's own `reruns`, never read off its
+ *  words (the first cut matched "re-run" in "No return is re-run"). */
+export function rerunsWords(r: StressReruns): string {
+  if (r.stabilized === "irr" && r.plan === "yoc") return "The levered IRR; on a plan, the yield on cost";
+  if (r.stabilized === "irr") return "The levered IRR; nothing on a plan";
+  if (r.plan === "yoc") return "Nothing on a stabilized deal; on a plan, the yield on cost";
+  return "Nothing";
+}
+
+/** The picture's label at the arrow's head: what is re-run, short. */
+export function rerunsMark(r: StressReruns): string {
+  if (r.stabilized === "irr" && r.plan === "yoc") return "IRR · yield on cost";
+  if (r.stabilized === "irr") return "IRR";
+  if (r.plan === "yoc") return "Yield on cost (plan)";
+  return "No re-run";
+}
+
+const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+
+/** The vacancy's rent roll and T-12: today's gap beside a stabilized
+ *  figure, the deciding figure for an occupancy stated for today. */
+export const TODAY_ROLE_TAG = "Beside a stabilized figure; decides one for today";
+
+/** An `against` item's tag, as the panel tags a built row's pieces
+ *  (lib/stress-test-words `DECIDES_TAG`, `BESIDE_TAG`): "Decides (1st)",
+ *  "Decides (1st, 3rd, 4th)", "Decides, in its class's order", or "Beside it,
+ *  not deciding". */
+export function roleTag(role: AgainstRole): string {
+  if (role === "beside") return BESIDE_TAG;
+  if (role === "by_class") return `${DECIDES_TAG}, in its class's order`;
+  if (role === "today") return TODAY_ROLE_TAG;
+  return `${DECIDES_TAG} (${role.map((n) => ORDINAL[n - 1] ?? `${n}th`).join(", ")})`;
+}
+
+/**
+ * Where each row's verdict word falls (lib/stress-test's own readers and
+ * constants, one cell each): the overview table's three columns. "Past
+ * that" is past the hair or the margin inside which the OM is at its figure.
+ * At its figure, a re-run that moves the return as far as `VERDICT_WORDS`
+ * says reads stretched too, which the table's caption names once.
+ */
+export const THRESHOLDS: Record<StressKey, { holds: string; stretched: string; unsupported: string }> = {
+  basis: { holds: `Up to ${BASIS_STRETCH_PCT}% over, or under`, stretched: `${BASIS_STRETCH_PCT}–${BASIS_UNSUPPORTED_PCT}% over`, unsupported: `More than ${BASIS_UNSUPPORTED_PCT}% over` },
+  exit_cap: {
+    holds: `Up to ${Math.round(SAME * 100)} bps tighter, or wider`,
+    stretched: `${Math.round(SAME * 100)}–${EXIT_CAP_UNSUPPORTED_BPS} bps tighter`,
+    unsupported: `${EXIT_CAP_UNSUPPORTED_BPS} bps or more tighter`,
+  },
+  debt: {
+    holds: `Up to ${Math.round(SAME * 100)} bps under, or over`,
+    stretched: `More than ${Math.round(SAME * 100)} bps under`,
+    unsupported: `More than ${DEBT_UNSUPPORTED_BPS} bps under the quote; with none, under the bare index too`,
+  },
+  noi: {
+    holds: `Within ${pctOf(NOI_IN_LINE_BAND)} over, or under`,
+    stretched: `More than ${pctOf(NOI_IN_LINE_BAND)} over`,
+    unsupported: `More than ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12 (never against the OM's own)`,
+  },
+  vacancy: {
+    holds: `Within the survey's margin (else ${SAME} pts) under, or over`,
+    stretched: `Under that, by up to ${VACANCY_UNSUPPORTED_PTS} pts more`,
+    unsupported: `More than ${VACANCY_UNSUPPORTED_PTS} pts past that`,
+  },
+  rent_growth: { holds: `Up to ${SAME} pts over, or under`, stretched: `Over that, by up to ${RENT_GROWTH_UNSUPPORTED_PTS} pts more`, unsupported: `More than ${RENT_GROWTH_UNSUPPORTED_PTS} pts past that` },
+  market_rent: { holds: `Up to ${BASIS_STRETCH_PCT}% over, or under`, stretched: `${BASIS_STRETCH_PCT}–${BASIS_UNSUPPORTED_PCT}% over`, unsupported: `More than ${BASIS_UNSUPPORTED_PCT}% over` },
+  expense_growth: {
+    holds: `Up to ${SAME} pts under, or over`,
+    stretched: `Under that, by up to ${EXPENSE_GROWTH_UNSUPPORTED_PTS} pts more`,
+    unsupported: `More than ${EXPENSE_GROWTH_UNSUPPORTED_PTS} pts past that`,
+  },
+  taxes: {
+    holds: `Within ${pctOf(SAME_SHARE)} under, or over`,
+    stretched: `More than ${pctOf(SAME_SHARE)} under`,
+    unsupported: `More than ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill (never the reset or the T-12's)`,
+  },
+  insurance: {
+    holds: `Never: within ${pctOf(SAME_SHARE)} of the T-12's or over it, the row is unchecked`,
+    stretched: `More than ${pctOf(SAME_SHARE)} under the T-12's premium`,
+    unsupported: "Never: the T-12 is the seller's history",
+  },
+  opex: {
+    holds: `Within ${pctOf(NOI_IN_LINE_BAND)} under, or over`,
+    stretched: `More than ${pctOf(NOI_IN_LINE_BAND)} under`,
+    unsupported: `More than ${pctOf(NOI_UNSUPPORTED_SHARE)} under the T-12 (never the class's ratio)`,
+  },
+  renovation_premium: {
+    holds: `Within ${pctOf(SAME_SHARE)} over, or under`,
+    stretched: `More than ${pctOf(SAME_SHARE)} over`,
+    unsupported: `More than ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over`,
+  },
+  other: { holds: "No verdict is struck", stretched: "No verdict is struck", unsupported: "No verdict is struck" },
+};
+
+/** The overview table's caption line under it: the re-run's own rule. */
+export const THRESHOLDS_NOTE = `At its figure, a row whose re-run lowers the levered IRR ${IRR_MOVE_STRETCH_BPS} bps or more, or a plan's yield on cost ${YOC_MOVE_STRETCH_PTS} points or more, reads stretched.`;
+
+/** One row of the overview table: the row, the figure that decides it and
+ *  its fallbacks in order (lib/stress-deciders `DECIDER_NAMES`), its
+ *  thresholds, what is re-run and what can score it (lib/track-record
+ *  `scorableGrid`, the scorer itself). */
+export interface OverviewRow {
+  key: StressKey;
+  title: string;
+  decides: readonly string[];
+  thresholds: (typeof THRESHOLDS)[StressKey];
+  reruns: string;
+  scoredBy: string;
+}
+
+export function overviewRows(): OverviewRow[] {
+  const grid = new Map(scorableGrid().map((r) => [r.key, r]));
+  return STRESS_METHODS.map((m) => ({
+    key: m.key,
+    title: m.title,
+    decides: DECIDER_NAMES[m.key],
+    thresholds: THRESHOLDS[m.key],
+    reruns: rerunsWords(m.reruns),
+    scoredBy: scoredByWords(grid.get(m.key)),
+  }));
 }
 
 export interface Publisher {
@@ -294,7 +423,9 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
  *  rules, its floor and its lists of what can score a row imported; the
  *  margins lib/stress-snapshot's `snapshotThreshold` — `rowThreshold`'s
  *  survey margin applies to a vacancy the survey decided, which no later
- *  document scores, so the page names none). */
+ *  document scores, so the page names none; a vacancy's is never finer
+ *  than one door's share of the units the OM states, `doorShare`, said with
+ *  the sample's 248 units). */
 const margin = (key: StressKey) => {
   const t = snapshotThreshold(key);
   return t ? marginWords(t).replace("-point", " points") : "";
@@ -312,7 +443,7 @@ export const TRACK_RECORD = {
     NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands within that margin, or better for the buyer.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
-    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, or one door's share where the OM states its units and that is larger (${doorShare(248)!.toFixed(2)} points, one door of 248), ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
     "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     // lib/track-record `scoreScreen`'s `admit`: refused where the document's

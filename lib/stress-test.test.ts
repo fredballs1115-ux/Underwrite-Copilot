@@ -27,7 +27,7 @@ import { compactUsd } from "./money";
 import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
-import { AVERAGE_NOT_FORECAST, GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
+import { AVERAGE_NOT_FORECAST, GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, ZILLOW_TRAILING_ONLY, type StressKey, type StressRow } from "./stress-test-types";
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
@@ -87,6 +87,9 @@ import { METRO_VACANCY_LABEL, VACANCY_ORDER } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
 import { stressSection } from "./anthropic/verdict";
+import { stressArgsAtCall, stressTestAtCall } from "./stress-at-call";
+import { readStressSnapshot, stressSnapshotOf } from "./stress-snapshot";
+import { stressDrift } from "./stress-drift";
 import { CANNOT, VERDICT_WORDS } from "./how-we-test";
 import { SAMPLE_PLAN_NOTE, basisMoveWords } from "./stress-test-words";
 import { createElement } from "react";
@@ -229,6 +232,17 @@ const rowOf = (t: { rows: StressRow[] }, key: StressKey): StressRow => {
 };
 
 // ── A stabilized apartment deal with a T-12 ──────────────────────────────
+
+describe("the vacancy row's doors: a class priced by the unit, the plan's own count (the audit of 2026-10-28)", () => {
+  it("counts the units an apartment building states, and no suites on an office", () => {
+    expect(rowOf(buildStressTest(apartmentArgs()), "vacancy").doors).toBe(153);
+    // An office's suites are no doors its vacancy moves by: it is counted by area.
+    const office = { ...APARTMENT, assetClass: "Office", metrics: APARTMENT.metrics.map((m) => (m.label === "Units" ? { ...m, label: "Suites" } : m)) };
+    const v = buildStressTest(apartmentArgs({ extraction: office, storedAssetClass: "office", derived: null, modelVsMarket: null })).rows.find((r) => r.key === "vacancy");
+    expect(v).toBeDefined();
+    expect(v!.doors).toBeUndefined();
+  });
+});
 
 describe("a stabilized apartment deal with a T-12", () => {
   const test = buildStressTest(apartmentArgs());
@@ -1180,34 +1194,45 @@ describe("the exit cap row", () => {
     );
   });
 
-  it("is decided by the higher of the going-in cap and the OM's own pro forma cap, the other beside it, no expansion added (the review of 2026-10-23)", () => {
-    // An exit capitalizes a forward NOI: the pro forma cap is the price's
-    // yield on the OM's stabilized NOI, the income the exit sells.
+  it("is decided by the going-in cap; the OM's pro forma cap is beside it, never deciding, no expansion added (the second review, 2026-10-28)", () => {
+    // The pro forma cap is the OM's stabilized NOI over the price: a yield on
+    // price that already counts the OM's projected NOI growth, so an exit held to it
+    // would call that value creation cap compression. Compression is said
+    // only against the going-in cap.
     const withProForma = (goingIn: string, exit: string, proForma: string, label = "Pro forma cap rate"): ExtractionResult => ({
       ...withCaps(goingIn, exit),
       metrics: [...withCaps(goingIn, exit).metrics, row(label, proForma, "p. 8")],
     });
     const x = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%") })), "exit_cap");
     expect(x.decidedBy).toBe(0);
-    expect(x.evidence[0]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
-    expect(x.evidence[1]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
-    expect(x.gap).toMatchObject({ value: 45, unit: "bps" });
-    expect(x.verdict).toBe("unsupported");
+    expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
+    expect(x.evidence[1]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
+    expect(x.evidence[1].text).toBe("5.70% (Pro forma cap rate): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding");
+    expect(x.gap).toMatchObject({ value: 20, unit: "bps" });
+    expect(x.verdict).toBe("stretched");
     expect(x.gap!.text).toBe(
-      "The OM's 5.25% exit is 45 bps tighter than its 5.70% pro forma cap — the price's yield on its own stabilized NOI, the income the exit sells — so it sells that income dearer than this buyer pays for it: cap compression. Its 5.45% going-in cap, on today's NOI, is beside it.",
+      "The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression. Its 5.70% pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the OM's projected NOI growth).",
     );
-    expect(x.impact!.altValue).toBeCloseTo(0.057, 9);
-    expect(x.impact!.note).toMatch(/^If the exit cap is the pro forma cap's 5\.70%, not the OM's 5\.25%/);
-    expect(x.method).toMatch(/^The OM's exit cap against the OM's pro forma cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: the OM's going-in cap/);
-    // A pro forma cap under the going-in cap: the going-in cap decides, the
-    // pro forma beside it.
-    const under = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.75%", "5.50%", "5.60%", "Stabilized cap rate") })), "exit_cap");
-    expect(under.evidence[under.decidedBy!].label).toBe("The OM's going-in cap");
-    expect(under.gap!.text).toBe("The OM's 5.50% exit is 25 bps tighter than its 5.75% going-in cap — cap compression. Its 5.60% pro forma cap, on its stabilized NOI, sits under it, shown beside it.");
-    // Flat to the pro forma cap holds, the expansion habit named, never held to.
-    const flat = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.70%", "5.70%") })), "exit_cap");
+    expect(x.impact!.altValue).toBeCloseTo(0.0545, 9);
+    expect(x.impact!.note).toMatch(/^If the exit cap is the going-in cap's 5\.45%, not the OM's 5\.25%/);
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: the OM's pro forma cap/);
+    // An exit flat to the going-in cap holds, under the pro forma cap or not:
+    // the pro forma cap's own figure is no compression.
+    const flat = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.45%", "5.70%") })), "exit_cap");
     expect(flat.verdict).toBe("holds");
     expect(flat.gap!.text).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
+    expect(flat.gap!.text).not.toMatch(/compression/);
+    // A pro forma cap alone, with no going-in cap, decides nothing: the
+    // tracker's low end where one is held to, else the row is unchecked and
+    // says why.
+    const both = withProForma("5.45%", "5.25%", "5.70%");
+    const alone: ExtractionResult = { ...both, metrics: both.metrics.filter((m) => m.label !== "Going-in cap rate") };
+    const noGoing = exitCapPieces(alone, false, null, 5.25);
+    expect(noGoing.decided).toBeNull();
+    expect(noGoing.proForma).toBe(5.7);
+    const unchecked = rowOf(buildStressTest(apartmentArgs({ extraction: alone, modelVsMarket: null })), "exit_cap");
+    expect(unchecked.verdict).toBe("unchecked");
+    expect(unchecked.unchecked).toMatch(/^The OM states no going-in cap — its 5\.70% pro forma cap is its stabilized yield on its price \(it includes the OM's projected NOI growth\), shown beside and never deciding — and /);
     // An exit, a cap on cost or a later year's cap is no pro forma cap.
     for (const label of [
       "Pro forma exit cap",
@@ -1224,14 +1249,12 @@ describe("the exit cap row", () => {
       expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(false);
     }
     // "Pro-forma", hyphenated or run together, is a pro forma label too, and
-    // a first year's cap is the pro forma's own.
+    // a first year's cap is the pro forma's own: shown beside, never deciding.
     for (const label of ["Pro-forma cap rate", "Proforma cap rate", "Year 1 pro forma cap rate"]) {
       const r = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%", label) })), "exit_cap");
-      expect(r.evidence[r.decidedBy!].label, label).toBe("The OM's pro forma cap");
+      expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(true);
+      expect(r.evidence[r.decidedBy!].label, label).toBe("The OM's going-in cap");
     }
-    // The screening model keeps its exit reader's own pieces: the going-in cap
-    // (lib/model-evidence reads them with `proForma: false`).
-    expect(exitCapPieces(withProForma("5.45%", "5.25%", "5.70%"), false, null, null, { proForma: false }).decided!.label).toBe("The OM's going-in cap");
   });
 });
 
@@ -1764,7 +1787,7 @@ describe("the plan re-runs strike no yield on a figure the plan does not reach",
 
   it("strikes no reset bill on a rate past the ceiling, on any deal, and says why (audit H2)", () => {
     expect(TAX_RATE_CEILING).toBe(0.05);
-    expect(STRESS_METHODS.find((m) => m.key === "taxes")!.limits.join(" ")).toContain(`past ${TAX_RATE_CEILING * 100}% is read as a misread`);
+    expect(STRESS_METHODS.find((m) => m.key === "taxes")!.rules.join(" ")).toContain(`past ${TAX_RATE_CEILING * 100}% is read as a misread`);
     // $380k over a $5M assessment is 7.6%: a fractional assessment or a misread.
     const ex = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Assessed value" ? { ...m, value: "$5,000,000" } : m)) };
     const tx = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "taxes");
@@ -2386,6 +2409,22 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(g.method).toMatch(/^The OM's rent growth against asking rent, apartments \(Zillow Research\), the one figure that decides; beside it, not deciding: .*allowance on the regulated units/i);
   });
 
+  it("strikes no average on a rent growth Zillow decides, as the methodology says (the review of 2026-10-28)", () => {
+    const g = rowOf(apartmentTest, "rent_growth");
+    expect(g.evidence[g.decidedBy!].label).toBe("Asking rent, apartments");
+    expect(g.evidence.some((e) => /: average a year over \d+ years$/.test(e.label))).toBe(false);
+    expect(STRESS_METHODS.find((m) => m.key === "rent_growth")!.rules).toContain(ZILLOW_TRAILING_ONLY);
+  });
+
+  it("re-runs a stabilized deal's return only on a row whose method says it does", () => {
+    for (const t of [apartmentTest, officeTest, chicagoTest]) {
+      for (const r of t.rows) {
+        if (!r.impact || r.impact.measure === "yield_on_cost") continue;
+        expect(STRESS_METHODS.find((m) => m.key === r.key)!.reruns.stabilized, r.key).toBe("irr");
+      }
+    }
+  });
+
   it("the map covers every key, one entry a sentence", () => {
     expect(Object.keys(AGAINST_SOURCES).sort()).toEqual([...STRESS_KEYS].sort());
     for (const m of STRESS_METHODS) expect(AGAINST_SOURCES[m.key].length, m.key).toBe(m.against.length);
@@ -2473,19 +2512,19 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
+      "5 of 5 state a figure /unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
     expect(favorable.evidence[0]).toMatchObject({ value: null });
-    expect(favorable.evidence[0].text).toContain("none graded clean (supports)");
+    expect(favorable.evidence[0].text).toContain("none graded clean (comparable)");
     expect(favorable.verdict).toBe("unchecked");
     expect(favorable.unchecked).toBe(basisFloorWhy(0, 1, "/unit"));
     // None graded clean: no figure, and the row has nothing to decide on.
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
+      text: "1 of 1 state a figure /unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
@@ -2635,10 +2674,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
     expect(one.evidence[0]).toMatchObject({ value: null });
-    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (supports): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(one.verdict).toBe("unchecked");
     expect(one.unchecked).toBe(
-      "Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+      "Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
     );
     expect(one.impact).toBeNull();
     const two = rowOf(
@@ -2650,7 +2689,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(two.verdict).toBe("unchecked");
     expect(two.unchecked).toBe(basisFloorWhy(2, 2, "/unit"));
     // The floor's sentence is the market-rent row's own, word for word but the noun.
-    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(supports\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
+    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(comparable\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
     // Two comps beside a recorded sales' median of four: the median decides.
     const withSales = rowOf(
       buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
@@ -3839,7 +3878,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     const decider = r.evidence[r.decidedBy!];
     expect(decider).toMatchObject({ kind: "om_internal", label: "The memorandum's lease comps", value: 2_250, page: 16 });
     expect(decider.text).toBe(
-      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (not a clean comparison): The Vue $2,900/mo",
+      "4 of 4 state a rent a month a unit; graded clean (comparable): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded not comparable by the comps step (not a clean comparison): The Vue $2,900/mo",
     );
     // 4.4% over the median: inside the comps' 5%, a hold.
     expect(r.gap).toMatchObject({ value: 4.4, unit: "pct" });
@@ -3861,9 +3900,9 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
   it("strikes no median under three comps graded clean, and says how many there are", () => {
     const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps({ name: "The Rowan", detail: "$2,050/mo", support: "supports" }, { name: "The Vue", detail: "$2,900/mo", support: "favorable" }) })), "market_rent");
     expect(r.verdict).toBe("unchecked");
-    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (supports) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
+    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (comparable) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
     expect(r.evidence[0].value).toBeNull();
-    expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded favorable");
+    expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded less comparable");
   });
 
   it("sets the rent roll's in-place rent beside it as the gap the OM claims to close, and Zillow's asking rent as the metro's", () => {
@@ -3920,11 +3959,11 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     );
     expect(r.verdict).toBe("unchecked");
     expect(r.unchecked).toBe(
-      "The memorandum's lease comps graded clean (supports) state their rents on different lease bases (net and full service), and a rent on one basis is not the same rent on another, so no median is struck over them.",
+      "The memorandum's lease comps graded clean (comparable) state their rents on different lease bases (net and full service), and a rent on one basis is not the same rent on another, so no median is struck over them.",
     );
     expect(r.evidence[0].value).toBeNull();
     expect(r.evidence[0].text).toContain(", stated on different lease bases (net and full service), so no median is struck over them");
-    expect(STRESS_METHODS.find((m) => m.key === "market_rent")!.limits.join(" ")).toContain("comps graded clean on different bases strike no median");
+    expect(STRESS_METHODS.find((m) => m.key === "market_rent")!.rules.join(" ")).toContain("comps graded clean on different bases strike no median");
   });
 
   it("sets Zillow's asking rent beside an apartment's or a rented home's rent only, never a pad's or a bed's", () => {
@@ -3966,7 +4005,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
       "market_rent",
     );
     expect(r.omSays.value).toBe(95);
-    expect(r.evidence[0].text).toMatch(/^3 of 3 state a rent a month a space; graded clean \(supports\): Deck A \$85\/mo; Deck B \$90\/mo; Deck C \$100\/mo — median \$90\/mo over the 3$/);
+    expect(r.evidence[0].text).toMatch(/^3 of 3 state a rent a month a space; graded clean \(comparable\): Deck A \$85\/mo; Deck B \$90\/mo; Deck C \$100\/mo — median \$90\/mo over the 3$/);
     expect(r.evidence[r.decidedBy!].value).toBe(90);
   });
 
@@ -4056,14 +4095,28 @@ describe("a term sheet on file decides the debt row (the owner's decision of 202
     expect(guarded).not.toContain("HEADLINE (the engine's");
     const debtLine = guarded.split("\n").find((l) => l.startsWith("- Debt (debt)"))!;
     expect(debtLine).not.toMatch(/\[(UNSUPPORTED|STRETCHED|HOLDS|UNCHECKED)\]/);
-    // What the pipeline hands the brief: the same build with no quote
-    // (lib/anthropic/pipeline `screenStressTest`'s `brief`).
-    const brief = stressSection(buildStressTest(apartmentArgs({ loanQuote: null }))).join("\n");
+    // What the pipeline hands the brief: the same build with no quote and no
+    // past screens (lib/stress-at-call, `screenStressTest`'s `brief`), which
+    // the deal page's "since the call" builds today's test through too.
+    const withQuote = apartmentArgs({ loanQuote: quote(6.5) });
+    expect(stressArgsAtCall(withQuote).loanQuote).toBeNull();
+    expect(stressArgsAtCall(withQuote).pastScreens).toBeNull();
+    const brief = stressSection(stressTestAtCall(withQuote, full)).join("\n");
     expect(brief).not.toContain("6.50%");
     expect(brief).not.toContain("The lender's quote on file");
     expect(brief).toContain("HEADLINE (the engine's");
     const pipeline = readFileSync("lib/anthropic/pipeline.ts", "utf8");
-    expect(pipeline).toContain("brief: args.loanQuote ? buildStressTest({ ...args, loanQuote: null }) : full");
+    expect(pipeline).toContain("brief: stressTestAtCall(args, full)");
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toContain("stressTestAtCall(stressArgs, stressTest)");
+    // So the call's snapshot set against today's test, built the same way,
+    // never reads the quote on file as the debt row moving.
+    const atCall = stressSnapshotOf(stressTestAtCall(withQuote, full));
+    const since = stressDrift(readStressSnapshot(JSON.parse(JSON.stringify(atCall))), stressTestAtCall(withQuote, full))!;
+    expect(since.rows.find((r) => r.key === "debt")!.kind).toBe("same");
+    expect(since.changed).toBe(false);
+    // Set against the page's own test, the quote would read as the decider
+    // changing — the divergence the one builder exists to prevent.
+    expect(stressDrift(readStressSnapshot(JSON.parse(JSON.stringify(atCall))), full)!.rows.find((r) => r.key === "debt")!.kind).not.toBe("same");
     expect(pipeline).toContain("const stressTest = tests?.brief ?? null;");
     // Every surface names the same sheet: the deal page's oldest-first order.
     expect(readFileSync("lib/loan-quote-read.ts", "utf8")).toContain('.order("created_at", { ascending: true })');

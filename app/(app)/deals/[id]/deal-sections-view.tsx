@@ -20,6 +20,7 @@ import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stres
 import { currentBriefLine } from "@/lib/permit-split";
 import type { BehindWhy } from "@/lib/screen-run";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
+import { COMP_RATING } from "@/lib/comp-rating";
 import { SourceChip } from "./source-chip";
 // The map is the deal page's (deal-sections.tsx hands it in): a type here,
 // so this module loads no Leaflet and none of its stylesheet.
@@ -430,13 +431,9 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 /* 3 — Broker-comp scrutiny                                            */
 /* ================================================================== */
 
-// "favorable" means broker-favorable — label it honestly so a screener never
-// reads the middle tier as good news.
-export const COMP_RATING = {
-  supports: { label: "Supports", badge: "bg-pass/10 text-pass", rank: 2 },
-  favorable: { label: "Leans favorable", badge: "bg-caution/10 text-caution", rank: 1 },
-  stretched: { label: "Stretched", badge: "bg-kill/10 text-kill", rank: 0 },
-} as const;
+// A comp's grade in the one display map's words (lib/comp-rating): by
+// comparability, never the stress test's verdict words.
+export { COMP_RATING };
 
 export function BrokerComps({
   result,
@@ -927,9 +924,9 @@ function CompTable({
         </h3>
         <SplitBar
           parts={[
-            { n: counts.stretched, label: "stretched", bar: "bg-kill", text: "text-kill" },
-            { n: counts.favorable, label: "leans", bar: "bg-caution", text: "text-caution" },
-            { n: counts.supports, label: "support", bar: "bg-pass", text: "text-pass" },
+            { n: counts.stretched, label: COMP_RATING.stretched.short, bar: "bg-kill", text: "text-kill" },
+            { n: counts.favorable, label: COMP_RATING.favorable.short, bar: "bg-caution", text: "text-caution" },
+            { n: counts.supports, label: COMP_RATING.supports.short, bar: "bg-pass", text: "text-pass" },
           ]}
         />
       </div>
@@ -968,7 +965,7 @@ function CompTable({
             <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
               <th className="px-4 py-2.5 font-medium">Comp</th>
               <th className="px-4 py-2.5 font-medium">Detail</th>
-              <th className="px-4 py-2.5 text-right font-medium">Assessment</th>
+              <th className="px-4 py-2.5 text-right font-medium">Comparability</th>
             </tr>
           </thead>
           <tbody>

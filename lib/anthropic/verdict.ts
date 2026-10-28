@@ -1,6 +1,7 @@
 import "server-only";
 import { LOAN_QUOTE_LABEL } from "@/lib/stress-deciders";
 import { compactUsd } from "@/lib/money";
+import { compRating } from "@/lib/comp-rating";
 import { z } from "zod";
 import { screenOutputFormat } from "./output-format";
 import { getAnthropic } from "./client";
@@ -561,11 +562,11 @@ export function buildBrief(input: VerdictInputs): string {
       ? [
           ...input.comps.saleComps.map(
             (c) =>
-              `- Sale [${c.support}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
+              `- Sale [${compRating(c.support).label}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
           ),
           ...input.comps.leaseComps.map(
             (c) =>
-              `- Lease [${c.support}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
+              `- Lease [${compRating(c.support).label}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
           ),
           ...input.comps.redFlags.map((f) => `- Red flag: ${f}`),
           `Summary: ${input.comps.summary}`,

@@ -20,6 +20,25 @@ const market: MarketResult = {
   },
 };
 
+describe("the verdict's brief grades each comp in the comp-rating words, never the stored grade", () => {
+  it("hands the synthesizer comparability, as the deal page says it", () => {
+    const comps = {
+      saleComps: [
+        { name: "The Brixton", detail: "$252k/unit", support: "supports" as const, note: "Same vintage.", page: "p. 14" },
+        { name: "Vue", detail: "$298k/unit", support: "stretched" as const, note: "Newer.", page: "p. 14" },
+      ],
+      leaseComps: [{ name: "The Brixton (renovated)", detail: "$2,520/mo", support: "favorable" as const, note: "Renovated." }],
+      redFlags: [],
+      summary: "Thin set.",
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps, reconciliation: null, market: null });
+    expect(brief).toContain("- Sale [Comparable] The Brixton ($252k/unit)");
+    expect(brief).toContain("- Sale [Not comparable] Vue ($298k/unit)");
+    expect(brief).toContain("- Lease [Less comparable, flatters the ask] The Brixton (renovated)");
+    expect(brief).not.toMatch(/\[(supports|favorable|stretched)\]/);
+  });
+});
+
 describe("the verdict's brief carries the figures the market check read", () => {
   it("as their own section after the market check, dated, with the instruction to name a figure as a source", () => {
     const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market });
@@ -561,7 +580,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     const at = brief.indexOf("## STRESS TEST, STRUCK IN CODE");
     expect(at).toBeGreaterThan(brief.indexOf("## Deal"));
     expect(at).toBeLessThan(brief.indexOf("## The buyer's standing buy box"));
-    expect(brief).toContain("11 assumptions read, 9 stated in the OM — 6 tested (2 unsupported, 3 stretched, 1 holds), 5 unchecked");
+    expect(brief).toContain("11 assumptions read, 9 stated in the OM — 6 tested (1 unsupported, 4 stretched, 1 holds), 5 unchecked");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price if the sale resets the assessment — the
     // jurisdiction's to say, so stretched at most — with the engine's move.
@@ -583,8 +602,10 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // unchecked, said why, with no move.
     expect(brief).toContain("- Basis (basis) [UNCHECKED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
     expect(brief).toContain("so no median is struck: the comps' own floor. The levered IRR: No return is re-run: no figure to swap.");
-    // The exit at the OM's own pro forma cap, the higher of its two caps.
-    expect(brief).toContain("- Exit cap (exit_cap) [UNSUPPORTED] — OM says: Exit cap: 5.25% [p. 41]. Set against: [DECIDES] The OM's pro forma cap: 5.70% (Pro forma cap)");
+    // The exit at the OM's going-in cap; its pro forma cap beside it, never
+    // deciding (the second review, 2026-10-28).
+    expect(brief).toContain("- Exit cap (exit_cap) [STRETCHED] — OM says: Exit cap: 5.25% [p. 41]. Set against: [DECIDES] The OM's going-in cap: 5.45% (Going-in cap)");
+    expect(brief).toContain("[BESIDE IT, NOT DECIDING] The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the OM's projected NOI growth)");
     expect(brief).toContain(moves("exit_cap"));
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
     expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");

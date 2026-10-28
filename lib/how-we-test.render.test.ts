@@ -33,9 +33,16 @@ import {
   VERDICT_RULES,
   VERDICT_WORDS,
   WHO_DOES_WHAT,
-  engineReruns,
+  HOW_WE_TEST_INTRO,
+  THRESHOLDS,
   evidenceKindOf,
+  overviewRows,
+  rerunsMark,
+  roleTag,
 } from "./how-we-test";
+import { DECIDER_NAMES } from "./stress-deciders";
+import { scorableGrid } from "./track-record";
+import { scorableCountLine, scorableRestLine, scorableSummary, scorableVacancyLine } from "./scorable-summary";
 import { snapshotThreshold } from "./stress-snapshot";
 import {
   BASIS_STRETCH_PCT,
@@ -79,6 +86,7 @@ describe("/how-we-test draws every method from the table", () => {
       for (const item of m.against) expect(text, `${m.key} against`).toContain(item);
       expect(text, `${m.key} engine`).toContain(m.engine);
       for (const item of m.limits) expect(text, `${m.key} limits`).toContain(item);
+      for (const item of m.rules) expect(text, `${m.key} rules`).toContain(item);
       // One section an assumption, keyed so the jump list lands on it.
       expect(html).toContain(`<section id="${m.key}"`);
       expect(html).toContain(`href="#${m.key}"`);
@@ -94,15 +102,24 @@ describe("/how-we-test draws every method from the table", () => {
     for (const p of pictures) {
       expect(p).toContain('aria-hidden="true"');
       // Three words and no figure: visibleText keeps <text> runs together.
-      const words = [...p.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1].trim());
-      expect(words).toEqual(["OM", "evidence", "IRR"]);
       expect(visibleText(p)).not.toMatch(/\d/);
     }
-    // The arrow is dashed where the engine swaps no figure.
-    const dashed = pictures.filter((p) => p.includes("stroke-dasharray")).length;
-    expect(dashed).toBe(STRESS_METHODS.filter((m) => !engineReruns(m)).length);
-    expect(engineReruns(STRESS_METHODS.find((m) => m.key === "vacancy")!)).toBe(true);
-    expect(engineReruns(STRESS_METHODS.find((m) => m.key === "other")!)).toBe(false);
+    // Its arrow ends on what the method re-runs, by the method's own
+    // `reruns` (the review of 2026-10-28: an arrow to "IRR" stood on rows
+    // that re-run nothing), and is dashed where nothing is re-run.
+    for (const [i, m] of STRESS_METHODS.entries()) {
+      const words = [...pictures[i].matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((x) => x[1].trim().replace(/&#x27;/g, "'"));
+      expect(words, m.key).toEqual(["OM", "evidence", rerunsMark(m.reruns)]);
+      expect(pictures[i].includes("stroke-dasharray"), m.key).toBe(m.reruns.stabilized === "none" && m.reruns.plan === "none");
+    }
+    expect(rerunsMark(STRESS_METHODS.find((m) => m.key === "market_rent")!.reruns)).toBe("Yield on cost (plan)");
+    expect(rerunsMark(STRESS_METHODS.find((m) => m.key === "other")!.reruns)).toBe("No re-run");
+    // The `reruns` field says what the engine sentence says: "the return is
+    // re-run" on a stabilized deal, "yield on cost is re-run" on a plan.
+    for (const m of STRESS_METHODS) {
+      expect(m.reruns.stabilized === "irr", `${m.key} irr`).toBe(/\bthe return is re-run\b/.test(m.engine));
+      expect(m.reruns.plan === "yoc", `${m.key} yoc`).toBe(/yield on cost is re-run/.test(m.engine));
+    }
   });
 
   it("marks each evidence item by its kind, read off the table's own words, and leaves the rest unmarked", () => {
@@ -232,9 +249,11 @@ describe("/how-we-test draws every method from the table", () => {
     expect(VERDICT_RULES.expense_growth).not.toMatch(/lowest/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
-    // The higher of the OM's own two caps decides; the published range only
-    // where the OM states neither (the review of 2026-10-23).
-    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added\./);
+    // The going-in cap decides; the published range only where the OM states
+    // none; the pro forma cap is beside it, never deciding (the second
+    // review, 2026-10-28: it counts the OM's projected NOI growth).
+    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the OM's projected NOI growth, so it never decides; no expansion over the hold is added\./);
+    expect(VERDICT_RULES.exit_cap).not.toMatch(/higher of/);
     expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
@@ -265,7 +284,10 @@ describe("/how-we-test draws every method from the table", () => {
     // A vacancy the survey decided is never scored (a later document is
     // today's vacancy, not a test of it), so its margin of error is a
     // tolerance no scored row uses, and the page does not offer it.
-    expect(record).toContain("kept with it: 0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    // A vacancy's never finer than one door's share of the units the OM
+    // states (the second review, 2026-10-28: 0.05 points is a tenth of a
+    // door on 248 units), said with the doors beside the points.
+    expect(record).toContain("kept with it: 0.05 points on a vacancy, or one door's share where the OM states its units and that is larger (0.40 points, one door of 248), 5% of the OM's NOI, 5% of its price.");
     expect(record).not.toContain("the survey's margin of error on a vacancy");
     expect(record).toContain("A row kept before its tolerance was carried keeps the margin it was stored with.");
     expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });
@@ -314,13 +336,14 @@ describe("/how-we-test draws every method from the table", () => {
     expect(a11yIssues(picture)).toEqual([]);
   });
 
-  it("says how the headline is struck, in HEADLINE_METHOD's own words, before the assumptions' sections", () => {
+  it("says how the headline is struck, in HEADLINE_METHOD's own words, after the assumptions' sections", () => {
     const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
     const m = HEADLINE_METHOD;
     for (const s of [m.title, m.claim, ...m.omCase, ...m.evidenceCase, ...m.split, ...m.overlap, ...m.plan, ...m.limits]) expect(flat).toContain(s);
-    // The panel's link lands here, ahead of the per-assumption sections.
+    // The panel's link lands here, after the per-assumption sections (the
+    // review of 2026-10-28: the rows first, then the headline and the model).
     expect(html).toContain('<section id="headline"');
-    expect(html.indexOf('id="headline"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
+    expect(html.indexOf('id="headline"')).toBeGreaterThan(html.indexOf(`id="${STRESS_METHODS[STRESS_METHODS.length - 1].key}"`));
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-qa="headline-picture"/);
   });
 
@@ -350,9 +373,9 @@ describe("/how-we-test draws every method from the table", () => {
       expect(flat).toContain(line);
       expect(line.length, line).toBeLessThanOrEqual(260);
     }
-    // After the headline, before the assumptions' own sections.
+    // After the headline, which follows the assumptions' own sections.
     expect(html.indexOf('id="model"')).toBeGreaterThan(html.indexOf('id="headline"'));
-    expect(html.indexOf('id="model"')).toBeLessThan(html.indexOf(`id="${STRESS_METHODS[0].key}"`));
+    expect(html.indexOf('id="model"')).toBeLessThan(html.indexOf('id="sources"'));
     // "Not a forecast" agrees with it: the model is a stance off a trailing year.
     const forecast = CANNOT.find((c) => c.heading === "Not a forecast")!.line;
     expect(forecast).toContain("the screening model's growth and exit are read off one: a stance, more cautious than the OM only where its own figure is the more optimistic");
@@ -440,10 +463,10 @@ describe("/how-we-test opens on a worked example and closes on the sign-up", () 
 
 describe("/how-we-test says what the test does not check yet", () => {
   const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
-  it("draws every item of lib/not-tested after the methods, linked from the intro in one line", () => {
+  it("draws every item of lib/not-tested right after the overview and before the methods, linked from the intro in one line", () => {
     const at = html.indexOf(`id="${NOT_TESTED_ID}"`);
-    expect(at).toBeGreaterThan(html.indexOf(`id="${STRESS_METHODS[STRESS_METHODS.length - 1].key}"`));
-    expect(at).toBeLessThan(html.indexOf('id="sources"'));
+    expect(at).toBeGreaterThan(html.indexOf('id="overview"'));
+    expect(at).toBeLessThan(html.indexOf(`<section id="${STRESS_METHODS[0].key}"`));
     expect(flat).toContain(NOT_TESTED_HEADING);
     expect(html).toMatch(new RegExp(`<a [^>]*href="#${NOT_TESTED_ID}"[^>]*>${NOT_TESTED_LINK}</a>`));
     // The link sits in the intro, before the first section.
@@ -469,5 +492,155 @@ describe("/how-we-test says what the test does not check yet", () => {
   it("no longer says every one of a memorandum's assumptions is tested", () => {
     expect(flat).toContain("A memorandum's key assumptions are each set against evidence a buyer can check.");
     expect(flat).not.toMatch(/A memorandum's assumptions are each set/);
+  });
+
+  it("names all four kinds of evidence in the intro, and the re-run only where a gap moves an input (the review of 2026-10-28)", () => {
+    for (const line of HOW_WE_TEST_INTRO) expect(flat).toContain(line);
+    const intro = HOW_WE_TEST_INTRO.join(" ");
+    for (const kind of ["published figure", "the deal's own documents", "the OM against its own figures", "a rule of thumb named as one"]) expect(intro).toContain(kind);
+    expect(intro).toContain("where the gap moves a model input");
+    expect(intro).toContain("on a plan the yield on cost");
+    expect(HOW_WE_TEST_PAGE.description).toContain("the OM against itself");
+    expect(HOW_WE_TEST_PAGE.description).toContain("where a gap moves an input");
+  });
+});
+
+// The review of 2026-10-28: the page opens on every row at a glance, each
+// cell read off the code — the deciders' orders, the thresholds' constants,
+// the method's re-run, the scorer's grid — and marks each "set against"
+// piece as the panel marks a built row's.
+describe("/how-we-test opens on one overview of every row", () => {
+  const flat = text.replace(/\s+/g, " ").replace(/&#x27;/g, "'");
+  const rows = overviewRows();
+
+  it("comes first after the intro, before the not-tested list and every method", () => {
+    const at = html.indexOf('id="overview"');
+    expect(at).toBeGreaterThan(html.indexOf('data-qa="how-we-test-marker"'));
+    expect(at).toBeLessThan(html.indexOf(`id="${NOT_TESTED_ID}"`));
+    expect(at).toBeLessThan(html.indexOf(`<section id="${STRESS_METHODS[0].key}"`));
+    expect(at).toBeLessThan(html.indexOf('data-qa="who-does-what"'));
+    expect((html.match(/data-overview-row="/g) ?? []).length).toBe(STRESS_METHODS.length);
+  });
+
+  it("lists each row's deciding figure and its fallbacks in the deciders' own order", () => {
+    expect(rows.map((r) => r.key)).toEqual(STRESS_METHODS.map((m) => m.key));
+    for (const r of rows) {
+      expect(r.decides, r.key).toEqual(DECIDER_NAMES[r.key]);
+      const from = html.indexOf(`data-overview-row="${r.key}"`);
+      const next = html.indexOf('data-overview-row="', from + 1);
+      const cell = visibleText(html.slice(from, next > -1 ? next : undefined)).replace(/&#x27;/g, "'");
+      let at = 0;
+      for (const name of r.decides) {
+        const word = `${name[0].toUpperCase()}${name.slice(1)}`;
+        const i = cell.indexOf(word, at);
+        expect(i, `${r.key}: ${name}`).toBeGreaterThan(-1);
+        at = i;
+      }
+    }
+  });
+
+  it("prints each row's three thresholds, struck on lib/stress-test's own constants", () => {
+    for (const r of rows) for (const v of ["holds", "stretched", "unsupported"] as const) expect(flat, `${r.key} ${v}`).toContain(r.thresholds[v]);
+    expect(THRESHOLDS.vacancy.unsupported).toContain(`${VACANCY_UNSUPPORTED_PTS} pts`);
+    expect(THRESHOLDS.rent_growth.unsupported).toContain(`${RENT_GROWTH_UNSUPPORTED_PTS} pts`);
+    expect(THRESHOLDS.expense_growth.unsupported).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} pts`);
+    expect(THRESHOLDS.exit_cap.unsupported).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
+    expect(THRESHOLDS.basis.unsupported).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
+    expect(THRESHOLDS.basis.holds).toContain(`${BASIS_STRETCH_PCT}%`);
+    expect(flat).toContain(`${IRR_MOVE_STRETCH_BPS} bps or more`);
+  });
+
+  it("says what each row re-runs and what can score it, from the method and the scorer", () => {
+    const grid = new Map(scorableGrid().map((g) => [g.key, g]));
+    for (const r of rows) {
+      expect(flat, r.key).toContain(r.reruns);
+      expect(flat, r.key).toContain(r.scoredBy);
+      const g = grid.get(r.key)!;
+      const any = g.by.t12 || g.by.rent_roll || g.by.trade;
+      expect(r.scoredBy === "Nothing yet" || r.scoredBy.startsWith("Only a decision") || r.scoredBy.startsWith("Not scored"), r.key).toBe(!any);
+    }
+    expect(rows.find((r) => r.key === "market_rent")!.reruns).toBe("Nothing on a stabilized deal; on a plan, the yield on cost");
+    expect(rows.find((r) => r.key === "exit_cap")!.reruns).toBe("The levered IRR; nothing on a plan");
+  });
+
+  it("marks every 'set against' piece Decides or Beside, each order place used once at least and none past the order", () => {
+    for (const m of STRESS_METHODS) {
+      expect(m.decides.length, m.key).toBe(m.against.length);
+      const n = DECIDER_NAMES[m.key].length;
+      const ranks = m.decides.flatMap((d) => (Array.isArray(d) ? d : []));
+      for (const k of ranks) expect(k >= 1 && k <= n, `${m.key} ${k}`).toBe(true);
+      // Every place in the order is some sentence's, save where the class
+      // sets its own (rent growth's houses, parks, students and mixed use).
+      for (let k = 1; k <= n; k++) expect(ranks.includes(k), `${m.key} place ${k}`).toBe(true);
+      if (n === 0) expect(m.decides.every((d) => d === "beside"), m.key).toBe(true);
+      // The sentence's own words never contradict its mark.
+      m.against.forEach((item, i) => {
+        if (m.decides[i] === "beside") expect(item, `${m.key} #${i}`).not.toMatch(/the one figure that decides(?!.*beside)/);
+      });
+    }
+    const marks = [...html.matchAll(/data-role="(\w+)"[^>]*>([^<]*)</g)].map((x) => x[2].replace(/&#x27;/g, "'"));
+    const expected = STRESS_METHODS.filter((m) => DECIDER_NAMES[m.key].length > 0).flatMap((m) => m.decides.map(roleTag));
+    expect(marks).toEqual(expected);
+    expect(roleTag([1, 3, 4])).toBe("Decides (1st, 3rd, 4th)");
+    expect(roleTag("beside")).toBe("Beside it, not deciding");
+    // The vacancy's rent roll and T-12 decide a figure for today and stand
+    // beside a stabilized one, and are marked as both, never "beside" alone
+    // while their sentence says they decide (the audit of 2026-10-28).
+    const vac = STRESS_METHODS.find((m) => m.key === "vacancy")!;
+    expect(vac.decides[2]).toBe("today");
+    expect(vac.decides[3]).toBe("today");
+    expect(vac.against[2]).toMatch(/It decides today's occupancy only/);
+    expect(vac.against[3]).toMatch(/It decides an economic figure for today only/);
+    expect(roleTag("today")).toBe("Beside a stabilized figure; decides one for today");
+    expect(html).toContain('data-role="today"');
+    // The marks and the sentence are words apart to a screen reader.
+    expect(visibleText(html).replace(/&#x27;/g, "'")).toMatch(/Beside a stabilized figure; decides one for today\s+The deal's own document\s+The deal's own rent roll/);
+    // The overview's cell says the vacancy's documents case by case.
+    expect(overviewRows().find((r) => r.key === "vacancy")!.scoredBy).toBe(
+      "A rent roll (doors) or a T-12 (dollars) dated after the verdict; none for a stabilized vacancy in doors the market decided",
+    );
+  });
+
+  it("puts the vacancy's tracker second in its order, as the decider does", () => {
+    const v = STRESS_METHODS.find((m) => m.key === "vacancy")!;
+    expect(DECIDER_NAMES.vacancy[1]).toMatch(/research tracker/);
+    expect(v.decides[1]).toEqual([2]);
+    expect(v.against[1]).toMatch(/research tracker's vacancy band at its low read/);
+    expect(v.against[0]).toMatch(/metro area, inside its own margin of error; then the tracker's band \(below\); then the Census region's; then the state's$/);
+  });
+
+  it("splits each method's rules from what it does not check", () => {
+    const rent = STRESS_METHODS.find((m) => m.key === "rent_growth")!;
+    expect(rent.rules.join(" ")).toContain("the more cautious of its trailing year and its compound average decides");
+    expect(rent.rules.join(" ")).toContain("the average never applies to it");
+    expect(rent.limits.join(" ")).not.toContain("compound average");
+    const vac = STRESS_METHODS.find((m) => m.key === "vacancy")!;
+    expect(vac.rules.join(" ")).toContain("meets the market's doors as a floor");
+    expect(vac.limits.join(" ")).not.toContain("as a floor");
+    expect((html.match(/>Rules<\/h3>/g) ?? []).length).toBe(STRESS_METHODS.filter((m) => m.rules.length > 0).length);
+  });
+
+  it("says how many rows can be scored today, and by what, counted off the scorer", () => {
+    const s = scorableSummary();
+    expect(s.total).toBe(STRESS_METHODS.length - 1);
+    expect(s.byFigure.length + s.byDecisionOnly.length + s.none.length).toBe(s.total);
+    expect(flat).toContain(scorableCountLine());
+    expect(flat).toContain(scorableRestLine());
+    expect(scorableCountLine()).toContain(`Today ${s.byFigure.length} of the ${s.total} assumptions`);
+    // The trade scores the price on a Dead deal only, and the vacancy is
+    // said case by case as the scorer scores it — never "by a T-12 or a
+    // rent roll", which a stabilized vacancy the market decided is not.
+    expect(scorableCountLine()).toContain("the price by a reported trade on a Dead deal");
+    expect(scorableCountLine()).toContain("the vacancy by the document of its own measure");
+    expect(scorableCountLine()).not.toMatch(/vacancy by a T-12 or a rent roll/);
+    expect(flat).toContain(scorableVacancyLine());
+    expect(scorableVacancyLine()).toBe(
+      "A vacancy counted by doors is scored by a later rent roll and one in dollars by a later T-12, but a stabilized vacancy in doors the market's figure decided by no document.",
+    );
+    // The same rule the track record's own lines state.
+    expect(TRACK_RECORD.lines.join(" ")).toContain("A stabilized vacancy in doors the market's figure decided is not scored by a later rent roll or T-12");
+    // The grid of what scores what, with no "re-screen" line on a public page.
+    expect(html.indexOf('data-qa="scorable-grid"')).toBeGreaterThan(html.indexOf('id="track-record"'));
+    expect(html).not.toContain('data-qa="scorable-grid-line"');
   });
 });

@@ -3,6 +3,7 @@ import {
   CADENCE_RULE,
   CANNOT,
   HEADLINE_METHOD,
+  HOW_WE_TEST_INTRO,
   HOW_WE_TEST_MARKER,
   HOW_WE_TEST_TITLE,
   KIND_LABEL,
@@ -10,14 +11,22 @@ import {
   SCORING_RULE,
   SCREENING_MODEL_SECTION,
   STRESS_METHODS,
+  THRESHOLDS_NOTE,
   TRACK_RECORD,
   VERDICT_RULES,
   VERDICT_WORDS,
   WHO_DOES_WHAT,
-  engineReruns,
   evidenceKindOf,
+  overviewRows,
+  rerunsMark,
+  rerunsWords,
+  roleTag,
 } from "@/lib/how-we-test";
-import type { StressMethod, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
+import { DECIDER_NAMES } from "@/lib/stress-deciders";
+import { scorableGrid } from "@/lib/track-record";
+import { scorableCountLine, scorableRestLine, scorableVacancyLine } from "@/lib/scorable-summary";
+import { ScorableGrid } from "@/app/(app)/scorable-grid";
+import type { StressMethod, StressReruns, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 import { drawsRerun } from "@/lib/stress-test-words";
 import { StressRowExample, sortStressRows } from "@/app/stress-test-panel";
 import { SAMPLE_PLAN_NOTE, SCENARIO_KIND_WORD } from "@/lib/stress-test-words";
@@ -57,16 +66,20 @@ const VERDICT_TONE: Record<StressVerdict, string> = {
 
 /**
  * The schematic a section opens on: a track with the OM's mark and the
- * evidence's, and an arrow to the IRR — the gap between the two marks is
- * what the engine runs. Purely illustrative: no figures, and hidden from a
- * screen reader, which has the words beneath it. Where the engine swaps no
- * figure (the renovation premium, the challenger's other points) the arrow
- * is dashed.
+ * evidence's, and an arrow to what the engine re-runs on the gap — the
+ * levered IRR, a plan's yield on cost, or nothing — read off the method's
+ * own `reruns` (the first cut read it off the word "re-run", which "No
+ * return is re-run" also holds, and drew a solid arrow to an IRR nothing
+ * re-ran). Purely illustrative: no figures, and hidden from a screen
+ * reader, which has the "Re-runs" line beneath it. Where nothing is re-run
+ * the arrow is dashed; where only a plan is, it is solid to the plan's
+ * yield, said so.
  */
-function MethodPicture({ reruns }: { reruns: boolean }) {
+function MethodPicture({ reruns }: { reruns: StressReruns }) {
+  const any = reruns.stabilized === "irr" || reruns.plan === "yoc";
   return (
     <svg
-      viewBox="0 0 320 60"
+      viewBox="0 0 420 60"
       className="h-14 w-full max-w-sm"
       aria-hidden="true"
       focusable="false"
@@ -96,13 +109,53 @@ function MethodPicture({ reruns }: { reruns: boolean }) {
         strokeOpacity="0.55"
         strokeWidth="2"
         strokeLinecap="round"
-        strokeDasharray={reruns ? undefined : "4 4"}
+        strokeDasharray={any ? undefined : "4 4"}
       />
       <path d="M262 24 L270 30 L262 36" fill="none" stroke="currentColor" strokeOpacity="0.55" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <text x="296" y="34" textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor">
-        IRR
+      <text x="278" y="34" textAnchor="start" fontSize="11" fontWeight="600" fill="currentColor" fillOpacity={any ? 1 : 0.55}>
+        {rerunsMark(reruns)}
       </text>
     </svg>
+  );
+}
+
+/** How each role's tag is drawn: a piece that decides filled, one beside
+ *  outlined, and one that decides a figure for today while it stands beside
+ *  a stabilized one (the vacancy's rent roll and T-12) outlined in ink. */
+const ROLE_TONE = {
+  decides: "bg-ink text-white",
+  today: "border border-ink text-ink",
+  beside: "border border-line text-muted",
+} as const;
+
+/** An `against` item's tag: what it does for its row, as the panel tags a
+ *  built row's pieces. None on a row nothing decides (the challenger's). */
+function RoleMark({ method, index }: { method: StressMethod; index: number }) {
+  if (DECIDER_NAMES[method.key].length === 0) return null;
+  const role = method.decides[index];
+  const kind: keyof typeof ROLE_TONE = role === "beside" ? "beside" : role === "today" ? "today" : "decides";
+  return (
+    <span className={`mr-2 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-medium ${ROLE_TONE[kind]}`} data-role={kind}>
+      {roleTag(role)}
+    </span>
+  );
+}
+
+/** A section's bulleted list under its small heading. */
+function MethodList({ heading, items, tone = "" }: { heading: string; items: readonly string[]; tone?: string }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">{heading}</h3>
+      <ul className={`mt-1.5 space-y-1.5 text-sm leading-relaxed ${tone}`}>
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-line" aria-hidden="true" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -130,15 +183,19 @@ function MethodSection({ method, index }: { method: StressMethod; index: number 
       <h2 className="mt-1 text-lg font-semibold tracking-tight">{method.title}</h2>
       <p className="mt-2 text-sm italic text-muted">{`The OM's claim: ${method.claim}`}</p>
       <div className="mt-3 text-ink">
-        <MethodPicture reruns={engineReruns(method)} />
+        <MethodPicture reruns={method.reruns} />
       </div>
+      <p className="text-xs text-muted" data-qa="method-reruns">{`Re-runs: ${rerunsWords(method.reruns)}.`}</p>
       <h3 className="mt-3 text-xs font-medium uppercase tracking-wider text-muted">Set against</h3>
       <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed">
-        {method.against.map((item) => (
+        {method.against.map((item, i) => (
           <li key={item} className="flex items-start gap-2">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
             <span>
-              <KindMark item={item} />
+              {/* The spaces are spelt, so a screen reader reads the marks and
+                  the sentence as words, never one run the margins glue. */}
+              <RoleMark method={method} index={i} />{" "}
+              <KindMark item={item} />{" "}
               {item}
             </span>
           </li>
@@ -150,15 +207,86 @@ function MethodSection({ method, index }: { method: StressMethod; index: number 
       </p>
       <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">What the engine does</h3>
       <p className="mt-1.5 text-sm leading-relaxed">{method.engine}</p>
-      <h3 className="mt-4 text-xs font-medium uppercase tracking-wider text-muted">Not checked</h3>
-      <ul className="mt-1.5 space-y-1.5 text-sm leading-relaxed text-muted">
-        {method.limits.map((item) => (
-          <li key={item} className="flex items-start gap-2">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-line" aria-hidden="true" />
-            <span>{item}</span>
+      {/* The rules that decide, apart from what is not checked (the review
+          of 2026-10-28: the growth rows' trailing-year-or-average rule and
+          the economic vacancy's floor sat under "Not checked"). */}
+      <MethodList heading="Rules" items={method.rules} />
+      <MethodList heading="Not checked" items={method.limits} tone="text-muted" />
+    </section>
+  );
+}
+
+/**
+ * The page's opening picture (the review of 2026-10-28): every row at a
+ * glance — the figure that decides it and its fallbacks in order
+ * (lib/stress-deciders `DECIDER_NAMES`), where each verdict word falls
+ * (`THRESHOLDS`, lib/stress-test's constants), what is re-run, and what can
+ * score it later (lib/track-record `scorableGrid`). A row a list item, its
+ * four answers a grid that stacks on a phone; each title links to its
+ * section.
+ */
+function OverviewTable() {
+  const rows = overviewRows();
+  const verdicts = ["holds", "stretched", "unsupported"] as const;
+  return (
+    <section className="mt-8" id="overview" data-qa="overview" aria-labelledby="overview-heading">
+      <h2 id="overview-heading" className="text-lg font-semibold tracking-tight">
+        Every row, at a glance
+      </h2>
+      <ol className="mt-3 divide-y divide-line rounded-2xl border border-line bg-surface">
+        {rows.map((r) => (
+          <li key={r.key} className="p-4" data-overview-row={r.key}>
+            <h3 className="text-sm font-semibold tracking-tight">
+              <a href={`#${r.key}`} className="hover:text-brand">
+                {r.title}
+              </a>
+            </h3>
+            <dl className="mt-2 grid gap-x-5 gap-y-2 text-xs leading-relaxed sm:grid-cols-2">
+              <div>
+                <dt className="font-medium uppercase tracking-wider text-muted">Decided by, in order</dt>
+                <dd className="mt-0.5">
+                  {r.decides.length > 0 ? (
+                    <ol className="space-y-0.5" data-qa="overview-order">
+                      {r.decides.map((name, i) => (
+                        <li key={name} className="flex gap-1.5">
+                          <span className="w-3 shrink-0 font-mono tabular-nums text-muted">{i + 1}</span>
+                          <span>{`${name[0].toUpperCase()}${name.slice(1)}`}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    "No figure: the challenger's words"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium uppercase tracking-wider text-muted">Verdict, against that figure</dt>
+                <dd className="mt-0.5 space-y-0.5">
+                  {verdicts.map((v) => (
+                    <p key={v} className="flex items-start gap-1.5" data-verdict={v}>
+                      <span className={`mt-px inline-block w-20 shrink-0 rounded px-1 text-center text-[10px] font-medium ${VERDICT_TONE[v]}`}>{v}</span>
+                      <span>{r.thresholds[v]}</span>
+                    </p>
+                  ))}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium uppercase tracking-wider text-muted">Re-runs</dt>
+                <dd className="mt-0.5" data-qa="overview-reruns">
+                  {r.reruns}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium uppercase tracking-wider text-muted">Scored later by</dt>
+                <dd className="mt-0.5" data-qa="overview-scored">
+                  {r.scoredBy}
+                </dd>
+              </div>
+            </dl>
           </li>
         ))}
-      </ul>
+      </ol>
+      <p className="mt-2 text-xs leading-relaxed text-muted">{THRESHOLDS_NOTE}</p>
     </section>
   );
 }
@@ -376,15 +504,11 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
   return (
     <div className="mx-auto w-full max-w-3xl" data-qa="how-we-test">
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{HOW_WE_TEST_TITLE}</h1>
-      <p className="mt-4 text-base leading-relaxed text-muted">
-        A memorandum&apos;s key assumptions are each set against evidence a buyer can check.
-      </p>
-      <p className="mt-1 text-base leading-relaxed text-muted">
-        A dated published figure, the deal&apos;s own documents, or a rule of thumb named as one.
-      </p>
-      <p className="mt-1 text-base leading-relaxed text-muted">
-        Then the return is run again with the evidence&apos;s figure in the OM&apos;s place.
-      </p>
+      {HOW_WE_TEST_INTRO.map((line, i) => (
+        <p key={line} className={`${i === 0 ? "mt-4" : "mt-1"} text-base leading-relaxed text-muted`} data-qa="how-we-test-intro">
+          {line}
+        </p>
+      ))}
       <p className="mt-3 text-sm font-medium text-ink" data-qa="how-we-test-marker">
         {HOW_WE_TEST_MARKER}
       </p>
@@ -393,6 +517,13 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
           {NOT_TESTED_LINK}
         </a>
       </p>
+
+      {/* The order an investor asked for (the review of 2026-10-28): every
+          row at a glance, then what is not tested, then a worked row, then
+          each method, then the headline and the model. */}
+      <OverviewTable />
+
+      <NotTestedSection />
 
       {example && <WorkedExample test={example} />}
 
@@ -425,21 +556,6 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
           ))}
         </ul>
       </section>
-      <HeadlineSection />
-
-      {/* The model every row's return is re-run on, and the rule its growth
-          and exit are set by: the one place the whole rule is said. */}
-      <section id={SCREENING_MODEL_SECTION.id} className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6" data-qa="screening-model">
-        <h2 className="text-lg font-semibold tracking-tight">{SCREENING_MODEL_SECTION.heading}</h2>
-        <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-muted">
-          {SCREENING_MODEL_SECTION.lines.map((line) => (
-            <li key={line} className="flex items-start gap-2">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <nav aria-label="The assumptions tested" className="mt-8">
         <ul className="flex flex-wrap gap-2 text-xs">
@@ -459,7 +575,21 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
         ))}
       </div>
 
-      <NotTestedSection />
+      <HeadlineSection />
+
+      {/* The model every row's return is re-run on, and the rule its growth
+          and exit are set by: the one place the whole rule is said. */}
+      <section id={SCREENING_MODEL_SECTION.id} className="mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6" data-qa="screening-model">
+        <h2 className="text-lg font-semibold tracking-tight">{SCREENING_MODEL_SECTION.heading}</h2>
+        <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-muted">
+          {SCREENING_MODEL_SECTION.lines.map((line) => (
+            <li key={line} className="flex items-start gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="mt-12" id="sources" data-qa="figure-sources">
         <h2 className="text-lg font-semibold tracking-tight">Where the figures come from</h2>
@@ -502,6 +632,18 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
 
       <section className="mt-12" id="track-record" data-qa="track-record">
         <h2 className="text-lg font-semibold tracking-tight">{TRACK_RECORD.heading}</h2>
+        {/* How many rows can be scored today, and by what: the scorer's own
+            grid (lib/track-record `scorableGrid`), never a typed count. */}
+        <p className="mt-2 text-sm leading-relaxed" data-qa="scorable-count">
+          {scorableCountLine()}
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-muted" data-qa="scorable-vacancy">
+          {scorableVacancyLine()}
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-muted" data-qa="scorable-rest">
+          {scorableRestLine()}
+        </p>
+        <ScorableGrid rows={scorableGrid()} rescreen={false} />
         <ScoringRulePicture />
         <ul className="mt-3 space-y-1.5 rounded-2xl border border-line bg-surface p-4 text-sm leading-relaxed text-muted">
           {TRACK_RECORD.lines.map((line) => (

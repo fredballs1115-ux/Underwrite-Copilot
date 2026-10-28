@@ -89,7 +89,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it is not",
     body: [
-      "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one stabilized vacancy (reached through a lease-up where the plan has one) and one loan, never lease by lease.",
+      "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one vacancy held flat from year one (no lease-up is modelled, even where the plan has one) and one loan, never lease by lease.",
       "It does not replace ARGUS, a lease-by-lease cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
       "The screening model is included so the test has something to re-run on a stabilized deal; it is not the product.",
     ],
@@ -158,6 +158,12 @@ export default function WhyPage() {
                 className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
               >
                 Get started
+              </Link>
+              <Link
+                href="/how-we-test"
+                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                How each assumption is tested
               </Link>
               <Link
                 href="/security"

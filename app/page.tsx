@@ -12,7 +12,6 @@ import {
   SPREAD_HIGH_IRR_PCT,
   SPREAD_BPS,
   ANALYSIS_STAGES,
-  DEAL_KILLERS,
   COMPS_JURISDICTIONS,
   PRICE_PRO_MONTHLY,
   PRICE_TEAM_BASE_MONTHLY,
@@ -27,6 +26,8 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { verdictCounts } from "@/lib/stress-test-words";
+import type { StressVerdict } from "@/lib/stress-test-types";
+import { scorableCountLine, scorableRestLine, scorableSummary, scorableVacancyLine } from "@/lib/scorable-summary";
 import { sampleDemoDataOnce, walkthroughData } from "./demo/demo-data";
 // The sample's stress test is read on the reader's day the memo tile and the
 // downloads date it by (lib/reader-day, New York with no reader's zone).
@@ -136,7 +137,7 @@ const RECONCILE_ICON = (
 // tasks).
 const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   {
-    label: "OM + rent roll + T‑12: actuals beat pro forma",
+    label: "Rent roll + T‑12 test today’s NOI; vacancy held to the market",
     href: "/demo",
     icon: (
       <Icon>
@@ -321,12 +322,29 @@ const DEAL_KINDS: string[] = [
   "Forward purchase",
 ];
 
-const STATS: { value: number; suffix: string; label: string }[] = [
-  { value: ANALYSIS_STAGES, suffix: "", label: "stages, same order every OM" },
-  { value: DEAL_KILLERS, suffix: "", label: "deal-killers named first" },
-  { value: MARKET_COUNT, suffix: "", label: "covered markets" },
-  { value: RULES.all, suffix: "", label: "rules checked by address" },
-];
+// The stat strip: the sample's own stress test counted (tested against
+// evidence, and named unchecked), from the walkthrough's one build of the
+// sample, so the strip and the panel below can never disagree; the rest
+// counted in the codebase (lib/marketing-constants).
+function stats(stress: Record<StressVerdict, number> | null): { value: number; suffix: string; label: string }[] {
+  const tested = stress ? stress.holds + stress.stretched + stress.unsupported : null;
+  return [
+    { value: ANALYSIS_STAGES, suffix: "", label: "stages, same order every OM" },
+    ...(stress && tested != null
+      ? [
+          { value: tested, suffix: "", label: "sample assumptions tested" },
+          { value: stress.unchecked, suffix: "", label: "named unchecked, never passed" },
+        ]
+      : []),
+    { value: MARKET_COUNT, suffix: "", label: "covered markets" },
+    { value: RULES.all, suffix: "", label: "rules checked by address" },
+  ];
+}
+
+// How many of the test's rows a later figure can score today, and by what
+// (lib/scorable-summary, read off the scorer itself): said where the page
+// says the test is scored, never "scored as evidence arrives" of every row.
+const SCORABLE = scorableSummary();
 
 // The Excel-preview tile's rows: the sample workbook's own figures — its
 // engine on the one derivation the demo workbook is built from, and two
@@ -361,11 +379,11 @@ const SAMPLE_FIT: SampleFit = {
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and actuals beat the pro forma. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and they test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market’s published figure. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
-    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb named as one — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb named as one — and conflicting sources are reconciled openly (a rent roll and T-12 test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
   },
   {
     q: "Which markets does it cover?",
@@ -377,7 +395,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does the test make me more accurate?",
-    a: "It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day, names each one it could not check, and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether each of its rows was right is scored only when a later document, your decision or a trade arrives, and the track record counts exactly those: it scores the test's rows, never your own calls.",
+    a: `It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day, names each one it could not check, and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether a row was right is scored only by evidence that arrives after it. ${scorableCountLine(SCORABLE)} ${scorableVacancyLine()} ${scorableRestLine(SCORABLE)} The track record counts exactly those: it scores the test's rows, never your own calls.`,
   },
   {
     q: "Are my documents private?",
@@ -435,7 +453,7 @@ const JSON_LD = {
       operatingSystem: "Web",
       // The layout's own description (app/layout.tsx), word for word.
       description:
-        "Upload an offering memorandum. Its key assumptions are each set against the deal's own documents, dated published figures or the rule of thumb they are asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
+        "Upload an offering memorandum. Its key assumptions are each set against dated published figures, the deal's own documents, the OM's own figures or a rule of thumb named as one, and the return re-run where the gap moves a model input; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },
@@ -608,7 +626,12 @@ export default async function Home() {
   // The sample memo's own data, as its download draws it, on the render's
   // day (the download names the day it is printed), on the published
   // figures the download reads.
-  const memo = sampleMemoData(new Date(), await sampleTodayReads());
+  const reads = await sampleTodayReads();
+  const memo = sampleMemoData(new Date(), reads);
+  // The stat strip counts the sample's own stress test, from the
+  // walkthrough's one build (the same day and figures).
+  const { data: sampleData } = sampleDemoDataOnce(readerToday(null), reads, NO_DEBT_SEEDS);
+  const strip = stats(sampleData.stressTest && sampleData.stressTest.rows.length > 0 ? verdictCounts(sampleData.stressTest) : null);
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -777,7 +800,7 @@ export default async function Home() {
                       return the gap moves, in code. The model is included,
                       not the product. */}
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    The OM&apos;s key assumptions, each set against the rent roll and T-12 you add, today&apos;s published figures or a rule of thumb named as one — and the return re-run where a gap moves it. The model is included.
+                    The OM&apos;s key assumptions, each set against today&apos;s published figures, the rent roll and T-12 you add, the OM&apos;s own figures or a rule of thumb named as one — and the return re-run where the gap moves a model input. The model is included.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
@@ -812,14 +835,14 @@ export default async function Home() {
               </div>
 
               {/* Stat strip — the screen, quantified, two words each. */}
-              <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
+              <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-3">
                 {/* Each stat read once: the label is the term, the figure
                     its value, and the column reversed so the figure still
                     sits on top. (A hidden term above a second copy of the
                     label as a value had a screen reader say it twice.)
                     `justify-end` packs a reversed column at its TOP, so
                     the figures share one line whichever label wraps. */}
-                {STATS.map((st) => (
+                {strip.map((st) => (
                   <div key={st.label} className="flex flex-col-reverse justify-end">
                     <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
                     <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
@@ -884,7 +907,10 @@ export default async function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  Same deal, same data room. The method is shown, the moves are computed, and whether it was right is scored as evidence arrives.
+                  {`Same deal, same data room. The method is shown and the moves are computed; ${SCORABLE.byFigure.length} of the ${SCORABLE.total} assumptions can be scored as later figures arrive.`}{" "}
+                  <Link href="/how-we-test#track-record" className="font-medium text-brand hover:text-brand-strong">
+                    What scores what
+                  </Link>
                 </p>
               </div>
             </Reveal>
@@ -921,6 +947,15 @@ export default async function Home() {
                 </span>
                 <span className="font-medium">{RECONCILE_RUN.label}</span>{" "}
                 <span className="text-muted">a run of its own, when you add your model</span>
+              </p>
+              {/* The stress test is no stage of the run: code strikes it on
+                  what the stages read, so the rail names it in a link to its
+                  method rather than a seventh node the deal page's rail does
+                  not have (lib/screen-stages, held to that rail). */}
+              <p className="mt-3 text-sm">
+                <Link href="/how-we-test" className="font-medium text-brand hover:text-brand-strong" data-qa="rail-method-link">
+                  How the stress test is struck, in code, on what the stages read
+                </Link>
               </p>
             </Reveal>
           </div>

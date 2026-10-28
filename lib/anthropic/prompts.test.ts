@@ -114,6 +114,13 @@ describe("plan deals are judged on their own terms", () => {
     // Any other deal is told exactly what it was told before.
     expect(brokerCompsInstruction("ctx", false)).toBe(brokerCompsInstruction("ctx"));
     expect(brokerCompsInstruction("ctx")).toContain("IF THE OM DESCRIBES A PLAN");
+    // The comps step's example words are comparability, never a direction
+    // a grade word could be read as (the audit of 2026-10-28).
+    for (const words of [brokerCompsInstruction("ctx"), brokerCompsInstruction("ctx", true)]) {
+      expect(words).not.toContain("leans favorable");
+      expect(words).toContain("less comparable by construction, in a way that flatters the ask");
+    }
+    expect(brokerCompsInstruction("ctx")).toContain('say "the comp set leans on less comparable trades"');
     expect(marketCheckInstruction("industrial", "ctx", "live", false)).toBe(marketCheckInstruction("industrial", "ctx", "live"));
     expect(verdictInstruction(false)).toBe(verdictInstruction());
     expect(verdictInstruction()).toContain("debt is the construction or bridge financing and the carry through the works");

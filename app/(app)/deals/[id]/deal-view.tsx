@@ -115,6 +115,7 @@ import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import type { StressTest } from "@/lib/stress-test-types";
+import type { StressDrift } from "@/lib/stress-drift";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -355,6 +356,7 @@ export function DealView({
   compsSubjectPoint = null,
   trackRecord = null,
   stressTest = null,
+  stressDrift = null,
 }: {
   dealId: string;
   dealName: string;
@@ -428,6 +430,10 @@ export function DealView({
    *  from what the page already holds — plain data, which the Overview
    *  leads with after the call */
   stressTest?: StressTest | null;
+  /** what moved in the stress test since the call (lib/stress-drift), built
+   *  on the server from the verdict's snapshot and today's test; drawn under
+   *  the panel only where something moved, never while a screen runs */
+  stressDrift?: StressDrift | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -874,6 +880,7 @@ export function DealView({
               stopped={stopped != null}
               stressTest={stressTest}
               sample={isSample}
+              stressDrift={live ? null : stressDrift}
               // Under the call and the stress test, never above them (the
               // first-run audit of 2026-10-20: after a re-screen with actuals
               // the diff and the reconciliation had opened the page): first

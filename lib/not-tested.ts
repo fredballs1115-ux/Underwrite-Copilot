@@ -6,7 +6,7 @@
 // lib/not-tested.test.ts: no item is a row the test strikes, and each
 // "beside it" names what a tested row really shows. Pure: no I/O.
 
-import { ROSTER_UNTESTED_PCT } from "@/lib/stress-test";
+import { ROSTER_UNTESTED_PCT, VACANCY_UNSUPPORTED_PTS } from "@/lib/stress-test";
 import type { StressKey } from "@/lib/stress-test-types";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 
@@ -62,8 +62,28 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "cap_expansion",
     title: "Cap expansion over the hold",
-    why: "No row asks for an exit wider than the caps the OM states: what a buyer at the sale will pay is a forecast, and the screen adds no expansion of its own.",
-    beside: { key: "exit_cap", line: "The exit is held to the higher of the OM's going-in cap and its own pro forma cap; one flat to it holds, the expansion habit named, never held to." },
+    why: "No row asks for an exit wider than the going-in cap the OM states: what a buyer at the sale will pay is a forecast, and the screen adds no expansion of its own.",
+    beside: { key: "exit_cap", line: "The exit is held to the OM's going-in cap; one flat to it holds, the expansion habit named, never held to." },
+  },
+  {
+    id: "plan_budget",
+    title: "The plan's budget and contingency",
+    why: "No row holds the OM's construction or renovation budget, or its contingency, to evidence: the report's plan page stresses the budget across a grid of savings and overruns, never a verdict.",
+    beside: { key: "basis", line: "On a plan deal the price row holds the all-in cost, the price plus the budget, to the comps' basis." },
+  },
+  {
+    id: "lease_up_pace",
+    title: "Lease-up pace and absorption",
+    why: "How fast a building fills from today's vacancy to a stabilized one is not modelled: the screening model runs one vacancy, flat from year one.",
+    beside: {
+      key: "vacancy",
+      line: `On a stabilized deal, where the rent roll or T-12 runs more than ${VACANCY_UNSUPPORTED_PTS} points over a stabilized assumption, the vacancy row says the lease-up is modelled in neither run.`,
+    },
+  },
+  {
+    id: "construction_schedule",
+    title: "The construction schedule",
+    why: "No row tests how long the works take or the carry through them: the yield on cost has no clock, and the model runs one closing and its own hold.",
   },
   {
     id: "reserves",

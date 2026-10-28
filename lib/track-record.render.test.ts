@@ -31,6 +31,7 @@ import {
   scoreDeal,
   type DealRecord,
 } from "./track-record";
+import { CARD_SCOPE_LEAD, CARD_SCOPE_REST } from "./track-record-words";
 import { ScorableGrid } from "@/app/(app)/scorable-grid";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 import { STRESS_SNAPSHOT_V, snapshotThreshold, type StressSnapshot, type StressSnapshotRow } from "./stress-snapshot";
@@ -143,7 +144,11 @@ describe("TrackRecordCard — what came after the screen, on the deal page", () 
     expect(text).toContain("Exit cap: nothing that arrived after the screen speaks to it.");
     // What it scores against, and why the insurance challenge is not scored.
     const words = text.replace(/&#x27;/g, "'");
-    expect(words).toContain(CARD_SCOPE);
+    // The scope: one line in the open, the rest folded under it, whole in the HTML.
+    expect(words).toContain(CARD_SCOPE_LEAD);
+    for (const line of CARD_SCOPE_REST) expect(words).toContain(line);
+    expect(out).toMatch(/<details[^>]*>\s*<summary[^>]*>[\s\S]*?What a later figure must be/);
+    expect([CARD_SCOPE_LEAD, ...CARD_SCOPE_REST].join(" ")).toBe(CARD_SCOPE);
     expect(words).toContain(TAX_INSURANCE_NOT_SCORED);
     expect(out).toContain('data-qa="track-record-tax-insurance"');
     expect(words).toContain("Insurance: a seller's T-12 cannot show a new owner's premium");

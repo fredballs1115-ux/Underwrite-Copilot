@@ -8,7 +8,7 @@ import type { Challenge } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StageChange } from "@/lib/stages";
 import { STRESS_KEYS, type StressEvidence, type StressKey, type StressRow, type StressTest } from "@/lib/stress-test-types";
-import { BREAKS_IF, BREAKS_IF_ESTIMATE, STRESS_SNAPSHOT_V, WORSE_WHEN, breaksIfLabel, callCitesEngine, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
+import { BREAKS_IF, BREAKS_IF_ESTIMATE, STRESS_SNAPSHOT_V, WORSE_WHEN, breaksIfLabel, callCitesEngine, doorShare, readStressSnapshot, rowThreshold, snapshotThreshold, stressSnapshotOf, type StressSnapshot, type StressSnapshotRow } from "@/lib/stress-snapshot";
 import {
   CARD_SCOPE,
   DECISION_SCORES,
@@ -892,7 +892,8 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
       verdict: "unsupported",
       om: 1_200_000,
       page: 5,
-      evidence: { value: 1_000_000, label: "The deal's T-12", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12" },
+      // Its period, as the panel said it (lib/stress-drift reads it).
+      evidence: { value: 1_000_000, label: "The deal's T-12", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12", period: "Jun 30, 2026" },
       per: null,
       threshold: { value: 0.05, unit: "share" },
       worse: "lower",
@@ -1177,6 +1178,54 @@ describe("the snapshot keeps the verdict's own tolerance, and the record scores 
     const re = String.raw`/±\s*(\d+(?:\.\d+)?)\s*pts?/`;
     expect(readFileSync(join(process.cwd(), "lib/stress-test.ts"), "utf8")).toContain(re);
     expect(readFileSync(join(process.cwd(), "lib/stress-snapshot.ts"), "utf8")).toContain(re);
+  });
+
+  it("a vacancy's margin is never finer than one door's share of the units the OM states, said with the doors (the second review, 2026-10-28)", () => {
+    // 0.05 points on 248 units is a tenth of one door: a held 6.0% read a
+    // false hold at 6.1%. One door of 248 is 0.40 points.
+    expect(doorShare(248)).toBeCloseTo(100 / 248, 12);
+    expect(doorShare(248)!.toFixed(2)).toBe("0.40");
+    expect(doorShare(null)).toBeNull();
+    expect(doorShare(0)).toBeNull();
+    expect(doorShare(12.5)).toBeNull();
+    const doc = ev({ kind: "document", label: "The deal's rent roll", text: "9.3% vacant", value: 9.3, publisher: "the deal's rent roll", scope: "deal" });
+    const rot = ev({ kind: "rule_of_thumb", label: "Multifamily vacancy, a rule of thumb", text: "5.0%", value: 5, publisher: "a rule of thumb", scope: "class" });
+    // In doors and in dollars alike, wherever the OM states a count.
+    expect(stressSnapshotOf(test({ ...vacRow([doc]), doors: 248 }))!.rows[0].threshold).toEqual({ value: 100 / 248, unit: "pts", doors: 248 });
+    expect(stressSnapshotOf(test({ ...vacRow([rot]), doors: 248, measure: "economic" }))!.rows[0].threshold).toEqual({ value: 100 / 248, unit: "pts", doors: 248 });
+    // No count stated: the key's own 0.05 points. A survey's wider margin
+    // of error stands over one door's share.
+    expect(stressSnapshotOf(test(vacRow([doc])))!.rows[0].threshold).toEqual({ value: 0.05, unit: "pts" });
+    expect(stressSnapshotOf(test({ ...vacRow([ev({})]), doors: 248 }))!.rows[0].threshold).toEqual({ value: 1.9, unit: "pts" });
+    // A building of 4,000 units: one door is 0.025 points, under 0.05.
+    expect(rowThreshold("vacancy", { kind: "document", text: "" }, 4000)).toEqual({ value: 0.05, unit: "pts" });
+    // Only a vacancy is held to a door.
+    expect(rowThreshold("rent_growth", { kind: "published", text: "" }, 248)).toEqual(snapshotThreshold("rent_growth"));
+    // Scored: a held 6.0% and a later 6.1% is within one door of 248, a hold
+    // borne out; at 0.05 points it was a false hold.
+    const held = (threshold: StressSnapshotRow["threshold"]): StressSnapshotRow => ({
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      verdict: "holds",
+      om: 6,
+      page: 21,
+      evidence: { value: 5, label: "A rule of thumb", asOf: null, kind: "rule_of_thumb", publisher: "a rule of thumb" },
+      per: null,
+      threshold,
+      worse: "higher",
+    });
+    const later = { ...roll, occupiedUnits: 0, unitCount: 0, sfWeightedOccupancy: 0.939 };
+    const score = (t: StressSnapshotRow["threshold"]) =>
+      scoreDeal({ screenedAt: T, stressSnapshot: { v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [held(t)] }, challenges: [], rentRoll: { arrivedAt: AFTER, dated: "2026-11-01", summary: later } }).rows[0];
+    const byDoor = score({ value: 100 / 248, unit: "pts", doors: 248 });
+    expect(byDoor).toMatchObject({ outcome: "hold_right", landing: "right" });
+    expect(byDoor.text).toContain("within the row's 0.40-point margin (one door of 248) of the OM's figure");
+    expect(score({ value: 0.05, unit: "pts" })).toMatchObject({ outcome: "false_hold", landing: "wrong" });
+    // Read back, the doors ride with the margin; a count that is no count is dropped.
+    const stored = (threshold: unknown) => readStressSnapshot({ v: STRESS_SNAPSHOT_V, readOn: "2026-10-01", rows: [{ ...held(null), threshold }] })!.rows[0].threshold;
+    expect(stored({ value: 100 / 248, unit: "pts", doors: 248 })).toEqual({ value: 100 / 248, unit: "pts", doors: 248 });
+    expect(stored({ value: 0.4, unit: "pts", doors: "248" })).toEqual({ value: 0.4, unit: "pts" });
+    expect(stored({ value: 0.05, unit: "share", doors: 248 })).toEqual({ value: 0.05, unit: "share" });
   });
 
   it("a row is scored by the tolerance it was kept with, and a stored snapshot keeps the margin it stored", () => {
