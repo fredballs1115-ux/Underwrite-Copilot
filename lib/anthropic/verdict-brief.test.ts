@@ -601,7 +601,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // Two comps graded clean are too few for a median: the price stands
     // unchecked, said why, with no move.
     expect(brief).toContain("- Basis (basis) [UNCHECKED] — OM says: $274k/unit (Asking price $68,000,000 over 248 units) [p. 3].");
-    expect(brief).toContain("so no median is struck: the comps' own floor. The levered IRR: No return is re-run: no figure to swap.");
+    expect(brief).toContain("so none is struck: the comps' own floor. The levered IRR: No return is re-run: no figure to swap.");
     // The exit at the OM's going-in cap; its pro forma cap beside it, never
     // deciding (the second review, 2026-10-28).
     expect(brief).toContain("- Exit cap (exit_cap) [STRETCHED] — OM says: Exit cap: 5.25% [p. 41]. Set against: [DECIDES] The OM's going-in cap: 5.45% (Going-in cap)");

@@ -2513,7 +2513,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
+      "5 of 5 state a price per unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
@@ -2525,7 +2525,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
+      text: "1 of 1 state a price per unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
@@ -2675,10 +2675,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
     expect(one.evidence[0]).toMatchObject({ value: null });
-    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.evidence[0].text).toBe("1 of 1 state a price per unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(one.verdict).toBe("unchecked");
     expect(one.unchecked).toBe(
-      "Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+      "The memorandum's one sale comp is graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.",
     );
     expect(one.impact).toBeNull();
     const two = rowOf(
@@ -2690,7 +2690,9 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(two.verdict).toBe("unchecked");
     expect(two.unchecked).toBe(basisFloorWhy(2, 2, "/unit"));
     // The floor's sentence is the market-rent row's own, word for word but the noun.
-    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(comparable\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
+    expect(basisFloorWhy(2, 2, "/unit")).toBe("The memorandum's 2 sale comps are graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.");
+    expect(basisFloorWhy(2, 3, "/unit")).toMatch(/^Only 2 of the memorandum's 3 sale comps are graded clean \(comparable\) with a stated price per unit; a median needs 3/);
+    expect(basisFloorWhy(0, 1, "/SF")).toMatch(/^None of the memorandum's one sale comp is graded clean \(comparable\) with a stated price per SF;/);
     // Two comps beside a recorded sales' median of four: the median decides.
     const withSales = rowOf(
       buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
@@ -2776,7 +2778,7 @@ describe("the basis row reads the deal as the card, the comps tick and the brief
     // The memorandum's comps state $/SF alone: judged per SF, never "no comp".
     const sfComps = basisOf(APARTMENT, { brokerComps: comps("$250/SF, 5.5% cap") })!;
     expect(sfComps.omSays.text).toBe("$300/SF (Asking price $42,000,000 over 140,000 SF)");
-    expect(sfComps.evidence[0].text).toMatch(/^3 of 3 state a figure \/SF alone, so they are judged per SF; graded clean/);
+    expect(sfComps.evidence[0].text).toMatch(/^3 of 3 state a price per SF alone, so they are judged per SF; graded clean/);
     expect(sfComps.gap!.text).toBe("The ask's $300/SF is 20.0% over the median of the memorandum's sale comps, $250/SF.");
     expect(sfComps.verdict).toBe("unsupported");
     // A per-unit set first, the per-SF comps a piece of their own; the OM's
@@ -3901,7 +3903,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
   it("strikes no median under three comps graded clean, and says how many there are", () => {
     const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps({ name: "The Rowan", detail: "$2,050/mo", support: "supports" }, { name: "The Vue", detail: "$2,900/mo", support: "favorable" }) })), "market_rent");
     expect(r.verdict).toBe("unchecked");
-    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (comparable) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
+    expect(r.unchecked).toBe("Only 1 of the memorandum's 2 lease comps is graded clean (comparable) with a stated rent a month a unit; a median needs 3, so none is struck: the comps' own floor.");
     expect(r.evidence[0].value).toBeNull();
     expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded less comparable");
   });

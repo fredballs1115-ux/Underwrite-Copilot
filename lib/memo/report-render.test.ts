@@ -3049,7 +3049,7 @@ describe("the report's stress-test page", () => {
       flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
     );
     // The price stands unchecked on two clean comps, on the comps' floor.
-    expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (2 of 3)");
+    expect(page).toContain("Unchecked: Only 2 of the memorandum's 3 sale comps are graded clean (comparable) with a stated price per unit");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the
     // jurisdiction's to say — and the engine's move on the gap.

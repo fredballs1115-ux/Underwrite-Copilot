@@ -1080,9 +1080,26 @@ function methodSentence(key: StressKey, evidence: StressEvidence[], decidedBy: n
   if (evidence.length === 0) return `${what}: no evidence with a figure or words could be read for this deal, so it stands unchecked.`;
   const name = (e: StressEvidence) => (e.label.toLowerCase().includes(e.publisher.toLowerCase()) ? lowerFirst(e.label) : `${lowerFirst(e.label)} (${e.publisher})`);
   const decider = decidedBy != null ? evidence[decidedBy] : null;
-  const beside = evidence.filter((_, i) => i !== decidedBy).map(name);
+  const beside = pairEnds(evidence.filter((_, i) => i !== decidedBy).map(name));
   if (!decider) return `${what} beside ${joinWords(beside)}: no figure decides it.`;
   return `${what} against ${name(decider)}, the one figure that decides${beside.length ? `; beside it, not deciding: ${joinWords(beside)}` : ""}.`;
+}
+
+/** A range's two ends named once: "apartment cap (research tracker), low end
+ *  (Northmarq)" beside the same name's "high end" reads "apartment cap
+ *  (research tracker), low and high ends (Northmarq)", the range's long
+ *  label said once rather than twice. */
+function pairEnds(names: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < names.length; i++) {
+    const low = names[i].match(/^(.*), low end( \([^()]*\))?$/);
+    const next = names[i + 1];
+    if (low && next === `${low[1]}, high end${low[2] ?? ""}`) {
+      out.push(`${low[1]}, low and high ends${low[2] ?? ""}`);
+      i++;
+    } else out.push(names[i]);
+  }
+  return out;
 }
 
 function unchecked(key: StressKey, omSays: StressRow["omSays"], evidence: StressEvidence[], why: string, title?: string): StressRow {
@@ -2738,7 +2755,7 @@ function marketRentRow(ctx: Ctx): StressRow | null {
         ? "The memorandum lists no lease comps, so no median of comps graded clean can be set against its rent."
         : mixedBases
           ? `The memorandum's lease comps graded clean (comparable) state their rents on different lease bases (${joinWords(mixedBases)}), and a rent on one basis is not the same rent on another, so no median is struck over them.`
-          : `Fewer than ${MEDIAN_FLOOR} of the memorandum's lease comps graded clean (comparable) state a rent ${yardWords} (${clean.length} of ${leaseComps.length}), so no median is struck: the comps' own floor.`;
+          : `${cleanCompsWords(clean.length, leaseComps.length, "lease")} with a stated rent ${yardWords}; a median needs ${MEDIAN_FLOOR}, so none is struck: the comps' own floor.`;
     return { ...unchecked("market_rent", omSays, evidence, why), ...base };
   }
   const best = decided.figure;
@@ -3743,7 +3760,23 @@ const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
  *  clean state a figure and no recorded sales' median stands: the comps'
  *  own floor, as the market-rent row says it. */
 export function basisFloorWhy(clean: number, listed: number, perWord: string): string {
-  return `Fewer than ${MEDIAN_FLOOR} of the memorandum's sale comps graded clean (comparable) state a figure ${perWord} (${clean} of ${listed}), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.`;
+  // "/unit" is said as "per unit", "/SF" as "per SF".
+  const per = perWord.startsWith("/") ? `per ${perWord.slice(1)}` : perWord;
+  return `${cleanCompsWords(clean, listed, "sale")} with a stated price ${per}; a median needs ${MEDIAN_FLOOR}, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.`;
+}
+
+/** "Only 2 of the memorandum's 3 sale comps are graded clean (comparable)" —
+ *  how many of the memorandum's comps of a kind the comps step graded clean,
+ *  said for any count. */
+function cleanCompsWords(clean: number, listed: number, kind: "sale" | "lease"): string {
+  const comps = listed === 1 ? `one ${kind} comp` : `${listed} ${kind} comps`;
+  const graded =
+    clean === 0
+      ? `None of the memorandum's ${comps} is graded`
+      : clean === listed
+        ? `The memorandum's ${comps} ${listed === 1 ? "is" : "are"} graded`
+        : `Only ${clean} of the memorandum's ${comps} ${clean === 1 ? "is" : "are"} graded`;
+  return `${graded} clean (comparable)`;
 }
 
 function basisRow(ctx: Ctx): StressRow | null {
@@ -3843,8 +3876,12 @@ function basisRow(ctx: Ctx): StressRow | null {
       })
       .join("");
     const figure = clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : null;
+    // "/unit" said as "per unit" in the sentence; the figures keep "$252k/unit".
+    const perSaid = pw.startsWith("/") ? `per ${pw.slice(1)}` : pw;
     const head =
-      on === per ? `${group.length} of ${sale.length} state a figure ${pw}` : `${group.length} of ${sale.length} state a figure ${pw} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
+      on === per
+        ? `${group.length} of ${sale.length} state a price ${perSaid}`
+        : `${group.length} of ${sale.length} state a price ${perSaid} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
     const graded = clean.length > 0 ? `; graded clean (comparable): ${named(clean)}` : "";
     const struck =
       clean.length >= MEDIAN_FLOOR

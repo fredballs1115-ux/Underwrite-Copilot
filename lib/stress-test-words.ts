@@ -89,6 +89,17 @@ export function leadRows(test: StressTest, max = 4): StressRow[] {
     .map((x) => x.r);
 }
 
+/** Every row in the order the panel, the workbook's tab and /how-we-test
+ *  draw them: the rows past their evidence in the memo's own lead order
+ *  (`leadRows`, unsupported then stretched, each by its share of the
+ *  headline's gap), then the rows that hold, then the unchecked, each in the
+ *  test's own order — so every surface leads with the same row. */
+export function stressRowOrder(test: StressTest): StressRow[] {
+  const lead = leadRows(test, Number.POSITIVE_INFINITY);
+  const rest = (v: StressVerdict) => test.rows.filter((r) => r.verdict === v);
+  return [...lead, ...rest("holds"), ...rest("unchecked")];
+}
+
 /** How many rows read each way. */
 export function verdictCounts(test: StressTest): Record<StressVerdict, number> {
   const counts: Record<StressVerdict, number> = { holds: 0, stretched: 0, unsupported: 0, unchecked: 0 };

@@ -500,11 +500,11 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
       title: "Basis",
       omSays: { text: "$275k/unit, $300/SF (Asking price $42,000,000 over 153 units and over 140,000 SF)", value: 274_510, page: 5 },
       evidence: [
-        { kind: "om_internal", label: "The memorandum's sale comps", text: "3 of 6 state a figure /unit — median $270k/unit over the 3", value: 270_000, asOf: null, publisher: "the offering memorandum", scope: "deal" },
+        { kind: "om_internal", label: "The memorandum's sale comps", text: "3 of 6 state a price per unit — median $270k/unit over the 3", value: 270_000, asOf: null, publisher: "the offering memorandum", scope: "deal" },
         {
           kind: "om_internal",
           label: "The memorandum's sale comps stating a price per SF alone",
-          text: "3 of 6 state a figure /SF alone, so they are judged per SF — median $250/SF over the 3",
+          text: "3 of 6 state a price per SF alone, so they are judged per SF — median $250/SF over the 3",
           value: 250,
           asOf: null,
           publisher: "the offering memorandum",
@@ -666,7 +666,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(t).toContain("Where the evidence's case and the screening model as it runs (9.3%) differ");
     expect(hh).toMatch(/<th scope="col"[^>]*>Assumption<\/th><th scope="col"[^>]*>Evidence&#x27;s case<\/th><th scope="col"[^>]*>Screening model<\/th>/);
     expect(t).toContain(
-      "Stabilized vacancy 6.0% (the OM's; the row holds) 9.1% Rent growth 4.0%/yr (the OM's; the row holds) 3.0%/yr Rent line (makes the OM's $3.88M NOI) $7.33M (the OM's; left out of the headline) $7.47M Real estate taxes $952k (the evidence's) $728k",
+      "Stabilized vacancy 6.0% (the OM's; the row holds) 9.1% Rent growth 4.0%/yr (the OM's; the row holds) 3.0%/yr Gross rent that gives the OM's $3.88M NOI $7.33M (the OM's; left out of the headline) $7.47M Real estate taxes $952k (the evidence's) $728k",
     );
     expect(hh.match(/<th scope="row"/g)).toHaveLength(4);
     expect(t).not.toContain("Against the screening model as it runs (9.3%), the evidence's case keeps");
@@ -793,7 +793,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
   it("draws the memorandum's sale comps as a list of comp, figure and grade", () => {
     const basis = test.rows.find((r) => r.key === "basis")!;
     const read = compLines(basis.evidence.find((e) => /^The memorandum's sale comps/.test(e.label))!)!;
-    expect(read.head).toBe("3 of 3 state a figure /unit");
+    expect(read.head).toBe("3 of 3 state a price per unit");
     // Graded by comparability: Parkside, the closest and newest, is clean
     // (the review of 2026-10-23), and two are too few for a median.
     expect(read.comps.map((c) => [c.name, c.figure, c.grade])).toEqual([
@@ -848,5 +848,17 @@ describe("the panel draws the OM's stated IRR under the headline's line, as the 
     expect(stated).toContain("at the OM&#x27;s figures on the rows re-run here");
     expect(gluedWords(visibleText(html))).toEqual([]);
     expect(render(base)).not.toContain('data-qa="stress-headline-stated"');
+  });
+});
+
+describe("the panel leads with the memo's own rows, in the memo's order", () => {
+  it("orders the rows past their evidence by leadRows, then those that hold, then the unchecked", async () => {
+    const { leadRows } = await import("./stress-test-words");
+    const test = sampleStressTest({ today: "2026-10-19" });
+    const order = sortStressRows(test.rows, test);
+    const lead = leadRows(test, 99);
+    expect(order.slice(0, lead.length).map((r) => r.key)).toEqual(lead.map((r) => r.key));
+    expect(order.map((r) => r.verdict).slice(lead.length)).toEqual([...test.rows.filter((r) => r.verdict === "holds"), ...test.rows.filter((r) => r.verdict === "unchecked")].map((r) => r.verdict));
+    expect(order).toHaveLength(test.rows.length);
   });
 });

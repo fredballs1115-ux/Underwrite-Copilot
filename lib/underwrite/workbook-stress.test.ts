@@ -99,7 +99,7 @@ describe("the Stress Test tab", () => {
   });
 
   it("prints one row a stress row in the panel's order, each figure the row's own, a blank where it carries none", async () => {
-    expect(stressTabRows(sample).map((r) => r.key)).toEqual(sortStressRows(sample.rows).map((r) => r.key));
+    expect(stressTabRows(sample).map((r) => r.key)).toEqual(sortStressRows(sample.rows, sample).map((r) => r.key));
     const ws = (await load(await build(sample))).getWorksheet("Stress Test")!;
     const rows = stressTabRows(sample);
     expect(rows.length).toBe(sample.rows.length);

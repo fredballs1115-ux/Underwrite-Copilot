@@ -46,6 +46,7 @@ import {
   rowMoveText,
   shownHeadline,
   stressReadLine,
+  stressRowOrder,
   whenWords,
 } from "@/lib/stress-test-words";
 
@@ -1400,16 +1401,12 @@ const STRESS_GRAIN: Partial<Record<StressEvidence["scope"], string>> = {
   nation: "the nation's",
 };
 
-/** The verdict's rank, most severe first — the panel's own order
- *  (app/stress-test-panel `sortStressRows`, which the tab's test holds this
- *  to): unsupported, stretched, holds, unchecked, the test's order inside
- *  each. */
-const STRESS_RANK: Record<StressVerdict, number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+/** The rows in the panel's own order (lib/stress-test-words
+ *  `stressRowOrder`, which app/stress-test-panel `sortStressRows` reads and
+ *  the tab's test holds this to): the rows past their evidence by the memo's
+ *  lead order, then those that hold, then the unchecked. */
 export function stressTabRows(test: StressTest): StressRow[] {
-  return test.rows
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => STRESS_RANK[a.r.verdict] - STRESS_RANK[b.r.verdict] || a.i - b.i)
-    .map((x) => x.r);
+  return stressRowOrder(test);
 }
 
 const MINUS = "−";

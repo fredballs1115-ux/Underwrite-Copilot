@@ -29,6 +29,7 @@ import {
   liveHeadline,
   modelCellText,
   statedReturnSentence,
+  stressRowOrder,
   modelIrrOf,
   noMoveWhy,
   noiRestSentence,
@@ -206,7 +207,11 @@ const yocText = (n: number | null): string => {
 };
 
 /** Most severe first, the reader's order inside a verdict. */
-export function sortStressRows(rows: readonly StressRow[]): StressRow[] {
+export function sortStressRows(rows: readonly StressRow[], test?: StressTest): StressRow[] {
+  // With the test in hand, the memo's own lead order (lib/stress-test-words
+  // `stressRowOrder`): within a verdict, the larger share of the headline's
+  // gap first.
+  if (test && test.rows === rows) return stressRowOrder(test);
   return rows.map((r, i) => ({ r, i })).sort((a, b) => VERDICT[a.r.verdict].rank - VERDICT[b.r.verdict].rank || a.i - b.i).map((x) => x.r);
 }
 
@@ -500,7 +505,7 @@ export function rangeEnds(a: StressEvidence, b: StressEvidence | undefined): { b
 export type CompLine = { name: string; figure: string; grade: "clean" | "favorable" | "stretched"; why: string | null };
 
 /**
- * The basis reader's sale-comps sentence ("3 of 3 state a figure /unit;
+ * The basis reader's sale-comps sentence ("3 of 3 state a price per unit;
  * graded clean (comparable): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
  * mi $261k/unit — two graded clean, too few for a median (3 or more), so
  * none is set against the ask; left out, graded not comparable by the comps step
@@ -512,7 +517,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
   if (!/^The memorandum's sale comps/.test(e.label)) return null;
   const m = e.text.match(
-    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(comparable\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(comparable\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+    /^(\d+ of \d+ state a (?:price per \S+|figure \/\S+)(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(comparable\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(comparable\), so none is set against the ask)((?:; left out, graded .*)?)$/,
   );
   if (!m) return null;
   const entries = (list: string): { name: string; figure: string }[] | null => {
@@ -950,7 +955,7 @@ export function keptRows(test: StressTest): KeptRow[] {
       .filter((k) => k.why === why)
       .map((k) => ({
         key: k.key,
-        assumption: k.key === "noi" && k.noi != null ? `Rent line (makes the OM's ${compactUsd(k.noi, MONEY)} NOI)` : k.label,
+        assumption: k.key === "noi" && k.noi != null ? `Gross rent that gives the OM's ${compactUsd(k.noi, MONEY)} NOI` : k.label,
         evidence: k.key === "noi" ? compactUsd(k.om, MONEY) : figureText(k.key, k.om),
         why: KEPT_WHY[why],
         model: k.key === "noi" ? compactUsd(k.model, MONEY) : modelCellText(test, k.key, k.model),
@@ -1112,7 +1117,9 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
       )}
       <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
         {h.parts.length > 1
-          ? `Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the ${yoc ? "yield" : "return"}.`
+          ? `Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the ${yoc ? "yield" : "return"}.${
+              !yoc && model != null ? ` Each row below moves its one input alone, from the screening model's own ${pctText(model)}, so a row's move is not its segment.` : ""
+            }`
           : h.parts.length === 1
             ? yoc
               ? "One assumption the plan's yield is struck on is past its evidence, so the whole gap is its own."
@@ -1138,7 +1145,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
 
 export function StressTestPanel({ test, className = "" }: { test: StressTest | null; className?: string }) {
   if (!test || test.rows.length === 0) return null;
-  const rows = sortStressRows(test.rows);
+  const rows = sortStressRows(test.rows, test);
   const tested = rows.filter((r) => r.verdict !== "unchecked");
   const unchecked = rows.filter((r) => r.verdict === "unchecked");
   const worst = rows[0].verdict;

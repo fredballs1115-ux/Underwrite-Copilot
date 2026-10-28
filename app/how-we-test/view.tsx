@@ -465,7 +465,7 @@ function NotTestedSection() {
  */
 export function exampleRowOf(test: StressTest | null): StressRow | null {
   if (!test) return null;
-  const tested = sortStressRows(test.rows).filter((r) => r.verdict !== "unchecked");
+  const tested = sortStressRows(test.rows, test).filter((r) => r.verdict !== "unchecked");
   return tested.find(drawsRerun) ?? tested[0] ?? null;
 }
 
