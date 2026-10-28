@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-10-28",
+      "title": "The OM's own IRR beside the stress test's",
+      "href": "/how-we-test",
+      "blurb": "Where a memorandum states its projected IRR, the stress test now shows it beside its headline as the OM's figure. A levered one is set against what the engine earns on the OM's figures, with where the two can part; an unlevered one is shown and compared with nothing. The rows that fail their evidence now lead in the same order on the deal page, the memo and the workbook, and the comps' count reads in plain words."
+    },
+    {
+      "date": "2026-10-28",
       "title": "How each row is tested, first, and what has moved since the call",
       "href": "/how-we-test",
       "blurb": "/how-we-test now opens on one table: each assumption's deciding figure and its fallbacks, the thresholds for holds, stretched and unsupported, what re-runs and what can score it later, then what the test does not check. The exit cap is held to the going-in cap again, the OM's pro forma cap shown beside it as the yield on its price it is; a vacancy is scored to the door; the comps' grades say comparable or not; and the deal page shows what has moved in the stress test since the call."
