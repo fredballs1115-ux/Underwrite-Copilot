@@ -226,7 +226,7 @@ describe("a built row carries the one figure that decided it", () => {
     expect(decidingFigureOf(x)).toMatchObject({ figure: 5.75, label: GOING_IN_CAP_LABEL });
     expect(x.gap).toMatchObject({ value: 25, unit: "bps" });
     expect(x.verdict).toBe("unsupported");
-    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: multifamily cap \(research tracker\), low end/);
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: multifamily cap \(research tracker\), low and high ends \(research tracker: CBRE\)\.$/);
   });
 
   it("reads every deciding figure off a built test, and none off an unchecked row", () => {

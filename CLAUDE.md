@@ -183,7 +183,14 @@ tested and whether that is right. So:
   screening model's own IRR (`HEADLINE_MODEL_WHY`); a seller's T-12 bill or
   premium is the building's own history, never a rule of thumb; a tax reset
   is "A scenario" (`RESET_BILL_LABEL`); the memo leads by severity then
-  Shapley share; transfer taxes are on the not-tested list.
+  Shapley share, and the panel, the workbook's tab and /how-we-test take the
+  same order (`stressRowOrder`); transfer taxes are on the not-tested list.
+  The OM's own stated IRR rides on the headline (`statedIrr`, the row's
+  words reading levered, unlevered or neither; no hurdle, preference,
+  target, LP or two-figure row, and none where the price buys no building):
+  a levered one is set against the OM's case in words, never re-run, and
+  the sample states none (its memo's one page and its buy box's target
+  chip would move).
 
 ## Architecture
 

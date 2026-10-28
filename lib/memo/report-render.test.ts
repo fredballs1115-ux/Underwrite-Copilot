@@ -2944,6 +2944,16 @@ describe("the report's stress-test page", () => {
   // thirty-second argument is the test.
   const between = [undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "2026-10-19"] as const;
 
+  it("lays the OM's stated IRR in the headline's sentences after, where the sentence says it", async () => {
+    const { sampleStressTest } = await import("@/lib/sample-cover");
+    const base = sampleStressTest("2026-10-19");
+    const test = { ...base, headline: { ...base.headline!, statedIrr: { pct: 18.4, label: "Projected levered IRR", page: 41, levered: true } } };
+    const h = reportHeadline(test)!;
+    expect(h.after.some((t) => t.startsWith("The OM states a levered IRR of 18.4% (Projected levered IRR, p. 41)"))).toBe(true);
+    const lower = (t: string) => `${t[0].toLowerCase()}${t.slice(1)}`;
+    expect(`${h.lead.slice(0, -1)}: ${headlineSplit(test)}, ${lower(h.splitNote)}${h.after.map((t) => ` ${t}`).join("")}`).toBe(headlineSentence(test));
+  });
+
   it("prints every row — the OM's figure with its page, each piece of evidence dated and attributed, the gap, the engine's move, the method and the question — between the call and the grids", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");
     const test = sampleStressTest("2026-10-19");
@@ -3039,7 +3049,7 @@ describe("the report's stress-test page", () => {
       flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
     );
     // The price stands unchecked on two clean comps, on the comps' floor.
-    expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (2 of 3)");
+    expect(page).toContain("Unchecked: Only 2 of the memorandum's 3 sale comps are graded clean (comparable) with a stated price per unit");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the
     // jurisdiction's to say — and the engine's move on the gap.

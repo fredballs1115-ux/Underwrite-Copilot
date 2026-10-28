@@ -162,8 +162,12 @@ describe("what the test does not check yet", () => {
     expect(item("construction_schedule").beside).toBeUndefined();
   });
 
-  it("names no stated return the engine re-runs: the stress test reads no IRR row of the OM's", () => {
+  it("says the OM's stated IRR is shown as the OM's and never re-run: it rides beside the two cases, never in them", () => {
     const src = readFileSync("lib/stress-test.ts", "utf8");
-    expect(src).not.toMatch(/(?:stated|projected|target|quoted)\s*irr/i);
+    // The reader's figure goes onto the headline as `statedIrr` and nowhere else.
+    expect(src.match(/statedIrrOf\(/g)?.length).toBe(2);
+    expect(src).toMatch(/statedIrr: statedIrrOf\(ctx\.rows, ex\)/);
+    expect(item("om_return").why).toContain("never re-run");
+    expect(item("om_return").why).toContain("only where its words call it levered");
   });
 });

@@ -334,6 +334,14 @@ export interface StressHeadline {
    *  forward purchase's is its price alone (`budget` null). Absent on a
    *  levered-IRR headline */
   planCost?: { total: number; price: number | null; budget: number | null } | null;
+  /** an IRR the memorandum states in a row of its own, with its page and
+   *  whether its own words call it levered (true), unlevered (false) or
+   *  neither (null) — the OM's figure, beside the two cases on a
+   *  levered-IRR headline and set against the OM's case only where it is
+   *  levered. Null where it states none, or where the price buys no
+   *  building (a note, a share, a position, the land); absent on a plan
+   *  deal's headline and on one struck before it was carried. */
+  statedIrr?: { pct: number; label: string; page: number | null; levered: boolean | null } | null;
   /** levered IRR in percent; null where that case's cash flows have no root */
   omIrrPct: number | null;
   evidenceIrrPct: number | null;

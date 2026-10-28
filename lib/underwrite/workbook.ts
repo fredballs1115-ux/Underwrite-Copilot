@@ -46,6 +46,7 @@ import {
   rowMoveText,
   shownHeadline,
   stressReadLine,
+  stressRowOrder,
   whenWords,
 } from "@/lib/stress-test-words";
 
@@ -1400,16 +1401,12 @@ const STRESS_GRAIN: Partial<Record<StressEvidence["scope"], string>> = {
   nation: "the nation's",
 };
 
-/** The verdict's rank, most severe first — the panel's own order
- *  (app/stress-test-panel `sortStressRows`, which the tab's test holds this
- *  to): unsupported, stretched, holds, unchecked, the test's order inside
- *  each. */
-const STRESS_RANK: Record<StressVerdict, number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
+/** The rows in the panel's own order (lib/stress-test-words
+ *  `stressRowOrder`, which app/stress-test-panel `sortStressRows` reads and
+ *  the tab's test holds this to): the rows past their evidence by the memo's
+ *  lead order, then those that hold, then the unchecked. */
 export function stressTabRows(test: StressTest): StressRow[] {
-  return test.rows
-    .map((r, i) => ({ r, i }))
-    .sort((a, b) => STRESS_RANK[a.r.verdict] - STRESS_RANK[b.r.verdict] || a.i - b.i)
-    .map((x) => x.r);
+  return stressRowOrder(test);
 }
 
 const MINUS = "−";
@@ -1752,6 +1749,12 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
     // The screening model as it runs, every input its own: the base every
     // row's re-run starts from, which neither case is.
     line(HEADLINE_MODEL_LABEL, h.modelIrrPct != null ? h.modelIrrPct / 100 : null, FMT.pct1, h.modelIrrPct == null ? "its levered IRR does not solve" : HEADLINE_MODEL_WHY);
+  }
+  if (!yoc && h.statedIrr && Number.isFinite(h.statedIrr.pct)) {
+    // The IRR the memorandum states in a row of its own, as the OM's.
+    const s = h.statedIrr;
+    const kind = s.levered === true ? "levered" : s.levered === false ? "unlevered" : "not saying whether levered";
+    line(`The OM's stated IRR (${kind})`, s.pct / 100, FMT.pct1, `${s.label}${s.page != null ? `, p. ${s.page}` : ""}`);
   }
   for (const o of h.omitted) line(`Left out: ${o.label}`, null, "", o.why);
   if (shown.parts.length > 0) signedBars(`${cellA1(firstPart, 2)}:${cellA1(lastPart, 2)}`);

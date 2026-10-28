@@ -78,11 +78,12 @@ import {
   vacancyEconomicStated,
   vacancyDecidedBy,
   stressHeadline,
+  statedIrrLevered,
   T12_TODAY_BESIDE,
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
+import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, statedIrrSentence, statedReturnSentence, stressReadLine, untestedSentence } from "./stress-test-words";
 import { METRO_VACANCY_LABEL, VACANCY_ORDER } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
@@ -2512,7 +2513,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
+      "5 of 5 state a price per unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
@@ -2524,7 +2525,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
+      text: "1 of 1 state a price per unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
@@ -2674,10 +2675,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
     expect(one.evidence[0]).toMatchObject({ value: null });
-    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.evidence[0].text).toBe("1 of 1 state a price per unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(one.verdict).toBe("unchecked");
     expect(one.unchecked).toBe(
-      "Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+      "The memorandum's one sale comp is graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.",
     );
     expect(one.impact).toBeNull();
     const two = rowOf(
@@ -2689,7 +2690,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(two.verdict).toBe("unchecked");
     expect(two.unchecked).toBe(basisFloorWhy(2, 2, "/unit"));
     // The floor's sentence is the market-rent row's own, word for word but the noun.
-    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(comparable\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
+    expect(basisFloorWhy(2, 2, "/unit")).toBe("The memorandum's 2 sale comps are graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.");
+    expect(basisFloorWhy(2, 3, "/unit")).toMatch(/^Only 2 of the memorandum's 3 sale comps are graded clean \(comparable\) with a stated price per unit; a median needs 3/);
+    expect(basisFloorWhy(0, 1, "/SF")).toMatch(/^The memorandum's one sale comp is not graded clean \(comparable\) with a stated price per SF;/);
+    expect(basisFloorWhy(0, 3, "/unit")).toMatch(/^None of the memorandum's 3 sale comps is graded clean \(comparable\)/);
     // Two comps beside a recorded sales' median of four: the median decides.
     const withSales = rowOf(
       buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
@@ -2775,7 +2779,7 @@ describe("the basis row reads the deal as the card, the comps tick and the brief
     // The memorandum's comps state $/SF alone: judged per SF, never "no comp".
     const sfComps = basisOf(APARTMENT, { brokerComps: comps("$250/SF, 5.5% cap") })!;
     expect(sfComps.omSays.text).toBe("$300/SF (Asking price $42,000,000 over 140,000 SF)");
-    expect(sfComps.evidence[0].text).toMatch(/^3 of 3 state a figure \/SF alone, so they are judged per SF; graded clean/);
+    expect(sfComps.evidence[0].text).toMatch(/^3 of 3 state a price per SF alone, so they are judged per SF; graded clean/);
     expect(sfComps.gap!.text).toBe("The ask's $300/SF is 20.0% over the median of the memorandum's sale comps, $250/SF.");
     expect(sfComps.verdict).toBe("unsupported");
     // A per-unit set first, the per-SF comps a piece of their own; the OM's
@@ -3900,7 +3904,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
   it("strikes no median under three comps graded clean, and says how many there are", () => {
     const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps({ name: "The Rowan", detail: "$2,050/mo", support: "supports" }, { name: "The Vue", detail: "$2,900/mo", support: "favorable" }) })), "market_rent");
     expect(r.verdict).toBe("unchecked");
-    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (comparable) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
+    expect(r.unchecked).toBe("Only 1 of the memorandum's 2 lease comps is graded clean (comparable) with a stated rent a month a unit; a median needs 3, so none is struck: the comps' own floor.");
     expect(r.evidence[0].value).toBeNull();
     expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded less comparable");
   });
@@ -4149,5 +4153,69 @@ describe("a price row's cost is the difference of the figures printed beside it"
     ).toBe("The ask costs 0.90 pts of yield on cost: 6.10% at it, 7.00% at the evidence's price");
     // Two figures that print alike cost nothing, said as the two figures.
     expect(basisMoveWords({ ...impact, baseIrrPct: 9.26, altIrrPct: 9.34 })).toBe("Levered IRR 9.3% at the ask, 9.3% at the evidence's price");
+  });
+});
+
+// ── The IRR the OM states, beside the headline (2026-10-28) ──────────────
+
+describe("the OM's stated IRR beside a levered-IRR headline", () => {
+  const withRows = (...extra: ReturnType<typeof row>[]) => {
+    const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics, ...extra] };
+    return buildStressTest(apartmentArgs({ extraction: ex }));
+  };
+
+  it("reads its words for levered, unlevered or neither", () => {
+    expect(statedIrrLevered("Projected levered IRR 18.5%")).toBe(true);
+    expect(statedIrrLevered("Unlevered IRR 9.0%")).toBe(false);
+    expect(statedIrrLevered("Un-levered IRR")).toBe(false);
+    expect(statedIrrLevered("IRR (property-level)")).toBe(false);
+    expect(statedIrrLevered("Projected IRR 15%")).toBeNull();
+    // The audit of 2026-10-28: "non-levered" and "with leverage" say which.
+    for (const w of ["Non-Levered IRR", "Non-leveraged IRR", "IRR (not levered)", "IRR (No Leverage)", "IRR without debt", "IRR before leverage", "Unleveraged IRR"]) expect(statedIrrLevered(w)).toBe(false);
+    for (const w of ["IRR w/ Leverage", "IRR with leverage", "IRR (Assumed Financing)", "Leveraged IRR"]) expect(statedIrrLevered(w)).toBe(true);
+  });
+
+  it("carries a levered IRR with its page, and sets it against the OM's case in words", () => {
+    const t = withRows(row("Projected levered IRR", "18.5%", "p. 9"));
+    const h = t.headline!;
+    expect(h.statedIrr).toEqual({ pct: 18.5, label: "Projected levered IRR", page: 9, levered: true });
+    const s = statedIrrSentence(h);
+    expect(s).toContain("The OM states a levered IRR of 18.5% (Projected levered IRR, p. 9)");
+    expect(s).toContain("at the OM's figures on the rows re-run here");
+    expect(headlineSentence(t)).toContain(s);
+    expect(headlineShort(t)).toContain("the OM states 18.5% levered, p. 9");
+    expect(statedReturnSentence(h)).toBe(s);
+  });
+
+  it("takes the levered row over an unlevered one, and sets an unlevered one against nothing", () => {
+    expect(withRows(row("Unlevered IRR", "9.0%", "p. 9"), row("Levered IRR", "17.0%", "p. 9")).headline!.statedIrr?.pct).toBe(17);
+    const un = withRows(row("Unlevered IRR", "9.0%", "p. 9")).headline!;
+    expect(un.statedIrr?.levered).toBe(false);
+    expect(statedIrrSentence(un)).toBe("The OM states an unlevered IRR of 9.0% (Unlevered IRR, p. 9); the figures here are levered, so the two are not set against each other.");
+    const bare = withRows(row("IRR", "15.0%", "p. 9")).headline!;
+    expect(statedIrrSentence(bare)).toContain("without saying whether it is levered, so it is not set against the levered figures here");
+  });
+
+  it("reads no hurdle, preference, target, LP figure, range or two-figure row as the OM's IRR", () => {
+    for (const r of [
+      row("Preferred return / IRR hurdle", "8.0%"),
+      row("Target IRR", "15%"),
+      row("LP net IRR", "14.2%"),
+      row("Levered IRR", "16%–18%"),
+      row("IRR", "18.0% levered / 9.0% unlevered"),
+      row("Downside case IRR", "8%"),
+      row("Levered IRR to Limited Partners", "15%"),
+      row("Levered IRR (After Fees)", "15%"),
+      row("Partnership IRR", "15%"),
+    ]) {
+      expect(withRows(r).headline!.statedIrr ?? null).toBeNull();
+    }
+    expect(statedIrrSentence(buildStressTest(apartmentArgs()).headline!)).toBe("");
+  });
+
+  it("states none where the price buys no building", () => {
+    const note = { ...APARTMENT, interest: { kind: "note" as const, summary: "", share: "", groundLease: "", loan: "", page: "" }, metrics: [...APARTMENT.metrics, row("Projected levered IRR", "18.5%")] };
+    const h = buildStressTest(apartmentArgs({ extraction: note })).headline;
+    expect(h?.statedIrr ?? null).toBeNull();
   });
 });
