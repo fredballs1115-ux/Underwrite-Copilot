@@ -3772,7 +3772,9 @@ function cleanCompsWords(clean: number, listed: number, kind: "sale" | "lease"):
   const comps = listed === 1 ? `one ${kind} comp` : `${listed} ${kind} comps`;
   const graded =
     clean === 0
-      ? `None of the memorandum's ${comps} is graded`
+      ? listed === 1
+        ? `The memorandum's one ${kind} comp is not graded`
+        : `None of the memorandum's ${comps} is graded`
       : clean === listed
         ? `The memorandum's ${comps} ${listed === 1 ? "is" : "are"} graded`
         : `Only ${clean} of the memorandum's ${comps} ${clean === 1 ? "is" : "are"} graded`;
@@ -4745,9 +4747,10 @@ const STATED_IRR_ROW = /\birr\b|\binternal\s+rate\s+of\s+return\b/i;
  *  target or a sensitivity is no projection of the deal's own return; a
  *  multiple, a cash-on-cash or a renovation's return is another figure. */
 const STATED_IRR_NOT =
-  /hurdle|\bpref(?:erred|erence)?\b|promote|waterfall|\blp\b|\bgp\b|investor|sponsor|\bnet\b|minimum|target|threshold|multiple|cash[- ]on[- ]cash|\bcoc\b|sensitivit|\b(?:down|up)side\b|scenario|renovat|\bper\b|\bmezz/i;
-const UNLEVERED_WORDS = /\bun-?levered\b|\bunleveraged\b|\basset[- ]level\b|\bproperty[- ]level\b|\ball[- ]cash\b|free\s+and\s+clear/i;
-const LEVERED_WORDS = /\blevered\b|\bleveraged\b/i;
+  /hurdle|\bpref(?:erred|erence)?\b|promote|waterfall|\blp\b|\bgp\b|investor|sponsor|\bnet\b|minimum|target|threshold|multiple|cash[- ]on[- ]cash|\bcoc\b|sensitivit|\b(?:down|up)side\b|scenario|renovat|\bper\b|\bmezz|limited\s+partner|partnership|\bmembers?\b|after[- ](?:fees|promote)|\bclass\s+[ab]\b/i;
+const UNLEVERED_WORDS =
+  /\bun-?levered\b|\bun-?leveraged\b|\bnon-?lever(?:ed|aged)\b|\bnot\s+lever(?:ed|aged)\b|\b(?:no|without|before|pre-?)\s*(?:leverage|debt|financing)\b|\basset[- ]level\b|\bproperty[- ]level\b|\ball[- ]cash\b|free\s+and\s+clear/i;
+const LEVERED_WORDS = /\blevered\b|\bleveraged\b|\bwith\s+(?:leverage|debt|financing)\b|\bw\/\s*(?:leverage|debt|financing)\b|\bassumed\s+financing\b/i;
 
 /** Whether a stated IRR's own words call it levered (true), unlevered
  *  (false) or neither (null). Exported for its test. */

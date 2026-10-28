@@ -850,8 +850,8 @@ export function statedYocSentence(h: StressHeadline): string {
  * everything else — "The OM states a levered IRR of 18.5% (Projected levered
  * IRR, p. 8); the engine, at the OM's figures on the rows re-run here, earns
  * 16.7%. The two part wherever the OM's own model runs an input these rows
- * do not hold to the OM's (the loan's terms, the hold, the costs of buying
- * and selling) or its own arithmetic." An unlevered one, or one whose words
+ * do not hold to the OM's (the rows not re-run here, …) or its own
+ * arithmetic." An unlevered one, or one whose words
  * say neither, is printed and set against nothing. "" where it states none.
  */
 export function statedIrrSentence(h: StressHeadline): string {
@@ -861,10 +861,10 @@ export function statedIrrSentence(h: StressHeadline): string {
   if (s.levered === false) return `The OM states an unlevered IRR of ${pct1(s.pct)} ${where}; the figures here are levered, so the two are not set against each other.`;
   if (s.levered === null) return `The OM states an IRR of ${pct1(s.pct)} ${where} without saying whether it is levered, so it is not set against the levered figures here.`;
   const stated = `The OM states a levered IRR of ${pct1(s.pct)} ${where}`;
-  if (h.omIrrPct == null || !Number.isFinite(h.omIrrPct)) return `${stated}; the engine's does not solve at the OM's figures.`;
+  if (h.omIrrPct == null || !Number.isFinite(h.omIrrPct)) return `${stated}; the engine's levered IRR does not solve at the OM's figures on the rows re-run here.`;
   const same = pct1(h.omIrrPct) === pct1(s.pct);
   const earns = same ? "earns the same" : `earns ${pct1(h.omIrrPct)}`;
-  const part = same ? "" : " The two part wherever the OM's own model runs an input these rows do not hold to the OM's (the loan's terms, the hold, the costs of buying and selling) or its own arithmetic.";
+  const part = same ? "" : " The two part wherever the OM's own model runs an input these rows do not hold to the OM's (the rows not re-run here, which run the screening model's own figures, the reserve, the loan's terms, the hold, the costs of buying and selling) or its own arithmetic.";
   return `${stated}; the engine, at the OM's figures on the rows re-run here, ${earns}.${part}`;
 }
 

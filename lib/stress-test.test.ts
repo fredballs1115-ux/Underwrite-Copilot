@@ -2692,7 +2692,8 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // The floor's sentence is the market-rent row's own, word for word but the noun.
     expect(basisFloorWhy(2, 2, "/unit")).toBe("The memorandum's 2 sale comps are graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.");
     expect(basisFloorWhy(2, 3, "/unit")).toMatch(/^Only 2 of the memorandum's 3 sale comps are graded clean \(comparable\) with a stated price per unit; a median needs 3/);
-    expect(basisFloorWhy(0, 1, "/SF")).toMatch(/^None of the memorandum's one sale comp is graded clean \(comparable\) with a stated price per SF;/);
+    expect(basisFloorWhy(0, 1, "/SF")).toMatch(/^The memorandum's one sale comp is not graded clean \(comparable\) with a stated price per SF;/);
+    expect(basisFloorWhy(0, 3, "/unit")).toMatch(/^None of the memorandum's 3 sale comps is graded clean \(comparable\)/);
     // Two comps beside a recorded sales' median of four: the median decides.
     const withSales = rowOf(
       buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
@@ -4169,6 +4170,9 @@ describe("the OM's stated IRR beside a levered-IRR headline", () => {
     expect(statedIrrLevered("Un-levered IRR")).toBe(false);
     expect(statedIrrLevered("IRR (property-level)")).toBe(false);
     expect(statedIrrLevered("Projected IRR 15%")).toBeNull();
+    // The audit of 2026-10-28: "non-levered" and "with leverage" say which.
+    for (const w of ["Non-Levered IRR", "Non-leveraged IRR", "IRR (not levered)", "IRR (No Leverage)", "IRR without debt", "IRR before leverage", "Unleveraged IRR"]) expect(statedIrrLevered(w)).toBe(false);
+    for (const w of ["IRR w/ Leverage", "IRR with leverage", "IRR (Assumed Financing)", "Leveraged IRR"]) expect(statedIrrLevered(w)).toBe(true);
   });
 
   it("carries a levered IRR with its page, and sets it against the OM's case in words", () => {
@@ -4200,6 +4204,9 @@ describe("the OM's stated IRR beside a levered-IRR headline", () => {
       row("Levered IRR", "16%–18%"),
       row("IRR", "18.0% levered / 9.0% unlevered"),
       row("Downside case IRR", "8%"),
+      row("Levered IRR to Limited Partners", "15%"),
+      row("Levered IRR (After Fees)", "15%"),
+      row("Partnership IRR", "15%"),
     ]) {
       expect(withRows(r).headline!.statedIrr ?? null).toBeNull();
     }

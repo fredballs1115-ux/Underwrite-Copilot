@@ -1118,7 +1118,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
       <p className={`mt-2 ${MEASURE} text-[11px] leading-4 text-muted`} data-qa="stress-headline-note">
         {h.parts.length > 1
           ? `Each segment is one assumption's share of the gap, averaged over every order the swaps could be made in, so the segments add up to it; one to the right is evidence that raises the ${yoc ? "yield" : "return"}.${
-              !yoc && model != null ? ` Each row below moves its one input alone, from the screening model's own ${pctText(model)}, so a row's move is not its segment.` : ""
+              !yoc && model != null ? " Each re-run row below swaps its one input on its own, the OM's figure against the evidence's, on the screening model's other inputs, so a row's move is not its segment." : ""
             }`
           : h.parts.length === 1
             ? yoc
