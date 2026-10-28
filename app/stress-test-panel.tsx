@@ -127,6 +127,9 @@ const VERDICT: Record<StressVerdict, { rank: number; label: string; chip: string
   holds: { rank: 2, label: "Holds", chip: "bg-pass/10 text-pass" },
   unchecked: { rank: 3, label: "Unchecked", chip: "bg-faint text-muted" },
 };
+/** Each verdict's word and chip, for the "since the call" chips
+ *  (app/stress-drift), so a then→now pair wears the panel's own tones. */
+export const VERDICT_CHIP: Readonly<Record<StressVerdict, { label: string; chip: string }>> = VERDICT;
 
 // Each kind has its own SHAPE as well as its tone — a dot for the deal's
 // document, a diamond for a published figure, a hollow dot for the OM

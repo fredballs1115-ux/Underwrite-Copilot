@@ -100,6 +100,8 @@ import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDec
 import { loanQuoteOf } from "@/lib/loan-quote";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
+import { stressDrift } from "@/lib/stress-drift";
+import { readStressSnapshot } from "@/lib/stress-snapshot";
 import { StressChip } from "./stress-chip";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -142,7 +144,7 @@ import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
-import { jobAgeMs, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
+import { jobAgeMs, screenedOn, storedPreviousResults, verdictBehind } from "@/lib/screen-run";
 import { olderScreen } from "@/lib/older-screen";
 import { OlderScreenNote } from "./older-screen-note";
 import { documentKindWarning } from "@/lib/document-kind";
@@ -1529,6 +1531,12 @@ export default async function DealPage({
   // The test at a glance beside the call, and in the bar that keeps the deal
   // in view: the panel's own counts (lib/stress-test-words), linking to it.
   const stressCounts = stressTest && stressTest.rows.length > 0 ? verdictCounts(stressTest) : null;
+  // What moved since the call (lib/stress-drift, display only): the test as
+  // the verdict kept it against the one just built — no new read. Nothing on
+  // the sample, whose evidence never postdates its screen.
+  const stressSinceCall = verdict
+    ? stressDrift(readStressSnapshot(verdict.stressSnapshot), stressTest, { calledOn: screenedOn(verdict.generatedAt), sample: isSampleDeal })
+    : null;
   const trackRecord = scoreTrackRecord(stabilizedVacancyStated(extraction, firstSignal) && vacancyDecidedBy(stressTest) === "published");
 
   // The photograph the deal's market is known by, leading the picture where
@@ -2153,6 +2161,7 @@ export default async function DealPage({
         compsSubjectPoint={compsSubjectPoint}
         // The OM's assumptions tested, which the Overview leads with.
         stressTest={stressTest}
+        stressDrift={stressSinceCall}
       />
 
       <div className="mt-6 space-y-4">

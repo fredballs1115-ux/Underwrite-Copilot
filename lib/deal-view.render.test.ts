@@ -230,6 +230,34 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(html).toContain('<div id="stress-test" tabindex="-1"');
   });
 
+  it("draws what moved since the call right under the stress-test panel, only where something moved and never while a screen runs (2026-10-28)", async () => {
+    const { stressSnapshotOf, readStressSnapshot } = await import("@/lib/stress-snapshot");
+    const { stressDrift } = await import("@/lib/stress-drift");
+    const today = sampleStressTest({ today: "2026-09-08" });
+    // The call as a reader's deal would have kept it, its NOI row then held.
+    const kept = JSON.parse(JSON.stringify(stressSnapshotOf(today)));
+    const noi = kept.rows.find((r: { key: string }) => r.key === "noi");
+    noi.verdict = "holds";
+    const drift = stressDrift(readStressSnapshot(kept), { ...today, sample: undefined }, { calledOn: "Sep 1, 2026" })!;
+    expect(drift.changed).toBe(true);
+    const p = { ...sampleProps("overview"), isSample: false, stressDrift: drift } as Props;
+    const html = render(p);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(textOf(html))).toEqual([]);
+    const at = html.indexOf('data-qa="stress-drift"');
+    expect(at).toBeGreaterThan(html.indexOf('data-qa="stress-test-panel"'));
+    expect(at).toBeLessThan(html.indexOf('data-qa="how-we-test-link"'));
+    const words = textOf(html.slice(at, html.indexOf("</section>", at))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(words).toContain("Since the call Sep 1, 2026: 1 row moved");
+    expect(words).toContain("At the call: Holds → today: Stretched");
+    // Nothing moved: nothing drawn; a screen running: nothing drawn.
+    const still = stressDrift(readStressSnapshot(JSON.parse(JSON.stringify(stressSnapshotOf(today)))), { ...today, sample: undefined })!;
+    expect(render({ ...p, stressDrift: still } as Props)).not.toContain('data-qa="stress-drift"');
+    const now = new Date().toISOString();
+    const running = { ...p, job: { status: "running", step: "challenge", progress: 30, error: null, updated_at: now, created_at: now } } as unknown as Props;
+    expect(render(running)).not.toContain('data-qa="stress-drift"');
+  });
+
   it("sets the rent roll and T-12 prompt directly under the stress test, saying what they do to it, with the reader's own model beside it (2026-10-20)", () => {
     // A reader's deal (not the sample) with its OM and neither document on file.
     const p = {

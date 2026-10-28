@@ -17,6 +17,8 @@ import { SAMPLE_NO_RECORD } from "@/lib/track-record-words";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { EmptyGlyph, StageRailGhost } from "@/app/empty-pictures";
 import { StressTestPanel } from "@/app/stress-test-panel";
+import { StressDriftView } from "@/app/stress-drift";
+import type { StressDrift } from "@/lib/stress-drift";
 import { STRESS_TEST_ANCHOR } from "./stress-chip";
 import type { StressTest } from "@/lib/stress-test-types";
 import type {
@@ -392,6 +394,7 @@ export function OverviewView({
   staleWhy = "failed",
   stopped = false,
   stressTest = null,
+  stressDrift = null,
   afterStress = null,
   sample = false,
 }: {
@@ -407,6 +410,10 @@ export function OverviewView({
    *  risk digest, since the test is what the call rests on; null draws
    *  nothing */
   stressTest?: StressTest | null;
+  /** what moved in the stress test since the call (lib/stress-drift): the
+   *  verdict's snapshot against today's test, drawn right under the panel
+   *  only where something moved; the deal page alone passes it */
+  stressDrift?: StressDrift | null;
   /** what the deal page sets directly under the stress test: the prompt for
    *  the deal's own rent roll and T-12, which turn its rows into tests
    *  against the building's figures (never on the sample; /demo and the
@@ -490,6 +497,8 @@ export function OverviewView({
       {stressTest && stressTest.rows.length > 0 && (
         <div id={STRESS_TEST_ANCHOR} tabIndex={-1} className="focus:outline-none">
           <StressTestPanel test={stressTest} />
+          {/* What moved since the call, only where something did. */}
+          <StressDriftView drift={stressDrift} className="mt-3" />
           {/* The whole method, one link under the panel wherever it is
               drawn — the deal page, /demo and the homepage's walkthrough;
               each row's own link lands on its section. */}

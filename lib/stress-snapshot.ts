@@ -32,11 +32,17 @@
 //     (`worse`): a vacancy, an exit cap or a rate rising, an NOI, a rent
 //     growth or a price (a trade under the ask) falling;
 //   - a stored snapshot is read back through `readStressSnapshot`, which
-//     refuses anything that is not one — a blank is null, never a hold.
+//     refuses anything that is not one — a blank is null, never a hold;
+//   - since 2026-10-28 (lib/stress-drift, what moved since the call) a row
+//     whose evidence is its own `decidedBy` piece says so (`decided`), the
+//     piece keeps its period as the panel said it (`period`), and the
+//     headline's two cases are kept (`headline`) — a snapshot kept before
+//     reads without them, its rows' verdict words alone.
 
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { BASIS_STRETCH_PCT, SAME, SAME_SHARE } from "@/lib/stress-test";
 import { STRESS_KEYS, type EvidenceKind, type StressKey, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
+import { evidencePeriod, liveHeadline } from "@/lib/stress-test-words";
 
 /** The snapshot's shape version: a reader refuses one it does not know. */
 export const STRESS_SNAPSHOT_V = 1;
@@ -50,6 +56,11 @@ export interface StressSnapshotEvidence {
   asOf: string | null;
   kind: EvidenceKind;
   publisher: string;
+  /** the period the figure is for, said by its own cadence as the panel
+   *  said it at the call (lib/stress-test-words `evidencePeriod`: "Aug
+   *  2026", "Q2 2026"); absent with no date, and on a snapshot kept before
+   *  it was carried */
+  period?: string;
 }
 
 export interface StressSnapshotRow {
@@ -86,6 +97,19 @@ export interface StressSnapshotRow {
    *  scored on the same footing (lib/stress-test-types `StressRow.footing`);
    *  absent elsewhere, and on a row kept before it was carried */
   less?: ("taxes" | "insurance")[];
+  /** true where `evidence` is the row's own deciding piece (`decidedBy`,
+   *  lib/stress-deciders), the one figure its verdict was struck on; absent
+   *  where it was a fallback, and on a snapshot kept before it was carried —
+   *  such a row's figure is never set against a later one (lib/stress-drift) */
+  decided?: true;
+}
+
+/** The headline's two cases at the call, in percent: the levered IRR, or on a
+ *  plan deal the yield on total cost; null where that case did not solve. */
+export interface StressSnapshotHeadline {
+  measure: "levered_irr" | "yield_on_cost";
+  om: number | null;
+  evidence: number | null;
 }
 
 export interface StressSnapshot {
@@ -93,6 +117,10 @@ export interface StressSnapshot {
   /** the day the test's published figures were read (the test's `readOn`) */
   readOn: string;
   rows: StressSnapshotRow[];
+  /** the headline as it stood at the call; absent where the test struck none
+   *  (or its re-runs were withheld), and on a snapshot kept before it was
+   *  carried */
+  headline?: StressSnapshotHeadline;
 }
 
 /** Which way a figure moving is worse for the buyer, a key at a time. */
@@ -191,9 +219,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       verdict: r.verdict,
       om,
       page: finite(r.omSays.page) ? r.omSays.page : null,
-      evidence: decider
-        ? { value: decider.value as number, label: decider.label, asOf: decider.asOf ?? null, kind: decider.kind, publisher: decider.publisher }
-        : null,
+      evidence: decider ? keptEvidence(decider) : null,
       // A market rent's yardstick, "/mo" or "/SF", so a later rent roll is
       // read on the same one.
       per: own ? own.per : (r.yardstick ?? null),
@@ -202,9 +228,32 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
       ...(r.footing ? { less: [...r.footing.less] } : {}),
+      ...(decider && r.decidedBy != null && picked === r.evidence[r.decidedBy] ? { decided: true as const } : {}),
     };
   });
-  return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows };
+  const h = liveHeadline(test);
+  const headline: StressSnapshotHeadline | null = h
+    ? h.measure === "yield_on_cost"
+      ? { measure: "yield_on_cost", om: finiteOrNull(h.omYocPct), evidence: finiteOrNull(h.evidenceYocPct) }
+      : { measure: "levered_irr", om: finiteOrNull(h.omIrrPct), evidence: finiteOrNull(h.evidenceIrrPct) }
+    : null;
+  return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows, ...(headline ? { headline } : {}) };
+}
+
+const finiteOrNull = (n: unknown): number | null => (finite(n) ? n : null);
+
+/** The deciding piece as kept: its figure, whose it is, and its period as the
+ *  panel said it. */
+function keptEvidence(e: StressTest["rows"][number]["evidence"][number]): StressSnapshotEvidence {
+  const period = evidencePeriod(e)?.said;
+  return {
+    value: e.value as number,
+    label: e.label,
+    asOf: e.asOf ?? null,
+    kind: e.kind,
+    publisher: e.publisher,
+    ...(period ? { period } : {}),
+  };
 }
 
 const VERDICTS: readonly StressVerdict[] = ["holds", "stretched", "unsupported", "unchecked"];
@@ -229,7 +278,14 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
     const e = r.evidence as Record<string, unknown> | null | undefined;
     const evidence =
       e && typeof e === "object" && finite(e.value) && str(e.label) && KINDS.includes(e.kind as EvidenceKind)
-        ? { value: e.value, label: e.label, asOf: str(e.asOf) ? e.asOf : null, kind: e.kind as EvidenceKind, publisher: str(e.publisher) ? e.publisher : "" }
+        ? {
+            value: e.value,
+            label: e.label,
+            asOf: str(e.asOf) ? e.asOf : null,
+            kind: e.kind as EvidenceKind,
+            publisher: str(e.publisher) ? e.publisher : "",
+            ...(str(e.period) && e.period ? { period: e.period } : {}),
+          }
         : null;
     const t = r.threshold as { value?: unknown; unit?: unknown } | null | undefined;
     rows.push({
@@ -247,10 +303,16 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
       ...(Array.isArray(r.less) ? { less: (r.less as unknown[]).filter((x): x is "taxes" | "insurance" => x === "taxes" || x === "insurance") } : {}),
+      ...(r.decided === true && evidence ? { decided: true as const } : {}),
     });
   }
   if (rows.length === 0) return null;
-  return { v: STRESS_SNAPSHOT_V, readOn: str(s.readOn) ? s.readOn : "", rows };
+  const h = (raw as { headline?: unknown }).headline as Record<string, unknown> | null | undefined;
+  const headline: StressSnapshotHeadline | null =
+    h && typeof h === "object" && (h.measure === "levered_irr" || h.measure === "yield_on_cost")
+      ? { measure: h.measure, om: finiteOrNull(h.om), evidence: finiteOrNull(h.evidence) }
+      : null;
+  return { v: STRESS_SNAPSHOT_V, readOn: str(s.readOn) ? s.readOn : "", rows, ...(headline ? { headline } : {}) };
 }
 
 /** The deal-killer card's label where the call cites the engine's figures. */

@@ -892,7 +892,8 @@ describe("stressSnapshotOf — the stress test as it stood at the verdict", () =
       verdict: "unsupported",
       om: 1_200_000,
       page: 5,
-      evidence: { value: 1_000_000, label: "The deal's T-12", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12" },
+      // Its period, as the panel said it (lib/stress-drift reads it).
+      evidence: { value: 1_000_000, label: "The deal's T-12", asOf: "2026-06-30", kind: "document", publisher: "the deal's T-12", period: "Jun 30, 2026" },
       per: null,
       threshold: { value: 0.05, unit: "share" },
       worse: "lower",
