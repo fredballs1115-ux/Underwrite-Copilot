@@ -48,8 +48,10 @@ describe("the sample's stress test", () => {
       // Two comps graded clean, The Brixton and Parkside: too few for a
       // median, so no verdict on the price (the review of 2026-10-23).
       ["basis", "unchecked"],
-      // 45 bps under the OM's own 5.70% pro forma cap, the higher of its two.
-      ["exit_cap", "unsupported"],
+      // 20 bps under the OM's 5.45% going-in cap, the one figure that decides
+      // (its 5.70% pro forma cap beside it, never deciding: a yield on price
+      // that counts the plan's NOI growth, the second review of 2026-10-28).
+      ["exit_cap", "stretched"],
       ["debt", "unchecked"],
       // 4.7% over the T-12, inside the band, but the re-run moves the
       // levered IRR 239 bps: never a holds.
@@ -81,10 +83,9 @@ describe("the sample's stress test", () => {
   it("re-runs the engine one input apart on every row whose figure is a model input", () => {
     // Two comps graded clean are no median: the price is re-run on nothing.
     expect(row("basis").impact).toBeNull();
-    // The exit at the OM's own 5.70% pro forma cap, under the model's own
-    // exit at the 5.45% going-in cap.
+    // The exit at the OM's 5.45% going-in cap, the model's own exit.
     expect(irr("exit_cap")).toEqual(rerun("exit_cap"));
-    expect(irr("exit_cap")![1]).toBeLessThan(own);
+    expect(irr("exit_cap")![1]).toBe(own);
     expect(irr("noi")).toEqual(rerun("noi"));
     expect(irr("noi")![1]).toBe(own);
     // "Vacancy (pro forma)" is the pro forma's deduction from gross
@@ -157,14 +158,15 @@ describe("the sample's stress test", () => {
   it("quotes the stress test's own exit re-run in the verdict's breaks-if, never the first-draft model's", () => {
     const exit = row("exit_cap").impact!;
     expect(exit.omValue).toBeCloseTo(SAMPLE_EXIT_RERUN.omExitPct / 100, 10);
-    expect(exit.altValue).toBeCloseTo(SAMPLE_EXIT_RERUN.proFormaExitPct / 100, 10);
+    expect(exit.altValue).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInExitPct / 100, 10);
     expect(exit.baseIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.omIrrPct, 2);
-    expect(exit.altIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.proFormaIrrPct, 2);
-    // The model's own case, the exit at the going-in cap it runs.
+    expect(exit.altIrrPct!).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInIrrPct, 2);
+    // The model's own case, the exit at the going-in cap it runs: the row's
+    // re-run is the model's own.
     expect(model.inputs.exitCapPct).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInExitPct / 100, 10);
     expect(computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInIrrPct, 2);
     const killer = SAMPLE_DEAL.verdict.screen!.dealKillers.find((k) => k.lever === "exit")!;
-    expect(killer.risk).toBe("At the 5.70% pro forma cap, the stress test's IRR falls 10.8% to 7.4%.");
+    expect(killer.risk).toBe("At the 5.45% going-in cap, the stress test's IRR falls 10.8% to 9.3%.");
     expect(killer.risk.length).toBeLessThanOrEqual(72);
   });
 });

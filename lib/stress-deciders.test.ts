@@ -104,7 +104,7 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(vacancyDecider(held(hi, lo), { stabilized: true })!.label).toBe(lo.label);
   });
 
-  it("exit cap: the higher of the going-in and the OM's pro forma cap, else the tracker range's low end; the 10-year never", () => {
+  it("exit cap: the going-in cap, else the tracker range's low end; the OM's pro forma cap and the 10-year never", () => {
     const going = piece(GOING_IN_CAP_LABEL, 5.71, { kind: "om_internal" });
     const ten = piece("10-year Treasury", null);
     const lo = piece("Office cap (research tracker), low end", 6.5);
@@ -112,13 +112,15 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(exitCapDecider(held(ten, hi, lo, going))!.label).toBe(GOING_IN_CAP_LABEL);
     expect(exitCapDecider(held(ten, hi, lo))!.label).toBe(lo.label);
     expect(exitCapDecider(held(ten))).toBeNull();
-    // The OM's pro forma cap over the going-in cap decides; under it, or tied,
-    // the going-in cap does; the tracker never beside either.
+    // The OM's pro forma cap never decides, over the going-in cap or alone:
+    // its stabilized NOI over the price counts the plan's NOI growth (the
+    // second review, 2026-10-28); the tracker's low end decides without a
+    // going-in cap.
     const pf = (v: number) => piece(PRO_FORMA_CAP_LABEL, v, { kind: "om_internal" });
-    expect(exitCapDecider(held(going, pf(5.95), lo))).toMatchObject({ index: 1, figure: 5.95, name: "the OM's pro forma cap" });
+    expect(exitCapDecider(held(going, pf(5.95), lo))).toMatchObject({ index: 0, figure: 5.71, name: "the OM's going-in cap" });
     expect(exitCapDecider(held(going, pf(5.5), lo))).toMatchObject({ index: 0, figure: 5.71, name: "the OM's going-in cap" });
-    expect(exitCapDecider(held(going, pf(5.71)))!.label).toBe(GOING_IN_CAP_LABEL);
-    expect(exitCapDecider(held(pf(5.5), lo))!.label).toBe(PRO_FORMA_CAP_LABEL);
+    expect(exitCapDecider(held(pf(5.95), lo))!.label).toBe(lo.label);
+    expect(exitCapDecider(held(pf(5.95)))).toBeNull();
   });
 
   it("the basis, the NOI and the taxes keep their own one figure; insurance the T-12's premium, only where the row hands it in", () => {
@@ -150,7 +152,9 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(DECIDER_NAMES.insurance).toEqual(["the deal's T-12 premium"]);
     expect(DECIDER_NAMES.vacancy).not.toContain("the deal's T-12");
     expect(VERDICT_RULES.expense_growth).toContain("all-items CPI");
-    expect(VERDICT_RULES.exit_cap).toContain("the higher of the OM's going-in cap and its own pro forma cap");
+    expect(VERDICT_RULES.exit_cap).toContain("Held to the going-in cap");
+    expect(VERDICT_RULES.exit_cap).toContain("so it never decides");
+    expect(DECIDER_NAMES.exit_cap).toEqual(["the OM's going-in cap", "the research tracker's cap range, at its low end"]);
     expect(VERDICT_RULES.exit_cap).toContain("no expansion over the hold is added");
     expect(DECIDER_NAMES.vacancy).not.toContain("the deal's rent roll");
     expect(DECIDER_NAMES.basis).toEqual(["the median of the memorandum's sale comps graded clean, three or more", "the recorded sales' median, three or more"]);

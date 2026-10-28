@@ -75,9 +75,9 @@
 //   expense growth   EXPENSE_GROWTH_UNSUPPORTED_PTS 1.5 pts under all-items
 //                    CPI (core CPI only where all-items is not fresh)
 //   exit cap         EXIT_CAP_UNSUPPORTED_BPS  25 bps tighter than the
-//                    higher of the going-in cap and the OM's own pro forma
-//                    cap (else the tracker cap range's low end); no
-//                    expansion over the hold is added
+//                    going-in cap (else the tracker cap range's low end);
+//                    the OM's pro forma cap is beside it, never deciding;
+//                    no expansion over the hold is added
 //   debt             DEBT_UNSUPPORTED_BPS      50 bps under the lender's quote
 //                    on file (a term sheet's rate), else under the seeded
 //                    rate (stretched at most unless under the bare index)
@@ -1602,7 +1602,17 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     method: methodSentence("vacancy", evidence, 0, title),
     ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
     ...(economic ? { measure: "economic" as const } : {}),
+    ...(doorsOf(ctx.rows) != null ? { doors: doorsOf(ctx.rows)! } : {}),
   };
+}
+
+/** The unit count the OM states, a whole count of one or more, for the
+ *  vacancy row's `doors`: one door's share of it is the smallest move a
+ *  vacancy can make, which the track record scores no finer than
+ *  (lib/stress-snapshot `rowThreshold`). Null where no count is stated. */
+function doorsOf(rows: Row[]): number | null {
+  const n = unitCountFromMetrics(rows);
+  return n != null && Number.isInteger(n) && n >= 1 ? n : null;
 }
 
 // — Rent growth —
@@ -1884,20 +1894,19 @@ function expenseGrowthRow(ctx: Ctx): StressRow | null {
  * carries no figure), and the tracker's cap range where one is on file,
  * held to only where the read holds the model to it (fresh, dated, the
  * whole stock) — and the one figure that decides (`exitCapDecider`): the
- * higher of the going-in cap and the OM's own pro forma cap (its stabilized
- * NOI over the same price, the income an exit sells — the review of
- * 2026-10-23: an exit capitalizes a forward NOI, so a cap struck on today's
- * alone lets an exit under the stabilized yield pass as no compression), the
- * other beside it; else the tracker's range at its low end. No expansion over
- * the hold is added to either. `exitPct` is the exit the 10-year's spread is
- * said for (none: the figure alone).
+ * going-in cap, else the tracker's range at its low end. The OM's own pro
+ * forma cap (its stabilized NOI over the same price) is drawn beside it and
+ * decides nothing: it is a yield on the price that already counts the plan's
+ * NOI growth, so an exit held to it would call the plan's value creation cap
+ * compression (the second review, 2026-10-28; the review of 2026-10-23 had
+ * let it decide). No expansion over the hold is added. `exitPct` is the exit
+ * the 10-year's spread is said for (none: the figure alone).
  */
 export function exitCapPieces(
   ex: ExtractionResult | null,
   plan: boolean,
   mvm: ModelVsMarket | null,
   exitPct: number | null,
-  opts: { proForma?: boolean } = {},
 ): RowPieces & { goingIn: number | null; proForma: number | null; rangeRead: boolean } {
   const rows = rowsOf(ex);
   const evidence: StressEvidence[] = [];
@@ -1918,19 +1927,20 @@ export function exitCapPieces(
       ...(page != null ? { page } : {}),
     });
   }
-  // The OM's pro forma cap: its stabilized NOI over the same price — the
-  // income an exit capitalizes — on the same terms as the going-in cap (no
-  // plan deal, a price that buys the building), inside the band a cap may be.
+  // The OM's pro forma cap: its stabilized NOI over the same price, on the
+  // same terms as the going-in cap (no plan deal, a price that buys the
+  // building), inside the band a cap may be. Beside the going-in cap, never
+  // deciding: a yield on price that includes the plan's own NOI growth.
   const pfHit = omProFormaCap(ex);
   const proFormaRow = pfHit?.row ?? null;
   const proForma = pfHit?.pct ?? null;
-  const proFormaOk = opts.proForma !== false && proForma != null && proForma > 0 && proForma < IMPLIED_CAP_CEILING * 100 && !plan && buildingPriceOf(ex, 1) != null;
+  const proFormaOk = proForma != null && proForma > 0 && proForma < IMPLIED_CAP_CEILING * 100 && !plan && buildingPriceOf(ex, 1) != null;
   if (proFormaOk) {
     const page = pageOf(proFormaRow, ex);
     evidence.push({
       kind: "om_internal",
       label: PRO_FORMA_CAP_LABEL,
-      text: `${pct2(proForma!)} (${proFormaRow!.label}): the yield the price earns on the OM's own stabilized NOI, the income an exit sells`,
+      text: `${pct2(proForma!)} (${proFormaRow!.label}): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding`,
       value: proForma!,
       asOf: null,
       publisher: "the offering memorandum",
@@ -1969,20 +1979,13 @@ export function exitCapPieces(
       }
     }
   }
-  // ONE figure decides (lib/stress-deciders `exitCapDecider`): the higher of
-  // the OM's own going-in cap — the cap the deal is bought at — and its pro
-  // forma cap — the stabilized NOI over the same price — else the tracker's
-  // cap range at its low end. A tracker range beside either is shown and
-  // decides nothing: it had turned an unsupported compression into a
-  // stretched one wherever its low end reached the exit.
-  const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || e.label === PRO_FORMA_CAP_LABEL || trackerHeld.has(e)));
-  // The pro forma cap, where it decides, is drawn first, the going-in cap
-  // beside it.
-  if (decided && decided.label === PRO_FORMA_CAP_LABEL && decided.index > 0) {
-    const [d] = evidence.splice(decided.index, 1);
-    evidence.unshift(d);
-    return { evidence, decided: { ...decided, index: 0 }, goingIn, proForma: proFormaOk ? proForma : null, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
-  }
+  // ONE figure decides (lib/stress-deciders `exitCapDecider`): the OM's own
+  // going-in cap — the cap the deal is bought at — else the tracker's cap
+  // range at its low end. The pro forma cap and a tracker range beside a
+  // going-in cap are shown and decide nothing: the range had turned an
+  // unsupported compression into a stretched one wherever its low end
+  // reached the exit, and the pro forma cap counts the plan's NOI growth.
+  const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || trackerHeld.has(e)));
   return { evidence, decided, goingIn, proForma: proFormaOk ? proForma : null, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
 }
 
@@ -2000,10 +2003,12 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     // OM states: on a value-add, lease-up, conversion or development deal
     // the going-in cap is struck on today's income, not the stabilized one
     // the exit sells; on a price that buys no building it is no building's.
-    const stated = (goingIn != null && goingIn > 0) || proForma != null;
+    const stated = goingIn != null && goingIn > 0;
     const range = rangeRead ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
     const why = !stated
-      ? `The OM states no going-in or pro forma cap, and ${range}.`
+      ? proForma != null
+        ? `The OM states no going-in cap — its ${pct2(proForma)} pro forma cap is its stabilized yield on its price (it includes the plan's NOI growth), shown beside and never deciding — and ${range}.`
+        : `The OM states no going-in cap, and ${range}.`
       : ctx.plan
         ? `On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and ${range}.`
         : `The price buys no building, so its going-in cap is no building's to hold the exit to; and ${range}.`;
@@ -2011,18 +2016,14 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   }
   const alt = decided.figure;
   const onGoingIn = decided.label === GOING_IN_CAP_LABEL;
-  const onProForma = decided.label === PRO_FORMA_CAP_LABEL;
-  // The OM's other cap, beside the one that decides: the going-in cap beside
-  // a pro forma cap that decides, the pro forma cap beside a going-in cap at
-  // or over it.
+  // The OM's pro forma cap, beside the figure that decides and never
+  // deciding: its stabilized NOI over the price is a yield on price that
+  // already counts the plan's NOI growth, so compression is said only
+  // against the going-in cap (the second review, 2026-10-28).
   const besideCap =
-    onProForma && goingIn != null && goingIn > 0
-      ? ` Its ${pct2(goingIn)} going-in cap, on today's NOI, is beside it.`
-      : onGoingIn && proForma != null
-        ? ` Its ${pct2(proForma)} pro forma cap, on its stabilized NOI, ${Math.abs(proForma - alt) < SAME ? "is the same" : "sits under it"}, shown beside it.`
-        : "";
-  // No expansion over the hold is added to either cap: said where the exit
-  // is flat to the cap that decides.
+    proForma != null ? ` Its ${pct2(proForma)} pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the plan's NOI growth).` : "";
+  // No expansion over the hold is added: said where the exit is flat to the
+  // going-in cap.
   const noExpansion = "adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to";
   // The figures are percent points here; the threshold is in bps. At or over
   // the figure holds; tighter is stretched, and by 25 bps or more
@@ -2040,20 +2041,11 @@ function exitCapRow(ctx: Ctx): StressRow | null {
         : diffBps > 0
           ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} going-in cap — cap compression.${besideCap}`
           : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} going-in cap — the conservative side.${besideCap}`
-      : onProForma
-        ? // The pro forma cap is the price's yield on the stabilized NOI the
-          // exit sells: an exit under it sells that income dearer than this
-          // buyer pays for it.
-          Math.abs(diffBps) < SAME * 100
-          ? `The OM's ${pct2(om.pct)} exit is flat to its ${pct2(alt)} pro forma cap, the price's yield on its own stabilized NOI; ${noExpansion}.${besideCap}`
-          : diffBps > 0
-            ? `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} tighter than its ${pct2(alt)} pro forma cap — the price's yield on its own stabilized NOI, the income the exit sells — so it sells that income dearer than this buyer pays for it: cap compression.${besideCap}`
-            : `The OM's ${pct2(om.pct)} exit is ${bps(diffBps)} over its ${pct2(alt)} pro forma cap, the price's yield on its own stabilized NOI — the conservative side.${besideCap}`
-        : Math.abs(gap) < SAME
-        ? `The OM's ${pct2(om.pct)} exit sits at the published cap range's low end, ${pct2(alt)}.`
+      : Math.abs(gap) < SAME
+        ? `The OM's ${pct2(om.pct)} exit sits at the published cap range's low end, ${pct2(alt)}.${besideCap}`
         : gap > 0
-          ? `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} under the published cap range's low end, ${pct2(alt)}.`
-          : `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} over the published cap range's low end, ${pct2(alt)} — the conservative side.`,
+          ? `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} under the published cap range's low end, ${pct2(alt)}.${besideCap}`
+          : `The OM's ${pct2(om.pct)} exit is ${bps(gap * 100)} over the published cap range's low end, ${pct2(alt)} — the conservative side.${besideCap}`,
   );
   judged.gap = { ...judged.gap, value: Math.round(diffBps), unit: "bps" };
   // 25 bps or more of compression is unsupported: the threshold is
@@ -2067,7 +2059,7 @@ function exitCapRow(ctx: Ctx): StressRow | null {
           what: "the exit cap",
           om: pct2(om.pct),
           alt: pct2(alt),
-          evidence: onGoingIn ? "the going-in cap" : onProForma ? "the pro forma cap" : evidence[evidenceIndex].publisher,
+          evidence: onGoingIn ? "the going-in cap" : evidence[evidenceIndex].publisher,
           model: pct2(ctx.derived.inputs.exitCapPct * 100),
         })
       : null;

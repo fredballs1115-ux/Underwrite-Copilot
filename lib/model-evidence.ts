@@ -12,16 +12,10 @@
 //     rent growth, the higher expense growth, the higher exit cap;
 //   - where one stands, that one;
 //   - else today's default (3.0%; the going-in cap, else 6.0%).
-// The model's exit runs the OM's going-in cap, else the research tracker's
-// cap range at its low end, so where the memorandum states a going-in cap on
-// a building it is bought as, the exit is never tighter than it, nor than
-// the memorandum's own stated exit — nor than its pro forma cap where that
-// decides the stress test's exit row (the higher of the going-in cap and the
-// OM's pro forma cap, the review of 2026-10-23; it reaches the model as the
-// OM's own stated figure, below). Where the pro forma cap decides that row
-// and no going-in cap stands, the tracker's range decides nothing for the
-// model either: it runs the row's own decider, never a figure the row did
-// not decide by, named as the stress test's.
+// The exit's deciding figure is the OM's going-in cap, else the research
+// tracker's cap range at its low end, so where the memorandum states a
+// going-in cap on a building it is bought as, the exit is never tighter
+// than it, nor than the memorandum's own stated exit.
 //
 // One read, every surface: the caller hands in the figures it already read
 // for the model's assumptions against the market (lib/model-vs-market-read
@@ -39,8 +33,8 @@ import { buildingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy"
 import { modelVsMarketFor, type MarketReads } from "@/lib/model-vs-market";
 import type { RegulationRead } from "@/lib/rent-regulation";
 import { readsNoRentIndex } from "@/lib/rent-growth-decider";
-import { PRO_FORMA_CAP_LABEL, type DecidingFigure } from "@/lib/stress-deciders";
-import { exitCapPieces, expenseGrowthPieces, omExitCap, omExpenseGrowth, omProFormaCap, omRentGrowth, rentGrowthPieces, type RowPieces } from "@/lib/stress-test";
+import type { DecidingFigure } from "@/lib/stress-deciders";
+import { exitCapPieces, expenseGrowthPieces, omExitCap, omExpenseGrowth, omRentGrowth, rentGrowthPieces, type RowPieces } from "@/lib/stress-test";
 import type { StressEvidence } from "@/lib/stress-test-types";
 import { houseShort, trackerFor } from "@/lib/tracker-read";
 
@@ -143,17 +137,6 @@ function statedOf(hit: { row: { label: string; value: string; page?: string }; p
   return hit ? { pct: hit.pct, label: hit.row.label, value: hit.row.value, ...(hit.row.page ? { page: hit.row.page } : {}) } : null;
 }
 
-/** The OM's own figure the model's exit is held to beside the deciding one:
- *  its stated exit, or — where the OM's pro forma cap decides the stress
- *  test's exit row and sits over the stated exit — the pro forma cap, the
- *  OM's own figure too, so the model never exits tighter than the row's. */
-function exitStated(
-  exit: { row: { label: string; value: string; page?: string }; pct: number } | null,
-  proForma: { row: { label: string; value: string; page?: string }; pct: number } | null,
-): StatedFigure | null {
-  return proForma && (!exit || proForma.pct > exit.pct + 1e-9) ? statedOf(proForma) : statedOf(exit);
-}
-
 /**
  * The figures the screening model runs its rent growth, expense growth and
  * exit at, for a deal: the published figures read once by the caller
@@ -196,17 +179,7 @@ export function modelEvidenceFor(args: {
   // going-in cap decides without any read, the tracker's range only with
   // one (lib/model-vs-market reads none for land, so land's exit is the
   // going-in cap the memorandum states, or none — as the row's).
-  // The stress test's exit row is decided by the higher of the OM's going-in
-  // cap and its pro forma cap (the review of 2026-10-23). The model's exit
-  // reader (lib/underwrite/inputs) knows an OM-internal deciding figure only
-  // as its own going-in cap, so it is handed the exit's pieces without the
-  // pro forma cap (`proForma: false`): the going-in cap, else the tracker's
-  // low end, as before. Where the pro forma cap decides the row, it reaches
-  // the model as the OM's own figure it is (`stated`, below): the model runs
-  // the higher of the deciding going-in cap and the OM's stated figure, so it
-  // runs the pro forma cap, its note naming it as the OM's, never as more.
-  const exitPieces = exitCapPieces(ex, plan, mvm, null, { proForma: false });
-  const rowExit = exitCapPieces(ex, plan, mvm, null).decided;
+  const exitPieces = exitCapPieces(ex, plan, mvm, null);
   let exitDecided = decidedOf(exitPieces, place);
   if (exitDecided && exitDecided.kind === "published") {
     // The range the low end is of, said as research with its house, its
@@ -237,16 +210,6 @@ export function modelEvidenceFor(args: {
         : buildingPriceOf(ex, 1) == null
           ? "the price buys no building, so its going-in cap is no building's"
           : "the OM's going-in cap is outside the band a cap may be";
-  // Where the stress test's exit row is struck on the OM's pro forma cap and
-  // no going-in cap decides the model's exit, the figure the model's own
-  // reader would take in its place (the tracker's low end) is not the row's
-  // deciding figure, and is never handed in as one: the model runs the row's
-  // own decider, the pro forma cap, the OM's own figure (`stated`), held to
-  // the cautious side of the OM's stated exit — the owner's rule, the
-  // deciding figure held to the OM's — and its note says why (`absent`).
-  const rowProForma = rowExit?.label === PRO_FORMA_CAP_LABEL ? omProFormaCap(ex) : null;
-  const proFormaDecidesInstead = rowProForma != null && exitDecided != null && exitDecided.kind !== "om_internal";
-  if (proFormaDecidesInstead) exitDecided = null;
   const exitCheck = mvm?.checks.find((c) => c.key === "exit_cap") ?? null;
   const rangeAbsent = !args.reads
     ? NOT_READ
@@ -282,12 +245,8 @@ export function modelEvidenceFor(args: {
     },
     exitCap: {
       decided: exitDecided,
-      stated: exitStated(omExitCap(ex), rowProForma),
-      absent: exitDecided
-        ? null
-        : proFormaDecidesInstead && rowProForma
-          ? `${goingInAbsent ?? "no going-in cap decides the exit"}, so the stress test's exit row is decided by the OM's own ${rowProForma.pct.toFixed(2)}% pro forma cap${rowProForma.row.page ? ` (${rowProForma.row.page})` : ""}, and the model runs no exit tighter than it`
-          : `${goingInAbsent ?? "no going-in cap decides the exit"}, and ${rangeAbsent}`,
+      stated: statedOf(omExitCap(ex)),
+      absent: exitDecided ? null : `${goingInAbsent ?? "no going-in cap decides the exit"}, and ${rangeAbsent}`,
       goingInAbsent,
     },
   };

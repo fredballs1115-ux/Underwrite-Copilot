@@ -3116,11 +3116,11 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).not.toContain("No return struck: The shared screen");
     expect(text).not.toContain("No model was derived");
     expect(html).not.toContain('data-bar="stress-impact"');
-    // The exit cap against the OM's own pro forma cap, the OM against
-    // itself, stands without a model; the loader reads the challenger's
-    // words for it.
+    // The exit cap against the going-in cap, the OM against itself, stands
+    // without a model (its pro forma cap beside it, never deciding); the
+    // loader reads the challenger's words for it.
     expect(html).toContain('data-qa="stress-row-exit_cap"');
-    expect(text).toContain("The OM's 5.25% exit is 45 bps tighter than its 5.70% pro forma cap");
+    expect(text).toContain("The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression.");
     // The loader selects the challenger result for it.
     expect(readFileSync("lib/share-resolve.ts", "utf8")).toMatch(/SHARED_DEAL_COLUMNS =\s*"[^"]*\bchallenges\b/);
     expect(readFileSync("app/share/[token]/page.tsx", "utf8")).toContain("challenger: (deal.challenges as ChallengerResult | null) ?? null");

@@ -207,6 +207,12 @@ export interface StressRow {
    *  and the track record scores a later T-12 on the same one. Absent
    *  elsewhere */
   footing?: { less: ("taxes" | "insurance")[] };
+  /** on the vacancy row, the unit count the OM states: one door's share of
+   *  it (one vacant door, or one door's rent of the gross potential rent) is
+   *  the smallest move the vacancy can make, so the track record scores the
+   *  row by no finer a margin (lib/stress-snapshot `rowThreshold`). Absent
+   *  where the OM states no count, elsewhere, and on a row built before */
+  doors?: number;
   /** on the market-rent row, the yardstick its figures stand on: "/mo", a
    *  month a unit, or "/SF", a square foot a year (the class's own). Absent
    *  elsewhere */
@@ -555,15 +561,15 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "The exit cap",
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
-      "The higher of the OM's going-in cap and its own pro forma cap decides, the other shown beside it: an exit tighter than either is cap compression, said as such",
-      "The OM's pro forma cap is its stabilized NOI over the price, the income an exit sells: an exit under it sells that income dearer than this buyer pays for it",
+      "The going-in cap, the one figure that decides: an exit tighter than the entry is cap compression, said as such",
+      "The OM's pro forma cap, shown beside it and deciding nothing: the OM's stabilized yield on its price (it includes the plan's NOI growth), so compression is said only against the going-in cap",
       "The exit's spread over the latest 10-year Treasury, dated, shown beside it and deciding nothing (a yield, not a cap), with the going-in cap's spread where the exit is held to it",
-      "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where the OM states neither cap, and beside one it is shown, deciding nothing",
+      "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where no going-in cap stands, and beside a going-in cap it is shown, deciding nothing",
     ],
-    engine: "The exit cap is a direct input: the return is re-run at the cap that decides, or at the published cap range's low end where the OM states neither.",
+    engine: "The exit cap is a direct input: the return is re-run at the going-in cap, or at the published cap range's low end where no going-in cap stands.",
     limits: [
       "No forecast of where caps go: the test asks what the exit assumes against today's figures.",
-      "No expansion over the hold is added to the cap that decides: an exit flat to it holds, and the common rule of thumb that adds some is named, never held to.",
+      "No expansion over the hold is added to the going-in cap: an exit flat to it holds, and the common rule of thumb that adds some is named, never held to.",
       "A stale tracker figure (over a year old by its own period) is shown and held against nothing.",
     ],
   },

@@ -30,7 +30,7 @@ import {
 } from "@/lib/stress-test";
 import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
 import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, SCORED_BY_TOO, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
-import { snapshotThreshold } from "@/lib/stress-snapshot";
+import { doorShare, snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
 import { SCREENING_MODEL_LINES, SCREENING_RULE_HREF } from "@/lib/screening-model-words";
 
@@ -102,7 +102,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // the comps graded clean first, then the recorded sales; under three, no
   // median, and the row stands unchecked, the comps named with their count.
   basis: `Held to the median of three or more trades: the comps graded clean, else the recorded sales. Under three, unchecked, the comps named with their count; your past screens' asks never decide. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
-  exit_cap: `Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
+  exit_cap: `Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the plan's NOI growth, so it never decides; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
@@ -147,7 +147,7 @@ export function evidenceKindOf(item: string): EvidenceKind | null {
   }
   // "The going-in cap: …" is the memorandum's own figure; "a going-in cap
   // under the all-in rate" (negative leverage) is arithmetic, left unmarked.
-  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|^The higher of the OM's going-in cap\b|^The OM's pro forma cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
+  if (/\bmemorandum\b|memorandum's|^The going-in cap\b|^The OM's pro forma cap\b|achieved premium|stated tax abatement/i.test(item)) return "om_internal";
   if (/deal's own|deal's T-12|rent roll|T-12/i.test(item)) return "document";
   return null;
 }
@@ -294,7 +294,9 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
  *  rules, its floor and its lists of what can score a row imported; the
  *  margins lib/stress-snapshot's `snapshotThreshold` — `rowThreshold`'s
  *  survey margin applies to a vacancy the survey decided, which no later
- *  document scores, so the page names none). */
+ *  document scores, so the page names none; a vacancy's is never finer
+ *  than one door's share of the units the OM states, `doorShare`, said with
+ *  the sample's 248 units). */
 const margin = (key: StressKey) => {
   const t = snapshotThreshold(key);
   return t ? marginWords(t).replace("-point", " points") : "";
@@ -312,7 +314,7 @@ export const TRACK_RECORD = {
     NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands within that margin, or better for the buyer.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
-    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, or one door's share where the OM states its units and that is larger (${doorShare(248)!.toFixed(2)} points, one door of 248), ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
     "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     // lib/track-record `scoreScreen`'s `admit`: refused where the document's

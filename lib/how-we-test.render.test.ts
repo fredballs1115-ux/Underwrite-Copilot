@@ -232,9 +232,11 @@ describe("/how-we-test draws every method from the table", () => {
     expect(VERDICT_RULES.expense_growth).not.toMatch(/lowest/);
     expect(VERDICT_RULES.expense_growth).toContain(`${EXPENSE_GROWTH_UNSUPPORTED_PTS} points`);
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
-    // The higher of the OM's own two caps decides; the published range only
-    // where the OM states neither (the review of 2026-10-23).
-    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the higher of the OM's going-in cap and its own pro forma cap, else the published cap range's low end; no expansion over the hold is added\./);
+    // The going-in cap decides; the published range only where the OM states
+    // none; the pro forma cap is beside it, never deciding (the second
+    // review, 2026-10-28: it counts the plan's NOI growth).
+    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the plan's NOI growth, so it never decides; no expansion over the hold is added\./);
+    expect(VERDICT_RULES.exit_cap).not.toMatch(/higher of/);
     expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_UNSUPPORTED_PCT}%`);
@@ -265,7 +267,10 @@ describe("/how-we-test draws every method from the table", () => {
     // A vacancy the survey decided is never scored (a later document is
     // today's vacancy, not a test of it), so its margin of error is a
     // tolerance no scored row uses, and the page does not offer it.
-    expect(record).toContain("kept with it: 0.05 points on a vacancy, 5% of the OM's NOI, 5% of its price.");
+    // A vacancy's never finer than one door's share of the units the OM
+    // states (the second review, 2026-10-28: 0.05 points is a tenth of a
+    // door on 248 units), said with the doors beside the points.
+    expect(record).toContain("kept with it: 0.05 points on a vacancy, or one door's share where the OM states its units and that is larger (0.40 points, one door of 248), 5% of the OM's NOI, 5% of its price.");
     expect(record).not.toContain("the survey's margin of error on a vacancy");
     expect(record).toContain("A row kept before its tolerance was carried keeps the margin it was stored with.");
     expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });

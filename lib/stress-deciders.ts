@@ -40,14 +40,15 @@
 //     (the cautious side for an expense grown every year of the hold, the
 //     review of 2026-10-23), the other beside it; the insurance premium
 //     index and the breakeven never decide;
-//   - exit cap: the HIGHER of the OM's own going-in cap (the cap the deal is
-//     bought at, on today's NOI) and its pro forma cap (the yield the price
-//     earns on the OM's own stabilized NOI — the income an exit sells, so an
-//     exit under it sells the stabilized building dearer than this buyer
-//     buys it), the other beside it; then the research tracker's cap range
-//     at its low end where neither stands; the 10-year is a yield, never a
-//     cap. No expansion over the hold is added: that is a rule of thumb the
-//     owner has not approved;
+//   - exit cap: the OM's own going-in cap (the cap the deal is bought at,
+//     on today's NOI: an exit tighter than it is cap compression), then the
+//     research tracker's cap range at its low end where no going-in cap
+//     stands; the OM's pro forma cap is beside it and never decides — it is
+//     the OM's stabilized yield on its price, so it carries the plan's own
+//     NOI growth, and an exit held to it would count that value creation as
+//     compression (the second review, 2026-10-28); the 10-year is a yield,
+//     never a cap. No expansion over the hold is added: that is a rule of
+//     thumb the owner has not approved;
 //   - basis: lib/stress-basis-evidence's order — the median of the
 //     memorandum's comps graded clean, three or more (MEDIAN_FLOOR; the
 //     class's yardstick, then per SF alone), then the recorded sales'
@@ -241,42 +242,28 @@ export function expenseGrowthDecider(candidates: readonly DeciderCandidate[]): D
 
 // — Exit cap —
 
-/** The OM's own two caps, the HIGHER of which decides (`exitCapDecider`):
- *  the going-in cap is today's NOI over the price, the pro forma cap the
- *  OM's own stabilized NOI over the same price — the income an exit sells.
- *  An exit under the higher of the two sells the building dearer, a dollar
- *  of NOI, than this buyer buys it: cap compression. */
+/** The exit's one deciding figure is the going-in cap — today's NOI over
+ *  the price, the cap the deal is bought at — else the tracker's low end.
+ *  The OM's pro forma cap (its stabilized NOI over the same price) is drawn
+ *  beside it and decides nothing: a yield on price that already counts the
+ *  plan's NOI growth, so an exit held to it would call the plan's value
+ *  creation cap compression (the second review, 2026-10-28). */
 const GOING_IN_CAP_STEP: DeciderStep = {
   name: "the OM's going-in cap",
   why: "the cap the deal is bought at, on today's NOI: an exit tighter than it is cap compression",
   is: isLabel(GOING_IN_CAP_LABEL),
 };
-const PRO_FORMA_CAP_STEP: DeciderStep = {
-  name: "the OM's pro forma cap",
-  why: "the yield the price earns on the OM's own stabilized NOI, the income the exit sells: an exit tighter than it sells the stabilized building dearer than this buyer buys it",
-  is: isLabel(PRO_FORMA_CAP_LABEL),
-};
 const TRACKER_CAP_STEP: DeciderStep = {
   name: "the research tracker's cap range, at its low end",
-  why: "where the OM states neither a going-in nor a pro forma cap that stands",
+  why: "where no going-in cap stands",
   is: (e) => /cap \(research tracker\)/i.test(e.label) && !/, high end$/.test(e.label),
 };
 
-/** The exit's steps: the higher of the OM's own two caps, then the tracker's
- *  low end. */
-export const EXIT_CAP_ORDER: readonly DeciderStep[] = [GOING_IN_CAP_STEP, PRO_FORMA_CAP_STEP, TRACKER_CAP_STEP];
+/** The exit's steps: the OM's going-in cap, then the tracker's low end. */
+export const EXIT_CAP_ORDER: readonly DeciderStep[] = [GOING_IN_CAP_STEP, TRACKER_CAP_STEP];
 
-/** The higher of the OM's going-in and pro forma caps that may decide (a tie
- *  is the going-in cap's), else the tracker's low end. */
 export function exitCapDecider(candidates: readonly DeciderCandidate[]): DecidingFigure | null {
-  const own = [GOING_IN_CAP_STEP, PRO_FORMA_CAP_STEP]
-    .map((step) => ({ step, index: candidates.findIndex((c) => usable(c) && step.is(c.evidence)) }))
-    .filter((x) => x.index >= 0);
-  if (own.length > 0) {
-    const top = own.reduce((a, b) => (candidates[b.index].evidence.value! > candidates[a.index].evidence.value! + 1e-9 ? b : a));
-    return found(candidates, top.index, top.step.name, top.step.why);
-  }
-  return pickDecider([TRACKER_CAP_STEP], candidates);
+  return pickDecider(EXIT_CAP_ORDER, candidates);
 }
 
 // — Basis —
@@ -415,7 +402,7 @@ export function marketRentDecider(candidates: readonly DeciderCandidate[]): Deci
  *  class's own (lib/rent-growth-decider); the challenger's rows have none. */
 export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   basis: BASIS_ORDER.map((s) => s.name),
-  exit_cap: ["the higher of the OM's going-in cap and its pro forma cap", TRACKER_CAP_STEP.name],
+  exit_cap: EXIT_CAP_ORDER.map((s) => s.name),
   debt: DEBT_ORDER.map((s) => s.name),
   noi: NOI_ORDER.map((s) => s.name),
   vacancy: VACANCY_ORDER.stabilized.map((s) => s.name),

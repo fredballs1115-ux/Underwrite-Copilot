@@ -62,8 +62,8 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "cap_expansion",
     title: "Cap expansion over the hold",
-    why: "No row asks for an exit wider than the caps the OM states: what a buyer at the sale will pay is a forecast, and the screen adds no expansion of its own.",
-    beside: { key: "exit_cap", line: "The exit is held to the higher of the OM's going-in cap and its own pro forma cap; one flat to it holds, the expansion habit named, never held to." },
+    why: "No row asks for an exit wider than the going-in cap the OM states: what a buyer at the sale will pay is a forecast, and the screen adds no expansion of its own.",
+    beside: { key: "exit_cap", line: "The exit is held to the OM's going-in cap; one flat to it holds, the expansion habit named, never held to." },
   },
   {
     id: "reserves",

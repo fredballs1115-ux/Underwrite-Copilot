@@ -93,12 +93,12 @@ const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.
 /**
  * The stress test's re-run of the exit on the sample (lib/stress-test's
  * exit-cap row, on the sample's one derivation, lib/sample-derive): the
- * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.70%
- * pro forma cap that decides the row (the higher of the OM's own going-in
- * and pro forma caps, the review of 2026-10-23) — each levered IRR in
- * percent; and the model's own case, the 5.45% going-in cap the derived
- * model exits at, with its levered IRR. The verdict's "breaks if" and its
- * scenarios quote these. They are written here because this module cannot
+ * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.45%
+ * going-in cap that decides the row, which the derived model exits at too
+ * (its 5.70% pro forma cap is beside it, never deciding: a yield on the price
+ * that includes the plan's NOI growth, the second review of 2026-10-28) —
+ * each levered IRR in percent. The verdict's "breaks if" and its scenarios
+ * quote these. They are written here because this module cannot
  * load the derivation (it imports this one, and the homepage's client bundle
  * loads this module), and lib/sample-figures.test.ts holds each to the
  * engine's own figure, so the sentence cannot drift from the row printed
@@ -106,9 +106,7 @@ const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.
  */
 export const SAMPLE_EXIT_RERUN = {
   omExitPct: 5.25,
-  proFormaExitPct: 5.7,
   omIrrPct: 10.75,
-  proFormaIrrPct: 7.42,
   goingInExitPct: 5.45,
   goingInIrrPct: 9.25,
 } as const;
@@ -652,13 +650,13 @@ const verdict: VerdictResult = {
   verdict: "caution",
   reason:
     // What the documents say, never a verdict a live feed decides: the ask
-    // over both clean comps, the OM's exit tighter than its own caps, and
+    // over both clean comps, the OM's exit tighter than its going-in cap, and
     // the premium its pro forma rents carry past what the renovated doors
     // achieve. The premium is in none of the model's returns (the model
     // grows today's rent at one rate), so it is said of the rents.
-    `The ask sits over both clean comps, the OM exits under its own pro forma cap, and the pro forma's rents lean on an unproven ${dollarsOf(PREMIUM.priced)} premium. Worth a closer look only if the seller moves on price or the premium is proven.`,
+    `The ask sits over both clean comps, the OM exits tighter than its going-in cap, and the pro forma's rents lean on an unproven ${dollarsOf(PREMIUM.priced)} premium. Worth a closer look only if the seller moves on price or the premium is proven.`,
   topRisks: [
-    "Exit cap of 5.25% sits 45 bps inside the OM's own 5.70% pro forma cap and 20 bps inside its 5.45% going-in cap.",
+    "Exit cap of 5.25% sits 20 bps inside the 5.45% going-in cap, with no catalyst for the compression.",
     // A condition, as the stress test's taxes row says it: whether the sale
     // resets the assessment is the jurisdiction's to say.
     `If the sale resets the assessment to the ${compactUsd(TAX.price, { trim: true })} price, the seller's ${dollarsOf(TAX.bill)} tax bill is ${dollarsOf(TAX.reset)} a year.`,
@@ -730,9 +728,9 @@ const verdict: VerdictResult = {
         // The stress test's own figures (its exit-cap row), never the
         // first-draft model's: the first cut quoted "roughly 180 bps" off
         // that model at a 5.50% exit, beside a stress test whose engine
-        // moves 10.8% to 7.4% at the pro forma cap that decides the row.
+        // moves 10.8% to 9.3% at the going-in cap that decides the row.
         // Short enough for the one-page memo's card (72 characters).
-        risk: `At the ${SAMPLE_EXIT_RERUN.proFormaExitPct.toFixed(2)}% pro forma cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.proFormaIrrPct.toFixed(1)}%.`,
+        risk: `At the ${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% going-in cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%.`,
       },
       {
         lever: "debt",

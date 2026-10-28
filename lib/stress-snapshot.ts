@@ -24,10 +24,14 @@
 //     (`rowThreshold`): the survey's margin of error where a survey's figure
 //     decided a vacancy (lib/stress-test's vacancy judge reads it off the
 //     figure's own text, "6.2% ±2.2 pts", and holds a 6.0% inside it), else
-//     the key's own (`snapshotThreshold`). A later figure is scored against
-//     the OM's by that margin (lib/track-record), so a stretched row is right
-//     only where the later figure lands past it, and a hold wrong only where
-//     the later figure lands past it on the buyer's bad side;
+//     the key's own (`snapshotThreshold`); a vacancy's never finer than one
+//     door's share of the units the OM states (`doorShare`: 0.40 points on
+//     248 units), the smallest move a vacancy can make, so a held 6.0% is
+//     never a false hold at 6.1% (the second review, 2026-10-28). A later
+//     figure is scored against the OM's by that margin (lib/track-record), so
+//     a stretched row is right only where the later figure lands past it, and
+//     a hold wrong only where the later figure lands past it on the buyer's
+//     bad side;
 //   - which way a figure moving is worse for the buyer is the key's own
 //     (`worse`): a vacancy, an exit cap or a rate rising, an NOI, a rent
 //     growth or a price (a trade under the ask) falling;
@@ -77,8 +81,11 @@ export interface StressSnapshotRow {
   /** the yardstick's word where the evidence was judged on one of its own ("/SF") */
   per: string | null;
   /** inside this of the OM's figure, a figure is AT it: points, or a share of
-   *  the OM's figure; null on a key nothing scores (insurance, other) */
-  threshold: { value: number; unit: "pts" | "share" } | null;
+   *  the OM's figure; null on a key nothing scores (insurance, other). On a
+   *  vacancy whose margin is one door's share of the units the OM states,
+   *  `doors` is that count, so every surface says the doors beside the
+   *  points */
+  threshold: { value: number; unit: "pts" | "share"; doors?: number } | null;
   /** which way a figure moving is worse for the buyer */
   worse: "higher" | "lower";
   /** what the row's re-run measured at the verdict: the derived model's
@@ -179,6 +186,14 @@ function marginOfError(text: string): number | null {
   return m && finite(Number(m[1])) ? Number(m[1]) : null;
 }
 
+/** One door's share of a count of units, in points: the smallest move a
+ *  vacancy counted by doors can make (one door empty or let), and in dollars
+ *  the smallest economic one (one door's rent of the gross potential rent).
+ *  Null where no whole count of one or more is stated. */
+export function doorShare(doors: number | null | undefined): number | null {
+  return doors != null && Number.isInteger(doors) && doors >= 1 ? 100 / doors : null;
+}
+
 /**
  * The tolerance the row's own verdict was struck by, kept so a later figure
  * is scored by the margin the verdict drew, never a stricter one. On a
@@ -188,14 +203,19 @@ function marginOfError(text: string): number | null {
  * margin is the row's; on every other row, the key's own
  * (`snapshotThreshold`) — the judges of the rent growth, the expense growth,
  * the exit cap and the debt strike at `SAME`, the NOI, the basis, a tax bill
- * and a premium at their own lines.
+ * and a premium at their own lines. A vacancy's margin is never finer than
+ * one door's share of the units the OM states (`doors`, the row's own count;
+ * in doors or in dollars alike): a 0.05-point margin on 248 units is a
+ * tenth of one door, so a held 6.0% read a false hold at 6.1%.
  */
-export function rowThreshold(key: StressKey, decider: { kind: EvidenceKind; text: string } | null): StressSnapshotRow["threshold"] {
-  if (key === "vacancy" && decider?.kind === "published") {
-    const moe = marginOfError(decider.text);
-    if (moe != null) return { value: moe, unit: "pts" };
-  }
-  return snapshotThreshold(key);
+export function rowThreshold(key: StressKey, decider: { kind: EvidenceKind; text: string } | null, doors?: number | null): StressSnapshotRow["threshold"] {
+  const base: StressSnapshotRow["threshold"] =
+    key === "vacancy" && decider?.kind === "published" && marginOfError(decider.text) != null
+      ? { value: marginOfError(decider.text)!, unit: "pts" }
+      : snapshotThreshold(key);
+  const door = key === "vacancy" ? doorShare(doors) : null;
+  if (base && base.unit === "pts" && door != null && door > base.value + 1e-9) return { value: door, unit: "pts", doors: doors! };
+  return base;
 }
 
 /** The stress test as it stood at the verdict; null with no test or no rows. */
@@ -223,7 +243,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       // A market rent's yardstick, "/mo" or "/SF", so a later rent roll is
       // read on the same one.
       per: own ? own.per : (r.yardstick ?? null),
-      threshold: rowThreshold(r.key, decider),
+      threshold: rowThreshold(r.key, decider, r.doors),
       worse: WORSE_WHEN[r.key],
       rerun: r.impact ? (r.impact.measure === "yield_on_cost" ? "yield_on_cost" : "levered_irr") : null,
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
@@ -287,7 +307,7 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
             ...(str(e.period) && e.period ? { period: e.period } : {}),
           }
         : null;
-    const t = r.threshold as { value?: unknown; unit?: unknown } | null | undefined;
+    const t = r.threshold as { value?: unknown; unit?: unknown; doors?: unknown } | null | undefined;
     rows.push({
       key,
       title: r.title,
@@ -296,7 +316,10 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       page: finite(r.page) ? r.page : null,
       evidence,
       per: str(r.per) ? r.per : null,
-      threshold: t && finite(t.value) && (t.unit === "pts" || t.unit === "share") ? { value: t.value, unit: t.unit } : null,
+      threshold:
+        t && finite(t.value) && (t.unit === "pts" || t.unit === "share")
+          ? { value: t.value, unit: t.unit, ...(t.unit === "pts" && finite(t.doors) && doorShare(t.doors) != null ? { doors: t.doors } : {}) }
+          : null,
       worse: r.worse === "higher" || r.worse === "lower" ? r.worse : WORSE_WHEN[key],
       // Kept only as one of its two words or a stored null; anything else,
       // or a snapshot kept before it was carried, is left absent (unknown).

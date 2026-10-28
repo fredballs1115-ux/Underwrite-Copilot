@@ -2960,7 +2960,7 @@ describe("the report's stress-test page", () => {
     expect(stress).toBeLessThan(at("Sensitivity analysis"));
     // The stress test runs on until the grids; its pages read as one.
     const page = pages.slice(stress, at("Sensitivity analysis")).join(" ");
-    expect(page).toContain("11 assumptions · 2 unsupported · 3 stretched · 1 holds · 5 unchecked");
+    expect(page).toContain("11 assumptions · 1 unsupported · 4 stretched · 1 holds · 5 unchecked");
     expect(page).toContain("the engine's own run of the model with that one input swapped, never an estimate");
     // The headline under the read line, in its parts — the lead, what the
     // split is, a row a part, then each sentence after — every part the
@@ -2983,7 +2983,7 @@ describe("the report's stress-test page", () => {
     // page says it, under the read line and before the headline.
     expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
     expect(page.indexOf(flat(SAMPLE_PLAN_NOTE))).toBeLessThan(page.indexOf(flat(h.lead)));
-    expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Exit cap"));
+    expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Renovation premium"));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
     expect(test.publishedRead).toBe(false);
@@ -3004,8 +3004,9 @@ describe("the report's stress-test page", () => {
     // Every row, unsupported first.
     for (const r of test.rows) expect(page).toContain(`OM says: ${r.omSays.text}`);
     // The verdict word is the row's tag, printed in capitals.
-    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeGreaterThan(-1);
-    expect(page.indexOf("UNSUPPORTED Exit cap")).toBeLessThan(page.indexOf("STRETCHED NOI"));
+    expect(page.indexOf("UNSUPPORTED Renovation premium")).toBeGreaterThan(-1);
+    expect(page.indexOf("UNSUPPORTED Renovation premium")).toBeLessThan(page.indexOf("STRETCHED Exit cap"));
+    expect(page.indexOf("UNSUPPORTED Renovation premium")).toBeLessThan(page.indexOf("STRETCHED NOI"));
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("HOLDS Stabilized vacancy"));
     expect(page.indexOf("HOLDS Stabilized vacancy")).toBeLessThan(page.indexOf("UNCHECKED Basis"));
     expect(page.indexOf("STRETCHED NOI")).toBeLessThan(page.indexOf("UNCHECKED Debt"));
@@ -3024,13 +3025,18 @@ describe("the report's stress-test page", () => {
     expect(page).toMatch(/Method: The OM's stabilized vacancy against multifamily vacancy, a rule of thumb, the one figure that decides/);
     expect(page).toContain("Ask: What's the absorption schedule to get from 9.1% to 6%?");
     // The memorandum's own pieces carry their validated page, as the panel's
-    // page chip and the memo's evidence cell do: the pro forma cap's.
+    // page chip and the memo's evidence cell do: the going-in cap's.
     const pf = test.rows.find((r) => r.key === "exit_cap")!.evidence.find((e) => e.page != null)!;
     expect(pf.page).toBe(8);
     expect(page).toContain(flat(`${pf.label}: ${pf.text} (OM p. 8)`));
     // The exit row's move is the engine's, spelled.
     expect(page).toContain(
-      "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the exit cap is the pro forma cap's 5.70%, not the OM's 5.25%, the levered IRR moves from 10.8% to 7.4%",
+      "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the exit cap is the going-in cap's 5.45%, not the OM's 5.25%, the levered IRR moves from 10.8% to 9.3%",
+    );
+    // The OM's pro forma cap is beside it, never deciding: a yield on its
+    // price that counts the plan's NOI growth (the second review, 2026-10-28).
+    expect(page).toContain(
+      flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
     );
     // The price stands unchecked on two clean comps, on the comps' floor.
     expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (2 of 3)");
@@ -3046,7 +3052,7 @@ describe("the report's stress-test page", () => {
     expect(page).toContain("The return: No return is re-run: no figure to swap.");
     expect(page).not.toMatch(/→/);
     // Page one carries the memo's lead rows.
-    expect(pages[0]).toContain("UNSUPPORTED Exit cap OM 5.25% (p. 41)");
+    expect(pages[0]).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25)");
   }, 90000);
 
   it("draws each row's two ticks on a track (four fills a row: the track, the span and the ticks), and prints no page without a test", async () => {

@@ -1180,34 +1180,45 @@ describe("the exit cap row", () => {
     );
   });
 
-  it("is decided by the higher of the going-in cap and the OM's own pro forma cap, the other beside it, no expansion added (the review of 2026-10-23)", () => {
-    // An exit capitalizes a forward NOI: the pro forma cap is the price's
-    // yield on the OM's stabilized NOI, the income the exit sells.
+  it("is decided by the going-in cap; the OM's pro forma cap is beside it, never deciding, no expansion added (the second review, 2026-10-28)", () => {
+    // The pro forma cap is the OM's stabilized NOI over the price: a yield on
+    // price that already counts the plan's NOI growth, so an exit held to it
+    // would call that value creation cap compression. Compression is said
+    // only against the going-in cap.
     const withProForma = (goingIn: string, exit: string, proForma: string, label = "Pro forma cap rate"): ExtractionResult => ({
       ...withCaps(goingIn, exit),
       metrics: [...withCaps(goingIn, exit).metrics, row(label, proForma, "p. 8")],
     });
     const x = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%") })), "exit_cap");
     expect(x.decidedBy).toBe(0);
-    expect(x.evidence[0]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
-    expect(x.evidence[1]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
-    expect(x.gap).toMatchObject({ value: 45, unit: "bps" });
-    expect(x.verdict).toBe("unsupported");
+    expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
+    expect(x.evidence[1]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
+    expect(x.evidence[1].text).toBe("5.70% (Pro forma cap rate): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding");
+    expect(x.gap).toMatchObject({ value: 20, unit: "bps" });
+    expect(x.verdict).toBe("stretched");
     expect(x.gap!.text).toBe(
-      "The OM's 5.25% exit is 45 bps tighter than its 5.70% pro forma cap — the price's yield on its own stabilized NOI, the income the exit sells — so it sells that income dearer than this buyer pays for it: cap compression. Its 5.45% going-in cap, on today's NOI, is beside it.",
+      "The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression. Its 5.70% pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the plan's NOI growth).",
     );
-    expect(x.impact!.altValue).toBeCloseTo(0.057, 9);
-    expect(x.impact!.note).toMatch(/^If the exit cap is the pro forma cap's 5\.70%, not the OM's 5\.25%/);
-    expect(x.method).toMatch(/^The OM's exit cap against the OM's pro forma cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: the OM's going-in cap/);
-    // A pro forma cap under the going-in cap: the going-in cap decides, the
-    // pro forma beside it.
-    const under = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.75%", "5.50%", "5.60%", "Stabilized cap rate") })), "exit_cap");
-    expect(under.evidence[under.decidedBy!].label).toBe("The OM's going-in cap");
-    expect(under.gap!.text).toBe("The OM's 5.50% exit is 25 bps tighter than its 5.75% going-in cap — cap compression. Its 5.60% pro forma cap, on its stabilized NOI, sits under it, shown beside it.");
-    // Flat to the pro forma cap holds, the expansion habit named, never held to.
-    const flat = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.70%", "5.70%") })), "exit_cap");
+    expect(x.impact!.altValue).toBeCloseTo(0.0545, 9);
+    expect(x.impact!.note).toMatch(/^If the exit cap is the going-in cap's 5\.45%, not the OM's 5\.25%/);
+    expect(x.method).toMatch(/^The OM's exit cap against the OM's going-in cap \(the offering memorandum\), the one figure that decides; beside it, not deciding: the OM's pro forma cap/);
+    // An exit flat to the going-in cap holds, under the pro forma cap or not:
+    // the pro forma cap's own figure is no compression.
+    const flat = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.45%", "5.70%") })), "exit_cap");
     expect(flat.verdict).toBe("holds");
     expect(flat.gap!.text).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
+    expect(flat.gap!.text).not.toMatch(/compression/);
+    // A pro forma cap alone, with no going-in cap, decides nothing: the
+    // tracker's low end where one is held to, else the row is unchecked and
+    // says why.
+    const both = withProForma("5.45%", "5.25%", "5.70%");
+    const alone: ExtractionResult = { ...both, metrics: both.metrics.filter((m) => m.label !== "Going-in cap rate") };
+    const noGoing = exitCapPieces(alone, false, null, 5.25);
+    expect(noGoing.decided).toBeNull();
+    expect(noGoing.proForma).toBe(5.7);
+    const unchecked = rowOf(buildStressTest(apartmentArgs({ extraction: alone, modelVsMarket: null })), "exit_cap");
+    expect(unchecked.verdict).toBe("unchecked");
+    expect(unchecked.unchecked).toMatch(/^The OM states no going-in cap — its 5\.70% pro forma cap is its stabilized yield on its price \(it includes the plan's NOI growth\), shown beside and never deciding — and /);
     // An exit, a cap on cost or a later year's cap is no pro forma cap.
     for (const label of [
       "Pro forma exit cap",
@@ -1224,14 +1235,12 @@ describe("the exit cap row", () => {
       expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(false);
     }
     // "Pro-forma", hyphenated or run together, is a pro forma label too, and
-    // a first year's cap is the pro forma's own.
+    // a first year's cap is the pro forma's own: shown beside, never deciding.
     for (const label of ["Pro-forma cap rate", "Proforma cap rate", "Year 1 pro forma cap rate"]) {
       const r = rowOf(buildStressTest(apartmentArgs({ extraction: withProForma("5.45%", "5.25%", "5.70%", label) })), "exit_cap");
-      expect(r.evidence[r.decidedBy!].label, label).toBe("The OM's pro forma cap");
+      expect(r.evidence.some((e) => e.label === "The OM's pro forma cap"), label).toBe(true);
+      expect(r.evidence[r.decidedBy!].label, label).toBe("The OM's going-in cap");
     }
-    // The screening model keeps its exit reader's own pieces: the going-in cap
-    // (lib/model-evidence reads them with `proForma: false`).
-    expect(exitCapPieces(withProForma("5.45%", "5.25%", "5.70%"), false, null, null, { proForma: false }).decided!.label).toBe("The OM's going-in cap");
   });
 });
 

@@ -116,7 +116,7 @@ describe("what the test does not check yet", () => {
     expect(item("comp_grades").beside?.key).toBe("basis");
     expect(readFileSync("lib/anthropic/prompts.ts", "utf8")).toContain("rate it by its COMPARABILITY to the subject");
     const exit = STRESS_METHODS.find((m) => m.key === "exit_cap")!;
-    expect(exit.limits.join(" ")).toContain("No expansion over the hold is added to the cap that decides");
+    expect(exit.limits.join(" ")).toContain("No expansion over the hold is added to the going-in cap");
     expect(item("cap_expansion").beside?.key).toBe("exit_cap");
     expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
   });

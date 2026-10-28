@@ -24,7 +24,7 @@ export const SCREENING_MODEL = "the screening model";
 /** How a real deal's growth and exit are set, with the conditions a
  *  published figure must meet to count. */
 export const SCREENING_RULE =
-  "never more optimistic than the memorandum: rent growth at the lower of the memorandum's stated rate and the published figure the stress test decides it by, expense growth at the higher of the two — either only inside −5% to +15% a year, the published one only where it is fresh — either alone where only one stands, else 3.0% a year; the exit at the higher of the memorandum's stated exit and the cap the stress test decides it by — the higher of its going-in cap and its own pro forma cap where the price buys the building as it stands, else the research tracker's cap range at its low end where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury — either alone where only one stands, else the going-in cap it states or 6.0%";
+  "never more optimistic than the memorandum: rent growth at the lower of the memorandum's stated rate and the published figure the stress test decides it by, expense growth at the higher of the two — either only inside −5% to +15% a year, the published one only where it is fresh — either alone where only one stands, else 3.0% a year; the exit at the higher of the memorandum's stated exit and the cap the stress test decides it by — the going-in cap where the price buys the building as it stands, else the research tracker's cap range at its low end where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury — either alone where only one stands, else the going-in cap it states or 6.0%";
 
 /** The sample's clause: its figures are pinned. */
 export const SCREENING_SAMPLE_CLAUSE = "the sample deal, its figures pinned, keeps 3.0% and its going-in cap";
@@ -80,7 +80,7 @@ export const SCREENING_MODEL_LINES: readonly string[] = [
   "The screening model is built on the OM's price and terms, and the rent roll's and T-12's figures where the deal has them.",
   "Rent growth runs at the lower of the OM's stated rate and the published figure the stress test decides it by; expense growth at the higher of the two.",
   "Either only inside −5% to +15% a year, the published one only where it is fresh. Where only one stands, that one; where neither does, 3.0% a year.",
-  "The exit runs at the higher of the OM's stated exit and the cap the stress test decides it by: the higher of its going-in and pro forma caps where the price buys the building.",
+  "The exit runs at the higher of the OM's stated exit and the cap the stress test decides it by: the going-in cap where the price buys the building as it stands.",
   "Else the research tracker's cap range at its low end, where that range is fresh, dated, for the whole stock and read beside a fresh 10-year Treasury.",
   "Where only one of the exits stands, that one; where neither does, the going-in cap the OM states, or 6.0%.",
   "So the model is never more optimistic than the OM, and more cautious than it only where the OM's own figure is the more optimistic one.",
