@@ -3034,9 +3034,9 @@ describe("the report's stress-test page", () => {
       "The return: from the model's own 9.3% levered IRR, this input alone set to the OM's figure, then to the evidence's. If the exit cap is the going-in cap's 5.45%, not the OM's 5.25%, the levered IRR moves from 10.8% to 9.3%",
     );
     // The OM's pro forma cap is beside it, never deciding: a yield on its
-    // price that counts the plan's NOI growth (the second review, 2026-10-28).
+    // price that counts the OM's projected NOI growth (the second review, 2026-10-28).
     expect(page).toContain(
-      flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
+      flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
     );
     // The price stands unchecked on two clean comps, on the comps' floor.
     expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (2 of 3)");

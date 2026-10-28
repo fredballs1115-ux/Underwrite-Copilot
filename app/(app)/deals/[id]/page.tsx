@@ -96,11 +96,13 @@ import type { SubjectPoint } from "@/lib/public-comps/subject-point";
 import { addressPrecision, cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
-import { buildStressTest, planVacancyStated, stabilizedVacancyStated, vacancyDecidedBy, vacancyEconomicStated } from "@/lib/stress-test";
+import { buildStressTest, planVacancyStated, type StressTestArgs, stabilizedVacancyStated, vacancyDecidedBy, vacancyEconomicStated } from "@/lib/stress-test";
 import { loanQuoteOf } from "@/lib/loan-quote";
 import { compsCallSubjectOf, memoryClassOf, stressBasisEvidence } from "@/lib/stress-basis-evidence";
 import { verdictCounts } from "@/lib/stress-test-words";
 import { stressDrift } from "@/lib/stress-drift";
+import { stressTestAtCall } from "@/lib/stress-at-call";
+import { STRESS_RULES_V } from "@/lib/stress-test-types";
 import { readStressSnapshot } from "@/lib/stress-snapshot";
 import { StressChip } from "./stress-chip";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -1505,7 +1507,7 @@ export default async function DealPage({
     memoryGroup: marketMemory,
     isSample: isSampleDeal,
   });
-  const stressTest = buildStressTest({
+  const stressArgs: StressTestArgs = {
     extraction,
     firstSignal,
     challenger: challenges,
@@ -1527,15 +1529,27 @@ export default async function DealPage({
     loanQuote: isSampleDeal ? null : loanQuoteOf(model, documents),
     sample: isSampleDeal,
     readOn: todayIso,
-  });
+  };
+  const stressTest = buildStressTest(stressArgs);
   // The test at a glance beside the call, and in the bar that keeps the deal
   // in view: the panel's own counts (lib/stress-test-words), linking to it.
   const stressCounts = stressTest && stressTest.rows.length > 0 ? verdictCounts(stressTest) : null;
   // What moved since the call (lib/stress-drift, display only): the test as
-  // the verdict kept it against the one just built — no new read. Nothing on
-  // the sample, whose evidence never postdates its screen.
-  const stressSinceCall = verdict
-    ? stressDrift(readStressSnapshot(verdict.stressSnapshot), stressTest, { calledOn: screenedOn(verdict.generatedAt), sample: isSampleDeal })
+  // the verdict kept it against today's built the way the call's was — no
+  // lender's quote, none of the reader's past screens (lib/stress-at-call,
+  // the one builder the pipeline's brief takes too) — and no new read.
+  // Nothing on the sample, whose evidence never postdates its screen, and
+  // nothing while the call is behind a re-screen that failed, stalled or is
+  // running.
+  const callSnapshot = verdict && !isSampleDeal && !verdictLag ? readStressSnapshot(verdict.stressSnapshot) : null;
+  const stressSinceCall = callSnapshot
+    ? // A snapshot struck under other rules is compared to nothing, so the
+      // call's test is built again only where the rules are today's.
+      stressDrift(callSnapshot, callSnapshot.rules === STRESS_RULES_V ? stressTestAtCall(stressArgs, stressTest) : stressTest, {
+        calledOn: screenedOn(verdict!.generatedAt),
+        sample: isSampleDeal,
+        behind: verdictLag,
+      })
     : null;
   const trackRecord = scoreTrackRecord(stabilizedVacancyStated(extraction, firstSignal) && vacancyDecidedBy(stressTest) === "published");
 

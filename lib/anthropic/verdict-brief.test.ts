@@ -20,6 +20,25 @@ const market: MarketResult = {
   },
 };
 
+describe("the verdict's brief grades each comp in the comp-rating words, never the stored grade", () => {
+  it("hands the synthesizer comparability, as the deal page says it", () => {
+    const comps = {
+      saleComps: [
+        { name: "The Brixton", detail: "$252k/unit", support: "supports" as const, note: "Same vintage.", page: "p. 14" },
+        { name: "Vue", detail: "$298k/unit", support: "stretched" as const, note: "Newer.", page: "p. 14" },
+      ],
+      leaseComps: [{ name: "The Brixton (renovated)", detail: "$2,520/mo", support: "favorable" as const, note: "Renovated." }],
+      redFlags: [],
+      summary: "Thin set.",
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps, reconciliation: null, market: null });
+    expect(brief).toContain("- Sale [Comparable] The Brixton ($252k/unit)");
+    expect(brief).toContain("- Sale [Not comparable] Vue ($298k/unit)");
+    expect(brief).toContain("- Lease [Less comparable, flatters the ask] The Brixton (renovated)");
+    expect(brief).not.toMatch(/\[(supports|favorable|stretched)\]/);
+  });
+});
+
 describe("the verdict's brief carries the figures the market check read", () => {
   it("as their own section after the market check, dated, with the instruction to name a figure as a source", () => {
     const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market });
@@ -586,7 +605,7 @@ describe("the verdict is handed the stress test, struck in code", () => {
     // The exit at the OM's going-in cap; its pro forma cap beside it, never
     // deciding (the second review, 2026-10-28).
     expect(brief).toContain("- Exit cap (exit_cap) [STRETCHED] — OM says: Exit cap: 5.25% [p. 41]. Set against: [DECIDES] The OM's going-in cap: 5.45% (Going-in cap)");
-    expect(brief).toContain("[BESIDE IT, NOT DECIDING] The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the plan's NOI growth)");
+    expect(brief).toContain("[BESIDE IT, NOT DECIDING] The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the OM's projected NOI growth)");
     expect(brief).toContain(moves("exit_cap"));
     expect(brief).toContain("- Debt (debt) [UNCHECKED] — OM says: The OM states no loan rate. Set against:");
     expect(brief).toContain("Gap: unchecked — The OM states no loan rate. The levered IRR: No return is re-run: no figure to swap.");

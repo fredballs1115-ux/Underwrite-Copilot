@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { driftSummary, stressDrift } from "@/lib/stress-drift";
+import { METHOD_CHANGED, OM_FIGURE_CHANGED, driftSummary, labelInSentence, stressDrift } from "@/lib/stress-drift";
+import { SEEDED_RATE_LABEL, SEEDED_RATE_ONLY_LABEL, T12_NOI_LABEL } from "@/lib/stress-deciders";
 import { readStressSnapshot, stressSnapshotOf, type StressSnapshot } from "@/lib/stress-snapshot";
 import type { StressEvidence, StressHeadline, StressRow, StressTest } from "@/lib/stress-test-types";
 import { sampleStressTest } from "@/lib/sample-stress";
@@ -95,17 +96,20 @@ describe("stressDrift — what moved in the stress test since the call (display 
     expect(of("taxes")).toMatchObject({ kind: "moved", then: "unchecked", now: "stretched", unchecked: "then", direction: null, thenFigure: null });
     expect(of("debt")).toMatchObject({ kind: "gone_row", then: "holds", now: null });
     expect(of("market_rent")).toMatchObject({ kind: "new_row", then: null, now: "holds" });
-    expect(d.counts).toEqual({ moved: 2, newer_figure: 1, revised: 0, decider_changed: 1, new_row: 1, gone_row: 1 });
+    expect(d.counts).toEqual({ moved: 2, om_changed: 0, newer_figure: 1, revised: 0, decider_changed: 1, new_row: 1, gone_row: 1 });
     // Changed rows first, the move away from holding leading.
     expect(d.rows.map((r) => r.key).slice(0, 2)).toEqual(["vacancy", "taxes"]);
     expect(d.rows.at(-1)!.key).toBe("noi");
     expect(d.changed).toBe(true);
     expect(d.wordsOnly).toBe(false);
+    expect(d.methodChanged).toBe(false);
   });
 
   it("sets the headline's evidence case then against now where both stand on one measure", () => {
     expect(d.headline).toEqual({ measure: "levered_irr", then: 7.1, now: 6.4 });
-    expect(driftSummary(d)).toBe("2 rows moved, 1 decider changed, 1 newer figure, 1 row new, 1 row not read today, the evidence's case moved");
+    // Today's case is struck with today's figures (the rate's seed among
+    // them), and the summary says so.
+    expect(driftSummary(d)).toBe("2 rows moved, 1 decider changed, 1 newer figure, 1 row new, 1 row not read today, the evidence's case moved with today's figures");
     // A plan's yield on cost is never set against a levered IRR.
     const plan = test(today.rows, { ...headline(6.4), measure: "yield_on_cost", omYocPct: 6.1, evidenceYocPct: 5.8, omIrrPct: null, evidenceIrrPct: null });
     expect(stressDrift(kept(atCall), plan)!.headline).toBeNull();
@@ -114,30 +118,84 @@ describe("stressDrift — what moved in the stress test since the call (display 
     expect(stressDrift(kept(test(atCall.rows)), today)!.headline).toBeNull();
   });
 
-  it("calls the same period at another figure revised, and the same piece unchanged the same", () => {
+  it("calls the same period at another figure revised, as printed, and the same piece unchanged the same", () => {
     const revised = test([row({ evidence: [ev({ value: 6.4 })] })]);
     expect(stressDrift(kept(test([row({})])), revised)!.rows[0].kind).toBe("revised");
     const same = stressDrift(kept(test([row({})])), test([row({})]))!;
     expect(same.rows[0].kind).toBe("same");
     expect(same.changed).toBe(false);
     expect(driftSummary(same)).toBe("");
+    // A figure that moved under the printed place is not a revision.
+    const hair = stressDrift(kept(test([row({ evidence: [ev({ value: 6.21 })] })])), test([row({ evidence: [ev({ value: 6.24 })] })]))!;
+    expect(hair.rows[0].kind).toBe("same");
+    expect(hair.changed).toBe(false);
   });
 
-  it("reads a snapshot kept before its rows named their decider for its verdict words alone", () => {
+  it("matches a decider by its step of the row's order, never by its label", () => {
+    // The debt row's two labels are one step, today's index plus the class's
+    // spread: a seed read with its index one day and without it the next is
+    // the same piece, at a newer figure, never a decider that changed.
+    const debt = (label: string, value: number, asOf: string) =>
+      row({ key: "debt", title: "Loan rate", omSays: { text: "6.00%", value: 6, page: 20 }, evidence: [ev({ kind: "rule_of_thumb", label, value, asOf, publisher: "FRED", scope: "class" })] });
+    const r = stressDrift(kept(test([debt(SEEDED_RATE_LABEL, 6.6, "2026-10-01")])), test([debt(SEEDED_RATE_ONLY_LABEL, 6.8, "2026-10-27")]))!.rows[0];
+    expect(r).toMatchObject({ kind: "newer_figure", deciderChanged: false });
+    expect(r.thenFigure!.text).toBe("6.60%");
+    expect(r.nowFigure!.text).toBe("6.80%");
+  });
+
+  it("says the OM's figure changed since the call rather than a move", () => {
+    const moved = test([row({ verdict: "stretched", omSays: { text: "Vacancy 5.0%", value: 5, page: 9 } })]);
+    const o = stressDrift(kept(test([row({})])), moved)!;
+    expect(o.rows[0]).toMatchObject({ kind: "om_changed", thenFigure: null, nowFigure: null, direction: null });
+    expect(o.counts.om_changed).toBe(1);
+    expect(o.counts.moved).toBe(0);
+    expect(driftSummary(o)).toBe("1 OM figure changed");
+    const html = renderToStaticMarkup(React.createElement(StressDriftView, { drift: o }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(visibleText(html).replace(/&#x27;/g, "'")).toContain(`${OM_FIGURE_CHANGED}, so its verdicts are not compared.`);
+    expect(html).not.toContain('data-qa="drift-verdicts"');
+  });
+
+  it("compares nothing where the call was struck under other rules, and says so", () => {
+    // A version-1 snapshot, kept before the rules were stamped.
     const old = JSON.parse(JSON.stringify(stressSnapshotOf(atCall)));
-    for (const r of old.rows) {
-      delete r.decided;
-      if (r.evidence) delete r.evidence.period;
-    }
-    delete old.headline;
-    const w = stressDrift(readStressSnapshot(old), today)!;
-    expect(w.wordsOnly).toBe(true);
-    const ofW = (key: string) => w.rows.find((r) => r.key === key)!;
-    expect(ofW("vacancy")).toMatchObject({ kind: "moved", thenFigure: null, nowFigure: null, wordsOnly: true });
-    // A newer figure and a changed decider are not read off verdict words.
-    expect(ofW("exit_cap").kind).toBe("same");
-    expect(ofW("rent_growth").kind).toBe("same");
-    expect(w.headline).toBeNull();
+    old.v = 1;
+    delete old.rules;
+    const v1 = readStressSnapshot(old)!;
+    expect(v1.v).toBe(1);
+    expect(v1.rules).toBeUndefined();
+    expect(v1.rows.some((r) => r.decided)).toBe(false);
+    const w = stressDrift(v1, today, { calledOn: "Oct 20, 2026" })!;
+    expect(w).toMatchObject({ methodChanged: true, rows: [], headline: null, wordsOnly: true, changed: true });
+    // A version-2 snapshot struck under rules other than today's.
+    const other = JSON.parse(JSON.stringify(stressSnapshotOf(atCall)));
+    other.rules = 0;
+    const m = stressDrift(readStressSnapshot(other), today, { calledOn: "Oct 20, 2026" })!;
+    expect(m).toMatchObject({ methodChanged: true, rows: [], headline: null, wordsOnly: false });
+    expect(driftSummary(m)).toBe("");
+    const html = renderToStaticMarkup(React.createElement(StressDriftView, { drift: m }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Called Oct 20, 2026");
+    expect(text).toContain(METHOD_CHANGED);
+    expect(METHOD_CHANGED).toBe("The test's method changed since the call; re-screen to compare.");
+    expect(html).not.toContain('data-qa="stress-drift-rows"');
+    expect(html).not.toContain('data-bar="drift-then"');
+  });
+
+  it("is withheld while the call is behind a re-screen that failed, stalled or is running", () => {
+    for (const behind of ["failed", "stalled", "running"] as const) expect(stressDrift(kept(atCall), today, { behind })).toBeNull();
+    expect(stressDrift(kept(atCall), today, { behind: null })).not.toBeNull();
+  });
+
+  it("says a piece's label inside a sentence with its first common word lowered", () => {
+    expect(labelInSentence(T12_NOI_LABEL)).toBe("the deal's T-12 NOI");
+    expect(labelInSentence("Rental vacancy, metro area")).toBe("rental vacancy, metro area");
+    expect(labelInSentence("CPI rent, metro area")).toBe("CPI rent, metro area");
+    expect(labelInSentence("Zillow's asking rents")).toBe("Zillow's asking rents");
+    expect(labelInSentence("NOI per unit")).toBe("NOI per unit");
+    expect(labelInSentence("A scenario: today's tax rate")).toBe("a scenario: today's tax rate");
   });
 
   it("shows nothing on the sample, with no snapshot, or with no test today", () => {
@@ -155,7 +213,7 @@ describe("stressDrift — what moved in the stress test since the call (display 
     const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Since the call");
-    expect(text).toContain("Oct 20, 2026: 2 rows moved, 1 decider changed, 1 newer figure, 1 row new, 1 row not read today, the evidence's case moved");
+    expect(text).toContain("Oct 20, 2026: 2 rows moved, 1 decider changed, 1 newer figure, 1 row new, 1 row not read today, the evidence's case moved with today's figures");
     const rowOf = (key: string) => {
       const from = html.indexOf(`data-qa="drift-${key}"`);
       return html.slice(from, html.indexOf("</li>", from));
@@ -166,7 +224,9 @@ describe("stressDrift — what moved in the stress test since the call (display 
     // Two pieces are named, never joined by an arrow.
     expect(rowOf("rent_growth")).toContain('data-qa="drift-decider"');
     expect(rowOf("rent_growth")).not.toContain('data-qa="drift-figure"');
-    expect(visibleText(rowOf("rent_growth"))).toContain("Decided now by CPI rent, metro area, not Asking rents, apartments");
+    expect(visibleText(rowOf("rent_growth"))).toContain("Decided now by CPI rent, metro area, not asking rents, apartments");
+    // The chips read as words to a screen reader: the spaces are spelt.
+    expect(visibleText(rowOf("vacancy")).replace(/\s+/g, " ")).toContain("At the call: Holds → today: Stretched");
     expect(visibleText(rowOf("taxes"))).toContain("Unchecked");
     expect(visibleText(rowOf("debt"))).toContain("Not read today");
     expect(visibleText(rowOf("market_rent"))).toContain("Not tested");
@@ -174,7 +234,7 @@ describe("stressDrift — what moved in the stress test since the call (display 
     expect(html).not.toContain('data-qa="drift-noi"');
     expect(html).toContain('data-bar="drift-then"');
     expect(html).toContain('data-bar="drift-now"');
-    expect(text).toContain("The evidence's case, levered IRR");
+    expect(text).toContain("The evidence's case, levered IRR, at the call and with today's figures");
     // Nothing moved, nothing drawn.
     expect(renderToStaticMarkup(React.createElement(StressDriftView, { drift: stressDrift(kept(test([row({})])), test([row({})])) }))).toBe("");
   });

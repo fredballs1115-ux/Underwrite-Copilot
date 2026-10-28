@@ -166,9 +166,11 @@ tested and whether that is right. So:
   physical; an in-place one stays measure-matched. The exit cap is held to
   the going-in cap, then the tracker range's low end (2026-10-28: a second
   review showed the OM's pro forma cap is a yield on price that carries the
-  plan's NOI growth, so it is drawn beside, never deciding, and
-  "compression" is said only against the going-in cap; a pro forma cap with
-  no going-in cap leaves the row unchecked), no expansion added and said.
+  OM's projected NOI growth, so it is drawn beside, never deciding, and
+  "compression" is said only against the going-in cap; with no going-in cap
+  the tracker range's low end decides where one is held to, and with neither
+  the row is unchecked, the pro forma cap beside it), no expansion added and
+  said.
   The track record scores a vacancy by the larger of the row's tolerance and
   one door's share of the stated count (`StressRow.doors`, "one door of
   248"). Growth decides on the

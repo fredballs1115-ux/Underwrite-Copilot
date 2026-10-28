@@ -96,7 +96,7 @@ const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.
  * engine run twice, ONE input apart — the OM's 5.25% exit, then the 5.45%
  * going-in cap that decides the row, which the derived model exits at too
  * (its 5.70% pro forma cap is beside it, never deciding: a yield on the price
- * that includes the plan's NOI growth, the second review of 2026-10-28) —
+ * that includes the OM's projected NOI growth, the second review of 2026-10-28) —
  * each levered IRR in percent. The verdict's "breaks if" and its scenarios
  * quote these. They are written here because this module cannot
  * load the derivation (it imports this one, and the homepage's client bundle
@@ -519,7 +519,7 @@ const comps: BrokerCompsResult = {
       name: "The Brixton — 2.1 mi",
       detail: "$252k/unit · 5.6% cap · Q3'25",
       support: "supports",
-      note: "Comparable vintage and submarket; supports a sub-$260k basis.",
+      note: "Comparable vintage and submarket, 2.1 mi away: a comparable trade.",
       page: "p. 14",
     },
     {

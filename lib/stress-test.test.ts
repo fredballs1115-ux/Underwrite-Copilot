@@ -87,6 +87,9 @@ import { METRO_VACANCY_LABEL, VACANCY_ORDER } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
 import { stressSection } from "./anthropic/verdict";
+import { stressArgsAtCall, stressTestAtCall } from "./stress-at-call";
+import { readStressSnapshot, stressSnapshotOf } from "./stress-snapshot";
+import { stressDrift } from "./stress-drift";
 import { CANNOT, VERDICT_WORDS } from "./how-we-test";
 import { SAMPLE_PLAN_NOTE, basisMoveWords } from "./stress-test-words";
 import { createElement } from "react";
@@ -229,6 +232,17 @@ const rowOf = (t: { rows: StressRow[] }, key: StressKey): StressRow => {
 };
 
 // ── A stabilized apartment deal with a T-12 ──────────────────────────────
+
+describe("the vacancy row's doors: a class priced by the unit, the plan's own count (the audit of 2026-10-28)", () => {
+  it("counts the units an apartment building states, and no suites on an office", () => {
+    expect(rowOf(buildStressTest(apartmentArgs()), "vacancy").doors).toBe(153);
+    // An office's suites are no doors its vacancy moves by: it is counted by area.
+    const office = { ...APARTMENT, assetClass: "Office", metrics: APARTMENT.metrics.map((m) => (m.label === "Units" ? { ...m, label: "Suites" } : m)) };
+    const v = buildStressTest(apartmentArgs({ extraction: office, storedAssetClass: "office", derived: null, modelVsMarket: null })).rows.find((r) => r.key === "vacancy");
+    expect(v).toBeDefined();
+    expect(v!.doors).toBeUndefined();
+  });
+});
 
 describe("a stabilized apartment deal with a T-12", () => {
   const test = buildStressTest(apartmentArgs());
@@ -1182,7 +1196,7 @@ describe("the exit cap row", () => {
 
   it("is decided by the going-in cap; the OM's pro forma cap is beside it, never deciding, no expansion added (the second review, 2026-10-28)", () => {
     // The pro forma cap is the OM's stabilized NOI over the price: a yield on
-    // price that already counts the plan's NOI growth, so an exit held to it
+    // price that already counts the OM's projected NOI growth, so an exit held to it
     // would call that value creation cap compression. Compression is said
     // only against the going-in cap.
     const withProForma = (goingIn: string, exit: string, proForma: string, label = "Pro forma cap rate"): ExtractionResult => ({
@@ -1193,11 +1207,11 @@ describe("the exit cap row", () => {
     expect(x.decidedBy).toBe(0);
     expect(x.evidence[0]).toMatchObject({ label: "The OM's going-in cap", value: 5.45 });
     expect(x.evidence[1]).toMatchObject({ kind: "om_internal", label: "The OM's pro forma cap", value: 5.7, page: 8 });
-    expect(x.evidence[1].text).toBe("5.70% (Pro forma cap rate): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding");
+    expect(x.evidence[1].text).toBe("5.70% (Pro forma cap rate): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding");
     expect(x.gap).toMatchObject({ value: 20, unit: "bps" });
     expect(x.verdict).toBe("stretched");
     expect(x.gap!.text).toBe(
-      "The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression. Its 5.70% pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the plan's NOI growth).",
+      "The OM's 5.25% exit is 20 bps tighter than its 5.45% going-in cap — cap compression. Its 5.70% pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the OM's projected NOI growth).",
     );
     expect(x.impact!.altValue).toBeCloseTo(0.0545, 9);
     expect(x.impact!.note).toMatch(/^If the exit cap is the going-in cap's 5\.45%, not the OM's 5\.25%/);
@@ -1218,7 +1232,7 @@ describe("the exit cap row", () => {
     expect(noGoing.proForma).toBe(5.7);
     const unchecked = rowOf(buildStressTest(apartmentArgs({ extraction: alone, modelVsMarket: null })), "exit_cap");
     expect(unchecked.verdict).toBe("unchecked");
-    expect(unchecked.unchecked).toMatch(/^The OM states no going-in cap — its 5\.70% pro forma cap is its stabilized yield on its price \(it includes the plan's NOI growth\), shown beside and never deciding — and /);
+    expect(unchecked.unchecked).toMatch(/^The OM states no going-in cap — its 5\.70% pro forma cap is its stabilized yield on its price \(it includes the OM's projected NOI growth\), shown beside and never deciding — and /);
     // An exit, a cap on cost or a later year's cap is no pro forma cap.
     for (const label of [
       "Pro forma exit cap",
@@ -4081,14 +4095,28 @@ describe("a term sheet on file decides the debt row (the owner's decision of 202
     expect(guarded).not.toContain("HEADLINE (the engine's");
     const debtLine = guarded.split("\n").find((l) => l.startsWith("- Debt (debt)"))!;
     expect(debtLine).not.toMatch(/\[(UNSUPPORTED|STRETCHED|HOLDS|UNCHECKED)\]/);
-    // What the pipeline hands the brief: the same build with no quote
-    // (lib/anthropic/pipeline `screenStressTest`'s `brief`).
-    const brief = stressSection(buildStressTest(apartmentArgs({ loanQuote: null }))).join("\n");
+    // What the pipeline hands the brief: the same build with no quote and no
+    // past screens (lib/stress-at-call, `screenStressTest`'s `brief`), which
+    // the deal page's "since the call" builds today's test through too.
+    const withQuote = apartmentArgs({ loanQuote: quote(6.5) });
+    expect(stressArgsAtCall(withQuote).loanQuote).toBeNull();
+    expect(stressArgsAtCall(withQuote).pastScreens).toBeNull();
+    const brief = stressSection(stressTestAtCall(withQuote, full)).join("\n");
     expect(brief).not.toContain("6.50%");
     expect(brief).not.toContain("The lender's quote on file");
     expect(brief).toContain("HEADLINE (the engine's");
     const pipeline = readFileSync("lib/anthropic/pipeline.ts", "utf8");
-    expect(pipeline).toContain("brief: args.loanQuote ? buildStressTest({ ...args, loanQuote: null }) : full");
+    expect(pipeline).toContain("brief: stressTestAtCall(args, full)");
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toContain("stressTestAtCall(stressArgs, stressTest)");
+    // So the call's snapshot set against today's test, built the same way,
+    // never reads the quote on file as the debt row moving.
+    const atCall = stressSnapshotOf(stressTestAtCall(withQuote, full));
+    const since = stressDrift(readStressSnapshot(JSON.parse(JSON.stringify(atCall))), stressTestAtCall(withQuote, full))!;
+    expect(since.rows.find((r) => r.key === "debt")!.kind).toBe("same");
+    expect(since.changed).toBe(false);
+    // Set against the page's own test, the quote would read as the decider
+    // changing — the divergence the one builder exists to prevent.
+    expect(stressDrift(readStressSnapshot(JSON.parse(JSON.stringify(atCall))), full)!.rows.find((r) => r.key === "debt")!.kind).not.toBe("same");
     expect(pipeline).toContain("const stressTest = tests?.brief ?? null;");
     // Every surface names the same sheet: the deal page's oldest-first order.
     expect(readFileSync("lib/loan-quote-read.ts", "utf8")).toContain('.order("created_at", { ascending: true })');

@@ -27,7 +27,7 @@ import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive"
 import { sampleTodayReads } from "@/lib/sample-stress-read";
 import { verdictCounts } from "@/lib/stress-test-words";
 import type { StressVerdict } from "@/lib/stress-test-types";
-import { scorableCountLine, scorableRestLine, scorableSummary } from "@/lib/scorable-summary";
+import { scorableCountLine, scorableRestLine, scorableSummary, scorableVacancyLine } from "@/lib/scorable-summary";
 import { sampleDemoDataOnce, walkthroughData } from "./demo/demo-data";
 // The sample's stress test is read on the reader's day the memo tile and the
 // downloads date it by (lib/reader-day, New York with no reader's zone).
@@ -395,7 +395,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Does the test make me more accurate?",
-    a: `It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day, names each one it could not check, and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether a row was right is scored only by evidence that arrives after it. ${scorableCountLine(SCORABLE)} ${scorableRestLine(SCORABLE)} The track record counts exactly those: it scores the test's rows, never your own calls.`,
+    a: `It cannot say yet. It checks the OM’s key assumptions against evidence that exists on the day, names each one it could not check, and, where a gap moves it, re-runs the return: the levered IRR on a stabilized deal, and on a value-add, lease-up, conversion or development plan the yield on total cost, where the OM states its stabilized NOI and total cost, since the model runs today's income, not the plan. Whether a row was right is scored only by evidence that arrives after it. ${scorableCountLine(SCORABLE)} ${scorableVacancyLine()} ${scorableRestLine(SCORABLE)} The track record counts exactly those: it scores the test's rows, never your own calls.`,
   },
   {
     q: "Are my documents private?",

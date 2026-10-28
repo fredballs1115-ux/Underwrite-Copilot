@@ -24,7 +24,7 @@ import {
 } from "@/lib/how-we-test";
 import { DECIDER_NAMES } from "@/lib/stress-deciders";
 import { scorableGrid } from "@/lib/track-record";
-import { scorableCountLine, scorableRestLine } from "@/lib/scorable-summary";
+import { scorableCountLine, scorableRestLine, scorableVacancyLine } from "@/lib/scorable-summary";
 import { ScorableGrid } from "@/app/(app)/scorable-grid";
 import type { StressMethod, StressReruns, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 import { drawsRerun } from "@/lib/stress-test-words";
@@ -119,17 +119,23 @@ function MethodPicture({ reruns }: { reruns: StressReruns }) {
   );
 }
 
+/** How each role's tag is drawn: a piece that decides filled, one beside
+ *  outlined, and one that decides a figure for today while it stands beside
+ *  a stabilized one (the vacancy's rent roll and T-12) outlined in ink. */
+const ROLE_TONE = {
+  decides: "bg-ink text-white",
+  today: "border border-ink text-ink",
+  beside: "border border-line text-muted",
+} as const;
+
 /** An `against` item's tag: what it does for its row, as the panel tags a
  *  built row's pieces. None on a row nothing decides (the challenger's). */
 function RoleMark({ method, index }: { method: StressMethod; index: number }) {
   if (DECIDER_NAMES[method.key].length === 0) return null;
   const role = method.decides[index];
-  const decides = role !== "beside";
+  const kind: keyof typeof ROLE_TONE = role === "beside" ? "beside" : role === "today" ? "today" : "decides";
   return (
-    <span
-      className={`mr-2 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-medium ${decides ? "bg-ink text-white" : "border border-line text-muted"}`}
-      data-role={decides ? "decides" : "beside"}
-    >
+    <span className={`mr-2 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-medium ${ROLE_TONE[kind]}`} data-role={kind}>
       {roleTag(role)}
     </span>
   );
@@ -186,8 +192,10 @@ function MethodSection({ method, index }: { method: StressMethod; index: number 
           <li key={item} className="flex items-start gap-2">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
             <span>
-              <RoleMark method={method} index={i} />
-              <KindMark item={item} />
+              {/* The spaces are spelt, so a screen reader reads the marks and
+                  the sentence as words, never one run the margins glue. */}
+              <RoleMark method={method} index={i} />{" "}
+              <KindMark item={item} />{" "}
               {item}
             </span>
           </li>
@@ -628,6 +636,9 @@ export function HowWeTestView({ example = null }: { example?: StressTest | null 
             grid (lib/track-record `scorableGrid`), never a typed count. */}
         <p className="mt-2 text-sm leading-relaxed" data-qa="scorable-count">
           {scorableCountLine()}
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-muted" data-qa="scorable-vacancy">
+          {scorableVacancyLine()}
         </p>
         <p className="mt-1 text-sm leading-relaxed text-muted" data-qa="scorable-rest">
           {scorableRestLine()}

@@ -37,19 +37,25 @@
 //     growth or a price (a trade under the ask) falling;
 //   - a stored snapshot is read back through `readStressSnapshot`, which
 //     refuses anything that is not one — a blank is null, never a hold;
-//   - since 2026-10-28 (lib/stress-drift, what moved since the call) a row
+//   - since 2026-10-28 (lib/stress-drift, what moved since the call) the
+//     snapshot is version 2: it is stamped with the rules its verdicts were
+//     struck by (`rules`, lib/stress-test-types `STRESS_RULES_V`), a row
 //     whose evidence is its own `decidedBy` piece says so (`decided`), the
 //     piece keeps its period as the panel said it (`period`), and the
-//     headline's two cases are kept (`headline`) — a snapshot kept before
-//     reads without them, its rows' verdict words alone.
+//     headline's two cases are kept (`headline`). A version-1 snapshot,
+//     kept before, reads without them and carries no rules version, so the
+//     drift sets none of it against today's.
 
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/in-line-band";
 import { BASIS_STRETCH_PCT, SAME, SAME_SHARE } from "@/lib/stress-test";
-import { STRESS_KEYS, type EvidenceKind, type StressKey, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
+import { STRESS_KEYS, STRESS_RULES_V, type EvidenceKind, type StressKey, type StressTest, type StressVerdict } from "@/lib/stress-test-types";
 import { evidencePeriod, liveHeadline } from "@/lib/stress-test-words";
 
-/** The snapshot's shape version: a reader refuses one it does not know. */
-export const STRESS_SNAPSHOT_V = 1;
+/** The snapshot's shape version: a reader refuses one it does not know. 2
+ *  (2026-10-28) carries the rules version, each row's `decided` and its
+ *  piece's period, and the headline; 1 carries none of them. */
+export const STRESS_SNAPSHOT_V = 2;
+const READ_VERSIONS: readonly number[] = [1, 2];
 
 export interface StressSnapshotEvidence {
   /** in the key's own unit (a percent as a percent, a dollar as a dollar) */
@@ -120,7 +126,12 @@ export interface StressSnapshotHeadline {
 }
 
 export interface StressSnapshot {
-  v: typeof STRESS_SNAPSHOT_V;
+  /** the shape version it was kept under (`STRESS_SNAPSHOT_V` today) */
+  v: 1 | 2;
+  /** the rules its verdicts were struck by (lib/stress-test-types
+   *  `STRESS_RULES_V`); absent on a version-1 snapshot, kept before it was
+   *  stamped, whose rules are unknown */
+  rules?: number;
   /** the day the test's published figures were read (the test's `readOn`) */
   readOn: string;
   rows: StressSnapshotRow[];
@@ -257,7 +268,7 @@ export function stressSnapshotOf(test: StressTest | null | undefined): StressSna
       ? { measure: "yield_on_cost", om: finiteOrNull(h.omYocPct), evidence: finiteOrNull(h.evidenceYocPct) }
       : { measure: "levered_irr", om: finiteOrNull(h.omIrrPct), evidence: finiteOrNull(h.evidenceIrrPct) }
     : null;
-  return { v: STRESS_SNAPSHOT_V, readOn: test.readOn, rows, ...(headline ? { headline } : {}) };
+  return { v: STRESS_SNAPSHOT_V, rules: STRESS_RULES_V, readOn: test.readOn, rows, ...(headline ? { headline } : {}) };
 }
 
 const finiteOrNull = (n: unknown): number | null => (finite(n) ? n : null);
@@ -287,8 +298,9 @@ const str = (v: unknown): v is string => typeof v === "string";
  */
 export function readStressSnapshot(raw: unknown): StressSnapshot | null {
   if (!raw || typeof raw !== "object") return null;
-  const s = raw as { v?: unknown; readOn?: unknown; rows?: unknown };
-  if (s.v !== STRESS_SNAPSHOT_V || !Array.isArray(s.rows)) return null;
+  const s = raw as { v?: unknown; rules?: unknown; readOn?: unknown; rows?: unknown };
+  if (typeof s.v !== "number" || !READ_VERSIONS.includes(s.v) || !Array.isArray(s.rows)) return null;
+  const v = s.v as 1 | 2;
   const rows: StressSnapshotRow[] = [];
   for (const x of s.rows as unknown[]) {
     if (!x || typeof x !== "object") continue;
@@ -326,7 +338,8 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
       ...(r.rerun === "levered_irr" || r.rerun === "yield_on_cost" || r.rerun === null ? { rerun: r.rerun } : {}),
       ...(r.measure === "economic" ? { measure: "economic" as const } : {}),
       ...(Array.isArray(r.less) ? { less: (r.less as unknown[]).filter((x): x is "taxes" | "insurance" => x === "taxes" || x === "insurance") } : {}),
-      ...(r.decided === true && evidence ? { decided: true as const } : {}),
+      // Carried from version 2 on: a version-1 row's mark is not one.
+      ...(v >= 2 && r.decided === true && evidence ? { decided: true as const } : {}),
     });
   }
   if (rows.length === 0) return null;
@@ -335,7 +348,8 @@ export function readStressSnapshot(raw: unknown): StressSnapshot | null {
     h && typeof h === "object" && (h.measure === "levered_irr" || h.measure === "yield_on_cost")
       ? { measure: h.measure, om: finiteOrNull(h.om), evidence: finiteOrNull(h.evidence) }
       : null;
-  return { v: STRESS_SNAPSHOT_V, readOn: str(s.readOn) ? s.readOn : "", rows, ...(headline ? { headline } : {}) };
+  const rules = v >= 2 && finite(s.rules) && Number.isInteger(s.rules) ? s.rules : null;
+  return { v, ...(rules != null ? { rules } : {}), readOn: str(s.readOn) ? s.readOn : "", rows, ...(v >= 2 && headline ? { headline } : {}) };
 }
 
 /** The deal-killer card's label where the call cites the engine's figures. */

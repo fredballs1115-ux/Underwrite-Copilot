@@ -42,7 +42,7 @@ import {
 } from "./how-we-test";
 import { DECIDER_NAMES } from "./stress-deciders";
 import { scorableGrid } from "./track-record";
-import { scorableCountLine, scorableRestLine, scorableSummary } from "./scorable-summary";
+import { scorableCountLine, scorableRestLine, scorableSummary, scorableVacancyLine } from "./scorable-summary";
 import { snapshotThreshold } from "./stress-snapshot";
 import {
   BASIS_STRETCH_PCT,
@@ -251,8 +251,8 @@ describe("/how-we-test draws every method from the table", () => {
     expect(VERDICT_RULES.exit_cap).toContain(`${EXIT_CAP_UNSUPPORTED_BPS} bps`);
     // The going-in cap decides; the published range only where the OM states
     // none; the pro forma cap is beside it, never deciding (the second
-    // review, 2026-10-28: it counts the plan's NOI growth).
-    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the plan's NOI growth, so it never decides; no expansion over the hold is added\./);
+    // review, 2026-10-28: it counts the OM's projected NOI growth).
+    expect(VERDICT_RULES.exit_cap).toMatch(/^Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the OM's projected NOI growth, so it never decides; no expansion over the hold is added\./);
     expect(VERDICT_RULES.exit_cap).not.toMatch(/higher of/);
     expect(VERDICT_RULES.exit_cap).not.toMatch(/stretched at worst/);
     expect(VERDICT_RULES.basis).toContain(`${BASIS_STRETCH_PCT}%`);
@@ -583,6 +583,22 @@ describe("/how-we-test opens on one overview of every row", () => {
     expect(marks).toEqual(expected);
     expect(roleTag([1, 3, 4])).toBe("Decides (1st, 3rd, 4th)");
     expect(roleTag("beside")).toBe("Beside it, not deciding");
+    // The vacancy's rent roll and T-12 decide a figure for today and stand
+    // beside a stabilized one, and are marked as both, never "beside" alone
+    // while their sentence says they decide (the audit of 2026-10-28).
+    const vac = STRESS_METHODS.find((m) => m.key === "vacancy")!;
+    expect(vac.decides[2]).toBe("today");
+    expect(vac.decides[3]).toBe("today");
+    expect(vac.against[2]).toMatch(/It decides today's occupancy only/);
+    expect(vac.against[3]).toMatch(/It decides an economic figure for today only/);
+    expect(roleTag("today")).toBe("Beside a stabilized figure; decides one for today");
+    expect(html).toContain('data-role="today"');
+    // The marks and the sentence are words apart to a screen reader.
+    expect(visibleText(html).replace(/&#x27;/g, "'")).toMatch(/Beside a stabilized figure; decides one for today\s+The deal's own document\s+The deal's own rent roll/);
+    // The overview's cell says the vacancy's documents case by case.
+    expect(overviewRows().find((r) => r.key === "vacancy")!.scoredBy).toBe(
+      "A rent roll (doors) or a T-12 (dollars) dated after the verdict; none for a stabilized vacancy in doors the market decided",
+    );
   });
 
   it("puts the vacancy's tracker second in its order, as the decider does", () => {
@@ -611,6 +627,18 @@ describe("/how-we-test opens on one overview of every row", () => {
     expect(flat).toContain(scorableCountLine());
     expect(flat).toContain(scorableRestLine());
     expect(scorableCountLine()).toContain(`Today ${s.byFigure.length} of the ${s.total} assumptions`);
+    // The trade scores the price on a Dead deal only, and the vacancy is
+    // said case by case as the scorer scores it — never "by a T-12 or a
+    // rent roll", which a stabilized vacancy the market decided is not.
+    expect(scorableCountLine()).toContain("the price by a reported trade on a Dead deal");
+    expect(scorableCountLine()).toContain("the vacancy by the document of its own measure");
+    expect(scorableCountLine()).not.toMatch(/vacancy by a T-12 or a rent roll/);
+    expect(flat).toContain(scorableVacancyLine());
+    expect(scorableVacancyLine()).toBe(
+      "A vacancy counted by doors is scored by a later rent roll and one in dollars by a later T-12, but a stabilized vacancy in doors the market's figure decided by no document.",
+    );
+    // The same rule the track record's own lines state.
+    expect(TRACK_RECORD.lines.join(" ")).toContain("A stabilized vacancy in doors the market's figure decided is not scored by a later rent roll or T-12");
     // The grid of what scores what, with no "re-screen" line on a public page.
     expect(html.indexOf('data-qa="scorable-grid"')).toBeGreaterThan(html.indexOf('id="track-record"'));
     expect(html).not.toContain('data-qa="scorable-grid-line"');

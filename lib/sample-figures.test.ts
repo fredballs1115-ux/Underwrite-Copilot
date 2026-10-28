@@ -50,7 +50,7 @@ describe("the sample's stress test", () => {
       ["basis", "unchecked"],
       // 20 bps under the OM's 5.45% going-in cap, the one figure that decides
       // (its 5.70% pro forma cap beside it, never deciding: a yield on price
-      // that counts the plan's NOI growth, the second review of 2026-10-28).
+      // that counts the OM's projected NOI growth, the second review of 2026-10-28).
       ["exit_cap", "stretched"],
       ["debt", "unchecked"],
       // 4.7% over the T-12, inside the band, but the re-run moves the

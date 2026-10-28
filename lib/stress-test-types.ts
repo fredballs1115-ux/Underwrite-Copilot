@@ -10,6 +10,20 @@
 
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 
+/**
+ * The version of the rules a row's verdict is struck by: its deciders and
+ * their order (lib/stress-deciders), its thresholds and its row rules
+ * (lib/stress-test). Bumped whenever any of them changes, and stamped on the
+ * snapshot the verdict keeps (lib/stress-snapshot `rules`), so a verdict
+ * struck under older rules is never set against today's as if the evidence
+ * had moved (lib/stress-drift: "The test's method changed since the call").
+ * 1 is the rules of 2026-10-28: the exit held to the going-in cap, a vacancy
+ * scored by the door. `lib/stress-rules-version.test.ts` holds it to a
+ * fingerprint of the deciders and thresholds, so a change to them fails
+ * until this is bumped.
+ */
+export const STRESS_RULES_V = 1;
+
 /** The assumptions the screen tests, each by one name on every surface. */
 export const STRESS_KEYS = [
   "basis",
@@ -530,9 +544,11 @@ export const HEADLINE_METHOD = {
  *  row's pieces (lib/stress-test-words `DECIDES_TAG` / `BESIDE_TAG`): it
  *  decides at its place or places in the row's order (lib/stress-deciders
  *  `DECIDER_NAMES`, 1 the first), it decides in its class's own order (rent
- *  growth's houses, parks, student and mixed-use buildings), or it stands
- *  beside the figure that decides and decides nothing. */
-export type AgainstRole = readonly number[] | "beside" | "by_class";
+ *  growth's houses, parks, student and mixed-use buildings), it stands
+ *  beside the figure that decides and decides nothing, or — the vacancy's
+ *  rent roll and T-12 — it stands beside a stabilized figure and decides one
+ *  for today (lib/stress-deciders `VACANCY_ORDER.today` and `.economic`). */
+export type AgainstRole = readonly number[] | "beside" | "by_class" | "today";
 
 /** What the engine re-runs on a row's evidence: the levered IRR on a
  *  stabilized deal, the yield on total cost on a plan deal, or nothing. */
@@ -593,7 +609,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "A buyer will pay the pro forma's cap rate at the sale.",
     against: [
       "The going-in cap, the one figure that decides: an exit tighter than the entry is cap compression, said as such",
-      "The OM's pro forma cap, shown beside it and deciding nothing: the OM's stabilized yield on its price (it includes the plan's NOI growth), so compression is said only against the going-in cap",
+      "The OM's pro forma cap, shown beside it and deciding nothing: the OM's stabilized yield on its price (it includes the OM's projected NOI growth), so compression is said only against the going-in cap",
       "The exit's spread over the latest 10-year Treasury, dated, shown beside it and deciding nothing (a yield, not a cap), with the going-in cap's spread where the exit is held to it",
       "The research tracker's cap range for the class and market, with its period, where one is on file: its low end decides only where no going-in cap stands, and beside a going-in cap it is shown, deciding nothing",
     ],
@@ -658,7 +674,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The deal's T-12: its vacancy and credit loss over gross potential rent, an economic figure, dollars not doors, over a trailing year. It decides an economic figure for today only; beside a stabilized one it is today's gap, never deciding",
       "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above may",
     ],
-    decides: [[1, 3, 4], [2], "beside", "beside", [5]],
+    decides: [[1, 3, 4], [2], "today", "today", [5]],
     engine: "Vacancy is a direct input: the return is re-run at the deciding figure, of the OM's own measure. A plan's yield on cost is re-run, moved by its stabilized gross times the gap to the market's figure, else the class's norm.",
     reruns: { stabilized: "irr", plan: "yoc" },
     rules: [

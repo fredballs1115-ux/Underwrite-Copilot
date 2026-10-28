@@ -135,7 +135,7 @@ import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
 import { assetClassKey, assetWords, countNoun, rentQuotedMonthly } from "@/lib/asset-words";
 import { compFigures, subjectBasis } from "@/lib/comp-detail";
-import { findGoingInCap, findMetric, occupancyRow, parsePct, planCountRow, screenYearOf, unitCountFromMetrics, unitCountRow, buildingSfFromMetrics } from "@/lib/criteria";
+import { findGoingInCap, findMetric, occupancyRow, parseCount, parsePct, planCountRow, screenYearOf, unitCountFromMetrics, unitCountRow, buildingSfFromMetrics } from "@/lib/criteria";
 import { condoUnitsOffered } from "@/lib/condo-units";
 import {
   askingPriceOf,
@@ -1603,16 +1603,22 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     method: methodSentence("vacancy", evidence, 0, title),
     ...(best.e.kind === "rule_of_thumb" ? { ruleOfThumbOnly: true } : {}),
     ...(economic ? { measure: "economic" as const } : {}),
-    ...(doorsOf(ctx.rows) != null ? { doors: doorsOf(ctx.rows)! } : {}),
+    ...(doorsOf(ctx) != null ? { doors: doorsOf(ctx)! } : {}),
   };
 }
 
 /** The unit count the OM states, a whole count of one or more, for the
  *  vacancy row's `doors`: one door's share of it is the smallest move a
  *  vacancy can make, which the track record scores no finer than
- *  (lib/stress-snapshot `rowThreshold`). Null where no count is stated. */
-function doorsOf(rows: Row[]): number | null {
-  const n = unitCountFromMetrics(rows);
+ *  (lib/stress-snapshot `rowThreshold`). Only on a class priced by the unit
+ *  (an office's suites or a flex building's bays are no doors its vacancy
+ *  moves by: it is counted by area), and on a plan deal the count of the
+ *  finished product (`planCountRow`: a conversion's proposed units, never
+ *  today's). Null where no such count is stated. */
+function doorsOf(ctx: Ctx): number | null {
+  if (assetWords(ctx.assetClass).basis !== "unit") return null;
+  const row = ctx.plan ? planCountRow(ctx.rows, ctx.kind) : unitCountRow(ctx.rows);
+  const n = row ? parseCount(row.value) : null;
   return n != null && Number.isInteger(n) && n >= 1 ? n : null;
 }
 
@@ -1941,7 +1947,7 @@ export function exitCapPieces(
     evidence.push({
       kind: "om_internal",
       label: PRO_FORMA_CAP_LABEL,
-      text: `${pct2(proForma!)} (${proFormaRow!.label}): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding`,
+      text: `${pct2(proForma!)} (${proFormaRow!.label}): the OM's stabilized yield on its price (it includes the OM's projected NOI growth), beside the going-in cap, never deciding`,
       value: proForma!,
       asOf: null,
       publisher: "the offering memorandum",
@@ -1985,7 +1991,7 @@ export function exitCapPieces(
   // range at its low end. The pro forma cap and a tracker range beside a
   // going-in cap are shown and decide nothing: the range had turned an
   // unsupported compression into a stretched one wherever its low end
-  // reached the exit, and the pro forma cap counts the plan's NOI growth.
+  // reached the exit, and the pro forma cap counts the OM's projected NOI growth.
   const decided = exitCapDecider(candidatesOf(evidence, (e) => e.label === GOING_IN_CAP_LABEL || trackerHeld.has(e)));
   return { evidence, decided, goingIn, proForma: proFormaOk ? proForma : null, rangeRead: !!check?.published.some((f) => /research tracker/i.test(f.label)) };
 }
@@ -2008,7 +2014,7 @@ function exitCapRow(ctx: Ctx): StressRow | null {
     const range = rangeRead ? "the published cap range is held to nothing (stale, undated or a narrower stock)" : "no published cap range was read for this market and class";
     const why = !stated
       ? proForma != null
-        ? `The OM states no going-in cap — its ${pct2(proForma)} pro forma cap is its stabilized yield on its price (it includes the plan's NOI growth), shown beside and never deciding — and ${range}.`
+        ? `The OM states no going-in cap — its ${pct2(proForma)} pro forma cap is its stabilized yield on its price (it includes the OM's projected NOI growth), shown beside and never deciding — and ${range}.`
         : `The OM states no going-in cap, and ${range}.`
       : ctx.plan
         ? `On a value-add, lease-up, conversion or development deal the OM's going-in cap is struck on today's income, not the stabilized income the exit sells, so the exit is not held to it; and ${range}.`
@@ -2019,10 +2025,10 @@ function exitCapRow(ctx: Ctx): StressRow | null {
   const onGoingIn = decided.label === GOING_IN_CAP_LABEL;
   // The OM's pro forma cap, beside the figure that decides and never
   // deciding: its stabilized NOI over the price is a yield on price that
-  // already counts the plan's NOI growth, so compression is said only
+  // already counts the OM's projected NOI growth, so compression is said only
   // against the going-in cap (the second review, 2026-10-28).
   const besideCap =
-    proForma != null ? ` Its ${pct2(proForma)} pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the plan's NOI growth).` : "";
+    proForma != null ? ` Its ${pct2(proForma)} pro forma cap is beside it, not deciding: the OM's stabilized yield on its price (it includes the OM's projected NOI growth).` : "";
   // No expansion over the hold is added: said where the exit is flat to the
   // going-in cap.
   const noExpansion = "adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to";

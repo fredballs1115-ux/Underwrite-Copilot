@@ -113,7 +113,7 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(exitCapDecider(held(ten, hi, lo))!.label).toBe(lo.label);
     expect(exitCapDecider(held(ten))).toBeNull();
     // The OM's pro forma cap never decides, over the going-in cap or alone:
-    // its stabilized NOI over the price counts the plan's NOI growth (the
+    // its stabilized NOI over the price counts the OM's projected NOI growth (the
     // second review, 2026-10-28); the tracker's low end decides without a
     // going-in cap.
     const pf = (v: number) => piece(PRO_FORMA_CAP_LABEL, v, { kind: "om_internal" });

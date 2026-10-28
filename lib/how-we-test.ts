@@ -106,7 +106,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // the comps graded clean first, then the recorded sales; under three, no
   // median, and the row stands unchecked, the comps named with their count.
   basis: `Held to the median of three or more trades: the comps graded clean, else the recorded sales. Under three, unchecked, the comps named with their count; your past screens' asks never decide. Holds up to ${BASIS_STRETCH_PCT}% over it; unsupported past ${BASIS_UNSUPPORTED_PCT}%.`,
-  exit_cap: `Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the plan's NOI growth, so it never decides; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
+  exit_cap: `Held to the going-in cap, else the published cap range's low end; the pro forma cap counts the OM's projected NOI growth, so it never decides; no expansion over the hold is added. More than ${Math.round(SAME * 100)} bps tighter is stretched, and ${EXIT_CAP_UNSUPPORTED_BPS} bps or more unsupported.`,
   debt: `Held to the lender's quote on file where one is, unsupported past ${DEBT_UNSUPPORTED_BPS} bps under it; else to today's index plus the class's screening spread: stretched under it, unsupported only past ${DEBT_UNSUPPORTED_BPS} bps under it and the bare index too.`,
   noi: `Held to the T-12 alone, else the OM's own in-place NOI. Holds within ${pctOf(NOI_IN_LINE_BAND)} or under it; unsupported past ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12, stretched at most against the OM's own figure.`,
   // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
@@ -194,6 +194,10 @@ export function rerunsMark(r: StressReruns): string {
 
 const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 
+/** The vacancy's rent roll and T-12: today's gap beside a stabilized
+ *  figure, the deciding figure for an occupancy stated for today. */
+export const TODAY_ROLE_TAG = "Beside a stabilized figure; decides one for today";
+
 /** An `against` item's tag, as the panel tags a built row's pieces
  *  (lib/stress-test-words `DECIDES_TAG`, `BESIDE_TAG`): "Decides (1st)",
  *  "Decides (1st, 3rd, 4th)", "Decides, in its class's order", or "Beside it,
@@ -201,6 +205,7 @@ const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
 export function roleTag(role: AgainstRole): string {
   if (role === "beside") return BESIDE_TAG;
   if (role === "by_class") return `${DECIDES_TAG}, in its class's order`;
+  if (role === "today") return TODAY_ROLE_TAG;
   return `${DECIDES_TAG} (${role.map((n) => ORDINAL[n - 1] ?? `${n}th`).join(", ")})`;
 }
 

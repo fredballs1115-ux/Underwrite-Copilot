@@ -245,9 +245,9 @@ export function expenseGrowthDecider(candidates: readonly DeciderCandidate[]): D
 /** The exit's one deciding figure is the going-in cap — today's NOI over
  *  the price, the cap the deal is bought at — else the tracker's low end.
  *  The OM's pro forma cap (its stabilized NOI over the same price) is drawn
- *  beside it and decides nothing: a yield on price that already counts the
- *  plan's NOI growth, so an exit held to it would call the plan's value
- *  creation cap compression (the second review, 2026-10-28). */
+ *  beside it and decides nothing: a yield on price that already counts the OM's
+ *  projected NOI growth, so an exit held to it would call that growth
+ *  cap compression (the second review, 2026-10-28). */
 const GOING_IN_CAP_STEP: DeciderStep = {
   name: "the OM's going-in cap",
   why: "the cap the deal is bought at, on today's NOI: an exit tighter than it is cap compression",
@@ -415,6 +415,44 @@ export const DECIDER_NAMES: Record<StressKey, readonly string[]> = {
   renovation_premium: PREMIUM_ORDER.map((s) => s.name),
   other: [],
 };
+
+/** Every step a key's piece can decide by, whichever order its row took. */
+const STEPS_OF: Partial<Record<StressKey, readonly DeciderStep[]>> = {
+  basis: BASIS_ORDER,
+  exit_cap: EXIT_CAP_ORDER,
+  debt: DEBT_ORDER,
+  noi: NOI_ORDER,
+  vacancy: [...VACANCY_ORDER.today, T12_VACANCY],
+  market_rent: MARKET_RENT_ORDER,
+  expense_growth: EXPENSE_GROWTH_ORDER,
+  taxes: TAXES_ORDER,
+  insurance: INSURANCE_ORDER,
+  opex: OPEX_ORDER,
+  renovation_premium: PREMIUM_ORDER,
+};
+
+/** A growth row's longer-average piece: its series' label, then the years. */
+const AVERAGE_SUFFIX = /: average a year over \d+ years$/;
+
+/**
+ * The step of its row's order a deciding piece decided by — the name a
+ * sentence gives it ("today's index plus the class's screening spread"),
+ * never its label, which can carry a figure or a count (a debt piece's two
+ * labels, a tracker's period, a growth average's years). A growth row's
+ * longer average is its series' step, said as the average. Null where the
+ * piece is no step's (the challenger's rows).
+ */
+export function deciderStepOf(key: StressKey, e: Pick<StressEvidence, "label" | "kind">): string | null {
+  const label = e.label.replace(AVERAGE_SUFFIX, "");
+  const averaged = label !== e.label ? ", its longer average" : "";
+  if (key === "rent_growth") {
+    const d = rentGrowthDecider(null, [label]);
+    return d ? `${d.name}${averaged}` : null;
+  }
+  const piece = { ...e, label } as StressEvidence;
+  const step = (STEPS_OF[key] ?? []).find((s) => s.is(piece));
+  return step ? `${step.name}${averaged}` : null;
+}
 
 // — Off a built row —
 
