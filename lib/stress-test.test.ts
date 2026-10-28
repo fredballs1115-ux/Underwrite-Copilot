@@ -27,7 +27,7 @@ import { compactUsd } from "./money";
 import { NO_RENT_INDEX } from "./rent-growth-decider";
 import type { ChallengerResult, ExtractionResult } from "./anthropic/types";
 import type { DebtIndex } from "./debt-index";
-import { AVERAGE_NOT_FORECAST, GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, type StressKey, type StressRow } from "./stress-test-types";
+import { AVERAGE_NOT_FORECAST, GROWTH_HISTORY_HELD, STRESS_KEYS, STRESS_METHODS, TRAILING_YEAR_NOT_FORECAST, ZILLOW_TRAILING_ONLY, type StressKey, type StressRow } from "./stress-test-types";
 import {
   CHALLENGE_KEYWORDS,
   HEADLINE_NOI_COMPONENTS,
@@ -1773,7 +1773,7 @@ describe("the plan re-runs strike no yield on a figure the plan does not reach",
 
   it("strikes no reset bill on a rate past the ceiling, on any deal, and says why (audit H2)", () => {
     expect(TAX_RATE_CEILING).toBe(0.05);
-    expect(STRESS_METHODS.find((m) => m.key === "taxes")!.limits.join(" ")).toContain(`past ${TAX_RATE_CEILING * 100}% is read as a misread`);
+    expect(STRESS_METHODS.find((m) => m.key === "taxes")!.rules.join(" ")).toContain(`past ${TAX_RATE_CEILING * 100}% is read as a misread`);
     // $380k over a $5M assessment is 7.6%: a fractional assessment or a misread.
     const ex = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Assessed value" ? { ...m, value: "$5,000,000" } : m)) };
     const tx = rowOf(buildStressTest(apartmentArgs({ extraction: ex })), "taxes");
@@ -2395,6 +2395,22 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(g.method).toMatch(/^The OM's rent growth against asking rent, apartments \(Zillow Research\), the one figure that decides; beside it, not deciding: .*allowance on the regulated units/i);
   });
 
+  it("strikes no average on a rent growth Zillow decides, as the methodology says (the review of 2026-10-28)", () => {
+    const g = rowOf(apartmentTest, "rent_growth");
+    expect(g.evidence[g.decidedBy!].label).toBe("Asking rent, apartments");
+    expect(g.evidence.some((e) => /: average a year over \d+ years$/.test(e.label))).toBe(false);
+    expect(STRESS_METHODS.find((m) => m.key === "rent_growth")!.rules).toContain(ZILLOW_TRAILING_ONLY);
+  });
+
+  it("re-runs a stabilized deal's return only on a row whose method says it does", () => {
+    for (const t of [apartmentTest, officeTest, chicagoTest]) {
+      for (const r of t.rows) {
+        if (!r.impact || r.impact.measure === "yield_on_cost") continue;
+        expect(STRESS_METHODS.find((m) => m.key === r.key)!.reruns.stabilized, r.key).toBe("irr");
+      }
+    }
+  });
+
   it("the map covers every key, one entry a sentence", () => {
     expect(Object.keys(AGAINST_SOURCES).sort()).toEqual([...STRESS_KEYS].sort());
     for (const m of STRESS_METHODS) expect(AGAINST_SOURCES[m.key].length, m.key).toBe(m.against.length);
@@ -2482,19 +2498,19 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     // prompts), is never clean.
     expect(b.evidence[0].value).toBe(252_000);
     expect(b.evidence[0].text).toBe(
-      "5 of 5 state a figure /unit; graded clean (supports): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded favorable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
+      "5 of 5 state a figure /unit; graded clean (comparable): The Ellery $252k/unit; The Rowan $249k/unit; Hallam $258k/unit — median $252k/unit over the 3; left out, graded less comparable by the comps step (not a clean comparison): Park Place $261k/unit; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     );
     // Favorable alone is no clean comp: nothing is set against the ask.
     const favorable = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[2]] } })), "basis");
     expect(favorable.evidence[0]).toMatchObject({ value: null });
-    expect(favorable.evidence[0].text).toContain("none graded clean (supports)");
+    expect(favorable.evidence[0].text).toContain("none graded clean (comparable)");
     expect(favorable.verdict).toBe("unchecked");
     expect(favorable.unchecked).toBe(basisFloorWhy(0, 1, "/unit"));
     // None graded clean: no figure, and the row has nothing to decide on.
     const none = rowOf(buildStressTest(apartmentArgs({ brokerComps: { ...comps, saleComps: [comps.saleComps[1]] } })), "basis");
     expect(none.evidence[0]).toMatchObject({
       value: null,
-      text: "1 of 1 state a figure /unit, none graded clean (supports), so none is set against the ask; left out, graded stretched by the comps step (not a clean comparison): Vue $298k/unit",
+      text: "1 of 1 state a figure /unit, none graded clean (comparable), so none is set against the ask; left out, graded not comparable by the comps step (not a clean comparison): Vue $298k/unit",
     });
     expect(none.verdict).toBe("unchecked");
   });
@@ -2644,10 +2660,10 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
     expect(one.evidence[0]).toMatchObject({ value: null });
-    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (supports): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.evidence[0].text).toBe("1 of 1 state a figure /unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
     expect(one.verdict).toBe("unchecked");
     expect(one.unchecked).toBe(
-      "Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+      "Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (1 of 1), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
     );
     expect(one.impact).toBeNull();
     const two = rowOf(
@@ -2659,7 +2675,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     expect(two.verdict).toBe("unchecked");
     expect(two.unchecked).toBe(basisFloorWhy(2, 2, "/unit"));
     // The floor's sentence is the market-rent row's own, word for word but the noun.
-    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(supports\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
+    expect(basisFloorWhy(2, 2, "/unit")).toMatch(/^Fewer than 3 of the memorandum's sale comps graded clean \(comparable\) state a figure \/unit \(2 of 2\).*, so no median is struck: the comps' own floor\.$/);
     // Two comps beside a recorded sales' median of four: the median decides.
     const withSales = rowOf(
       buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit"), comp("Vue", "$236,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: { count: 4, medianPerSqft: null, medianPerUnit: 240_000, providerName: "Philadelphia OPA", retrievedAt: "2026-10-01" } })),
@@ -3848,7 +3864,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     const decider = r.evidence[r.decidedBy!];
     expect(decider).toMatchObject({ kind: "om_internal", label: "The memorandum's lease comps", value: 2_250, page: 16 });
     expect(decider.text).toBe(
-      "4 of 4 state a rent a month a unit; graded clean (supports): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded stretched by the comps step (not a clean comparison): The Vue $2,900/mo",
+      "4 of 4 state a rent a month a unit; graded clean (comparable): The Rowan $2,050/mo; The Calder $2,300/mo; Hale House $2,250/mo — median $2,250/mo over the 3; left out, graded not comparable by the comps step (not a clean comparison): The Vue $2,900/mo",
     );
     // 4.4% over the median: inside the comps' 5%, a hold.
     expect(r.gap).toMatchObject({ value: 4.4, unit: "pct" });
@@ -3870,9 +3886,9 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
   it("strikes no median under three comps graded clean, and says how many there are", () => {
     const r = rowOf(buildStressTest(apartmentArgs({ brokerComps: comps({ name: "The Rowan", detail: "$2,050/mo", support: "supports" }, { name: "The Vue", detail: "$2,900/mo", support: "favorable" }) })), "market_rent");
     expect(r.verdict).toBe("unchecked");
-    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (supports) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
+    expect(r.unchecked).toBe("Fewer than 3 of the memorandum's lease comps graded clean (comparable) state a rent a month a unit (1 of 2), so no median is struck: the comps' own floor.");
     expect(r.evidence[0].value).toBeNull();
-    expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded favorable");
+    expect(r.evidence[0].text).toContain(", too few graded clean for a median (3 or more); left out, graded less comparable");
   });
 
   it("sets the rent roll's in-place rent beside it as the gap the OM claims to close, and Zillow's asking rent as the metro's", () => {
@@ -3929,11 +3945,11 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
     );
     expect(r.verdict).toBe("unchecked");
     expect(r.unchecked).toBe(
-      "The memorandum's lease comps graded clean (supports) state their rents on different lease bases (net and full service), and a rent on one basis is not the same rent on another, so no median is struck over them.",
+      "The memorandum's lease comps graded clean (comparable) state their rents on different lease bases (net and full service), and a rent on one basis is not the same rent on another, so no median is struck over them.",
     );
     expect(r.evidence[0].value).toBeNull();
     expect(r.evidence[0].text).toContain(", stated on different lease bases (net and full service), so no median is struck over them");
-    expect(STRESS_METHODS.find((m) => m.key === "market_rent")!.limits.join(" ")).toContain("comps graded clean on different bases strike no median");
+    expect(STRESS_METHODS.find((m) => m.key === "market_rent")!.rules.join(" ")).toContain("comps graded clean on different bases strike no median");
   });
 
   it("sets Zillow's asking rent beside an apartment's or a rented home's rent only, never a pad's or a bed's", () => {
@@ -3975,7 +3991,7 @@ describe("the market-rent row (the owner's decision of 2026-10-21)", () => {
       "market_rent",
     );
     expect(r.omSays.value).toBe(95);
-    expect(r.evidence[0].text).toMatch(/^3 of 3 state a rent a month a space; graded clean \(supports\): Deck A \$85\/mo; Deck B \$90\/mo; Deck C \$100\/mo — median \$90\/mo over the 3$/);
+    expect(r.evidence[0].text).toMatch(/^3 of 3 state a rent a month a space; graded clean \(comparable\): Deck A \$85\/mo; Deck B \$90\/mo; Deck C \$100\/mo — median \$90\/mo over the 3$/);
     expect(r.evidence[r.decidedBy!].value).toBe(90);
   });
 

@@ -339,7 +339,7 @@ export function deriveRisks(results: Results): RiskItem[] {
     if (c.support === "stretched") {
       risks.push({
         severity: "medium",
-        title: `Stretched comp: ${c.name}`,
+        title: `A comp not comparable to the subject: ${c.name}`,
         detail: c.note,
         source: "Comps",
         tab: "comps",

@@ -129,6 +129,7 @@ import type {
 import { avgRentOf, type ActualsRead } from "@/lib/actuals/actuals-read";
 import { monthlyRentFloor, statedLeaseBasis, statedRent, type LeaseBasis } from "@/lib/lease-comp-rent";
 import type { LoanQuote } from "@/lib/loan-quote";
+import { COMP_RATING } from "@/lib/comp-rating";
 import { NOI_IN_LINE_BAND, pickOmNoi, t12Vacancy, t12VacancyOverWords } from "@/lib/actuals/analyze";
 import { withArticle } from "@/lib/article";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -2657,14 +2658,14 @@ function marketRentRow(ctx: Ctx): StressRow | null {
     evidence.push({
       kind: "om_internal",
       label: MARKET_RENT_COMPS_LABEL,
-      text: `${stating.length} of ${leaseComps.length} state a rent ${yardWords}${clean.length ? `; graded clean (supports): ${named(clean)}` : ""}${
+      text: `${stating.length} of ${leaseComps.length} state a rent ${yardWords}${clean.length ? `; graded clean (comparable): ${named(clean)}` : ""}${
         median3 != null
           ? ` — median ${say(median3)} over the ${clean.length}`
           : mixedBases
             ? `, stated on different lease bases (${joinWords(mixedBases)}), so no median is struck over them`
             : clean.length > 0
               ? `, too few graded clean for a median (${MEDIAN_FLOOR} or more)`
-              : ", none graded clean (supports), so none is set against the OM's rent"
+              : ", none graded clean (comparable), so none is set against the OM's rent"
       }${leftOut}`,
       value: median3 != null ? Math.round(median3 * 100) / 100 : null,
       asOf: null,
@@ -2730,8 +2731,8 @@ function marketRentRow(ctx: Ctx): StressRow | null {
       leaseComps.length === 0
         ? "The memorandum lists no lease comps, so no median of comps graded clean can be set against its rent."
         : mixedBases
-          ? `The memorandum's lease comps graded clean (supports) state their rents on different lease bases (${joinWords(mixedBases)}), and a rent on one basis is not the same rent on another, so no median is struck over them.`
-          : `Fewer than ${MEDIAN_FLOOR} of the memorandum's lease comps graded clean (supports) state a rent ${yardWords} (${clean.length} of ${leaseComps.length}), so no median is struck: the comps' own floor.`;
+          ? `The memorandum's lease comps graded clean (comparable) state their rents on different lease bases (${joinWords(mixedBases)}), and a rent on one basis is not the same rent on another, so no median is struck over them.`
+          : `Fewer than ${MEDIAN_FLOOR} of the memorandum's lease comps graded clean (comparable) state a rent ${yardWords} (${clean.length} of ${leaseComps.length}), so no median is struck: the comps' own floor.`;
     return { ...unchecked("market_rent", omSays, evidence, why), ...base };
   }
   const best = decided.figure;
@@ -3719,22 +3720,24 @@ interface BasisComparable {
   on: Per;
 }
 
-/** Why a comp graded favorable or stretched is left out, in words true of
- *  every grade on file: the comps step grades by comparability to the
+/** Why a comp graded `favorable` or `stretched` is left out, in words true
+ *  of every grade on file: the comps step grades by comparability to the
  *  subject now (lib/anthropic/prompts `brokerCompsInstruction`), but a
  *  screen kept from before that prompt graded otherwise, and either way a
  *  grade other than `supports` is no clean comparison — never a claim of
- *  what made it one. */
+ *  what made it one. Said in the one display map's words (lib/comp-rating),
+ *  never the stored grade, whose words are the stress test's verdict words
+ *  too. */
 const LEFT_OUT_GRADE: Record<"favorable" | "stretched", string> = {
-  favorable: "favorable by the comps step (not a clean comparison)",
-  stretched: "stretched by the comps step (not a clean comparison)",
+  favorable: `${COMP_RATING.favorable.short} by the comps step (not a clean comparison)`,
+  stretched: `${COMP_RATING.stretched.short} by the comps step (not a clean comparison)`,
 };
 
 /** Why the price stands unchecked where fewer than MEDIAN_FLOOR comps graded
  *  clean state a figure and no recorded sales' median stands: the comps'
  *  own floor, as the market-rent row says it. */
 export function basisFloorWhy(clean: number, listed: number, perWord: string): string {
-  return `Fewer than ${MEDIAN_FLOOR} of the memorandum's sale comps graded clean (supports) state a figure ${perWord} (${clean} of ${listed}), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.`;
+  return `Fewer than ${MEDIAN_FLOOR} of the memorandum's sale comps graded clean (comparable) state a figure ${perWord} (${clean} of ${listed}), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.`;
 }
 
 function basisRow(ctx: Ctx): StressRow | null {
@@ -3836,13 +3839,13 @@ function basisRow(ctx: Ctx): StressRow | null {
     const figure = clean.length >= MEDIAN_FLOOR ? median(clean.map((c) => c.figure)) : null;
     const head =
       on === per ? `${group.length} of ${sale.length} state a figure ${pw}` : `${group.length} of ${sale.length} state a figure ${pw} alone, so ${group.length === 1 ? "it is" : "they are"} judged per SF`;
-    const graded = clean.length > 0 ? `; graded clean (supports): ${named(clean)}` : "";
+    const graded = clean.length > 0 ? `; graded clean (comparable): ${named(clean)}` : "";
     const struck =
       clean.length >= MEDIAN_FLOOR
         ? ` — median ${money(figure!)}${pw} over the ${clean.length}`
         : clean.length > 0
           ? ` — ${clean.length === 1 ? "one" : "two"} graded clean, too few for a median (${MEDIAN_FLOOR} or more), so none is set against the ask`
-          : ", none graded clean (supports), so none is set against the ask";
+          : ", none graded clean (comparable), so none is set against the ask";
     // The page the figure is read off: the clean comps' own page, each
     // validated against the deck (lib/facts `locatedPage`), where they all
     // sit on one; none where they sit on several or any states none.

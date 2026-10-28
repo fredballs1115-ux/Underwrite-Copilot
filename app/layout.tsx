@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Upload an offering memorandum. Its key assumptions are each set against the deal's own documents, dated published figures or the rule of thumb they are asked to beat, named as such; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
+    "Upload an offering memorandum. Its key assumptions are each set against dated published figures, the deal's own documents, the OM's own figures or a rule of thumb named as one, and the return re-run where the gap moves a model input; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",

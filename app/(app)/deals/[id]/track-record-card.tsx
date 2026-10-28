@@ -2,7 +2,8 @@ import type { DealRecord, Landing, ScoredRow } from "@/lib/track-record";
 import {
   CALIBRATION_NOTE,
   CAPTURE_TRACK,
-  CARD_SCOPE,
+  CARD_SCOPE_LEAD,
+  CARD_SCOPE_REST,
   NOT_YET_SCORABLE,
   OUTCOME_WORD,
   PURCHASE_IS_DECISION,
@@ -13,7 +14,7 @@ import {
   decisionBadge,
   type GapCapturedLike,
 } from "@/lib/track-record-words";
-import { Key, KeyItem, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, PanelFold, Tick } from "@/app/panel-parts";
 import { ScorableGrid } from "../../scorable-grid";
 
 /**
@@ -73,10 +74,13 @@ export function TrackRecordCard({ record, sample = false }: { record: DealRecord
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm" data-qa="track-record">
       <h2 className="text-sm font-semibold tracking-tight">What came after the screen</h2>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">
+      {/* One line in the open, the rest of the scope folded under it,
+          whole in the HTML (the review of 2026-10-28). */}
+      <p className="mt-0.5 text-xs leading-relaxed text-muted" data-qa="track-record-scope">
         {record.screenedOn ? `Screened ${record.screenedOn}. ` : ""}
-        {CARD_SCOPE}
+        {CARD_SCOPE_LEAD}
       </p>
+      <PanelFold rest={CARD_SCOPE_REST} label="What a later figure must be" />
       <p className="mt-1 text-xs leading-relaxed text-muted" data-qa="track-record-not-scorable">
         {NOT_YET_SCORABLE}
       </p>

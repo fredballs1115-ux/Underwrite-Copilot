@@ -135,7 +135,7 @@ const modelMetrics: ReconciledMetric[] = [
     authority: "T-12",
     // The OM states no expense total: the gap is its 6% vacancy against the
     // building's, which more than covers it (the reconciliation below).
-    rationale: "Actuals beat the pro forma; the building's vacancy against the OM's 6% more than covers the gap, and the OM states no expense total.",
+    rationale: "The T-12 is the building's NOI today, so it sets year one over the pro forma; the building's vacancy against the OM's 6% more than covers the gap, and the OM states no expense total.",
     confidence: "medium",
     isConflict: true,
   },

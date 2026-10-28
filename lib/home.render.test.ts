@@ -594,7 +594,7 @@ describe("the screen-run trace credits each stage with what it writes", () => {
 
   it("speaks the product's own words for a lever, a comp's rating and a market read", () => {
     for (const [k, word] of Object.entries(STRIP_WORDS.lever)) expect(word).toBe(LEVER_META[k as keyof typeof LEVER_META].label.toLowerCase());
-    for (const [k, word] of Object.entries(STRIP_WORDS.comp)) expect(word).toBe(COMP_RATING[k as keyof typeof COMP_RATING].label.toLowerCase());
+    for (const [k, word] of Object.entries(STRIP_WORDS.comp)) expect(word).toBe(COMP_RATING[k as keyof typeof COMP_RATING].short);
     for (const [k, word] of Object.entries(STRIP_WORDS.market)) expect(word).toBe(TONE[k as keyof typeof TONE].label.toLowerCase());
     const html = renderToStaticMarkup(React.createElement(ScreenRunStrip));
     expect(gluedWords(visibleText(html))).toEqual([]);
@@ -852,5 +852,30 @@ describe("the homepage footer's steward line", () => {
     const days = [...src.matchAll(/\{fmt\(verifiedAt\)\}(.{0,4})/g)].map((m) => m[1]);
     expect(days.length).toBe(2);
     for (const after of days) expect(after.startsWith(" UTC")).toBe(true);
+  });
+});
+
+// The review of 2026-10-28: the homepage says how many rows can be scored,
+// counted off the scorer; counts the sample's own test on its strip; never
+// says actuals beat the pro forma (a stabilized vacancy is the market's);
+// and its rail links the stress test's method.
+describe("the homepage says how each row is tested, in counts the code makes", () => {
+  it("counts the scorable rows, the sample's tested and unchecked rows, and links the method from the rail", async () => {
+    const { scorableSummary, scorableCountLine } = await import("./scorable-summary");
+    const html = await renderHome();
+    const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+    const s = scorableSummary();
+    expect(text).toContain(`${s.byFigure.length} of the ${s.total} assumptions can be scored as later figures arrive.`);
+    expect(text).not.toContain("whether it was right is scored as evidence arrives");
+    expect(html).toContain(scorableCountLine(s).replace(/'/g, "&#x27;").slice(0, 40));
+    // The strip no longer counts the verdict's deal-killer cards as a stat.
+    expect(html).not.toMatch(/<dt[^>]*>deal-killers named first/);
+    expect(text).not.toMatch(/actuals beat/i);
+    // The strip's two counts are the sample's own build's (app/page `stats`).
+    expect(text).toContain("sample assumptions tested");
+    expect(text).toContain("named unchecked, never passed");
+    expect(readFileSync("app/page.tsx", "utf8")).toContain("const strip = stats(sampleData.stressTest && sampleData.stressTest.rows.length > 0 ? verdictCounts(sampleData.stressTest) : null);");
+    const rail = html.match(/<a [^>]*data-qa="rail-method-link"[^>]*>/)?.[0] ?? "";
+    expect(rail).toContain('href="/how-we-test"');
   });
 });

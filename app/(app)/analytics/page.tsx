@@ -288,6 +288,13 @@ export default async function AnalyticsPage() {
         </p>
       </div>
 
+      {/* The track record leads (the review of 2026-10-28: it sat at the
+          page's foot, under the pricing tables) and stands whatever the
+          count: with nothing scored it says, in its own words, that none is
+          claimed, and under RECORD_FLOOR scored rows that it is a start,
+          with no share. */}
+      <TrackRecordSection record={trackRecord} />
+
       {!enough ? (
         <section className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center shadow-sm">
           <AnalyticsEmptyPicture screened={deals.length} />
@@ -435,10 +442,6 @@ export default async function AnalyticsPage() {
         </>
       )}
 
-      {/* The track record stands whatever the count: with nothing scored it
-          says, in its own words, that none is claimed, and under
-          RECORD_FLOOR scored rows that it is a start, with no share. */}
-      <TrackRecordSection record={trackRecord} />
     </div>
   );
 }

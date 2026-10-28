@@ -28,7 +28,11 @@ import {
   VACANCY_UNSUPPORTED_PTS,
   YOC_MOVE_STRETCH_PTS,
 } from "@/lib/stress-test";
-import { STRESS_METHODS, type EvidenceKind, type StressKey, type StressMethod, type StressVerdict } from "@/lib/stress-test-types";
+import { STRESS_METHODS, type AgainstRole, type EvidenceKind, type StressKey, type StressReruns, type StressVerdict } from "@/lib/stress-test-types";
+import { DECIDER_NAMES } from "@/lib/stress-deciders";
+import { BESIDE_TAG, DECIDES_TAG } from "@/lib/stress-test-words";
+import { scorableGrid } from "@/lib/track-record";
+import { scoredByWords } from "@/lib/scorable-summary";
 import { BASE_RATE_WHY, DECISION_SCORES, NOT_YET_SCORABLE, PURCHASE_IS_DECISION, RECORD_FLOOR, RESCREEN_RULE, SCORED_BY, SCORED_BY_TOO, TRADE_DATE_RULE, VACANCY_MEASURE_RULE, marginWords } from "@/lib/track-record";
 import { doorShare, snapshotThreshold } from "@/lib/stress-snapshot";
 import { ZORI_CREDIT, ZORI_SOURCE_URL } from "@/lib/zori";
@@ -161,10 +165,130 @@ export const KIND_LABEL: Record<EvidenceKind, string> = {
   om_internal: "The OM against itself",
 };
 
-/** Whether the engine runs the return again on this method's evidence —
- *  the table's own words say "re-run" where it does. */
-export function engineReruns(method: Pick<StressMethod, "engine">): boolean {
-  return /\bre-run\b/.test(method.engine);
+/** The intro's lines (the review of 2026-10-28): all four kinds of evidence
+ *  named, each as the panel names it, and the re-run said where it is made —
+ *  only where the gap moves a model input (`StressMethod.reruns`). */
+export const HOW_WE_TEST_INTRO = [
+  "A memorandum's key assumptions are each set against evidence a buyer can check.",
+  "A dated published figure, the deal's own documents (its rent roll and T-12), the OM against its own figures, or a rule of thumb named as one.",
+  "Then, where the gap moves a model input, the return is run again with the evidence's figure in the OM's place: the levered IRR, or on a plan the yield on cost.",
+] as const;
+
+/** What the engine re-runs on a method's evidence, in words a table cell and
+ *  a picture's label say: the method's own `reruns`, never read off its
+ *  words (the first cut matched "re-run" in "No return is re-run"). */
+export function rerunsWords(r: StressReruns): string {
+  if (r.stabilized === "irr" && r.plan === "yoc") return "The levered IRR; on a plan, the yield on cost";
+  if (r.stabilized === "irr") return "The levered IRR; nothing on a plan";
+  if (r.plan === "yoc") return "Nothing on a stabilized deal; on a plan, the yield on cost";
+  return "Nothing";
+}
+
+/** The picture's label at the arrow's head: what is re-run, short. */
+export function rerunsMark(r: StressReruns): string {
+  if (r.stabilized === "irr" && r.plan === "yoc") return "IRR · yield on cost";
+  if (r.stabilized === "irr") return "IRR";
+  if (r.plan === "yoc") return "Yield on cost (plan)";
+  return "No re-run";
+}
+
+const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+
+/** An `against` item's tag, as the panel tags a built row's pieces
+ *  (lib/stress-test-words `DECIDES_TAG`, `BESIDE_TAG`): "Decides (1st)",
+ *  "Decides (1st, 3rd, 4th)", "Decides, in its class's order", or "Beside it,
+ *  not deciding". */
+export function roleTag(role: AgainstRole): string {
+  if (role === "beside") return BESIDE_TAG;
+  if (role === "by_class") return `${DECIDES_TAG}, in its class's order`;
+  return `${DECIDES_TAG} (${role.map((n) => ORDINAL[n - 1] ?? `${n}th`).join(", ")})`;
+}
+
+/**
+ * Where each row's verdict word falls (lib/stress-test's own readers and
+ * constants, one cell each): the overview table's three columns. "Past
+ * that" is past the hair or the margin inside which the OM is at its figure.
+ * At its figure, a re-run that moves the return as far as `VERDICT_WORDS`
+ * says reads stretched too, which the table's caption names once.
+ */
+export const THRESHOLDS: Record<StressKey, { holds: string; stretched: string; unsupported: string }> = {
+  basis: { holds: `Up to ${BASIS_STRETCH_PCT}% over, or under`, stretched: `${BASIS_STRETCH_PCT}–${BASIS_UNSUPPORTED_PCT}% over`, unsupported: `More than ${BASIS_UNSUPPORTED_PCT}% over` },
+  exit_cap: {
+    holds: `Up to ${Math.round(SAME * 100)} bps tighter, or wider`,
+    stretched: `${Math.round(SAME * 100)}–${EXIT_CAP_UNSUPPORTED_BPS} bps tighter`,
+    unsupported: `${EXIT_CAP_UNSUPPORTED_BPS} bps or more tighter`,
+  },
+  debt: {
+    holds: `Up to ${Math.round(SAME * 100)} bps under, or over`,
+    stretched: `More than ${Math.round(SAME * 100)} bps under`,
+    unsupported: `More than ${DEBT_UNSUPPORTED_BPS} bps under the quote; with none, under the bare index too`,
+  },
+  noi: {
+    holds: `Within ${pctOf(NOI_IN_LINE_BAND)} over, or under`,
+    stretched: `More than ${pctOf(NOI_IN_LINE_BAND)} over`,
+    unsupported: `More than ${pctOf(NOI_UNSUPPORTED_SHARE)} over the T-12 (never against the OM's own)`,
+  },
+  vacancy: {
+    holds: `Within the survey's margin (else ${SAME} pts) under, or over`,
+    stretched: `Under that, by up to ${VACANCY_UNSUPPORTED_PTS} pts more`,
+    unsupported: `More than ${VACANCY_UNSUPPORTED_PTS} pts past that`,
+  },
+  rent_growth: { holds: `Up to ${SAME} pts over, or under`, stretched: `Over that, by up to ${RENT_GROWTH_UNSUPPORTED_PTS} pts more`, unsupported: `More than ${RENT_GROWTH_UNSUPPORTED_PTS} pts past that` },
+  market_rent: { holds: `Up to ${BASIS_STRETCH_PCT}% over, or under`, stretched: `${BASIS_STRETCH_PCT}–${BASIS_UNSUPPORTED_PCT}% over`, unsupported: `More than ${BASIS_UNSUPPORTED_PCT}% over` },
+  expense_growth: {
+    holds: `Up to ${SAME} pts under, or over`,
+    stretched: `Under that, by up to ${EXPENSE_GROWTH_UNSUPPORTED_PTS} pts more`,
+    unsupported: `More than ${EXPENSE_GROWTH_UNSUPPORTED_PTS} pts past that`,
+  },
+  taxes: {
+    holds: `Within ${pctOf(SAME_SHARE)} under, or over`,
+    stretched: `More than ${pctOf(SAME_SHARE)} under`,
+    unsupported: `More than ${pctOf(TAX_UNSUPPORTED_SHARE)} under the unabated bill (never the reset or the T-12's)`,
+  },
+  insurance: {
+    holds: `Never: within ${pctOf(SAME_SHARE)} of the T-12's or over it, the row is unchecked`,
+    stretched: `More than ${pctOf(SAME_SHARE)} under the T-12's premium`,
+    unsupported: "Never: the T-12 is the seller's history",
+  },
+  opex: {
+    holds: `Within ${pctOf(NOI_IN_LINE_BAND)} under, or over`,
+    stretched: `More than ${pctOf(NOI_IN_LINE_BAND)} under`,
+    unsupported: `More than ${pctOf(NOI_UNSUPPORTED_SHARE)} under the T-12 (never the class's ratio)`,
+  },
+  renovation_premium: {
+    holds: `Within ${pctOf(SAME_SHARE)} over, or under`,
+    stretched: `More than ${pctOf(SAME_SHARE)} over`,
+    unsupported: `More than ${pctOf(PREMIUM_UNSUPPORTED_SHARE)} over`,
+  },
+  other: { holds: "No verdict is struck", stretched: "No verdict is struck", unsupported: "No verdict is struck" },
+};
+
+/** The overview table's caption line under it: the re-run's own rule. */
+export const THRESHOLDS_NOTE = `At its figure, a row whose re-run lowers the levered IRR ${IRR_MOVE_STRETCH_BPS} bps or more, or a plan's yield on cost ${YOC_MOVE_STRETCH_PTS} points or more, reads stretched.`;
+
+/** One row of the overview table: the row, the figure that decides it and
+ *  its fallbacks in order (lib/stress-deciders `DECIDER_NAMES`), its
+ *  thresholds, what is re-run and what can score it (lib/track-record
+ *  `scorableGrid`, the scorer itself). */
+export interface OverviewRow {
+  key: StressKey;
+  title: string;
+  decides: readonly string[];
+  thresholds: (typeof THRESHOLDS)[StressKey];
+  reruns: string;
+  scoredBy: string;
+}
+
+export function overviewRows(): OverviewRow[] {
+  const grid = new Map(scorableGrid().map((r) => [r.key, r]));
+  return STRESS_METHODS.map((m) => ({
+    key: m.key,
+    title: m.title,
+    decides: DECIDER_NAMES[m.key],
+    thresholds: THRESHOLDS[m.key],
+    reruns: rerunsWords(m.reruns),
+    scoredBy: scoredByWords(grid.get(m.key)),
+  }));
 }
 
 export interface Publisher {

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { compactUsd } from "@/lib/money";
+import { COMP_RATING } from "@/lib/comp-rating";
 import { BarRow, BarRows, Key, KeyItem, MEASURE, PanelFold, PanelHead, PanelNote, Tick } from "@/app/panel-parts";
 import {
   HEADLINE_EVIDENCE_CASE_LABEL,
@@ -500,9 +501,9 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 
 /**
  * The basis reader's sale-comps sentence ("3 of 3 state a figure /unit;
- * graded clean (supports): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
+ * graded clean (comparable): The Brixton — 2.1 mi $252k/unit; Parkside — 1.4
  * mi $261k/unit — two graded clean, too few for a median (3 or more), so
- * none is set against the ask; left out, graded stretched by the comps step
+ * none is set against the ask; left out, graded not comparable by the comps step
  * (not a clean comparison): Vue at Girard — 4.0 mi $298k/unit")
  * read back into its parts — the count, each comp with its figure and its
  * grade, and what is struck over the clean ones — so the panel draws a list.
@@ -511,7 +512,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
   if (!/^The memorandum's sale comps/.test(e.label)) return null;
   const m = e.text.match(
-    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(supports\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(supports\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+    /^(\d+ of \d+ state a figure \/\S+(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(comparable\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(comparable\), so none is set against the ask)((?:; left out, graded .*)?)$/,
   );
   if (!m) return null;
   const entries = (list: string): { name: string; figure: string }[] | null => {
@@ -529,10 +530,13 @@ export function compLines(e: StressEvidence): { head: string; comps: CompLine[];
     if (!clean) return null;
     comps.push(...clean.map((c) => ({ ...c, grade: "clean" as const, why: null })));
   }
-  for (const g of (m[4] ?? "").matchAll(/; left out, graded (favorable|stretched) by the comps step \(([^()]*)\): (.*?)(?=; left out, graded |$)/g)) {
+  // The left-out grades in the one display map's words (lib/comp-rating).
+  const left = new RegExp(`; left out, graded (${COMP_RATING.favorable.short}|${COMP_RATING.stretched.short}) by the comps step \\(([^()]*)\\): (.*?)(?=; left out, graded |$)`, "g");
+  for (const g of (m[4] ?? "").matchAll(left)) {
     const list = entries(g[3]);
     if (!list) return null;
-    comps.push(...list.map((c) => ({ ...c, grade: g[1] as "favorable" | "stretched", why: g[2] })));
+    const grade = g[1] === COMP_RATING.favorable.short ? ("favorable" as const) : ("stretched" as const);
+    comps.push(...list.map((c) => ({ ...c, grade, why: g[2] })));
   }
   // No comp named, nothing to list; every left-out clause read, or the
   // sentence is printed whole.
@@ -542,10 +546,12 @@ export function compLines(e: StressEvidence): { head: string; comps: CompLine[];
   return { head: m[1], comps, struck: upperFirst(struck) };
 }
 
+// A grade in the one display map's words (lib/comp-rating), never the
+// stored grade, whose "stretched" is a verdict word too.
 const GRADE_WORD: Record<CompLine["grade"], string> = {
-  clean: "Graded clean",
-  favorable: "Favorable, left out",
-  stretched: "Stretched, left out",
+  clean: COMP_RATING.supports.label,
+  favorable: `${COMP_RATING.favorable.label}, left out`,
+  stretched: `${COMP_RATING.stretched.label}, left out`,
 };
 
 /** The sale comps as a list: each comp with its figure and its grade in

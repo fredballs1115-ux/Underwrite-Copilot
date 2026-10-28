@@ -76,7 +76,7 @@ describe("the sample's stress test", () => {
     ]);
     expect(row("debt").unchecked).toBe("The OM states no loan rate.");
     expect(row("basis").unchecked).toBe(
-      "Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (2 of 3), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
+      "Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (2 of 3), and no recorded sales' median stands beside them, so no median is struck: the comps' own floor.",
     );
   });
 

@@ -109,8 +109,9 @@ function Intro() {
         Build a first-draft underwriting model
       </h2>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
-        Upload what you have — one document is enough to start. Actuals beat
-        pro forma, and every conflict is shown with its sources.
+        Upload what you have — one document is enough to start. A rent roll
+        and T-12 set today&apos;s NOI, expenses and occupancy over the pro
+        forma, and every conflict is shown with its sources.
       </p>
     </div>
   );

@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { NOT_TESTED } from "./not-tested";
 import { HEADLINE_METHOD, STRESS_KEYS, STRESS_METHODS } from "./stress-test-types";
-import { CHALLENGE_KEYWORDS, ROSTER_UNTESTED_PCT, challengeKey } from "./stress-test";
+import { CHALLENGE_KEYWORDS, ROSTER_UNTESTED_PCT, VACANCY_UNSUPPORTED_PTS, challengeKey, leaseUpNotModelled } from "./stress-test";
+import { BUDGET_STOPS, yieldOnCost } from "./plan-sensitivity";
 import { HOLD_MONTHS } from "./underwrite/inputs";
 import { sampleDerivedInputs } from "./sample-derive";
 import type { Challenge } from "./anthropic/types";
@@ -100,7 +101,7 @@ describe("what the test does not check yet", () => {
     // A floating quote on file is not the OM's floating rate: the quote is
     // shown as stated, and the OM's fixed rate is held to the screening default.
     expect(item("floating_rate").why).toContain("A floating quote on file is shown as stated; the OM's rate meets the screening default.");
-    expect(debt.limits.join(" ")).toContain("A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested");
+    expect(debt.rules.join(" ")).toContain("A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested");
     expect(src).not.toMatch(/termSofr|sofrSpread/);
   });
 
@@ -112,11 +113,11 @@ describe("what the test does not check yet", () => {
 
   it("says the comps' grades are the AI's and no expansion is added to the exit, each beside the row that shows it (the review of 2026-10-23)", () => {
     const basis = STRESS_METHODS.find((m) => m.key === "basis")!;
-    expect(basis.limits.join(" ")).toContain("The grades are the comps step's reading of each comp's comparability, the AI's");
+    expect(basis.rules.join(" ")).toContain("The grades are the comps step's reading of each comp's comparability, the AI's");
     expect(item("comp_grades").beside?.key).toBe("basis");
     expect(readFileSync("lib/anthropic/prompts.ts", "utf8")).toContain("rate it by its COMPARABILITY to the subject");
     const exit = STRESS_METHODS.find((m) => m.key === "exit_cap")!;
-    expect(exit.limits.join(" ")).toContain("No expansion over the hold is added to the going-in cap");
+    expect(exit.rules.join(" ")).toContain("No expansion over the hold is added to the going-in cap");
     expect(item("cap_expansion").beside?.key).toBe("exit_cap");
     expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("adding some expansion over a hold is a common rule of thumb, which the screen does not hold it to");
   });
@@ -133,6 +134,32 @@ describe("what the test does not check yet", () => {
     // No rate, no figure: the item names no jurisdiction's tax.
     expect(why).not.toMatch(/\d/);
     expect(item("transfer_taxes").beside).toBeUndefined();
+  });
+
+  it("says a plan's budget and contingency are a sensitivity grid, never a row, and its all-in cost is the price row's on a plan (the review of 2026-10-28)", () => {
+    for (const k of STRESS_KEYS) expect(k).not.toMatch(/budget|contingency|absorption|lease_up|schedule|construction/);
+    // The plan's grid stresses the budget, both ways, and holds no verdict.
+    expect(BUDGET_STOPS.some((b) => b > 0) && BUDGET_STOPS.some((b) => b < 0)).toBe(true);
+    expect(item("plan_budget").why).toContain("a grid of savings and overruns, never a verdict");
+    const basis = STRESS_METHODS.find((m) => m.key === "basis")!;
+    expect(basis.rules.join(" ")).toContain("judged on its all-in cost (the price plus the plan's budget)");
+    expect(item("plan_budget").beside).toEqual({ key: "basis", line: expect.stringContaining("the price plus the budget") });
+  });
+
+  it("says the lease-up's pace is not modelled, the model's vacancy flat from year one, and where the vacancy row says so", () => {
+    expect(leaseUpNotModelled(9.3, 6)).toContain("each runs its vacancy from year one");
+    expect(readFileSync("lib/stress-test.ts", "utf8")).toContain("!ctx.plan && doc.e.value! - om.pct > VACANCY_UNSUPPORTED_PTS ? ` ${leaseUpNotModelled(doc.e.value!, om.pct)}`");
+    expect(item("lease_up_pace").why).toContain("one vacancy, flat from year one");
+    expect(item("lease_up_pace").beside?.line).toContain(`more than ${VACANCY_UNSUPPORTED_PTS} points over a stabilized assumption`);
+    const { inputs } = sampleDerivedInputs();
+    expect(typeof inputs.vacancyPct).toBe("number");
+  });
+
+  it("says no row tests the construction schedule: the yield on cost has no clock", () => {
+    expect(yieldOnCost(1_000_000, 20_000_000)).toBe(0.05);
+    expect(yieldOnCost.length).toBe(2);
+    expect(item("construction_schedule").why).toContain("the yield on cost has no clock");
+    expect(item("construction_schedule").beside).toBeUndefined();
   });
 
   it("names no stated return the engine re-runs: the stress test reads no IRR row of the OM's", () => {

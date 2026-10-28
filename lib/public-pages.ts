@@ -62,7 +62,7 @@ export const HOW_WE_TEST_PATH = "/how-we-test";
 export const HOW_WE_TEST_PAGE: PageMeta = {
   title: "How the stress test is struck",
   description:
-    "How Underwrite Copilot tests an offering memorandum's assumptions: each set against a dated published figure, the deal's own documents or a rule of thumb named as one, and the return re-run in code.",
+    "How each OM assumption is tested: against a dated published figure, the deal's documents, the OM against itself or a rule of thumb named as one; the return re-run in code where a gap moves an input.",
   canonical: HOW_WE_TEST_PATH,
   image: SITE_CARD,
 };

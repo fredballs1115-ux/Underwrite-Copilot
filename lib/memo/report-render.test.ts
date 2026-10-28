@@ -2558,8 +2558,8 @@ describe("ReportDocument (full report)", () => {
       await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
     );
     // A header row over each group of comps, as every other table has.
-    expect(text).toMatch(/SALE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
-    expect(text).toMatch(/LEASE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
+    expect(text).toMatch(/SALE COMPS\nCOMP\nDETAIL\nCOMPARABILITY\nWHY\nPAGE\n/);
+    expect(text).toMatch(/LEASE COMPS\nCOMP\nDETAIL\nCOMPARABILITY\nWHY\nPAGE\n/);
     // A value as wide as its column wraps inside it, short of the basis
     // column's dash: it printed "October 22, 2026 at 5:00 PM ET—".
     expect(text).toMatch(/Offers due\nOctober 22, 2026 at 5:00 PM ?\nET\n—\np\. 2\n/);
@@ -3039,7 +3039,7 @@ describe("the report's stress-test page", () => {
       flat("The OM's pro forma cap: 5.70% (Pro forma cap): the OM's stabilized yield on its price (it includes the plan's NOI growth), beside the going-in cap, never deciding (OM p. 8)"),
     );
     // The price stands unchecked on two clean comps, on the comps' floor.
-    expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (supports) state a figure /unit (2 of 3)");
+    expect(page).toContain("Unchecked: Fewer than 3 of the memorandum's sale comps graded clean (comparable) state a figure /unit (2 of 3)");
     // The taxes row: the seller's bill against the bill the memorandum's own
     // figures make on the price IF the sale resets the assessment — the
     // jurisdiction's to say — and the engine's move on the gap.

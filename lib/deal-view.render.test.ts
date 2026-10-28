@@ -62,6 +62,7 @@ import { SandwichPanel } from "@/app/sandwich-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
+import { TAXES_ORDER } from "./stress-deciders";
 import { supportMailto } from "./support-link";
 import {
   NO_FIGURES_FAILURE,
@@ -274,13 +275,16 @@ describe("DealView — the sample deal renders every section without a runtime e
     const words = textOf(html.slice(prompt, html.indexOf("</section>", prompt))).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     // Doors and dollars (lib/stress-deciders `VACANCY_ORDER`): the T-12 never
     // decides an occupancy counted by doors.
-    expect(words).toContain("A T-12 tests the OM's NOI and its operating expenses, and tests the OM's insurance premium where it sits under the T-12's, the seller's actual premium, not a new owner's quote; a rent roll tests the OM's occupancy today, by its doors, and the T-12 an economic vacancy today, in dollars.");
+    expect(words).toContain("T-12 The OM's NOI and its operating expenses; and its tax bill and insurance premium where either sits more than 2% under the seller's own (a tax bill only where no reset bill can be struck): the building's history, not a new owner's bill or quote.");
+    expect(words).toContain("Rent roll The OM's occupancy today, by its doors. (The T-12 tests an economic vacancy today, in dollars.)");
     expect(words).not.toContain("a rent roll, else the T-12");
-    expect(words).toContain("Beside a stabilized vacancy they show today's gap to close and never decide it: the market's published figure does, else the class's norm.");
+    expect(words).toContain("A stabilized vacancy is held to the market's published figure, else the class's norm; beside it the documents show today's gap to close, and never decide it.");
     expect(words).not.toContain("vacancy and insurance against");
     expect(words).toContain("Dated after this screen (the roll's as-of, the T-12's period end), either one lets the track record score the stress test's rows, each in its own measure.");
-    // The T-12's tax line judges no row, so taxes are never promised.
-    expect(words).not.toMatch(/\btax/i);
+    // The T-12's tax line decides the taxes row in lib/stress-deciders'
+    // TAXES_ORDER (its third step), so the prompt says so, on its condition.
+    expect(TAXES_ORDER.map((s) => s.name)).toContain("the deal's T-12 tax line");
+    expect(words).toContain("(a tax bill only where no reset bill can be struck)");
     expect(html).toContain('href="/deals/sample?tab=analyses&amp;a=reconciler"');
     expect(words).toContain("Reconcile your own model against the OM");
     expect(a11yIssues(html)).toEqual([]);

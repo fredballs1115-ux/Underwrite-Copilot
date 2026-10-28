@@ -21,7 +21,17 @@ const COLUMNS: readonly { source: LaterSource; label: string }[] = [
   { source: "trade", label: "Trade" },
 ];
 
-export function ScorableGrid({ rows, className = "mt-3" }: { rows: readonly ScorableRow[]; className?: string }) {
+export function ScorableGrid({
+  rows,
+  className = "mt-3",
+  rescreen = true,
+}: {
+  rows: readonly ScorableRow[];
+  className?: string;
+  /** the "upload, then re-screen" line, left off where no deal can be
+   *  re-screened (the public methodology page) */
+  rescreen?: boolean;
+}) {
   if (rows.length === 0) return null;
   // A vacancy a document can score is scored in its own measure, said under
   // the grid: a mark in the T-12's column is an economic vacancy's alone.
@@ -70,9 +80,11 @@ export function ScorableGrid({ rows, className = "mt-3" }: { rows: readonly Scor
           {VACANCY_MEASURE_RULE}
         </p>
       )}
-      <p className="mt-2 text-xs font-medium" data-qa="scorable-grid-line">
-        {RESCREEN_LINE}
-      </p>
+      {rescreen && (
+        <p className="mt-2 text-xs font-medium" data-qa="scorable-grid-line">
+          {RESCREEN_LINE}
+        </p>
+      )}
     </div>
   );
 }
