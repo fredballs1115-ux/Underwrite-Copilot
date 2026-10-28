@@ -546,8 +546,8 @@ const comps: BrokerCompsResult = {
     {
       name: "The Brixton (renovated)",
       detail: "$2,520/mo · 2BR",
-      support: "favorable",
-      note: "Renovated units clear $2,520 — below the $2,600 pro forma.",
+      support: "supports",
+      note: "Renovated units like the program's own: a comparable lease, clearing $2,520, below the $2,600 pro forma.",
     },
   ],
   redFlags: [
