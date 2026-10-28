@@ -837,3 +837,16 @@ describe("StressTestPanel on the sample — each claim once", () => {
     expect(modelCellText({ ...test, sample: undefined }, "exit_cap", 5.45)).toBe("5.45%");
   });
 });
+
+describe("the panel draws the OM's stated IRR under the headline's line, as the OM's", () => {
+  it("says it, and sets a levered one against the OM's case", () => {
+    const base = sampleStressTest({ today: "2026-10-19" });
+    const test = { ...base, headline: { ...base.headline!, statedIrr: { pct: 18.4, label: "Projected levered IRR", page: 41, levered: true } } };
+    const html = render(test);
+    const stated = html.match(/data-qa="stress-headline-stated"[^>]*>([^<]+)</)?.[1] ?? "";
+    expect(stated).toContain("The OM states a levered IRR of 18.4% (Projected levered IRR, p. 41)");
+    expect(stated).toContain("at the OM&#x27;s figures on the rows re-run here");
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(render(base)).not.toContain('data-qa="stress-headline-stated"');
+  });
+});

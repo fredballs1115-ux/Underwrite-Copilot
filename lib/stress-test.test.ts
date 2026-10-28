@@ -78,11 +78,12 @@ import {
   vacancyEconomicStated,
   vacancyDecidedBy,
   stressHeadline,
+  statedIrrLevered,
   T12_TODAY_BESIDE,
   type StressTestArgs,
 } from "./stress-test";
 import { HEADLINE_BASIS_LEFT_OUT, HEADLINE_METHOD, HEADLINE_NOI_LEFT_OUT, headlineBasisLeftOut } from "./stress-test-types";
-import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, stressReadLine, untestedSentence } from "./stress-test-words";
+import { evidenceDateTime, evidenceDay, evidencePeriod, evidenceShort, evidenceWhen, isoDayOf, sourceWithPage, whenWords, headlineLine, headlineName, headlineSentence, headlineShort, keptSentence, leadRows, moveShort, moveSize, noMoveWhy, rowWords, noiRestClause, noiRestSentence, ptsText, rerunWords, shownHeadline, statedIrrSentence, statedReturnSentence, stressReadLine, untestedSentence } from "./stress-test-words";
 import { METRO_VACANCY_LABEL, VACANCY_ORDER } from "./stress-deciders";
 import { planYieldBase } from "./plan-sensitivity";
 import { monthlyOf } from "./value-add";
@@ -4149,5 +4150,63 @@ describe("a price row's cost is the difference of the figures printed beside it"
     ).toBe("The ask costs 0.90 pts of yield on cost: 6.10% at it, 7.00% at the evidence's price");
     // Two figures that print alike cost nothing, said as the two figures.
     expect(basisMoveWords({ ...impact, baseIrrPct: 9.26, altIrrPct: 9.34 })).toBe("Levered IRR 9.3% at the ask, 9.3% at the evidence's price");
+  });
+});
+
+// ── The IRR the OM states, beside the headline (2026-10-28) ──────────────
+
+describe("the OM's stated IRR beside a levered-IRR headline", () => {
+  const withRows = (...extra: ReturnType<typeof row>[]) => {
+    const ex = { ...APARTMENT, metrics: [...APARTMENT.metrics, ...extra] };
+    return buildStressTest(apartmentArgs({ extraction: ex }));
+  };
+
+  it("reads its words for levered, unlevered or neither", () => {
+    expect(statedIrrLevered("Projected levered IRR 18.5%")).toBe(true);
+    expect(statedIrrLevered("Unlevered IRR 9.0%")).toBe(false);
+    expect(statedIrrLevered("Un-levered IRR")).toBe(false);
+    expect(statedIrrLevered("IRR (property-level)")).toBe(false);
+    expect(statedIrrLevered("Projected IRR 15%")).toBeNull();
+  });
+
+  it("carries a levered IRR with its page, and sets it against the OM's case in words", () => {
+    const t = withRows(row("Projected levered IRR", "18.5%", "p. 9"));
+    const h = t.headline!;
+    expect(h.statedIrr).toEqual({ pct: 18.5, label: "Projected levered IRR", page: 9, levered: true });
+    const s = statedIrrSentence(h);
+    expect(s).toContain("The OM states a levered IRR of 18.5% (Projected levered IRR, p. 9)");
+    expect(s).toContain("at the OM's figures on the rows re-run here");
+    expect(headlineSentence(t)).toContain(s);
+    expect(headlineShort(t)).toContain("the OM states 18.5% levered, p. 9");
+    expect(statedReturnSentence(h)).toBe(s);
+  });
+
+  it("takes the levered row over an unlevered one, and sets an unlevered one against nothing", () => {
+    expect(withRows(row("Unlevered IRR", "9.0%", "p. 9"), row("Levered IRR", "17.0%", "p. 9")).headline!.statedIrr?.pct).toBe(17);
+    const un = withRows(row("Unlevered IRR", "9.0%", "p. 9")).headline!;
+    expect(un.statedIrr?.levered).toBe(false);
+    expect(statedIrrSentence(un)).toBe("The OM states an unlevered IRR of 9.0% (Unlevered IRR, p. 9); the figures here are levered, so the two are not set against each other.");
+    const bare = withRows(row("IRR", "15.0%", "p. 9")).headline!;
+    expect(statedIrrSentence(bare)).toContain("without saying whether it is levered, so it is not set against the levered figures here");
+  });
+
+  it("reads no hurdle, preference, target, LP figure, range or two-figure row as the OM's IRR", () => {
+    for (const r of [
+      row("Preferred return / IRR hurdle", "8.0%"),
+      row("Target IRR", "15%"),
+      row("LP net IRR", "14.2%"),
+      row("Levered IRR", "16%–18%"),
+      row("IRR", "18.0% levered / 9.0% unlevered"),
+      row("Downside case IRR", "8%"),
+    ]) {
+      expect(withRows(r).headline!.statedIrr ?? null).toBeNull();
+    }
+    expect(statedIrrSentence(buildStressTest(apartmentArgs()).headline!)).toBe("");
+  });
+
+  it("states none where the price buys no building", () => {
+    const note = { ...APARTMENT, interest: { kind: "note" as const, summary: "", share: "", groundLease: "", loan: "", page: "" }, metrics: [...APARTMENT.metrics, row("Projected levered IRR", "18.5%")] };
+    const h = buildStressTest(apartmentArgs({ extraction: note })).headline;
+    expect(h?.statedIrr ?? null).toBeNull();
   });
 });

@@ -28,7 +28,7 @@ import {
   keptSentence,
   liveHeadline,
   modelCellText,
-  statedYocSentence,
+  statedReturnSentence,
   modelIrrOf,
   noMoveWhy,
   noiRestSentence,
@@ -1022,7 +1022,7 @@ function HeadlineView({ headline: h, line, kept, test }: { headline: StressHeadl
     : h.modelIrrPct != null && Number.isFinite(h.modelIrrPct)
       ? Number(h.modelIrrPct.toFixed(1))
       : null;
-  const stated = statedYocSentence(h);
+  const stated = statedReturnSentence(h);
   const walk: { part: ShownPart; from: number; to: number }[] = [];
   if (om != null) {
     let at = om;

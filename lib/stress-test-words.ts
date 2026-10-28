@@ -831,6 +831,38 @@ export function statedYocSentence(h: StressHeadline): string {
   return `${stated}, ${its}; the plan's ${pct2(own)} is struck on ${cost}.`;
 }
 
+/**
+ * The IRR the memorandum states, beside a levered-IRR headline, said as the
+ * OM's (`StressHeadline.statedIrr`). A levered one is set against the OM's
+ * case, and the sentence says where the two can part: the case runs the
+ * OM's figures only on the rows re-run here, and the engine's own on
+ * everything else — "The OM states a levered IRR of 18.5% (Projected levered
+ * IRR, p. 8); the engine, at the OM's figures on the rows re-run here, earns
+ * 16.7%. The two part wherever the OM's own model runs an input these rows
+ * do not hold to the OM's (the loan's terms, the hold, the costs of buying
+ * and selling) or its own arithmetic." An unlevered one, or one whose words
+ * say neither, is printed and set against nothing. "" where it states none.
+ */
+export function statedIrrSentence(h: StressHeadline): string {
+  const s = isYieldHeadline(h) ? null : h.statedIrr;
+  if (!s || !Number.isFinite(s.pct)) return "";
+  const where = `(${s.label}${s.page != null ? `, p. ${s.page}` : ""})`;
+  if (s.levered === false) return `The OM states an unlevered IRR of ${pct1(s.pct)} ${where}; the figures here are levered, so the two are not set against each other.`;
+  if (s.levered === null) return `The OM states an IRR of ${pct1(s.pct)} ${where} without saying whether it is levered, so it is not set against the levered figures here.`;
+  const stated = `The OM states a levered IRR of ${pct1(s.pct)} ${where}`;
+  if (h.omIrrPct == null || !Number.isFinite(h.omIrrPct)) return `${stated}; the engine's does not solve at the OM's figures.`;
+  const same = pct1(h.omIrrPct) === pct1(s.pct);
+  const earns = same ? "earns the same" : `earns ${pct1(h.omIrrPct)}`;
+  const part = same ? "" : " The two part wherever the OM's own model runs an input these rows do not hold to the OM's (the loan's terms, the hold, the costs of buying and selling) or its own arithmetic.";
+  return `${stated}; the engine, at the OM's figures on the rows re-run here, ${earns}.${part}`;
+}
+
+/** The OM's own stated return beside the headline, whichever the measure:
+ *  a plan's yield on cost, else an IRR. "" where it states none. */
+export function statedReturnSentence(h: StressHeadline): string {
+  return isYieldHeadline(h) ? statedYocSentence(h) : statedIrrSentence(h);
+}
+
 /** "2 mixes of the swaps had no IRR and were counted at the engine's floor
  *  in the split." — "" where every mix solved. */
 export function unsolvedSentence(h: StressHeadline): string {
@@ -955,6 +987,11 @@ export function headlineShort(test: StressTest, withModel = true): string | null
   if (against.length > 0) notes.push(joinAnd(against));
   const stated = isYieldHeadline(h) ? h.statedYoc : null;
   if (stated && Number.isFinite(stated.pct)) notes.push(`the OM states ${pct2(stated.pct)}${stated.page != null ? `, p. ${stated.page}` : ""}`);
+  const irr = isYieldHeadline(h) ? null : h.statedIrr;
+  if (irr && Number.isFinite(irr.pct)) {
+    const kind = irr.levered === true ? " levered" : irr.levered === false ? " unlevered" : "";
+    notes.push(`the OM states ${pct1(irr.pct)}${kind}${irr.levered === null ? ", not saying whether levered" : ""}${irr.page != null ? `, p. ${irr.page}` : ""}`);
+  }
   const model = withModel ? modelClause(h) : "";
   if (model) notes.push(model);
   return `${line}${notes.length > 0 ? ` (${notes.join("; ")})` : ""}${h.parts.length > 0 ? "; the report splits the gap." : "."}`;
@@ -1161,7 +1198,9 @@ export function headlineSentence(test: StressTest): string | null {
   const kept = keptSentence(test);
   const clause = modelClause(h);
   const model = kept ? ` ${kept}` : clause ? ` ${upperFirst(clause)}.` : "";
-  return `${line}${multiples}${split}${unsolved}${untested}${left}${rest ? ` ${rest}` : ""}${model}`;
+  // The IRR the OM states, as the OM's.
+  const stated = statedIrrSentence(h) ? ` ${statedIrrSentence(h)}` : "";
+  return `${line}${multiples}${split}${unsolved}${untested}${left}${stated}${rest ? ` ${rest}` : ""}${model}`;
 }
 
 /**

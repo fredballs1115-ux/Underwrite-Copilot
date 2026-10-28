@@ -1753,6 +1753,12 @@ function buildStressTestTab(ws: ExcelJS.Worksheet, test: StressTest) {
     // row's re-run starts from, which neither case is.
     line(HEADLINE_MODEL_LABEL, h.modelIrrPct != null ? h.modelIrrPct / 100 : null, FMT.pct1, h.modelIrrPct == null ? "its levered IRR does not solve" : HEADLINE_MODEL_WHY);
   }
+  if (!yoc && h.statedIrr && Number.isFinite(h.statedIrr.pct)) {
+    // The IRR the memorandum states in a row of its own, as the OM's.
+    const s = h.statedIrr;
+    const kind = s.levered === true ? "levered" : s.levered === false ? "unlevered" : "not saying whether levered";
+    line(`The OM's stated IRR (${kind})`, s.pct / 100, FMT.pct1, `${s.label}${s.page != null ? `, p. ${s.page}` : ""}`);
+  }
   for (const o of h.omitted) line(`Left out: ${o.label}`, null, "", o.why);
   if (shown.parts.length > 0) signedBars(`${cellA1(firstPart, 2)}:${cellA1(lastPart, 2)}`);
   r++;

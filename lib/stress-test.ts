@@ -4627,7 +4627,15 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   // another, the headline says it does not test the OM's (a plan's yield on
   // cost has no hold in it).
   const hold = planYield || !derived ? null : holdUntested(ctx.rows, ex, derived.inputs.holdMonths);
-  const headline = struck ? { ...struck, untested: headlineUntested(built, ex, args.readOn, planYield ? PLAN_UNTESTED_KEYS : HEADLINE_UNTESTED_KEYS, hold) } : null;
+  const headline = struck
+    ? {
+        ...struck,
+        // The OM's own stated IRR, beside a levered-IRR headline (a plan's
+        // stated yield on cost rides in `statedYoc`).
+        ...(planYield ? {} : { statedIrr: statedIrrOf(ctx.rows, ex) }),
+        untested: headlineUntested(built, ex, args.readOn, planYield ? PLAN_UNTESTED_KEYS : HEADLINE_UNTESTED_KEYS, hold),
+      }
+    : null;
   return {
     rows,
     readOn: args.readOn,
@@ -4693,6 +4701,50 @@ function holdUntested(rows: Row[], ex: ExtractionResult | null, modelMonths: num
   const months = statedMonths(row);
   if (months == null || Math.abs(months - modelMonths) < 1) return null;
   return { omYears: Math.round((months / 12) * 10) / 10, modelYears: Math.round((modelMonths / 12) * 10) / 10, page: pageOf(row, ex) };
+}
+
+const STATED_IRR_ROW = /\birr\b|\binternal\s+rate\s+of\s+return\b/i;
+/** A hurdle, a preference, a promote's tier, an investor's net figure, a
+ *  target or a sensitivity is no projection of the deal's own return; a
+ *  multiple, a cash-on-cash or a renovation's return is another figure. */
+const STATED_IRR_NOT =
+  /hurdle|\bpref(?:erred|erence)?\b|promote|waterfall|\blp\b|\bgp\b|investor|sponsor|\bnet\b|minimum|target|threshold|multiple|cash[- ]on[- ]cash|\bcoc\b|sensitivit|\b(?:down|up)side\b|scenario|renovat|\bper\b|\bmezz/i;
+const UNLEVERED_WORDS = /\bun-?levered\b|\bunleveraged\b|\basset[- ]level\b|\bproperty[- ]level\b|\ball[- ]cash\b|free\s+and\s+clear/i;
+const LEVERED_WORDS = /\blevered\b|\bleveraged\b/i;
+
+/** Whether a stated IRR's own words call it levered (true), unlevered
+ *  (false) or neither (null). Exported for its test. */
+export function statedIrrLevered(words: string): boolean | null {
+  if (UNLEVERED_WORDS.test(words)) return false;
+  return LEVERED_WORDS.test(words) ? true : null;
+}
+
+/**
+ * An IRR the memorandum states in a row of its own, with its page and
+ * whether its words call it levered (lib/stress-test-types `statedIrr`). The
+ * row a buyer would set the engine's against is the levered one, so it is
+ * taken first, then one naming neither, then the unlevered one. A range, a
+ * value stating two percentages ("18% levered / 9% unlevered" in one row) and
+ * a figure no deal earns are none. Null where the price buys no building — a
+ * note's, a share's, a position's or the land's stated IRR is the property's,
+ * not this buyer's (the buy box's rule, lib/criteria `returnWithheldOf`).
+ */
+function statedIrrOf(rows: Row[], ex: ExtractionResult | null): NonNullable<StressHeadline["statedIrr"]> | null {
+  if (ex) {
+    const kind = interestOf(ex).kind;
+    if (kind !== "fee_simple" && kind !== "leasehold" && kind !== "unknown") return null;
+  }
+  const found = rows
+    .filter((m) => STATED_IRR_ROW.test(m.label) && !STATED_IRR_NOT.test(m.label))
+    .map((m) => {
+      const pct = parsePct(m.value);
+      const percents = m.value.match(/-?\d+(?:\.\d+)?\s*%/g) ?? [];
+      const one = new Set(percents.map((p) => Number.parseFloat(p))).size <= 1;
+      const ok = pct != null && pct > -50 && pct < 100 && one && !statesRange(m.value);
+      return ok ? { pct: pct!, label: m.label, page: pageOf(m, ex), levered: statedIrrLevered(`${m.label} ${m.value}`) } : null;
+    })
+    .filter((s): s is NonNullable<typeof s> => s != null);
+  return found.find((s) => s.levered === true) ?? found.find((s) => s.levered === null) ?? found[0] ?? null;
 }
 
 // ── The headline: the OM's case against the evidence's ───────────────────

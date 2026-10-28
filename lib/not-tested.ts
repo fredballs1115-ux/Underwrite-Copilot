@@ -112,7 +112,7 @@ export const NOT_TESTED: readonly NotTested[] = [
   {
     id: "om_return",
     title: "The OM's own stated return",
-    why: "The IRR or multiple a memorandum quotes is not re-run or set against the model's: every return the test prints is the engine's.",
+    why: "A quoted IRR is shown as the OM's, set against the engine's only where its words call it levered, and never re-run; its model and any quoted multiple are not read.",
   },
   {
     id: "floating_rate",

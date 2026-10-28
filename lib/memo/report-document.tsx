@@ -131,6 +131,7 @@ import {
   rerunWords,
   rowMoveText,
   shownHeadline,
+  statedIrrSentence,
   statedYocSentence,
   stressReadLine,
   tickPositions,
@@ -521,7 +522,7 @@ export function reportHeadline(test: StressTest): ReportHeadline | null {
   const after = (
     yoc
       ? [untestedSentence(h), left, statedYocSentence(h)]
-      : [unsolvedSentence(h), untestedSentence(h), left, noiRestSentence(h, test), kept ?? (clause ? `${upperFirst(clause)}.` : "")]
+      : [unsolvedSentence(h), untestedSentence(h), left, statedIrrSentence(h), noiRestSentence(h, test), kept ?? (clause ? `${upperFirst(clause)}.` : "")]
   ).filter(Boolean);
   const tail = after.join(" ");
   if (tail && !sentence.endsWith(` ${tail}`)) return whole;
