@@ -463,7 +463,7 @@ describe("a stabilized apartment deal with a T-12", () => {
     expect(i.gap).toEqual({
       value: 30_000,
       unit: "usd",
-      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the T-12's is the seller's actual premium, the building's own history, not a new owner's quote, and the row reads stretched at most.",
+      text: "The OM's $120k premium is $30k (20.0%) under the $150k the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the seller's premium is a floor and the row reads stretched at most.",
     });
     expect(i.method).toBe(
       "The OM's insurance against the deal's T-12 insurance line, the one figure that decides; beside it, not deciding: the OM's $120k moved by the national premium index (PPI, commercial multiple peril) (BLS via FRED).",
