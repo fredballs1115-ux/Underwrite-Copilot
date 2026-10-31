@@ -33,14 +33,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "The sample test: one OM, worked end to end",
     description:
-      "Each assumption set against its evidence and the return re-run in code, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
+      "Each assumption tested against the evidence that can check it, the return re-run in code where a gap moves it, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
     images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",
     title: "The sample test: one OM, worked end to end",
     description:
-      "Each assumption set against its evidence and the return re-run in code, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
+      "Each assumption tested against the evidence that can check it, the return re-run in code where a gap moves it, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
     images: ["/opengraph-image"],
   },
 };

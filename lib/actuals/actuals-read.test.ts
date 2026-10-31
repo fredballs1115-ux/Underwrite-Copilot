@@ -2,7 +2,7 @@
 // memo's line (research pass 24, B3).
 import { describe, expect, it } from "vitest";
 import type { RentRollSummary, T12Summary } from "./types";
-import { actualsFromRows, actualsShortLine, readActuals, rentRollDateWords, t12DateWords, t12IncomeLines } from "./actuals-read";
+import { actualsFromRows, actualsShortLine, readActuals, rentRollDateWords, t12DateWords, t12IncomeLines, t12IncomeNote } from "./actuals-read";
 
 const ROLL: RentRollSummary = {
   unitCount: 120,
@@ -128,7 +128,25 @@ describe("the T-12's income lines add up (the investor's review of 2026-10-31)",
   });
 
   it("names a gross rent line gross potential rent, and prints any other as stated", () => {
-    expect(t12IncomeLines({ collectedRent: 7_150_000, vacancyLoss: -650_000, otherIncome: 292_000, egi: 6_792_000 })[0].label).toBe("Gross potential rent");
+    const gross = { collectedRent: 7_150_000, vacancyLoss: -650_000, otherIncome: 292_000, egi: 6_792_000, egiStated: true };
+    expect(t12IncomeLines(gross)[0].label).toBe("Gross potential rent");
+    expect(t12IncomeNote(gross)).toBeNull();
+    // An EGI the summary derived (the rent line less the loss) says nothing
+    // of the line, which the stress test reads as net (t12Vacancy): never
+    // "Gross potential rent", the EGI marked derived and said so.
+    const derived = { ...gross, egiStated: false };
+    expect(t12IncomeLines(derived).map((l) => l.label)).toEqual([
+      "Rent (as stated)",
+      "Vacancy / credit loss",
+      "Other income",
+      "Effective gross income (derived)",
+    ]);
+    expect(t12IncomeNote(derived)).toMatch(/^The statement states no EGI/);
+    // A stated EGI the lines do not reach: printed as stated, and said.
+    const untied = { collectedRent: 6_000_000, vacancyLoss: 500_000, otherIncome: null, egi: 5_000_000, egiStated: true };
+    expect(t12IncomeLines(untied)[0].label).toBe("Collected rent");
+    expect(t12IncomeNote(untied)).toBe("The income lines do not add up to the statement's own EGI; each is printed as stated.");
+    expect(t12IncomeNote({ collectedRent: 6_499_500, vacancyLoss: 650_500, otherIncome: 292_000, egi: 6_791_500, egiStated: true })).toBeNull();
     expect(t12IncomeLines({ collectedRent: 7_000_000, vacancyLoss: 650_000, otherIncome: null, egi: null }).map((l) => l.label)).toEqual([
       "Collected rent",
       "Vacancy / credit loss",

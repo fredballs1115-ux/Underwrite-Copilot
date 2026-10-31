@@ -126,38 +126,75 @@ export interface T12IncomeLine {
   strong?: boolean;
 }
 
+/** Which way the T-12's income lines add up to its EGI: "net" — the EGI is
+ *  the rent line plus other income, so the line is already net of the loss;
+ *  "gross" — a STATED EGI is the rent line less the loss plus other income;
+ *  "derived" — no EGI was stated, and the summary derived one (the rent line
+ *  less the loss plus other income, `summarizeT12`), which says nothing of
+ *  the line, as `t12Vacancy` reads it; "untied" — a stated EGI neither
+ *  equation reaches; null where there is no EGI or no rent line. */
+function t12IncomeShape(
+  st: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi" | "egiStated">,
+): "net" | "gross" | "derived" | "untied" | null {
+  const rent = st.collectedRent;
+  const egi = st.egi;
+  if (rent == null || egi == null || !Number.isFinite(rent) || !Number.isFinite(egi)) return null;
+  const loss = st.vacancyLoss == null || !Number.isFinite(st.vacancyLoss) ? 0 : Math.abs(st.vacancyLoss);
+  const other = st.otherIncome != null && Number.isFinite(st.otherIncome) ? st.otherIncome : 0;
+  const close = (a: number, b: number) => Math.abs(a - b) < 2;
+  if (loss > 0 && close(egi, rent + other)) return "net";
+  if (st.egiStated !== true) return "derived";
+  if (close(egi, rent - loss + other)) return loss > 0 ? "gross" : "net";
+  return "untied";
+}
+
 /**
  * The T-12's income lines in an order that adds up. A statement whose EGI is
  * its rent line plus other income has a rent line already net of the loss
  * (`t12Vacancy`'s "net"): it reads "Rent before vacancy" (the rent line plus
  * the loss, our addition, said so), the loss, "Collected rent", other income
  * and EGI — where the old order printed the loss between the rent line and
- * an EGI it was never taken from, so the column did not add up. One whose EGI
- * is the rent line less the loss plus other income has a gross rent line,
- * "Gross potential rent". Any other is printed as stated.
+ * an EGI it was never taken from, so the column did not add up. One whose
+ * STATED EGI is the rent line less the loss plus other income has a gross
+ * rent line, "Gross potential rent". Where no EGI was stated the summary's
+ * own is derived on that reading, which says nothing of the line (the
+ * stress test reads it as net, `t12Vacancy`): the line is "Rent (as
+ * stated)" and the EGI is marked derived. Any other is printed as stated,
+ * and `t12IncomeNote` says it does not tie.
  */
-export function t12IncomeLines(st: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi">): T12IncomeLine[] {
+export function t12IncomeLines(st: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi" | "egiStated">): T12IncomeLine[] {
   const rent = st.collectedRent;
   const loss = st.vacancyLoss == null || !Number.isFinite(st.vacancyLoss) ? null : Math.abs(st.vacancyLoss);
   const other = st.otherIncome != null && Number.isFinite(st.otherIncome) ? st.otherIncome : null;
   const egi = st.egi;
-  const close = (a: number, b: number) => Math.abs(a - b) < 2;
+  const shape = t12IncomeShape(st);
   const lines: T12IncomeLine[] = [];
   const tail = () => {
     if (other != null) lines.push({ label: "Other income", value: actualsUsd(other) });
-    lines.push({ label: "Effective gross income", value: actualsUsd(egi), strong: true });
+    lines.push({ label: shape === "derived" ? "Effective gross income (derived)" : "Effective gross income", value: actualsUsd(egi), strong: true });
     return lines;
   };
-  if (rent != null && loss != null && loss > 0 && egi != null && close(egi, rent + (other ?? 0))) {
+  if (shape === "net" && rent != null && loss != null && loss > 0) {
     lines.push({ label: "Rent before vacancy (collected + the loss)", value: actualsUsd(rent + loss) });
     lines.push({ label: "Vacancy / credit loss", value: t12DeductionText(loss) });
     lines.push({ label: "Collected rent", value: actualsUsd(rent) });
     return tail();
   }
-  const gross = rent != null && loss != null && loss > 0 && egi != null && close(egi, rent - loss + (other ?? 0));
-  lines.push({ label: gross ? "Gross potential rent" : "Collected rent", value: actualsUsd(rent) });
+  const rentLabel = shape === "gross" ? "Gross potential rent" : shape === "derived" ? "Rent (as stated)" : "Collected rent";
+  lines.push({ label: rentLabel, value: actualsUsd(rent) });
   if (loss != null) lines.push({ label: "Vacancy / credit loss", value: t12DeductionText(loss) });
   return tail();
+}
+
+/** The note under the T-12's income lines: a derived EGI said as ours, and a
+ *  stated EGI the lines do not reach said not to tie; null where they do. */
+export function t12IncomeNote(st: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi" | "egiStated">): string | null {
+  const shape = t12IncomeShape(st);
+  if (shape === "derived") {
+    return "The statement states no EGI: ours is its rent line less the loss plus other income, and whether that line is gross or already net of the loss it does not say.";
+  }
+  if (shape === "untied") return "The income lines do not add up to the statement's own EGI; each is printed as stated.";
+  return null;
 }
 
 /** Why a statement whose expense lines carry both signs shows no total

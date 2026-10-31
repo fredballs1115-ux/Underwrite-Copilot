@@ -33,6 +33,7 @@ import {
   t12DateWords,
   t12DeductionText,
   t12IncomeLines,
+  t12IncomeNote,
   t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
@@ -1620,7 +1621,13 @@ export function buildReportData(
     graded && chip && irr != null && Number.isFinite(irr) && gridSubjectOf(extraction) == null
       ? 2 + ((deal.verdict as VerdictResult | null) ? 1 : 0) + (test ? 1 : 0) + (plan ? 1 : 0)
       : null;
-  const annotated = targetReturnPage != null ? withTargetReturnNote(memo, irr, targetReturnPage) : memo;
+  // Where the report grades no IRR (a plan, withheld returns, a note's
+  // collateral), the one-page memo's own "model X%" beside the target is
+  // taken off too: page 1 never names a figure the report says it left out.
+  const annotated =
+    targetReturnPage != null
+      ? withTargetReturnNote(memo, irr, targetReturnPage)
+      : { ...memo, buyBox: memo.buyBox.map((c) => (c.label === TARGET_RETURN && c.note ? { label: c.label, status: c.status } : c)) };
   return {
     modelVsMarket: modelVsMarket ?? null,
     assumable: modelRead(assumable),
@@ -2080,6 +2087,9 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
           {line(st.noiDerived ? "Net operating income (derived)" : "Net operating income", actualsUsd(st.noi), { bold: true })}
           {t12SignsNote(st) ? (
             <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>{str(t12SignsNote(st)!)}</Text>
+          ) : null}
+          {t12IncomeNote(st) ? (
+            <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>{str(t12IncomeNote(st)!)}</Text>
           ) : null}
         </View>
       ) : null}
