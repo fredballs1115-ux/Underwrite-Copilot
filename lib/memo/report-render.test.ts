@@ -905,7 +905,7 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Vacancy / credit loss ($120k)");
     expect(text).toContain("Real estate taxes ($250k)");
     expect(text).toContain("Total operating expenses ($400k)");
-    expect(text).toContain("Effective gross income $1.03M");
+    expect(text).toContain("Effective gross income (derived) $1.03M");
     expect(text).toContain("Net operating income (derived) $630k");
     expect(text).not.toMatch(/\([−-]\$/);
     expect(text).not.toContain("carry both signs");
@@ -2943,6 +2943,18 @@ describe("the report's stress-test page", () => {
   // buildReportData's arguments between the sensitivity and the test: the
   // thirty-second argument is the test.
   const between = [undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, "2026-10-19"] as const;
+
+  it("never names the model's IRR beside the target on a report that grades none (the audit of 2026-10-31)", async () => {
+    const { sampleStressTest, sampleDocumentChecks } = await import("@/lib/sample-cover");
+    const test = sampleStressTest("2026-10-19");
+    // The one-page memo names it, as its stress block's key does…
+    const memo = buildMemoData(sampleRow(), "October 19, 2026", sampleDocumentChecks(), null, null, null, "2026-10-19", null, test);
+    expect(memo.buyBox.find((c) => c.label === "Target return")?.note).toMatch(/^model \d+\.\d%$/);
+    // …and a report with no graded grids takes it off its first page.
+    const input = buildReportData(sampleRow(), "October 19, 2026", sampleDocumentChecks(), null, ...between, test);
+    expect(input.targetReturnPage).toBeNull();
+    expect(input.memo.buyBox.find((c) => c.label === "Target return")?.note).toBeUndefined();
+  });
 
   it("lays the OM's stated IRR in the headline's sentences after, where the sentence says it", async () => {
     const { sampleStressTest } = await import("@/lib/sample-cover");

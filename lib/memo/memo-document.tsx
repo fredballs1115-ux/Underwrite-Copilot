@@ -592,10 +592,17 @@ export interface MemoStressBlock {
    *  on the sample wherever its re-runs stand; "" elsewhere */
   planNote?: string;
   rows: MemoStressRow[];
-  /** the rows past their evidence the memo has no room for, by title and
-   *  verdict ("the NOI (stretched)"), named in the key so the count above
-   *  never reads as the rows below; "" where every one is printed */
-  notPrinted?: string;
+  /** every row past its evidence, by title and verdict ("NOI (stretched)"),
+   *  in the order `rows` takes its first few from: the key names the ones
+   *  past the rows printed (`memoNotPrinted`), so the count above never
+   *  reads as the rows below, whatever the fit steps cut */
+  lead?: string[];
+}
+
+/** The rows past their evidence the memo does not print, named in its key:
+ *  every lead row past the rows the page carries, after any fit step. */
+export function memoNotPrinted(block: Pick<MemoStressBlock, "rows" | "lead">): string {
+  return (block.lead ?? []).slice(block.rows.length).join(", ");
 }
 
 /** A printed row, and whether it carries a re-run (lib/stress-test-words
@@ -625,12 +632,7 @@ export function memoStressBlock(test: StressTest | null | undefined): MemoStress
       const w = rowWords(r);
       return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move), rerun: drawsRerun(r) };
     }),
-    notPrinted: pdfSafe(
-      leadRows(test, Number.POSITIVE_INFINITY)
-        .slice(MEMO_STRESS_ROWS)
-        .map((r) => `${r.title} (${r.verdict})`)
-        .join(", "),
-    ),
+    lead: leadRows(test, Number.POSITIVE_INFINITY).map((r) => pdfSafe(`${r.title} (${r.verdict})`)),
   };
 }
 
@@ -1726,7 +1728,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                   data.stressTest.rerun && data.stressTest.rows.some((r) => r.rerun)
                     ? `Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun}`
                     : "Ticks: the OM's figure in the row's tone, the evidence's in ink"
-                }; ${data.stressTest.notPrinted ? `not printed here: ${data.stressTest.notPrinted}; the report has every row.` : "the report has every row."}`}
+                }; ${memoNotPrinted(data.stressTest) ? `not printed here: ${memoNotPrinted(data.stressTest)}; the report has every row.` : "the report has every row."}`}
               </Text>
             ) : null}
           </Section>

@@ -3355,7 +3355,7 @@ function insuranceRow(ctx: Ctx): StressRow | null {
   const gap: StressRow["gap"] = {
     value: Math.round(floor - premium),
     unit: "usd",
-    text: `The OM's ${money(premium)} premium is ${money(floor - premium)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the seller's premium is a floor and the row reads stretched at most.`,
+    text: `The OM's ${money(premium)} premium is ${money(floor - premium)} (${pct1(share * 100)}) under the ${money(floor)} the seller paid over the T-12: the OM against its own building's history. A new owner's quote is what finally decides the premium, and none is on file, so the seller's premium is read as a floor, not a quote, and the row reads stretched at most.`,
   };
   const evidenceIndex = decided.index;
   const words = { what: "the insurance line", om: money(premium), alt: `the seller's actual ${money(floor)} T-12 premium (the building's own history, not a new owner's quote)`, evidence: "" };

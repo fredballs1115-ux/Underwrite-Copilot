@@ -13,6 +13,7 @@ import {
   t12DateWords,
   t12DeductionText,
   t12IncomeLines,
+  t12IncomeNote,
   t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
@@ -195,6 +196,11 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             {t12SignsNote(st) && (
               <p className="mt-2 text-[11px] text-muted" data-qa="t12-signs-mixed">
                 {t12SignsNote(st)}
+              </p>
+            )}
+            {t12IncomeNote(st) && (
+              <p className="mt-2 text-[11px] text-muted" data-qa="t12-income-note">
+                {t12IncomeNote(st)}
               </p>
             )}
           </div>

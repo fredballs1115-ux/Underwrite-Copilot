@@ -7,7 +7,7 @@
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { MemoDocument, basePosition, buildMemoData, clampWords, pdfPageCount, renderMemoPdf } from "./memo-document";
+import { MEMO_FIT_STEPS, MemoDocument, basePosition, buildMemoData, clampWords, memoNotPrinted, pdfPageCount, renderMemoPdf } from "./memo-document";
 import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
@@ -1606,6 +1606,12 @@ describe("the memo leads with the stress test", () => {
     // report than that it prints every row.
     expect(text).toContain(`Re-runs: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's; not printed here: NOI (stretched); the report has every row.`);
     expect(text).not.toContain("tests every assumption");
+    // A fit step that cuts the block names every row it cut, never only
+    // the ones the first cut left out (the audit of 2026-10-31).
+    expect(memoNotPrinted(data.stressTest!)).toBe("NOI (stretched)");
+    const cut = MEMO_FIT_STEPS[1](data)!;
+    expect(cut.stressTest!.rows).toHaveLength(2);
+    expect(memoNotPrinted(cut.stressTest!)).toBe("Exit cap (stretched), Insurance (stretched), NOI (stretched)");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (OM p. 25) · gap $60");
     // The achieved $140 still clears the $82 break-even: the cell says the
