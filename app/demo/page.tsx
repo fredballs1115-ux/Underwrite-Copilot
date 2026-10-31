@@ -26,21 +26,21 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Sample test — one OM, its assumptions tested",
   description:
-    "Browse a full Underwrite Copilot test: the key assumptions set against dated published figures, the deal's own rent roll and T-12, or a rule of thumb named as one, the broker's comps graded, a market check, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
+    "Browse a full Underwrite Copilot test: the key assumptions set against dated published figures, the deal's own rent roll and T-12, the OM's own figures, or a rule of thumb named as one, the return re-run in code where a gap moves it, the broker's comps graded, a market check, the verdict, buy-box fit score, live sensitivity sliders, reconciliation, financing & capital, and downloadable memo + Excel — on an illustrative sample deal.",
   alternates: { canonical: "/demo" },
   // Child `openGraph`/`twitter` REPLACE the root objects wholesale, so the
   // image and card type must be restated or shares lose their preview.
   openGraph: {
     title: "The sample test: one OM, worked end to end",
     description:
-      "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
+      "Each assumption set against its evidence and the return re-run in code, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
     images: ["/opengraph-image"],
   },
   twitter: {
     card: "summary_large_image",
     title: "The sample test: one OM, worked end to end",
     description:
-      "Challenged assumptions, graded comps, a market check, the verdict, fit score, live sliders, and the model included — on an illustrative sample deal.",
+      "Each assumption set against its evidence and the return re-run in code, then the comps graded, a market check and the verdict, on an illustrative sample deal. The model is included.",
     images: ["/opengraph-image"],
   },
 };
