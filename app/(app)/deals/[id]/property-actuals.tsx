@@ -12,6 +12,7 @@ import {
   statedDay,
   t12DateWords,
   t12DeductionText,
+  t12IncomeLines,
   t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
@@ -175,10 +176,10 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
             <T12IncomeBar st={st} />
             <table className="mt-3 w-full text-sm">
               <tbody>
-                <Line k="Collected rent" v={usd(st.collectedRent)} />
-                {st.vacancyLoss != null && <Line k="Vacancy / credit loss" v={t12DeductionText(st.vacancyLoss)} />}
-                {st.otherIncome != null && <Line k="Other income" v={usd(st.otherIncome)} />}
-                <Line k="Effective gross income" v={usd(st.egi)} strong />
+                {/* In an order that adds up (lib/actuals/actuals-read). */}
+                {t12IncomeLines(st).map((l) => (
+                  <Line key={l.label} k={l.label} v={l.value} strong={l.strong} />
+                ))}
                 {st.opex.map((l, i) => (
                   <Line key={`${l.key}-${i}`} k={l.label} v={t12DeductionText(l.amount, { asStated: st.opexSignsMixed })} indent />
                 ))}
