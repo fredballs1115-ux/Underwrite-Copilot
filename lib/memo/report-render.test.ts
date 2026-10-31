@@ -3024,7 +3024,7 @@ describe("the report's stress-test page", () => {
     // figure, so with no figure read the class's norm decides it; the T-12
     // and the rent roll are the building today, beside it, never deciding.
     expect(page).toContain("OM says: Vacancy (pro forma): 6.0% (p. 8)");
-    expect(page).toContain("Decides: Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure (a rule of thumb)");
+    expect(page).toContain("Decides: Rule of thumb — Multifamily vacancy, a rule of thumb: 5.0%, the class's screening default (a rule of thumb)");
     expect(page).toContain("Beside it, not deciding: The deal's document — The deal's T-12 economic vacancy (vacancy and credit loss over gross potential rent): 9.1% economic");
     expect(page).toContain("today's, 3.1 points over the stabilized assumption — the gap a lease-up has to close (the deal's T-12)");
     expect(page).toContain("Beside it, not deciding: The deal's document — The deal's rent roll: the occupancy it runs at: 9.3% vacant (by count, 225 of 248 units occupied, as of May 31, 2026); the building today, which a lease-up starts from: shown beside the stabilized assumption and never deciding it (the deal's rent roll)");

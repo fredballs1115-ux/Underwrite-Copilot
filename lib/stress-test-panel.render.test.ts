@@ -54,7 +54,7 @@ const VACANCY: StressRow = {
     {
       kind: "rule_of_thumb",
       label: "Multifamily vacancy, a rule of thumb",
-      text: "5.0% — the class's screening default, a rule of thumb, not this market's figure",
+      text: "5.0%, the class's screening default",
       value: 5,
       asOf: null,
       publisher: "a rule of thumb",
@@ -384,7 +384,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(all.match(/never the building's/g)).toHaveLength(1);
     expect(all).not.toContain("figure, not the building's");
     expect(row).toContain('href="https://www.census.gov/housing/hvs/"');
-    expect(t).toContain("A rule of thumb Beside it, not deciding Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure — a rule of thumb · the class's, not this market's");
+    expect(t).toContain("A rule of thumb Beside it, not deciding Multifamily vacancy, a rule of thumb: 5.0%, the class's screening default — the class's, not this market's");
     expect(row.match(/data-qa="stress-decides-tag"/g)).toHaveLength(3);
     // The gap in words, then the impact: the pair, the two runs as bars on
     // one scale (the OM's figure's, then the evidence's), and the sentence.

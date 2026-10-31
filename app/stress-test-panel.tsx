@@ -167,6 +167,13 @@ const SCOPE: Record<StressEvidence["scope"], string> = {
   class: "the class's, not this market's",
 };
 
+/** A rule of thumb whose label already says so ("Multifamily vacancy, a rule
+ *  of thumb"), with no period of its own: its publisher is not said again
+ *  after it. */
+function namesItsPublisher(e: StressEvidence): boolean {
+  return e.kind === "rule_of_thumb" && evidencePeriod(e) == null && e.label.toLowerCase().includes(e.publisher.toLowerCase());
+}
+
 /** The published grains, as the key names them. */
 const GRAIN: Partial<Record<StressEvidence["scope"], string>> = {
   metro: "the metro's",
@@ -631,7 +638,9 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                   period (a month, a quarter, a day only for a day's figure),
                   and not again where its text already says it. */}
               <span className="text-muted">
-                {`— ${e.publisher}`}
+                {/* A publisher the label already names ("Multifamily vacancy,
+                    a rule of thumb") is not said again. */}
+                {namesItsPublisher(e) ? "—" : `— ${e.publisher}`}
                 {period ? (
                   period.inText ? null : (
                     <>
@@ -651,7 +660,9 @@ function EvidenceList({ row, marks = false }: { row: StressRow; marks?: boolean 
                 ) : e.kind === "rule_of_thumb" || e.kind === "om_internal" ? null : (
                   ", undated"
                 )}
-                {e.scope === "deal" && (e.kind === "document" || e.kind === "om_internal") ? "" : ` · ${SCOPE[e.scope]}`}
+                {e.scope === "deal" && (e.kind === "document" || e.kind === "om_internal")
+                  ? ""
+                  : `${namesItsPublisher(e) ? " " : " · "}${SCOPE[e.scope]}`}
               </span>
               {e.page != null && (
                 <>

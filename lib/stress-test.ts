@@ -1336,7 +1336,7 @@ function vacancyRow(ctx: Ctx): StressRow | null {
     rot = piece({
       kind: "rule_of_thumb",
       label: `${cd.classWord[0].toUpperCase()}${cd.classWord.slice(1)} vacancy, a rule of thumb`,
-      text: `${pct1(cd.pct)} — the class's screening default, a rule of thumb, not this market's figure`,
+      text: `${pct1(cd.pct)}, the class's screening default`,
       value: cd.pct,
       asOf: null,
       publisher: "a rule of thumb",
