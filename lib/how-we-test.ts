@@ -70,7 +70,7 @@ export const WHO_DOES_WHAT = {
   code: {
     heading: "Code runs",
     items: [
-      "the lookup: the one published figure, document or rule of thumb that decides it, the rest shown beside it",
+      "the lookup: the one figure that decides it, published, the deal's document, the OM's own or a rule of thumb, the rest shown beside it",
       "the median of the comps graded clean, three or more, or none",
       "the arithmetic: the gap in the assumption's own unit",
       "the verdict word, from the gap and the row's own threshold",
@@ -220,7 +220,7 @@ export const THRESHOLDS: Record<StressKey, { holds: string; stretched: string; u
   basis: { holds: `Up to ${BASIS_STRETCH_PCT}% over, or under`, stretched: `${BASIS_STRETCH_PCT}–${BASIS_UNSUPPORTED_PCT}% over`, unsupported: `More than ${BASIS_UNSUPPORTED_PCT}% over` },
   exit_cap: {
     holds: `Up to ${Math.round(SAME * 100)} bps tighter, or wider`,
-    stretched: `${Math.round(SAME * 100)}–${EXIT_CAP_UNSUPPORTED_BPS} bps tighter`,
+    stretched: `More than ${Math.round(SAME * 100)}, under ${EXIT_CAP_UNSUPPORTED_BPS} bps tighter`,
     unsupported: `${EXIT_CAP_UNSUPPORTED_BPS} bps or more tighter`,
   },
   debt: {
@@ -279,10 +279,21 @@ export interface OverviewRow {
   key: StressKey;
   title: string;
   decides: readonly string[];
+  /** what the order's list leaves out, said under it */
+  orderNote?: string;
   thresholds: (typeof THRESHOLDS)[StressKey];
   reruns: string;
   scoredBy: string;
 }
+
+/** What an order's list leaves out, said under it: a growth row decides on
+ *  the cautious of its series' trailing year and its stored average
+ *  (lib/growth-average `cautiousGrowth`), and rent growth's order is the
+ *  class's own, the list an apartment building's. */
+const ORDER_NOTE: Partial<Record<StressKey, string>> = {
+  rent_growth: "Each the lower of its trailing year and its average where two years are held; the order shown is an apartment building's, and each class reads its own kind of rent first.",
+  expense_growth: "Each the higher of its trailing year and its average where two years are held.",
+};
 
 export function overviewRows(): OverviewRow[] {
   const grid = new Map(scorableGrid().map((r) => [r.key, r]));
@@ -290,6 +301,7 @@ export function overviewRows(): OverviewRow[] {
     key: m.key,
     title: m.title,
     decides: DECIDER_NAMES[m.key],
+    ...(ORDER_NOTE[m.key] ? { orderNote: ORDER_NOTE[m.key] } : {}),
     thresholds: THRESHOLDS[m.key],
     reruns: rerunsWords(m.reruns),
     scoredBy: scoredByWords(grid.get(m.key)),
@@ -363,7 +375,7 @@ export const CADENCE_RULE = {
     // What a StressEvidence carries (lib/stress-test-types): a publisher and
     // an `asOf` on every published figure but the reader's own past screens,
     // and an `href` only on recorded sales, where the provider gives one.
-    "A published figure names its publisher and the day or period it is for (your own past screens, pooled across days, carry no date); a recorded sale links to its record where the source gives one.",
+    "A published figure names its publisher and the day or period it is for where the file records them, and an undated one or one whose house is not recorded says so and is held to nothing (your own past screens, pooled across days, carry no date); a recorded sale links to its record where the source gives one.",
     "A daily series is stale in days, a monthly one in weeks, a quarterly one in months: each is judged by its own cadence, never one threshold for all.",
     "A stale figure still shows with its date, and is set against nothing.",
     `A research print is stale past ${RESEARCH_STALE_DAYS} days from the day it was read.`,
@@ -415,17 +427,17 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
   // vacancy rows read them; a licensed survey database is never read.
   {
     heading: "Licensed databases are not read",
-    line: "Published broker research is read: each cap range or vacancy band on the research tracker is dated, its house named where the file records one. Licensed survey databases are not read.",
+    line: "Published broker research is read: each cap range or vacancy band on the research tracker is dated and its house named where the file records them; an undated one is shown and held to nothing. Licensed survey databases are not read.",
   },
 ];
 
 /** Whether the screen was right: scored, never claimed (lib/track-record's
  *  rules, its floor and its lists of what can score a row imported; the
- *  margins lib/stress-snapshot's `snapshotThreshold` — `rowThreshold`'s
- *  survey margin applies to a vacancy the survey decided, which no later
- *  document scores, so the page names none; a vacancy's is never finer
- *  than one door's share of the units the OM states, `doorShare`, said with
- *  the sample's 248 units). */
+ *  margins lib/stress-snapshot's `snapshotThreshold`, and `rowThreshold`'s
+ *  survey margin on a vacancy the survey decided: a stabilized one in
+ *  dollars, held to the survey as a floor, is scored by a later T-12 by
+ *  that margin; a vacancy's is never finer than one door's share of the
+ *  units the OM states, `doorShare`, said with the sample's 248 units). */
 const margin = (key: StressKey) => {
   const t = snapshotThreshold(key);
   return t ? marginWords(t).replace("-point", " points") : "";
@@ -443,7 +455,8 @@ export const TRACK_RECORD = {
     NOT_YET_SCORABLE,
     "A row read stretched or unsupported is right where the later figure lands past the OM's figure on the buyer's bad side by more than the row's own margin, and wrong where it lands within that margin, or better for the buyer.",
     "A row that held is right where the later figure lands within that margin of the OM's figure, or better for the buyer, and wrong, a false hold, where it lands past it on the buyer's bad side. An unchecked row is not scored.",
-    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("vacancy")} on a vacancy, or one door's share where the OM states its units and that is larger (${doorShare(248)!.toFixed(2)} points, one door of 248), ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price.`,
+    `The margin is the row's own tolerance, the one its verdict was struck by, kept with it: ${margin("noi")} of the OM's NOI, ${margin("basis")} of its price, ${margin("vacancy")} on a vacancy.`,
+    `On a vacancy the survey decided, the survey's margin of error; never finer than one door's share where the OM states its units (${doorShare(248)!.toFixed(2)} points, one door of 248).`,
     "A row kept before its tolerance was carried keeps the margin it was stored with.",
     "A screen made before its stress test was kept with the verdict has no rows to score: its challenges are scored on the challenger's own figures, and the record says the rows were not snapshotted.",
     // lib/track-record `scoreScreen`'s `admit`: refused where the document's
