@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-31",
+      "title": "The documents add up, and say whose figures they are",
+      "href": "/demo",
+      "blurb": "The T-12 table's income column now adds up: a rent line already net of vacancy is shown with the loss added back above it, not taken off twice. A rent roll's occupancy by area is labelled by area beside its unit count. The memo names the stress-test rows it has no room to print and points to the report, a tax reset is credited as our arithmetic on the OM's figures, and /how-we-test was checked sentence by sentence against the code. On the sample, the buy box is called the sample's, never yours."
+    },
+    {
       "date": "2026-10-28",
       "title": "The OM's own IRR beside the stress test's",
       "href": "/how-we-test",
