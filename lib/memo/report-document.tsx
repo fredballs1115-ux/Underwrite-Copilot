@@ -32,6 +32,7 @@ import {
   rentRollDateWords,
   t12DateWords,
   t12DeductionText,
+  t12IncomeLines,
   t12SignsNote,
   type ActualsRead,
 } from "@/lib/actuals/actuals-read";
@@ -2014,7 +2015,7 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
         <View wrap={false} style={{ marginBottom: 10 }}>
           <TitleRow title="Rent roll" count={str(rentRollDateWords(read.rentRoll) ?? "") || undefined} marginTop={4} />
           <View style={{ flexDirection: "row", marginBottom: 4 }}>
-            {tile("Occupancy", pct(rr.sfWeightedOccupancy))}
+            {tile("Occupancy by area", pct(rr.sfWeightedOccupancy))}
             {tile("WALT", walt?.text ?? "—", walt?.note)}
             {tile("Avg rent", rent?.text ?? "—", rent?.basis)}
             {tile("Occupied", `${rr.occupiedUnits} / ${rr.unitCount}`)}
@@ -2048,10 +2049,9 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
       {st ? (
         <View wrap={false}>
           <TitleRow title="T-12 operating statement" count={str(t12DateWords(read.t12) ?? "") || undefined} marginTop={4} />
-          {line("Collected rent", actualsUsd(st.collectedRent))}
-          {st.vacancyLoss != null ? line("Vacancy / credit loss", t12DeductionText(st.vacancyLoss)) : null}
-          {st.otherIncome != null ? line("Other income", actualsUsd(st.otherIncome)) : null}
-          {line("Effective gross income", actualsUsd(st.egi), { bold: true })}
+          {t12IncomeLines(st).map((l) => (
+            <View key={l.label}>{line(l.label, l.value, { bold: l.strong })}</View>
+          ))}
           {st.opex.map((l, i) => (
             <View key={`${l.key}-${i}`}>{line(l.label, t12DeductionText(l.amount, { asStated: st.opexSignsMixed }), { indent: true })}</View>
           ))}

@@ -118,6 +118,48 @@ export function t12DeductionText(n: number | null | undefined, opts: { asStated?
   return opts.asStated ? actualsUsd(n) : `(${actualsUsd(Math.abs(n))})`;
 }
 
+/** One line of the T-12's income table, as the card and the report print it. */
+export interface T12IncomeLine {
+  label: string;
+  value: string;
+  /** the subtotal the lines above add up to */
+  strong?: boolean;
+}
+
+/**
+ * The T-12's income lines in an order that adds up. A statement whose EGI is
+ * its rent line plus other income has a rent line already net of the loss
+ * (`t12Vacancy`'s "net"): it reads "Rent before vacancy" (the rent line plus
+ * the loss, our addition, said so), the loss, "Collected rent", other income
+ * and EGI — where the old order printed the loss between the rent line and
+ * an EGI it was never taken from, so the column did not add up. One whose EGI
+ * is the rent line less the loss plus other income has a gross rent line,
+ * "Gross potential rent". Any other is printed as stated.
+ */
+export function t12IncomeLines(st: Pick<T12Summary, "collectedRent" | "vacancyLoss" | "otherIncome" | "egi">): T12IncomeLine[] {
+  const rent = st.collectedRent;
+  const loss = st.vacancyLoss == null || !Number.isFinite(st.vacancyLoss) ? null : Math.abs(st.vacancyLoss);
+  const other = st.otherIncome != null && Number.isFinite(st.otherIncome) ? st.otherIncome : null;
+  const egi = st.egi;
+  const close = (a: number, b: number) => Math.abs(a - b) < 2;
+  const lines: T12IncomeLine[] = [];
+  const tail = () => {
+    if (other != null) lines.push({ label: "Other income", value: actualsUsd(other) });
+    lines.push({ label: "Effective gross income", value: actualsUsd(egi), strong: true });
+    return lines;
+  };
+  if (rent != null && loss != null && loss > 0 && egi != null && close(egi, rent + (other ?? 0))) {
+    lines.push({ label: "Rent before vacancy (collected + the loss)", value: actualsUsd(rent + loss) });
+    lines.push({ label: "Vacancy / credit loss", value: t12DeductionText(loss) });
+    lines.push({ label: "Collected rent", value: actualsUsd(rent) });
+    return tail();
+  }
+  const gross = rent != null && loss != null && loss > 0 && egi != null && close(egi, rent - loss + (other ?? 0));
+  lines.push({ label: gross ? "Gross potential rent" : "Collected rent", value: actualsUsd(rent) });
+  if (loss != null) lines.push({ label: "Vacancy / credit loss", value: t12DeductionText(loss) });
+  return tail();
+}
+
 /** Why a statement whose expense lines carry both signs shows no total
  *  (and no NOI on one): the card and the report say it under the table. */
 export const T12_SIGNS_MIXED_NOTE = "Its expense lines carry both signs, so no total is derived.";
@@ -252,7 +294,7 @@ export function actualsShortLine(read: ActualsRead | null): string {
   const rr = read.rentRoll?.summary;
   if (rr) {
     const stats = [
-      rr.sfWeightedOccupancy != null ? `${pct1(rr.sfWeightedOccupancy)} occupied` : `${rr.occupiedUnits} of ${rr.unitCount} occupied`,
+      rr.sfWeightedOccupancy != null ? `${pct1(rr.sfWeightedOccupancy)} occupied by area` : `${rr.occupiedUnits} of ${rr.unitCount} occupied`,
       // The rent-roll page's rule (actualsWalt): a roll of leases of a year
       // or less has no WALT worth printing.
       rr.waltYears != null && !leasesShort(read.assetClass) ? `WALT ${rr.waltYears.toFixed(1)} yrs` : null,

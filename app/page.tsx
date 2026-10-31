@@ -909,7 +909,7 @@ export default async function Home() {
                   />
                 </div>
                 <p className="mt-3 text-center text-xs text-muted">
-                  {`Same deal, same data room. The method is shown and the moves are computed; ${SCORABLE.byFigure.length} of the ${SCORABLE.total} assumptions can be scored as later figures arrive.`}{" "}
+                  {`Same deal, same data room. The method is shown and the moves are computed; ${SCORABLE.byFigure.length} of the ${SCORABLE.total} assumptions the test reads can be scored as later figures arrive.`}{" "}
                   <Link href="/how-we-test#track-record" className="font-medium text-brand hover:text-brand-strong">
                     What scores what
                   </Link>

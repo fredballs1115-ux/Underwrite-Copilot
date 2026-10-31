@@ -865,7 +865,7 @@ describe("the homepage says how each row is tested, in counts the code makes", (
     const html = await renderHome();
     const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
     const s = scorableSummary();
-    expect(text).toContain(`${s.byFigure.length} of the ${s.total} assumptions can be scored as later figures arrive.`);
+    expect(text).toContain(`${s.byFigure.length} of the ${s.total} assumptions the test reads can be scored as later figures arrive.`);
     expect(text).not.toContain("whether it was right is scored as evidence arrives");
     expect(html).toContain(scorableCountLine(s).replace(/'/g, "&#x27;").slice(0, 40));
     // The strip no longer counts the verdict's deal-killer cards as a stat.

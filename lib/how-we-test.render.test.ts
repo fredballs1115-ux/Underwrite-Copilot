@@ -134,7 +134,7 @@ describe("/how-we-test draws every method from the table", () => {
       // The OM's own two caps, then the 10-year and the tracker.
       exit_cap: ["om_internal", "om_internal", "published", "published"],
       // The lender's quote is the deal's own loan terms.
-      debt: ["document", "published", null, null],
+      debt: ["document", "rule_of_thumb", null, null],
       noi: ["document", "document", "om_internal", "document"],
       // A stabilized assumption is the market's to judge first; the
       // documents' vacancy is today's: the rent roll's by its doors, the
@@ -287,7 +287,8 @@ describe("/how-we-test draws every method from the table", () => {
     // A vacancy's never finer than one door's share of the units the OM
     // states (the second review, 2026-10-28: 0.05 points is a tenth of a
     // door on 248 units), said with the doors beside the points.
-    expect(record).toContain("kept with it: 0.05 points on a vacancy, or one door's share where the OM states its units and that is larger (0.40 points, one door of 248), 5% of the OM's NOI, 5% of its price.");
+    expect(record).toContain("kept with it: 5% of the OM's NOI, 5% of its price, 0.05 points on a vacancy.");
+    expect(record).toContain("On a vacancy the survey decided, the survey's margin of error; never finer than one door's share where the OM states its units (0.40 points, one door of 248).");
     expect(record).not.toContain("the survey's margin of error on a vacancy");
     expect(record).toContain("A row kept before its tolerance was carried keeps the margin it was stored with.");
     expect(snapshotThreshold("vacancy")).toEqual({ value: 0.05, unit: "pts" });

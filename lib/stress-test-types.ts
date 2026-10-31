@@ -496,6 +496,7 @@ export const HEADLINE_METHOD = {
     "So the evidence's case is not the model as it runs: the headline draws the model's own levered IRR beside the two cases, and names each figure it keeps at the OM's, and each evidence figure it runs, where the model runs another.",
     "Both cases pay the price the model runs: the ask, a share's price grossed up to the whole, or an auction's floor.",
     "The headline asks what that price earns, and the price row says how far the ask sits from the comps.",
+    "An IRR the OM states in a row of its own is drawn beside the two cases as the OM's, set against the OM's case only where its words call it levered, and never re-run: none where the price buys no building.",
   ],
   split: [
     "The gap between the two levered IRRs is split by assumption with Shapley values, the Assumption Bridge's own arithmetic.",
@@ -626,7 +627,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     reruns: { stabilized: "irr", plan: "none" },
     rules: [
       "No expansion over the hold is added to the going-in cap: an exit flat to it holds, and the common rule of thumb that adds some is named, never held to.",
-      "A stale tracker figure (over a year old by its own period) is shown and held against nothing.",
+      "A tracker range is held to only where the market read holds it: never one that is undated, for a narrower stock than the class, over a year old by its own period, or read more than 180 days ago; such a range is shown and held against nothing.",
     ],
     limits: ["No forecast of where caps go: the test asks what the exit assumes against today's figures."],
   },
@@ -636,7 +637,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
       "The lender's quote on file: the rate the deal's own loan terms state, read where its model was built from them, the one figure that decides; a floating quote is shown as stated and priced on nothing",
-      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a screening default, the bare index setting only where a rate reads unsupported",
+      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a rule of thumb named as one, the bare index setting only where a rate reads unsupported",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
       "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],
@@ -652,7 +653,8 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "A floating quote on file is shown as stated and priced on nothing too, but the OM's own fixed rate is still tested: the row is held to the screening default, the index plus the class's spread, as where no quote is on file.",
     ],
     limits: [
-      "A floating rate the OM states (an index plus a spread, or a coupon that resets) or a supplemental loan is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
+      "A floating rate the OM states (an index plus a spread, or a coupon that resets) is read as stated and priced on nothing: the row stands unchecked, and the lender tests run at the model's rate.",
+      "A supplemental or mezzanine loan's rate is not read: the row tests the first loan's rate, and where only such a rate is stated it reads as no rate stated.",
     ],
   },
   {
@@ -666,7 +668,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "The OM's other income against the T-12's, where both state one, in words beside it and never deciding",
     ],
     decides: [[1], "beside", [2], "beside"],
-    engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file.",
+    engine: "Year-one income and expenses are direct inputs: the return is re-run on the T-12's NOI where one is on file, else on the OM's own in-place NOI where it decides.",
     reruns: { stabilized: "irr", plan: "none" },
     rules: ["A stated figure is never dropped for a derived one."],
     limits: ["The T-12's period is not matched to the OM's figure: it is printed beside the T-12's NOI, and neither figure is scaled to the other's period."],
@@ -696,7 +698,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     ],
     limits: [
       "A submarket's vacancy is not read: a metro figure is the metro's, its whole rental stock rather than this building's competitive set.",
-      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: where the deal's rent roll runs more than 3 points over the assumption, the row says so.",
+      "The lease-up from today's vacancy to a stabilized one is modelled in neither run: on a stabilized deal, where the document of its own measure (rent roll for doors, T-12 for dollars) runs more than 3 points over the assumption, the row says so.",
     ],
   },
   {
@@ -765,12 +767,12 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     title: "Real estate taxes",
     claim: "The tax line stays at the seller's bill.",
     against: [
-      "A scenario on the memorandum's own figures, not the OM contradicting itself: its bill over its assessed value is today's rate, and that rate on the price is the bill if the sale resets the assessment, the one figure that decides where both are stated",
+      "A scenario, our arithmetic on the memorandum's figures, not the OM against itself: its bill over its assessed value is today's rate, and that rate on the price is the bill if the sale resets the assessment, the one figure that decides where both are stated",
       "A stated tax abatement and when it ends, read against the model's sale: its unabated bill decides only where no reset bill can be struck",
       "The deal's T-12 tax line, the seller's actual bill: it decides only where nothing above does and the OM's line sits more than 2% under it, the OM against its own building's history, stretched at most; else it is shown beside it",
     ],
     decides: [[1], [2], [3]],
-    engine: "The tax line is an expense input: the return is re-run at the reset bill where the OM states both figures, else at the T-12's bill where it decides. A plan's yield on cost is re-run on its pro forma line; not on a development, conversion or forward purchase.",
+    engine: "The tax line is an expense input: the return is re-run at the reset bill, else the unabated bill a stated abatement decides, else the T-12's bill. A plan's yield on cost is re-run on its pro forma line; not on a development, conversion or forward purchase.",
     reruns: { stabilized: "irr", plan: "yoc" },
     rules: [
       "A bill over its assessed value past 5% is read as a misread or an assessment at a fraction of value, and no reset bill is struck on it.",

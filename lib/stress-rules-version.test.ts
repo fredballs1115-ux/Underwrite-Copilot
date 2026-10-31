@@ -19,6 +19,9 @@ const fingerprint = () =>
 
 describe("the stress test's rules version", () => {
   it("is bumped whenever the deciders, their roles or the thresholds change", () => {
-    expect({ v: STRESS_RULES_V, rules: fingerprint() }).toEqual({ v: 1, rules: "70d37acd505b286a" });
+    // Moved without a bump on 2026-10-31: the exit cap's stretched band was
+    // re-worded ("5–25 bps" read as overlapping the 25 bps that is
+    // unsupported), its rule unchanged (lib/stress-test EXIT_CAP_UNSUPPORTED_BPS).
+    expect({ v: STRESS_RULES_V, rules: fingerprint() }).toEqual({ v: 1, rules: "4726919ad892ebfb" });
   });
 });

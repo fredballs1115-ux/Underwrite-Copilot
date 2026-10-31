@@ -2,7 +2,7 @@
 // memo's line (research pass 24, B3).
 import { describe, expect, it } from "vitest";
 import type { RentRollSummary, T12Summary } from "./types";
-import { actualsFromRows, actualsShortLine, readActuals, rentRollDateWords, t12DateWords } from "./actuals-read";
+import { actualsFromRows, actualsShortLine, readActuals, rentRollDateWords, t12DateWords, t12IncomeLines } from "./actuals-read";
 
 const ROLL: RentRollSummary = {
   unitCount: 120,
@@ -46,7 +46,7 @@ describe("readActuals", () => {
     expect(actualsShortLine(read)).toBe(
       // An apartment roll's leases run a year or less: no WALT, by the
       // rent-roll page's rule (actualsWalt), as the card and the report say.
-      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied.",
+      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied by area.",
     );
     const office = readActuals({
       metrics: OM,
@@ -67,7 +67,7 @@ describe("readActuals", () => {
     })!;
     expect(read.noiComparison).toBeNull();
     expect(actualsShortLine(read)).toBe(
-      "T-12 NOI $2.40M (period not stated). Rent roll (undated): 94.2% occupied, WALT 3.1 yrs.",
+      "T-12 NOI $2.40M (period not stated). Rent roll (undated): 94.2% occupied by area, WALT 3.1 yrs.",
     );
   });
 
@@ -112,5 +112,27 @@ describe("readActuals", () => {
     expect(read.noiComparison).toBeNull();
     expect(actualsFromRows({ metrics: OM }, { kind: "stabilized", label: "Stabilized" }, null, null, { summary: null })).toBeNull();
     expect(actualsShortLine(null)).toBe("");
+  });
+});
+
+describe("the T-12's income lines add up (the investor's review of 2026-10-31)", () => {
+  it("puts a net rent line after the loss, under a rent before vacancy that is said as our addition", () => {
+    const lines = t12IncomeLines({ collectedRent: 6_499_500, vacancyLoss: 650_500, otherIncome: 292_000, egi: 6_791_500 });
+    expect(lines.map((l) => [l.label, l.value])).toEqual([
+      ["Rent before vacancy (collected + the loss)", "$7.15M"],
+      ["Vacancy / credit loss", "($651k)"],
+      ["Collected rent", "$6.50M"],
+      ["Other income", "$292k"],
+      ["Effective gross income", "$6.79M"],
+    ]);
+  });
+
+  it("names a gross rent line gross potential rent, and prints any other as stated", () => {
+    expect(t12IncomeLines({ collectedRent: 7_150_000, vacancyLoss: -650_000, otherIncome: 292_000, egi: 6_792_000 })[0].label).toBe("Gross potential rent");
+    expect(t12IncomeLines({ collectedRent: 7_000_000, vacancyLoss: 650_000, otherIncome: null, egi: null }).map((l) => l.label)).toEqual([
+      "Collected rent",
+      "Vacancy / credit loss",
+      "Effective gross income",
+    ]);
   });
 });

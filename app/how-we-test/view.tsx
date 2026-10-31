@@ -257,6 +257,11 @@ function OverviewTable() {
                   ) : (
                     "No figure: the challenger's words"
                   )}
+                  {r.orderNote && (
+                    <p className="mt-1 text-muted" data-qa="overview-order-note">
+                      {r.orderNote}
+                    </p>
+                  )}
                 </dd>
               </div>
               <div>
