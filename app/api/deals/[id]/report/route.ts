@@ -30,7 +30,7 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
-import { buildSensitivityData, screeningCompareModel, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, screeningCompareModel, type SensitivityData, reserveUnitsOf } from "@/lib/underwrite/report-grid";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { bidFloors, type BidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
@@ -329,6 +329,7 @@ export async function GET(
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
         sources: derived.sources,
         floors,
+        units: reserveUnitsOf(derived.meta),
         // The sample's box is the public sample's example box, whoever
         // reads it (lib/buy-box `buyBoxForDealRow`), never "your" box.
         sampleBox: !!(deal as { is_sample?: boolean }).is_sample,

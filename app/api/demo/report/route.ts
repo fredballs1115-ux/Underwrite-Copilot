@@ -2,7 +2,7 @@ import { buildReportData, renderReportPdf, withActuals } from "@/lib/memo/report
 import type { MemoCover, MemoData } from "@/lib/memo/memo-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildSensitivityData, screeningCompareModel } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, screeningCompareModel, reserveUnitsOf } from "@/lib/underwrite/report-grid";
 import { bidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -75,6 +75,7 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   const sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
     sources: derived.sources,
     floors,
+    units: reserveUnitsOf(derived.meta),
     sampleBox: true,
     termRead: termReadFor(extraction),
     occupancyPct: derived.meta.occupancyPct ?? null,
