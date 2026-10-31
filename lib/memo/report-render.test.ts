@@ -31,7 +31,7 @@ import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import { challengerInstruction } from "@/lib/anthropic/prompts";
 import { CHALLENGER_SCENARIO_NOTE, CHALLENGER_SCENARIO_TITLE } from "@/lib/stress-test-title";
-import { SAMPLE_PLAN_NOTE, headlineSentence, headlineSplit } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, headlineSentence, headlineSplit, stressRowOrder } from "@/lib/stress-test-words";
 import { pdfSafe } from "./pdf-text";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -2994,6 +2994,12 @@ describe("the report's stress-test page", () => {
     expect(page).toContain(flat(SAMPLE_PLAN_NOTE));
     expect(page.indexOf(flat(SAMPLE_PLAN_NOTE))).toBeLessThan(page.indexOf(flat(h.lead)));
     expect(page.indexOf("Levered IRR on the OM's figures")).toBeLessThan(page.indexOf("UNSUPPORTED Renovation premium"));
+    // The rows run in the panel's order (`stressRowOrder`): severity, then
+    // each row's share of the headline's gap — taxes before the exit cap,
+    // the NOI (left out of the headline) after the insurance.
+    const titles = stressRowOrder(test).map((r) => page.indexOf(` ${r.title} OM says`));
+    expect(titles.every((i) => i > -1)).toBe(true);
+    expect(titles).toEqual([...titles].sort((a, b) => a - b));
     // The sample's test reads no figure today and its rows carry no
     // published figure at all, so the page dates no read.
     expect(test.publishedRead).toBe(false);

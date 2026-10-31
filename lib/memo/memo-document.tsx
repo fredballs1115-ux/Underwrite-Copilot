@@ -65,7 +65,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import type { StressTest } from "@/lib/stress-test-types";
 import { BREAKS_IF_ESTIMATE, breaksIfLabel } from "@/lib/stress-snapshot";
-import { SAMPLE_PLAN_NOTE, drawsRerun, headlineShort, leadRows, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
+import { SAMPLE_PLAN_NOTE, drawsRerun, headlineShort, leadRows, modelIrrOf, rerunWords, rowWords, stressReadLine, verdictCounts, type StressRowWords } from "@/lib/stress-test-words";
 
 const C = {
   brand: "#114e54",
@@ -862,6 +862,14 @@ export function buildMemoData(
   // full report's "The call, in full" page prints both whole.
   const stressBlock = memoStressBlock(stressTest);
   const hasStress = !!stressBlock && stressBlock.rows.length > 0;
+  // The model's own levered IRR, as the stress block's key prints it: only
+  // where the test measures a levered IRR (never a plan's yield on cost)
+  // and its returns are not withheld.
+  const memoModelIrr = (() => {
+    if (!stressTest || stressTest.impactsWithheld || stressTest.measure === "yield_on_cost") return null;
+    const v = modelIrrOf(stressTest);
+    return v != null && Number.isFinite(v) ? v : null;
+  })();
 
   // Retrade line: what moved since the previous screen, compressed to one
   // sentence-length string. Only when something actually moved.
@@ -954,6 +962,12 @@ export function buildMemoData(
     buyBox: (buyBoxChecks ?? []).map((c) => ({
       label: clamp(c.label, 20),
       status: c.status,
+      // The target return the screen read no IRR for: the model's own
+      // levered IRR beside it, as the stress block's key names it ("the
+      // model's own 9.3% levered IRR") — a chip reading "not checked" over
+      // a page that prints the model's IRR read as if there were none. The
+      // check itself is unchanged; the full report adds its page.
+      ...(c.label === "Target return" && c.status === "unknown" && memoModelIrr != null ? { note: `model ${memoModelIrr.toFixed(1)}%` } : {}),
     })),
     sinceLast,
     // The analyst's own words, clamped but never paraphrased.

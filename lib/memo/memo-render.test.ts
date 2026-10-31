@@ -1445,6 +1445,14 @@ describe("the memo's wording (research pass 35)", () => {
     expect(text).toContain("Since last screen (Aug 2, 2026):");
   }, 30000);
 
+  it("names the model's own levered IRR beside a target return the screen read none for, as the stress block's key does", async () => {
+    const demo = await import("@/app/api/demo/memo/route");
+    const text = (await pdfTextOf(Buffer.from(await (await demo.GET()).arrayBuffer()))).replace(/\s+/g, " ");
+    const irr = text.match(/from the model's own (\d+\.\d)% levered IRR/)?.[1];
+    expect(irr).toBeTruthy();
+    expect(text).toContain(`Target return · model ${irr}%`);
+  }, 60_000);
+
   it("keys the buy-box chips' marks after them, only the marks the row uses", async () => {
     const textOf = async (checks: { label: string; status: "pass" | "near" | "miss" | "unknown"; detail: string }[]) =>
       (await pdfTextOf(
