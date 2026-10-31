@@ -1340,7 +1340,7 @@ describe("MemoDocument (redesigned)", () => {
     // The sample's exit killer quotes the stress test's own re-run (its call
     // is written on its own test), so the card takes the plain label — never
     // "the screen's estimate" over the engine's.
-    expect(text).toMatch(/Breaks if: At the 5\.45% going-in cap, the stress test's IRR falls 10\.8% to 9\.3%\./);
+    expect(text).toMatch(/Breaks if: At the 5\.45% going-in cap, the stress test's IRR is 9\.3%, not 10\.8%\./);
     expect(text).not.toContain("Breaks if (the screen's estimate)");
     expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
     // Any other deal's call is the verdict step's words: "Breaks if:" plain

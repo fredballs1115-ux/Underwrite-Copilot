@@ -75,6 +75,7 @@ async function renderSampleReport(dateStr: string, readerDay: string): Promise<B
   const sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
     sources: derived.sources,
     floors,
+    sampleBox: true,
     termRead: termReadFor(extraction),
     occupancyPct: derived.meta.occupancyPct ?? null,
     interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs)),

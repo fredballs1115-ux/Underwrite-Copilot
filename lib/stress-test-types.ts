@@ -637,7 +637,7 @@ export const STRESS_METHODS: readonly StressMethod[] = [
     claim: "The loan the pro forma assumes is available at that rate and that coverage.",
     against: [
       "The lender's quote on file: the rate the deal's own loan terms state, read where its model was built from them, the one figure that decides; a floating quote is shown as stated and priced on nothing",
-      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a rule of thumb named as one, the bare index setting only where a rate reads unsupported",
+      "Where no quote is on file, today's index (the Treasury tenor nearest the OM's stated loan term where read, else the hold's; FRED, dated) plus the class's screening spread, a rule of thumb named as one; a rate reads unsupported only under the bare index as well",
       "The lender tests: loan-to-value, debt service coverage and debt yield, with the binding one named, shown beside it",
       "Negative leverage: a going-in cap under the loan's rate, so each borrowed dollar lowers the year-one cash yield, shown beside it",
     ],

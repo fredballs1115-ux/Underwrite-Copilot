@@ -1602,9 +1602,9 @@ describe("ModelView — the sample model renders every panel", () => {
     it("draws the Buy box tab's panel, and the sample's box read off the box itself", () => {
       const html = section("buybox");
       const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-      expect(text).toContain("The deal against your mandate");
-      // The panel speaks to a signed-in reader's mandate: a caption a
-      // visitor sees says the box is the sample's example box.
+      expect(text).toContain("The deal against the sample's box");
+      expect(text).not.toContain("your mandate");
+      // A caption a visitor sees says the box is the sample's example box.
       expect(html).toContain('data-qa="sample-box-caption"');
       expect(text).toContain("The sample's example buy box — on a deal of your own, the box you set.");
       for (const line of buyBoxLines(SAMPLE_DEMO_BOX, { exchange: false })) expect(text).toContain(line);

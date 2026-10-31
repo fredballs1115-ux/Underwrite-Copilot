@@ -144,6 +144,10 @@ describe("the sample's public documents render as the signed-in sample's", () =>
       );
     }
     expect(b).toBe(a);
+    // The box is the sample's example box, whoever reads it: never "your"
+    // box, which a visitor never set.
+    expect(b).toMatch(/the sample's buy box|the floors of the sample's buy box/);
+    expect(b).not.toMatch(/your buy box|your \d+(\.\d+)?% (IRR|cash-on-cash|going-in cap) (floor|target)/i);
   }, 120_000);
 
   it("the memo: the same words, through the same renderMemoPdf and actuals line", async () => {

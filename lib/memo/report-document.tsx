@@ -1256,19 +1256,32 @@ function CallInFullPage({
         </View>
       ) : null}
       {killers.length > 0 ? (
-        <View wrap={false}>
-          <TitleRow title="The deal-killers" marginTop={10} />
-          {killers.map((k, i) => (
-            <View key={i} style={{ marginBottom: 5 }} wrap={false}>
-              <Text style={[item, { fontFamily: "Helvetica-Bold", color: C.brand }]}>
-                {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
-              </Text>
-              {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
-              {/* "Breaks if:" only where the call cites the engine's re-runs
-                  (lib/stress-snapshot `breaksIfLabel`, the memo's own). */}
-              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`${memo.breaksIf ?? BREAKS_IF_ESTIMATE} ${str(k?.risk)}`)}</Text> : null}
-            </View>
-          ))}
+        // The killers may break between themselves, each one whole and the
+        // title with the first: kept whole as one block, a full page two
+        // pushed every one of them, and the flips after, onto a page of
+        // their own, leaving the flips alone on page three.
+        <View>
+          {killers.map((k, i) => {
+            const killer = (
+              <View style={{ marginBottom: 5 }} wrap={false}>
+                <Text style={[item, { fontFamily: "Helvetica-Bold", color: C.brand }]}>
+                  {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
+                </Text>
+                {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
+                {/* "Breaks if:" only where the call cites the engine's re-runs
+                    (lib/stress-snapshot `breaksIfLabel`, the memo's own). */}
+                {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`${memo.breaksIf ?? BREAKS_IF_ESTIMATE} ${str(k?.risk)}`)}</Text> : null}
+              </View>
+            );
+            return i === 0 ? (
+              <View key={i} wrap={false}>
+                <TitleRow title="The deal-killers" marginTop={10} />
+                {killer}
+              </View>
+            ) : (
+              <View key={i}>{killer}</View>
+            );
+          })}
         </View>
       ) : null}
       {flips.length > 0 ? (
@@ -2826,7 +2839,7 @@ export function ReportDocument({
           <Text style={s.sub}>
             {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Colour marks distance from the ${
               sensitivity.hurdleSource === "buybox"
-                ? `${fmtHurdle(sensitivity.hurdlePct)} IRR target in your buy box`
+                ? `${fmtHurdle(sensitivity.hurdlePct)} IRR target in ${sensitivity.sampleBox ? "the sample's buy box" : "your buy box"}`
                 : `${fmtHurdle(sensitivity.hurdlePct)} screening hurdle`
             } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modelled base case.`}
           </Text>

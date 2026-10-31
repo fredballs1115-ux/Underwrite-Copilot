@@ -332,18 +332,21 @@ describe("the homepage's buy box is the deal page's own panel", () => {
     const data = sampleBuyBox();
     const html = renderToStaticMarkup(React.createElement(DemoPanel, { tab: "Buy box", buyBox: data }));
     // The panel itself, markup for markup.
-    expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel, publicDemo: true })));
+    expect(html).toContain(renderToStaticMarkup(React.createElement(BuyBoxPanel, { data: data.panel, publicDemo: true, sample: true })));
     // A visitor has no criteria page: the link asks them to set their own box.
     expect(html).toContain('href="/login?mode=signup"');
     expect(html).not.toContain('href="/criteria"');
     const text = visibleText(html).replace(/&#x27;/g, "'").replace(/\s+/g, " ");
-    expect(text).toContain("The deal against your mandate");
+    // Whose box: the sample's, never "your mandate", with no Personal badge.
+    expect(text).toContain("The deal against the sample's box");
+    expect(text).not.toContain("your mandate");
+    expect(text).not.toMatch(/\bPersonal\b/);
     expect(text).toMatch(new RegExp(`\\b${data.panel.mandate!.score}\\s*/ 100`));
     for (const c of data.panel.checks) expect(text).toContain(c.label);
     // Whose box it is, in words a visitor sees, before the panel.
     expect(html).toContain('data-qa="sample-box-caption"');
     expect(text).toContain("The sample's example buy box — on a deal of your own, the box you set.");
-    expect(html.indexOf('data-qa="sample-box-caption"')).toBeLessThan(html.indexOf("The deal against your mandate"));
+    expect(html.indexOf('data-qa="sample-box-caption"')).toBeLessThan(html.indexOf("The deal against the sample"));
     for (const line of data.lines) expect(text).toContain(line);
     // No drawn copy of its own.
     expect(text).not.toContain("Mandate fit ");

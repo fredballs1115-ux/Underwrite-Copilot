@@ -730,7 +730,7 @@ const verdict: VerdictResult = {
         // that model at a 5.50% exit, beside a stress test whose engine
         // moves 10.8% to 9.3% at the going-in cap that decides the row.
         // Short enough for the one-page memo's card (72 characters).
-        risk: `At the ${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% going-in cap, the stress test's IRR falls ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}% to ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%.`,
+        risk: `At the ${SAMPLE_EXIT_RERUN.goingInExitPct.toFixed(2)}% going-in cap, the stress test's IRR is ${SAMPLE_EXIT_RERUN.goingInIrrPct.toFixed(1)}%, not ${SAMPLE_EXIT_RERUN.omIrrPct.toFixed(1)}%.`,
       },
       {
         lever: "debt",

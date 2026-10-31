@@ -1340,11 +1340,11 @@ describe("DealView — the sample deal renders every section without a runtime e
     } as Props);
     expect(html).toContain('data-qa="sample-box-caption"');
     // /demo's tab, word for word, but for the panel's link: a signed-in
-    // reader edits their own criteria where a visitor is asked to sign up.
+    // reader is sent to set their own box where a visitor is asked to sign up.
     const sample = { data: { panel: data.buyBox, lines: data.boxLines } };
     expect(html).toContain(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false })));
     const demo = renderToStaticMarkup(React.createElement(SampleBuyBox, sample));
-    expect(textOf(demo).replace("Sign up to set your own box →", "Edit criteria →")).toBe(
+    expect(textOf(demo).replace("Sign up to set your own box →", "Set your own box →")).toBe(
       textOf(renderToStaticMarkup(React.createElement(SampleBuyBox, { ...sample, publicDemo: false }))),
     );
     // The sample's page runs the model, as /demo's does, so its target return

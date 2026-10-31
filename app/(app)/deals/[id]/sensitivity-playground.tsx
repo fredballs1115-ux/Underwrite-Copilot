@@ -21,7 +21,7 @@ import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { FIT_ON_MEMORANDUM, fitWithModel } from "@/lib/fit-label";
-import { noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import { boxOwnerWords, noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import {
   MISREAD_WORD,
   misreadPageLine,
@@ -361,7 +361,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       ...solved,
       noBid:
         solved.price == null
-          ? noBidSentence(floors, noBidRead(solveOn, floors, levers), { vs: bidAgainst != null ? "the price entered" : "the modelled price", share })
+          ? noBidSentence(floors, noBidRead(solveOn, floors, levers), { vs: bidAgainst != null ? "the price entered" : "the modelled price", share, sampleBox: data.sample === true })
           : null,
     };
   }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, data.sharePct, data.shareNoun]);
@@ -589,6 +589,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           dirty={dirty}
           sharePct={data.sharePct ?? null}
           shareNoun={data.shareNoun ?? "share"}
+          sampleBox={data.sample === true}
         />
       )}
       {box && !floorsSet && (
@@ -860,14 +861,14 @@ function fmtBid(n: number): string {
   return `$${Math.floor(n / 1e3).toLocaleString("en-US")}k`;
 }
 
-function bindingLabel(key: NonNullable<MaxBidSolution["binding"]>, box: BuyBox): string {
+function bindingLabel(key: NonNullable<MaxBidSolution["binding"]>, box: BuyBox, whose: string): string {
   switch (key) {
     case "minIrr":
-      return `your ${box.minIrrPct}% IRR floor binds`;
+      return `${whose} ${box.minIrrPct}% IRR floor binds`;
     case "minCoc":
-      return `your ${box.minCoCPct}% cash-on-cash floor binds`;
+      return `${whose} ${box.minCoCPct}% cash-on-cash floor binds`;
     case "minCap":
-      return `your ${box.minCapPct}% going-in cap floor binds`;
+      return `${whose} ${box.minCapPct}% going-in cap floor binds`;
   }
 }
 
@@ -879,6 +880,7 @@ function MaxBidCard({
   dirty,
   sharePct = null,
   shareNoun = "share",
+  sampleBox = false,
 }: {
   /** the solve, and where no price clears, the report's sentence why
    *  (lib/underwrite/solver `noBidSentence`), null where it names nothing */
@@ -896,7 +898,11 @@ function MaxBidCard({
   sharePct?: number | null;
   /** what the share is called (`PlaygroundData.shareNoun`) */
   shareNoun?: "share" | "interest";
+  /** the box is the public sample's example box, not the reader's
+   *  (lib/underwrite/solver `boxOwnerWords`) */
+  sampleBox?: boolean;
 }) {
+  const owner = boxOwnerWords(sampleBox);
   const vs = against === "yours" ? "your price" : "the modelled price";
   // The share's bid, rounded down as the whole's is, so it still clears.
   const shareBid = (whole: number, atLeast = false): string | null =>
@@ -908,21 +914,21 @@ function MaxBidCard({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xs font-semibold tracking-tight">Max bid</span>
         <span className="text-[11px] text-muted">
-          highest price that still clears your box
+          {`highest price that still clears ${sampleBox ? "the sample's box" : "your box"}`}
           {dirty ? " — under the current slider scenario" : ""}
         </span>
       </div>
       {bid.price == null ? (
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
           {bid.noBid ??
-            "No price in range clears your floors under this scenario — the deal economics, not the price, are the blocker."}
+            `No price in range clears ${sampleBox ? "the sample's" : "your"} floors under this scenario — the deal economics, not the price, are the blocker.`}
         </p>
       ) : bid.unbounded ? (
         // Every floor still clears at the top of the range searched — the
         // window doubles from twice the price while they clear (research
         // pass 40, H2) — so the bid is at least that top, and said so.
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          {`Your floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.${
+          {`${sampleBox ? "The sample's" : "Your"} floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.${
             shareBid(bid.price) ? ` That is ${shareBid(bid.price, true)}.` : ""
           }`}
         </p>
@@ -944,7 +950,7 @@ function MaxBidCard({
             )}
             {bid.binding && (
               <span className="text-xs text-muted">
-                {bindingLabel(bid.binding, box)}
+                {bindingLabel(bid.binding, box, owner.whose)}
               </span>
             )}
           </p>

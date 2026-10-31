@@ -329,6 +329,9 @@ export async function GET(
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct, {
         sources: derived.sources,
         floors,
+        // The sample's box is the public sample's example box, whoever
+        // reads it (lib/buy-box `buyBoxForDealRow`), never "your" box.
+        sampleBox: !!(deal as { is_sample?: boolean }).is_sample,
         termRead: termReadFor(extraction),
         occupancyPct: derived.meta.occupancyPct ?? null,
         // Where a leasehold's lease ends inside the hold, the grids and the

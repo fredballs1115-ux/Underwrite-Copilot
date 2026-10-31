@@ -3,6 +3,29 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🔴 2026-10-31 — the live site stopped deploying on October 20
+
+The live site still serves bea5ca0 (#487, merged Oct 20). The eight pull
+requests merged since, #488 through #495, including the answers to the
+investor's review, are on main but not on the site. live-verify's stress-test lines
+show it: the live sample rates the price row "stretched" and the
+insurance row "unchecked", with the headline at 16.7% → 7.7%. Built from
+main, the price row is unchecked (two clean comps, under the floor of
+three), insurance is stretched, and the headline is 13.1% → 7.4%.
+
+Nothing in `render.yaml` or the build changed between those commits, so
+the cause is on Render's side. Your move, about 5 minutes:
+
+1. Render dashboard → the web service → Events. Look for a failed build
+   after Oct 20, or "Auto-Deploy: No".
+2. If a build failed, open its log and send me the first error.
+   Otherwise, press "Manual Deploy → Deploy latest commit".
+3. Do the same for the worker service.
+4. Tell me when it is done; I will run live-verify to confirm the SHA.
+
+Until then, anyone reading the site, Matt included, sees the October 20
+version.
+
 ## 🔴 2026-10-05 — your repository is public, with confidential deal work on main
 
 `gh api repos/fredballs1115-ux/Underwrite-Copilot` reports `"visibility":

@@ -166,7 +166,7 @@ describe("the sample's stress test", () => {
     expect(model.inputs.exitCapPct).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInExitPct / 100, 10);
     expect(computeUnderwrite(model.inputs).returns.leveredIrrPct! * 100).toBeCloseTo(SAMPLE_EXIT_RERUN.goingInIrrPct, 2);
     const killer = SAMPLE_DEAL.verdict.screen!.dealKillers.find((k) => k.lever === "exit")!;
-    expect(killer.risk).toBe("At the 5.45% going-in cap, the stress test's IRR falls 10.8% to 9.3%.");
+    expect(killer.risk).toBe("At the 5.45% going-in cap, the stress test's IRR is 9.3%, not 10.8%.");
     expect(killer.risk.length).toBeLessThanOrEqual(72);
   });
 });
