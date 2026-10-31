@@ -22,6 +22,7 @@ import {
   nearlyVacantWord,
   NEARLY_VACANT,
   pageBaseLevers,
+  reserveUnitsOf,
   placeholderPageLine,
   placeholderReason,
   placeholderReturnsLine,
@@ -646,5 +647,21 @@ describe("a building the model runs nearly vacant: the page's base is the model'
     expect(nearlyVacantReason(baseInputs({ vacancyPct: 0.89 }), 0.11)).toBeNull();
     expect(nearlyVacantWord(baseInputs({ vacancyPct: 0.89 }))).toBeNull();
     expect(nearlyVacantWord(baseInputs({ vacancyPct: NEARLY_VACANT }))).toBe("90% vacant");
+  });
+});
+
+describe("the base case's reserve, a unit beside a foot where the class is quoted by the unit", () => {
+  it("says the sample's reserve a unit a year, from the model's own count, and never on a class priced by the foot", () => {
+    const d = sampleDerivedInputs();
+    const units = reserveUnitsOf(d.meta);
+    expect(units).toEqual({ count: 248, one: "unit" });
+    const s = buildSensitivityData(d.inputs, 13, { sources: d.sources, units });
+    const b = s.baseCase!;
+    expect(b.reservesPerUnit!.amount).toBeCloseTo((b.reservesPsf * d.inputs.rsf) / 248, 6);
+    // An office is quoted by the foot: no unit figure beside it.
+    expect(reserveUnitsOf({ ...d.meta, assetClass: "office" })).toBeNull();
+    // No count, no unit figure.
+    expect(reserveUnitsOf({ ...d.meta, units: null })).toBeNull();
+    expect(buildSensitivityData(d.inputs, 13, { sources: d.sources }).baseCase!.reservesPerUnit).toBeNull();
   });
 });

@@ -1773,7 +1773,11 @@ export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
   // Each as the model holds it, never a figure typed here.
   const yearly = [
     b.amFee > 0 ? `an asset-management fee of ${Number((b.amFee * 100).toFixed(2))}% of equity${tag(b.amFeeSource)}` : "",
-    b.reservesPsf > 0 ? `capital reserves of $${b.reservesPsf.toFixed(2)} a square foot, grown with expenses${tag(b.reservesSource)}` : "",
+    b.reservesPsf > 0
+      ? `capital reserves of $${b.reservesPsf.toFixed(2)} a square foot${
+          b.reservesPerUnit ? ` (about ${compactUsd(b.reservesPerUnit.amount)} ${withArticle(b.reservesPerUnit.one)} a year)` : ""
+        }, grown with expenses${tag(b.reservesSource)}`
+      : "",
   ].filter(Boolean);
   return (
     [

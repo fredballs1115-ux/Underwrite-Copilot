@@ -14,6 +14,7 @@ import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
 import { boxOwnerWords, floorWords, floorsWords, fmtBid, noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type BidMetrics, type NoBidRead } from "./solver";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 
 /** Where each of the model's inputs came from (lib/underwrite/inputs). */
 export type ModelSources = DerivedModel["sources"];
@@ -414,6 +415,10 @@ export interface BaseCase {
   amFeeSource: InputSource | null;
   reservesPsf: number;
   reservesSource: InputSource | null;
+  /** the same reserve a year a unit, in the deal's own noun, where the
+   *  class is quoted by the unit and the model reads a count: an apartment
+   *  underwriter reads a reserve a unit, never a foot */
+  reservesPerUnit?: { amount: number; one: string } | null;
   leveredIrr: number | null;
   /** where no levered IRR solved, why (lib/underwrite/no-irr) — the tile
    *  says it in the dash's place; null where it solved */
@@ -446,7 +451,15 @@ export interface BaseCase {
   vacancySource?: InputSource | null;
 }
 
-export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
+/** The model's count for the base case's reserve a unit (`SensitivityOptions.units`):
+ *  only where the class is quoted by the unit and the model reads a count. */
+export function reserveUnitsOf(meta: { units?: number | null; unitNoun?: { one: string } | null; assetClass?: string | null }): { count: number; one: string } | null {
+  if (meta.units == null || !(meta.units > 0)) return null;
+  if (assetWords(assetClassKey(meta.assetClass ?? null)).basis !== "unit") return null;
+  return { count: meta.units, one: meta.unitNoun?.one ?? "unit" };
+}
+
+export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources, units?: { count: number; one: string } | null): BaseCase {
   const uw = computeUnderwrite(inputs);
   const su = uw.sourcesUses;
   const y1 = uw.cashFlow[0];
@@ -471,6 +484,10 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     amFeeSource: sources.amFeePctEquity ?? null,
     reservesPsf: inputs.reservesPsf,
     reservesSource: sources.reservesPsf ?? null,
+    reservesPerUnit:
+      units && units.count > 0 && inputs.rsf > 0 && inputs.reservesPsf > 0
+        ? { amount: (inputs.reservesPsf * inputs.rsf) / units.count, one: units.one }
+        : null,
     leveredIrr: uw.returns.leveredIrrPct,
     noIrr: noIrrWhy(uw.returns.leveredIrrPct, uw.residual.netSaleProceeds, uw.leveredVector.slice(1).reduce((a, b) => a + b, 0)),
     equityMultiple: uw.returns.leveredEquityMultiple,
@@ -531,6 +548,10 @@ export interface SensitivityOptions {
   /** the floors are the public sample's example box, not the reader's
    *  (lib/underwrite/solver `boxOwnerWords`) */
   sampleBox?: boolean;
+  /** the model's count in the deal's own noun (the derived model's
+   *  `meta.units` and `meta.unitNoun`), where its class is quoted by the
+   *  unit: the base case says the reserve a unit beside its foot */
+  units?: { count: number; one: string } | null;
 }
 
 /**
@@ -992,7 +1013,7 @@ export function buildSensitivityData(
     withheld: firstReason ?? standing,
     ...(firstReason == null && standing != null ? { readsStand: true } : {}),
     priceSource: opts.sources?.purchasePrice ?? null,
-    baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
+    baseCase: opts.sources ? buildBaseCase(inputs, opts.sources, opts.units) : null,
   };
 }
 
