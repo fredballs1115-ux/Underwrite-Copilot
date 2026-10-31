@@ -286,6 +286,21 @@ export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: P
 }
 
 /**
+ * Whose buy box a max bid's floors are, in words: the reader's own ("your
+ * 15% IRR floor"), or, on the public sample, the sample's example box —
+ * a visitor set none, so "your" would claim a box they never wrote.
+ */
+export function boxOwnerWords(sample: boolean): { whose: string; box: string; floors: string } {
+  return sample
+    ? { whose: "the sample's", box: "the sample's buy box", floors: "the floors of the sample's buy box" }
+    : { whose: "your", box: "your buy box", floors: "your buy box's floors" };
+}
+
+function capitalize(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/**
  * Where no price clears the box's floors together, the sentence that names
  * them from each floor's own solve (`noBidRead`): the floor that clears at
  * no tested price, with the reason the engine proves for a cash-on-cash
@@ -305,9 +320,13 @@ export function noBidSentence(
      *  its price grosses up to: a floor-alone price is the whole's, and the
      *  share's is said beside it, as the max-bid card says it */
     share?: { pct: number; noun: "share" | "interest" } | null;
+    /** whose box the floors are: the reader's own, or the public sample's
+     *  example box, which a visitor never set (`boxOwnerWords`) */
+    sampleBox?: boolean;
   } = {},
 ): string | null {
   if (!nb || nb.alone.length === 0) return null;
+  const owner = boxOwnerWords(opts.sampleBox === true);
   const words = (k: keyof BidFloors) => floorWords(k, floors);
   const vs = opts.vs ?? "the modelled price";
   const share = opts.share;
@@ -319,14 +338,14 @@ export function noBidSentence(
   const alone = nb.alone.filter((a) => a.price != null);
   const clearsAlone = alone.map(
     (a, i) =>
-      `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${
+      `${owner.whose} ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${
         a.unbounded ? `at every price searched, up to ${timesWords(MAX_BID_SEARCH_X)} ${vs}` : `up to ${fmtBid(a.price!)}`
       }${shareOf(a.price!, a.unbounded)}`,
   );
-  const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
+  const aloneLine = clearsAlone.length > 0 ? `${capitalize(clearsAlone.join(", and "))}.` : "";
   if (never.length === 0) {
     // Each floor clears on its own, never all of them at one price.
-    return `No price inside the tested range clears your buy box's floors together. ${aloneLine}`;
+    return `No price inside the tested range clears ${owner.floors} together. ${aloneLine}`;
   }
   if (never.length > 1 && alone.length === 0) return null;
   const because =
@@ -337,7 +356,7 @@ export function noBidSentence(
       : "";
   const list = never.map((a) => words(a.key));
   const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} or ${list[list.length - 1]}`;
-  const head = `No price inside the tested range clears your ${named} floor`;
+  const head = `No price inside the tested range clears ${owner.whose} ${named} floor`;
   const why = because ? (never.length === 1 ? `: ${because}` : ` (the cash-on-cash because ${because})`) : "";
   if (alone.length === 0) {
     // The box's one floor: the reason where the engine proves one.

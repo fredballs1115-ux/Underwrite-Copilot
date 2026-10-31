@@ -373,6 +373,15 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     );
   });
 
+  it("on the public sample, names the sample's box, never the reader's", () => {
+    const s = buildSensitivityData(inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { floors: bidFloors(SAMPLE_DEMO_BOX), sampleBox: true });
+    const line = maxBidSentence(s);
+    expect(line).toMatch(/^Max bid clearing the floors of the sample's buy box \(13% IRR/);
+    expect(line).toMatch(/; the sample's 5% cash-on-cash floor binds\./);
+    expect(line).not.toMatch(/\byour\b/i);
+    expect(maxBidSentence(buildSensitivityData(inputs, 13, { sampleBox: true }))).toMatch(/^Max bid holding the sample's 13% IRR target: /);
+  });
+
   it("falls back to the screening hurdle's IRR where the box sets no floor, and says whose it is", () => {
     const none = buildSensitivityData(inputs, null, { floors: null });
     expect(none.maxBidFloors).toEqual({ floors: { minIrr: 0.15 }, from: "screening" });

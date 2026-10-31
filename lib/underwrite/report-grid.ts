@@ -13,7 +13,7 @@ import { annualCashFlowOf, type AnnualCashFlow } from "./annual-cash-flow";
 import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { NO_IRR_SHORT, NO_IRR_WHY, noIrrWhy, type NoIrrWhy } from "./no-irr";
-import { floorWords, floorsWords, fmtBid, noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type BidMetrics, type NoBidRead } from "./solver";
+import { boxOwnerWords, floorWords, floorsWords, fmtBid, noBidRead, noBidSentence, solveMaxBid, timesWords, type BidFloors, type BidMetrics, type NoBidRead } from "./solver";
 
 /** Where each of the model's inputs came from (lib/underwrite/inputs). */
 export type ModelSources = DerivedModel["sources"];
@@ -337,6 +337,8 @@ export interface SensitivityData {
   /** percent points — the buy-box target IRR when set, else 15 */
   hurdlePct: number;
   hurdleSource: "buybox" | "default";
+  /** the buy box is the public sample's example box, not the reader's */
+  sampleBox?: boolean;
   takeaway: string;
   /** the highest price that clears the floors (solver), null when none in
    *  the searched range does */
@@ -526,6 +528,9 @@ export interface SensitivityOptions {
    *  against the returns (`findingWithholdsReturns`), the grids and the max
    *  bid are left out under the playground's own reason (research pass 38) */
   findings?: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null;
+  /** the floors are the public sample's example box, not the reader's
+   *  (lib/underwrite/solver `boxOwnerWords`) */
+  sampleBox?: boolean;
 }
 
 /**
@@ -958,6 +963,7 @@ export function buildSensitivityData(
     priceGrid,
     hurdlePct: hurdle,
     hurdleSource: hurdlePct != null && Number.isFinite(hurdlePct) && hurdlePct > 0 ? "buybox" : "default",
+    ...(opts.sampleBox ? { sampleBox: true } : {}),
     takeaway: gridTakeaway(grid, hurdle),
     maxBid:
       solved && solved.price != null && solved.deltaPct != null
@@ -1001,7 +1007,7 @@ const pct1 = (d: number | null | undefined, dp = 1) => (d == null || !Number.isF
  * hurdle's IRR, which is what it was solved on.
  */
 export function maxBidSentence(
-  s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid" | "maxBidWithheld">,
+  s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid" | "maxBidWithheld" | "sampleBox">,
 ): string {
   // Withheld rather than solved (a building the model runs nearly vacant):
   // the deal page's own reason, in the bid's place.
@@ -1009,15 +1015,16 @@ export function maxBidSentence(
   const f = s.maxBidFloors ?? { floors: { minIrr: s.hurdlePct / 100 }, from: "screening" as const };
   const box = f.from === "buybox";
   const hurdle = `${Number(s.hurdlePct.toFixed(1))}%`;
+  const owner = boxOwnerWords(s.sampleBox === true);
   const what = box
-    ? `your buy box's floors (${floorsWords(f.floors)})`
+    ? `${owner.floors} (${floorsWords(f.floors)})`
     : s.hurdleSource === "buybox"
-      ? `your ${hurdle} IRR target`
+      ? `${owner.whose} ${hurdle} IRR target`
       : `the ${hurdle} screening hurdle`;
   const bid = s.maxBid;
   if (!bid) {
     if (!box) return `No price inside the tested range holds ${what} under these assumptions.`;
-    return noBidSentence(f.floors, s.noBid ?? null) ?? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`;
+    return noBidSentence(f.floors, s.noBid ?? null, { sampleBox: s.sampleBox === true }) ?? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`;
   }
   // Every floor still clearing at the top of the range searched: the bid is
   // at least that top, and the range is said — the window doubles from twice
@@ -1029,7 +1036,7 @@ export function maxBidSentence(
       : `Max bid holding ${what}: at least ${fmtBid(bid.price)}, ${times} and the top of the range searched — the model's own ceiling lies above it.`;
   }
   const delta = `${bid.deltaPct > 0 ? "+" : ""}${(bid.deltaPct * 100).toFixed(1)}% vs the modelled price`;
-  const binds = box && bid.binding ? `; your ${floorWords(bid.binding, f.floors)} floor binds` : "";
+  const binds = box && bid.binding ? `; ${owner.whose} ${floorWords(bid.binding, f.floors)} floor binds` : "";
   const at = bid.at
     ? ` At that price: IRR ${pct1(bid.at.irr)}, year-1 cash-on-cash ${pct1(bid.at.coc)}, going-in cap ${pct1(bid.at.cap, 2)}.`
     : "";
