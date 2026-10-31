@@ -29,7 +29,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "What we never do",
     body: [
-      "We don't sell your data. We don't share your documents or analyses with anyone outside your account — or outside your team, if you join one — except a screen you send as a share link, which shows it to whoever holds the link, never the documents. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
+      "We don't sell your data. We don't share your documents or analyses with anyone outside your account — or outside your team, if you join one — except a screen you send as a share link, which shows it, with the building’s photograph, to whoever holds the link, never the documents. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
     ],
   },
   {
@@ -96,7 +96,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: October 19, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 31, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and

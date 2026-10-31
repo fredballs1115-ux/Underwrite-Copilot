@@ -19,7 +19,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "The short version",
     body: [
-      "Offering memorandums travel under confidentiality terms, so the bar is simple: your documents are visible to your account (and your team, if you create or join one) and to no other user; a share link you send shows the screen to whoever holds it, never the documents. To run your screen they are read by Anthropic's Claude API, and they are stored with Supabase — the list below names every outside service and what it receives. Isolation is enforced in the database itself (the reads that go round it are named below), documents sit in private storage behind expiring links, analysis keys never reach the browser, and nothing you upload is used to train AI models.",
+      "Offering memorandums travel under confidentiality terms, so the bar is simple: your documents are visible to your account (and your team, if you create or join one) and to no other user; a share link you send shows the screen and the building’s photograph to whoever holds it, never the documents. To run your screen they are read by Anthropic's Claude API, and they are stored with Supabase — the list below names every outside service and what it receives. Isolation is enforced in the database itself (the reads that go round it are named below), documents sit in private storage behind expiring links, analysis keys never reach the browser, and nothing you upload is used to train AI models.",
     ],
   },
   {
@@ -89,7 +89,7 @@ export default function SecurityPage() {
 
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-tight">Security</h1>
-        <p className="mt-2 text-sm text-muted">Last updated: October 5, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 31, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Every upload comes down to one thing: whether it is safe to put a
           confidential OM here. This page is the answer — how documents are
