@@ -1591,7 +1591,7 @@ describe("the memo leads with the stress test", () => {
     // before both.
     expect(text.indexOf("UNSUPPORTED Renovation premium")).toBeLessThan(text.indexOf("STRETCHED Real estate taxes"));
     expect(text.indexOf("STRETCHED Real estate taxes")).toBeLessThan(text.indexOf("STRETCHED Exit cap"));
-    expect(text).toContain(`STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the memorandum's own figures) · gap $224k · ${move("taxes")}`);
+    expect(text).toContain(`STRETCHED Real estate taxes OM $728k (p. 27) · against $952k (the OM's figures, our arithmetic) · gap $224k · ${move("taxes")}`);
     expect(text).not.toContain("UNSUPPORTED Insurance");
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the

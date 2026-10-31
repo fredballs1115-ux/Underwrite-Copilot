@@ -2903,7 +2903,7 @@ function taxesRow(ctx: Ctx): StressRow | null {
         : `${billWords} over ${money(assessed)} assessed is ${(rate * 100).toFixed(2)}%, which on the ${money(price)} price is ${money(reset)} a year if the sale resets the assessment to the price`,
       value: rateMisread ? null : Math.round(reset),
       asOf: null,
-      publisher: "the memorandum's own figures",
+      publisher: "the OM's figures, our arithmetic",
       scope: "deal",
     });
   }
