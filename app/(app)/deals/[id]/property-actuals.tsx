@@ -130,7 +130,8 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <span className="text-[11px] text-muted">{rentRollDateWords(rentRoll)}</span>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />
+              {/* By area: the units tile beside it counts doors. */}
+              <Stat k="Occupancy by area" v={pct(rr.sfWeightedOccupancy)} />
               {/* By the rent-roll page's rule: an apartment roll is read for
                   loss to lease, never by its WALT (lib/actuals `actualsWalt`). */}
               <Stat k="WALT" v={walt?.text ?? "—"} sub={walt?.note ?? null} />

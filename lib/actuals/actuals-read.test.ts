@@ -46,7 +46,7 @@ describe("readActuals", () => {
     expect(actualsShortLine(read)).toBe(
       // An apartment roll's leases run a year or less: no WALT, by the
       // rent-roll page's rule (actualsWalt), as the card and the report say.
-      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied.",
+      "T-12 NOI $2.40M (TTM to May 31, 2026): OM pro forma NOI 9.0% over, material. Rent roll (as of Jun 1, 2026): 94.2% occupied by area.",
     );
     const office = readActuals({
       metrics: OM,
@@ -67,7 +67,7 @@ describe("readActuals", () => {
     })!;
     expect(read.noiComparison).toBeNull();
     expect(actualsShortLine(read)).toBe(
-      "T-12 NOI $2.40M (period not stated). Rent roll (undated): 94.2% occupied, WALT 3.1 yrs.",
+      "T-12 NOI $2.40M (period not stated). Rent roll (undated): 94.2% occupied by area, WALT 3.1 yrs.",
     );
   });
 

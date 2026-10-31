@@ -294,7 +294,7 @@ export function actualsShortLine(read: ActualsRead | null): string {
   const rr = read.rentRoll?.summary;
   if (rr) {
     const stats = [
-      rr.sfWeightedOccupancy != null ? `${pct1(rr.sfWeightedOccupancy)} occupied` : `${rr.occupiedUnits} of ${rr.unitCount} occupied`,
+      rr.sfWeightedOccupancy != null ? `${pct1(rr.sfWeightedOccupancy)} occupied by area` : `${rr.occupiedUnits} of ${rr.unitCount} occupied`,
       // The rent-roll page's rule (actualsWalt): a roll of leases of a year
       // or less has no WALT worth printing.
       rr.waltYears != null && !leasesShort(read.assetClass) ? `WALT ${rr.waltYears.toFixed(1)} yrs` : null,

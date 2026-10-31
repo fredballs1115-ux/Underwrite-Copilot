@@ -2015,7 +2015,7 @@ function ActualsBlock({ read }: { read: ActualsRead }) {
         <View wrap={false} style={{ marginBottom: 10 }}>
           <TitleRow title="Rent roll" count={str(rentRollDateWords(read.rentRoll) ?? "") || undefined} marginTop={4} />
           <View style={{ flexDirection: "row", marginBottom: 4 }}>
-            {tile("Occupancy", pct(rr.sfWeightedOccupancy))}
+            {tile("Occupancy by area", pct(rr.sfWeightedOccupancy))}
             {tile("WALT", walt?.text ?? "—", walt?.note)}
             {tile("Avg rent", rent?.text ?? "—", rent?.basis)}
             {tile("Occupied", `${rr.occupiedUnits} / ${rr.unitCount}`)}
