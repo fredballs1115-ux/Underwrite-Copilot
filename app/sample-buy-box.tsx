@@ -1,9 +1,9 @@
 // The sample deal's Buy box tab, on the homepage's walkthrough and on /demo:
 // the deal page's own panel (app/(app)/deals/[id]/buy-box-panel), read on
 // the server against the public sample's box (lib/sample-deal
-// SAMPLE_DEMO_BOX) by the deal header's reader. The panel speaks to a
-// signed-in reader ("The deal against your mandate"), and a visitor set no
-// box, so a caption over it says whose box it is, and the box's own lines
+// SAMPLE_DEMO_BOX) by the deal header's reader. Nobody reading the sample set
+// that box, so the panel is headed "The deal against the sample's box", a
+// caption over it says whose box it is, and the box's own lines
 // (lib/criteria `buyBoxLines`) say what it asks.
 import { BuyBoxPanel, type BuyBoxPanelData } from "./(app)/deals/[id]/buy-box-panel";
 
@@ -39,7 +39,7 @@ export function SampleBuyBox({
           ))}
         </ul>
       </div>
-      <BuyBoxPanel data={data.panel} publicDemo={publicDemo} />
+      <BuyBoxPanel data={data.panel} publicDemo={publicDemo} sample />
     </div>
   );
 }

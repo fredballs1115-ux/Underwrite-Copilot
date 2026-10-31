@@ -121,11 +121,16 @@ function MandateScoreHeader({
 export function BuyBoxPanel({
   data,
   publicDemo = false,
+  sample = publicDemo,
 }: {
   data: BuyBoxPanelData;
   /** the public pages' sample: a visitor has no criteria page to edit, so
    *  the link asks them to sign up and set their own box */
   publicDemo?: boolean;
+  /** the sample deal, judged against the sample's example box whoever reads
+   *  it (lib/sample-deal SAMPLE_DEMO_BOX): the panel says whose box it is,
+   *  never "your mandate", and carries no Personal or Team badge */
+  sample?: boolean;
 }) {
   if (!data.hasBox) {
     return (
@@ -152,10 +157,10 @@ export function BuyBoxPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold tracking-tight">
-            The deal against your mandate
+            {sample ? "The deal against the sample's box" : "The deal against your mandate"}
           </h2>
           <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-            {data.scope === "team" ? "Team" : "Personal"}
+            {sample ? "Example" : data.scope === "team" ? "Team" : "Personal"}
           </span>
           {data.provisional && (
             <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
@@ -167,7 +172,7 @@ export function BuyBoxPanel({
           href={publicDemo ? "/login?mode=signup" : "/criteria"}
           className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
-          {publicDemo ? "Sign up to set your own box →" : "Edit criteria →"}
+          {publicDemo ? "Sign up to set your own box →" : sample ? "Set your own box →" : "Edit criteria →"}
         </Link>
       </div>
       {data.mandate?.score != null && data.mandate.verdict && (
