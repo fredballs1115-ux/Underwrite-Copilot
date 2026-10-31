@@ -135,6 +135,7 @@ import {
   statedIrrSentence,
   statedYocSentence,
   stressReadLine,
+  stressRowOrder,
   tickPositions,
   untestedSentence,
   unsolvedSentence,
@@ -582,8 +583,11 @@ function HeadlineBlock({ headline }: { headline: ReportHeadline }) {
  */
 function StressTestPage({ test, dealName, branding }: { test: StressTest; dealName: string; branding?: MemoData["branding"] }) {
   const c = verdictCounts(test);
-  const rank: Record<StressRow["verdict"], number> = { unsupported: 0, stretched: 1, holds: 2, unchecked: 3 };
-  const rows = test.rows.map((r, i) => ({ r, i })).sort((a, b) => rank[a.r.verdict] - rank[b.r.verdict] || a.i - b.i).map((x) => x.r);
+  // The panel's, the memo's and the workbook's order (`stressRowOrder`):
+  // past the evidence by severity then share of the headline's gap, then
+  // the holds, then the unchecked — the report had sorted by verdict alone,
+  // so its stretched rows ran in the test's order, not the panel's.
+  const rows = stressRowOrder(test);
   // Every verdict counted, as the panel and the header's chip count them
   // (`verdictCounts`): the rows that hold and the unchecked too, so the
   // count adds up to the assumptions it heads.
