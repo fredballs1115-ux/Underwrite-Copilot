@@ -712,7 +712,7 @@ const verdict: VerdictResult = {
         base: "$261k",
         high: "$261k",
         source: "Trades $252k and $261k, both clean (p. 14)",
-        basis: `The $274k ask sits ${CLEAN_COMP_GAP_PCT.parkside}% over the closer, newer clean comp and ${CLEAN_COMP_GAP_PCT.brixton}% over the other, with no renovation premium yet.`,
+        basis: `The $274k ask sits ${CLEAN_COMP_GAP_PCT.parkside}% over the closer, newer clean comp and ${CLEAN_COMP_GAP_PCT.brixton}% over the other, the $140 achieved premium not yet closing it.`,
         confidence: "medium",
       },
     ],
@@ -720,7 +720,7 @@ const verdict: VerdictResult = {
       {
         lever: "basis",
         read: "Buying at ~$274k/unit — above both clean comps.",
-        risk: "No renovation premium yet justifies the spread.",
+        risk: "The achieved $140 premium does not yet justify it.",
       },
       {
         lever: "exit",

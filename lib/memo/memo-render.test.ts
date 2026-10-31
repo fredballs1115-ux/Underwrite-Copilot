@@ -1348,12 +1348,12 @@ describe("MemoDocument (redesigned)", () => {
     // re-runs; a verdict saved before the stress test is the screen's
     // estimate.
     const other = { ...deal, is_sample: false } as unknown as DealRow;
-    expect(await render(other)).toContain("Breaks if (the screen's estimate): No renovation premium yet justifies the spread.");
+    expect(await render(other)).toContain("Breaks if (the screen's estimate): The achieved $140 premium does not yet justify it.");
     const { stressSnapshotOf } = await import("@/lib/stress-snapshot");
     const { sampleStressTest } = await import("@/lib/sample-stress");
     const cited = { ...other, verdict: { ...SAMPLE_DEAL.verdict, stressSnapshot: stressSnapshotOf(sampleStressTest({ today: "2026-09-30" })) } } as unknown as DealRow;
     const citedText = await render(cited);
-    expect(citedText).toContain("Breaks if: No renovation premium yet justifies the spread.");
+    expect(citedText).toContain("Breaks if: The achieved $140 premium does not yet justify it.");
     expect(citedText).not.toContain("Breaks if (the screen's estimate)");
   }, 45000);
 
