@@ -1596,7 +1596,7 @@ describe("the memo leads with the stress test", () => {
     // The key says what each of a row's two IRRs is run at — the one-page
     // memo has no room to say it on every row — and claims no more of the
     // report than that it prints every row.
-    expect(text).toContain(`Re-runs: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's; the report has every row.`);
+    expect(text).toContain(`Re-runs: from the model's own ${test.headline!.modelIrrPct!.toFixed(1)}% levered IRR, this input alone set to the OM's figure, then to the evidence's; not printed here: NOI (stretched); the report has every row.`);
     expect(text).not.toContain("tests every assumption");
     // The premium is no model input: its row has a gap and no IRR.
     expect(text).toContain("UNSUPPORTED Renovation premium OM $200/mo (p. 25) · against $140/mo (OM p. 25) · gap $60");
@@ -1705,7 +1705,7 @@ describe("the memo leads with the stress test", () => {
     expect(data.stressTest!.rows.length).toBeGreaterThan(0);
     const text = pdfTextOf(await renderMemoPdf(data)).replace(/\s+/g, " ");
     expect(text).toContain(why);
-    expect(text).toContain("Ticks: the OM's figure in the row's tone, the evidence's in ink; the report has every row.");
+    expect(text).toContain("Ticks: the OM's figure in the row's tone, the evidence's in ink; not printed here: Insurance (stretched); the report has every row.");
     expect(text).not.toContain("Re-runs:");
     expect(text).not.toContain("Read as stabilized, the sample's re-runs");
     // Not withheld, but no printed row carries a re-run: the key says none.

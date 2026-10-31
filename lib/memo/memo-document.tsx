@@ -592,6 +592,10 @@ export interface MemoStressBlock {
    *  on the sample wherever its re-runs stand; "" elsewhere */
   planNote?: string;
   rows: MemoStressRow[];
+  /** the rows past their evidence the memo has no room for, by title and
+   *  verdict ("the NOI (stretched)"), named in the key so the count above
+   *  never reads as the rows below; "" where every one is printed */
+  notPrinted?: string;
 }
 
 /** A printed row, and whether it carries a re-run (lib/stress-test-words
@@ -621,6 +625,12 @@ export function memoStressBlock(test: StressTest | null | undefined): MemoStress
       const w = rowWords(r);
       return { ...w, title: pdfSafe(w.title), om: pdfSafe(w.om), against: pdfSafe(w.against), gap: pdfSafe(w.gap), move: pdfSafe(w.move), rerun: drawsRerun(r) };
     }),
+    notPrinted: pdfSafe(
+      leadRows(test, Number.POSITIVE_INFINITY)
+        .slice(MEMO_STRESS_ROWS)
+        .map((r) => `${r.title} (${r.verdict})`)
+        .join(", "),
+    ),
   };
 }
 
@@ -1698,9 +1708,11 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                 {/* The re-runs are named only where a printed row carries
                     one: never beside a read line that says no return is
                     re-run. */}
-                {data.stressTest.rerun && data.stressTest.rows.some((r) => r.rerun)
-                  ? `Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun}; the report has every row.`
-                  : "Ticks: the OM's figure in the row's tone, the evidence's in ink; the report has every row."}
+                {`${
+                  data.stressTest.rerun && data.stressTest.rows.some((r) => r.rerun)
+                    ? `Ticks: the OM's figure in the row's tone, the evidence's in ink. Re-runs: ${data.stressTest.rerun}`
+                    : "Ticks: the OM's figure in the row's tone, the evidence's in ink"
+                }; ${data.stressTest.notPrinted ? `not printed here: ${data.stressTest.notPrinted}; the report has every row.` : "the report has every row."}`}
               </Text>
             ) : null}
           </Section>
