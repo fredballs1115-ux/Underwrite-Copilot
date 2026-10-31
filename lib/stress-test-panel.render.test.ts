@@ -54,7 +54,7 @@ const VACANCY: StressRow = {
     {
       kind: "rule_of_thumb",
       label: "Multifamily vacancy, a rule of thumb",
-      text: "5.0% — the class's screening default, a rule of thumb, not this market's figure",
+      text: "5.0%, the class's screening default",
       value: 5,
       asOf: null,
       publisher: "a rule of thumb",
@@ -384,7 +384,7 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     expect(all.match(/never the building's/g)).toHaveLength(1);
     expect(all).not.toContain("figure, not the building's");
     expect(row).toContain('href="https://www.census.gov/housing/hvs/"');
-    expect(t).toContain("A rule of thumb Beside it, not deciding Multifamily vacancy, a rule of thumb: 5.0% — the class's screening default, a rule of thumb, not this market's figure — a rule of thumb · the class's, not this market's");
+    expect(t).toContain("A rule of thumb Beside it, not deciding Multifamily vacancy, a rule of thumb: 5.0%, the class's screening default — the class's, not this market's");
     expect(row.match(/data-qa="stress-decides-tag"/g)).toHaveLength(3);
     // The gap in words, then the impact: the pair, the two runs as bars on
     // one scale (the OM's figure's, then the evidence's), and the sentence.
@@ -801,7 +801,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
       ["Parkside — 1.4 mi", "$261k/unit", "clean"],
       ["Vue at Girard — 4.0 mi", "$298k/unit", "stretched"],
     ]);
-    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask; the ask's $274k/unit is 8.8% over The Brixton and 5.1% over Parkside, shown beside and deciding nothing");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
     expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Not comparable, left out: not a clean comparison");
     // The sale comps are the list above, never a sentence too (the lease

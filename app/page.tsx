@@ -135,9 +135,9 @@ const RECONCILE_ICON = (
 // on a deal of your own is a tile with no link, never a link to a page
 // that does not show it (the tasks tile had opened /demo, which shows no
 // tasks).
-const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
+const FEATURES: { label: string; href?: string; icon: ReactNode; pro?: true }[] = [
   {
-    label: "Rent roll + T‑12 test today’s NOI; vacancy held to the market",
+    label: "Rent roll + T‑12 test today’s NOI; vacancy held to the market, else a named norm",
     href: "/demo",
     icon: (
       <Icon>
@@ -199,7 +199,7 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Every number carries its source",
+    label: "Every number dated and sourced, or said not to be",
     href: "/market",
     icon: (
       <Icon>
@@ -210,6 +210,7 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   },
   {
     label: "Ask this deal, answered with the page",
+    pro: true,
     icon: (
       <Icon>
         <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
@@ -259,6 +260,7 @@ const FEATURES: { label: string; href?: string; icon: ReactNode }[] = [
   },
   {
     label: "An LOI drafted from the screen",
+    pro: true,
     icon: (
       <Icon>
         <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
@@ -379,11 +381,11 @@ const SAMPLE_FIT: SampleFit = {
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and they test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market’s published figure. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the test runs on its own: the headline figures, the extraction, the key assumptions challenged, the broker's comps graded, the market check, a verdict. Add a rent roll or T-12 and they test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market’s published figure where one is read, else to the class norm, named as a rule of thumb. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
-    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb named as one — and conflicting sources are reconciled openly (a rent roll and T-12 test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb or screening default named as one, and a figure whose publisher or period is not on file says so — and conflicting sources are reconciled openly (a rent roll and T-12 test today’s NOI, expenses and occupancy; a stabilized vacancy is held to the market’s figure, else a class norm named as one), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
   },
   {
     q: "Which markets does it cover?",
@@ -399,7 +401,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are my documents private?",
-    a: "Yes. Documents are stored in private storage behind the database's row-level security and a server check on every file, and your deals are visible only to you and your team — and to whoever holds a share link you send, which shows the screen, never your documents. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
+    a: "Yes. Documents are stored in private storage behind the database's row-level security and a server check on every file, and your deals are visible only to you and your team — and to whoever holds a share link you send, which shows the screen and the building’s photograph, never your documents. To run a screen, a document is read by Anthropic's Claude API, which does not train on it; the security page lists every outside service and what it receives. Nothing you upload is ever sold.",
   },
   {
     q: "Is this investment advice?",
@@ -453,7 +455,7 @@ const JSON_LD = {
       operatingSystem: "Web",
       // The layout's own description (app/layout.tsx), word for word.
       description:
-        "Upload an offering memorandum. Its key assumptions are each set against dated published figures, the deal's own documents, the OM's own figures or a rule of thumb named as one, and the return re-run where the gap moves a model input; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
+        "Upload an offering memorandum. Its key assumptions are each set against dated published figures, the deal's own documents, the OM's own figures or a rule of thumb named as one, or named unchecked where nothing on file can test them, and the return re-run where the gap moves a model input; the unsupported and stretched ones are listed first; a Go / Caution / No-go that shows its work. The model is included.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },
@@ -490,7 +492,7 @@ const TRUST: { label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    label: "Isolated in the database itself",
+    label: "Isolated in the database, the exceptions named",
     icon: (
       <Icon>
         <ellipse cx="12" cy="6" rx="8" ry="3" />
@@ -800,7 +802,7 @@ export default async function Home() {
                       return the gap moves, in code. The model is included,
                       not the product. */}
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    The OM&apos;s key assumptions, each set against today&apos;s published figures, the rent roll and T-12 you add, the OM&apos;s own figures or a rule of thumb named as one — and the return re-run where the gap moves a model input. The model is included.
+                    The OM&apos;s key assumptions, each set against today&apos;s published figures, the rent roll and T-12 you add, the OM&apos;s own figures or a rule of thumb named as one, or named unchecked where nothing can test them — and the return re-run where the gap moves a model input. The model is included.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link
@@ -1210,7 +1212,17 @@ export default async function Home() {
                       <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
                         {f.icon}
                       </span>
-                      <span className="text-sm font-medium leading-snug">{f.label}</span>
+                      <span className="text-sm font-medium leading-snug">
+                        {f.label}
+                        {/* A Pro feature carries the IC memo tile's own mark
+                            (lib/marketing-constants PRO_PLAN). */}
+                        {f.pro && (
+                          <>
+                            {" "}
+                            <span className="rounded-full bg-brand/10 px-1.5 py-px align-[1px] text-[10px] font-semibold text-brand">Pro</span>
+                          </>
+                        )}
+                      </span>
                     </>
                   );
                   const tile = "flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card";

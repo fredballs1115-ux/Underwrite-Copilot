@@ -45,7 +45,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it does",
     body: [
-      "Upload an OM. The app reads it and returns a test of it: the key assumptions challenged, the comps inside the deck graded, a market check against dated figures, and a verdict — the key terms extracted on the way. Add a rent roll, a T-12 or your own model and it reconciles across them.",
+      "Upload an OM. The app reads it and returns a test of it: the key assumptions challenged, the comps inside the deck graded, a market check against dated figures, and a verdict — the key terms extracted on the way. Add a rent roll or a T-12 and they turn rows of the test into checks; add your own model and it is reconciled against the screen.",
       "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call (Outside box where it misses outright), or says which criteria it could not check. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
       "Two calls, kept apart: Go, Caution or No-go is the screen's call on the deal itself; Pursue, Watch or Pass is how the deal fits your buy box.",
     ],

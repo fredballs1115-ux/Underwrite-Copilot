@@ -79,6 +79,7 @@ import {
   vacancyDecidedBy,
   stressHeadline,
   statedIrrLevered,
+  askBeside,
   T12_TODAY_BESIDE,
   type StressTestArgs,
 } from "./stress-test";
@@ -2675,7 +2676,7 @@ describe("every STRESS_METHODS sentence names a source the reader attaches", () 
     const comp = (name: string, detail: string) => ({ name, detail, support: "supports" as const, note: "" });
     const one = rowOf(buildStressTest(apartmentArgs({ brokerComps: { saleComps: [comp("The Ellery", "$232,000 per unit")], leaseComps: [], redFlags: [], summary: "" }, recordedSales: null })), "basis");
     expect(one.evidence[0]).toMatchObject({ value: null });
-    expect(one.evidence[0].text).toBe("1 of 1 state a price per unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(one.evidence[0].text).toBe("1 of 1 state a price per unit; graded clean (comparable): The Ellery $232k/unit — one graded clean, too few for a median (3 or more), so none is set against the ask; the ask's $275k/unit is 18.3% over The Ellery, shown beside and deciding nothing");
     expect(one.verdict).toBe("unchecked");
     expect(one.unchecked).toBe(
       "The memorandum's one sale comp is graded clean (comparable) with a stated price per unit; a median needs 3, and no recorded sales' median stands beside them, so none is struck: the comps' own floor.",
@@ -4217,5 +4218,16 @@ describe("the OM's stated IRR beside a levered-IRR headline", () => {
     const note = { ...APARTMENT, interest: { kind: "note" as const, summary: "", share: "", groundLease: "", loan: "", page: "" }, metrics: [...APARTMENT.metrics, row("Projected levered IRR", "18.5%")] };
     const h = buildStressTest(apartmentArgs({ extraction: note })).headline;
     expect(h?.statedIrr ?? null).toBeNull();
+  });
+});
+
+describe("the ask beside one or two clean comps (the investor's review of 2026-10-28)", () => {
+  it("says where the ask sits against each, over or under, and decides nothing", () => {
+    const c = (name: string, figure: number) => ({ comp: { name }, figure });
+    expect(askBeside(274_000, [c("The Brixton — 2.1 mi", 252_000), c("Parkside", 290_000)], "/unit")).toBe(
+      "; the ask's $274k/unit is 8.7% over The Brixton and 5.5% under Parkside, shown beside and deciding nothing",
+    );
+    expect(askBeside(252_000, [c("The Brixton", 252_000)], "/unit")).toBe("; the ask's $252k/unit is at The Brixton, shown beside and deciding nothing");
+    expect(askBeside(null, [c("The Brixton", 252_000)], "/unit")).toBe("");
   });
 });
