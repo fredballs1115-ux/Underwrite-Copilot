@@ -3781,6 +3781,23 @@ function cleanCompsWords(clean: number, listed: number, kind: "sale" | "lease"):
   return `${graded} clean (comparable)`;
 }
 
+/** Where the ask's own figure sits against one or two comps graded clean,
+ *  too few for a median: "; the ask's $274k/unit is 8.7% over The Brixton
+ *  and 5.0% over Parkside, shown beside and deciding nothing". "" with no
+ *  figure of the ask's on the comps' footing. Exported for its test. */
+export function askBeside(ask: number | null, clean: readonly { comp: { name: string }; figure: number }[], pw: string): string {
+  if (ask == null || !(ask > 0) || clean.length === 0) return "";
+  const each = clean.map((c) => {
+    // The comp's name without the distance the comps step writes after it
+    // ("The Brixton — 2.1 mi").
+    const name = c.comp.name.split(" — ")[0];
+    const pct = ((ask - c.figure) / c.figure) * 100;
+    if (Math.abs(pct) < 0.05) return `at ${name}`;
+    return `${Math.abs(pct).toFixed(1)}% ${pct > 0 ? "over" : "under"} ${name}`;
+  });
+  return `; the ask's ${money(ask)}${pw} is ${joinWords(each)}, shown beside and deciding nothing`;
+}
+
 function basisRow(ctx: Ctx): StressRow | null {
   const ex = ctx.ex;
   const screenYear = screenYearOf(ex);
@@ -3889,7 +3906,7 @@ function basisRow(ctx: Ctx): StressRow | null {
       clean.length >= MEDIAN_FLOOR
         ? ` — median ${money(figure!)}${pw} over the ${clean.length}`
         : clean.length > 0
-          ? ` — ${clean.length === 1 ? "one" : "two"} graded clean, too few for a median (${MEDIAN_FLOOR} or more), so none is set against the ask`
+          ? ` — ${clean.length === 1 ? "one" : "two"} graded clean, too few for a median (${MEDIAN_FLOOR} or more), so none is set against the ask${askBeside(omOn(on), clean, pw)}`
           : ", none graded clean (comparable), so none is set against the ask";
     // The page the figure is read off: the clean comps' own page, each
     // validated against the deck (lib/facts `locatedPage`), where they all

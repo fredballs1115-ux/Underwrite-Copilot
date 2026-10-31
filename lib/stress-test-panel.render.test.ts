@@ -801,7 +801,7 @@ describe("StressTestPanel on the sample — each claim once", () => {
       ["Parkside — 1.4 mi", "$261k/unit", "clean"],
       ["Vue at Girard — 4.0 mi", "$298k/unit", "stretched"],
     ]);
-    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask");
+    expect(read.struck).toBe("Two graded clean, too few for a median (3 or more), so none is set against the ask; the ask's $274k/unit is 8.8% over The Brixton and 5.1% over Parkside, shown beside and deciding nothing");
     expect(out.match(/data-grade="/g)).toHaveLength(3);
     expect(t).toContain("Vue at Girard — 4.0 mi $298k/unit · Not comparable, left out: not a clean comparison");
     // The sale comps are the list above, never a sentence too (the lease

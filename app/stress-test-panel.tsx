@@ -517,7 +517,7 @@ export type CompLine = { name: string; figure: string; grade: "clean" | "favorab
 export function compLines(e: StressEvidence): { head: string; comps: CompLine[]; struck: string } | null {
   if (!/^The memorandum's sale comps/.test(e.label)) return null;
   const m = e.text.match(
-    /^(\d+ of \d+ state a (?:price per \S+|figure \/\S+)(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(comparable\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask|, none graded clean \(comparable\), so none is set against the ask)((?:; left out, graded .*)?)$/,
+    /^(\d+ of \d+ state a (?:price per \S+|figure \/\S+)(?: alone, so (?:it is|they are) judged per SF)?)(?:; graded clean \(comparable\): (.*?))?( — median .*? over the \d+| — (?:one|two) graded clean, too few for a median \(\d+ or more\), so none is set against the ask(?:; the ask's .*?, shown beside and deciding nothing)?|, none graded clean \(comparable\), so none is set against the ask)((?:; left out, graded .*)?)$/,
   );
   if (!m) return null;
   const entries = (list: string): { name: string; figure: string }[] | null => {
