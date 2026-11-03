@@ -417,6 +417,13 @@ export const CANNOT: readonly { heading: string; line: string }[] = [
     heading: "No return is re-run on a figure nobody stated",
     line: "Where the price is a placeholder or the year-one NOI assumed, or the price buys no building (a note, a position, the land, a share that cannot be grossed up), the gaps stand and no return is re-run.",
   },
+  // lib/stress-test `returnsWithheldReason`: the playground's, the report's
+  // and the workbook's own gates on the model's returns (the audit of
+  // 2026-11-03).
+  {
+    heading: "No return is re-run where it would be a misread's",
+    line: "Where the model runs the building 90% vacant or more, the plausibility check finds figures that do not tie, or a leasehold's lease ends inside the hold, the deal page withholds the model's returns, and the test re-runs none: each gap stands, with the reason.",
+  },
   {
     heading: "A metro figure is the metro's",
     line: "Never the submarket's and never the building's: a published figure is said as whose it is, and a submarket's vacancy is not read.",

@@ -1,5 +1,6 @@
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
+import { withDealAddress } from "@/lib/underwrite/inputs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
@@ -57,7 +58,7 @@ async function buildSampleWorkbook(readerDay: string): Promise<Buffer> {
   // derive), actuals included, told the rent rules and the day as the
   // signed-in route tells it (the cover's lines; no figure moves). The
   // sample is never seeded from today's rates (lib/model-market).
-  const model = sampleDerivedInputs({ regulation, asOf });
+  const model = withDealAddress(sampleDerivedInputs({ regulation, asOf }), address);
 
   // A visitor has no firm to brand the workbook with.
   const branding: ExportBranding | null = null;

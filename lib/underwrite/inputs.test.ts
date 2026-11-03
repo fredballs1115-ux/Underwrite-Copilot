@@ -705,3 +705,14 @@ describe("the reserve runs the higher of the OM's stated figure and the class's 
     expect(plain.sources.reservesPsf?.note).not.toContain("after reserves");
   });
 });
+
+describe("withDealAddress — the workbook's address line (2026-11-03)", () => {
+  it("keeps the memorandum's own line, else takes the deal's, never a dash over an address the deal holds", async () => {
+    const { withDealAddress } = await import("./inputs");
+    const model = { meta: { address: "" } };
+    expect(withDealAddress(model, { label: "Brewerytown, Philadelphia, PA" }).meta.address).toBe("Brewerytown, Philadelphia, PA");
+    expect(withDealAddress({ meta: { address: "1200 N Capitol St NW" } }, { label: "Elsewhere" }).meta.address).toBe("1200 N Capitol St NW");
+    expect(withDealAddress(model, null)).toBe(model);
+    expect(withDealAddress(model, { label: "  " })).toBe(model);
+  });
+});

@@ -4,7 +4,7 @@ import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { SAMPLE_EXPORT_PATH, exportGate, exportGateDealOf } from "@/lib/sample-exports";
-import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, withDealAddress, type ActualsForModel } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
@@ -184,10 +184,13 @@ export async function GET(
       reads,
       regulation,
     });
-    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence), {
-      regulation,
-      asOf,
-    });
+    const model = withDealAddress(
+      deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt, modelEvidence), {
+        regulation,
+        asOf,
+      }),
+      address,
+    );
     // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
     // buy box's IRR floor, as the deal page and the report say it; the
     // model's own read is at the screening default. Asked only of a deal
