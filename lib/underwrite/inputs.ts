@@ -997,6 +997,20 @@ function researchWords(f: EvidenceFigure): string {
   return `${point ? "" : "the low end of "}the research tracker's ${span} ${r.sector} cap ${point ? "figure" : "range"} (${r.house}, ${r.period}${r.readOn ? `, read ${r.readOn}` : ""}; a research print, not a feed)`;
 }
 
+/**
+ * The workbook's address line: the memorandum's own, else the deal's (the
+ * line the deal page shows) — never a dash on the cover over an address the
+ * deal holds. Words only: no figure reads it.
+ */
+export function withDealAddress<T extends { meta: Pick<WorkbookMeta, "address"> }>(
+  model: T,
+  address: { label?: string | null } | null | undefined,
+): T {
+  const line = address?.label?.trim();
+  if (model.meta.address?.trim() || !line) return model;
+  return { ...model, meta: { ...model.meta, address: line } };
+}
+
 export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
   fallbackName: string,
