@@ -4231,3 +4231,44 @@ describe("the ask beside one or two clean comps (the investor's review of 2026-1
     expect(askBeside(null, [c("The Brixton", 252_000)], "/unit")).toBe("");
   });
 });
+
+// The audit of 2026-11-03: the stress test re-ran the levered return on a
+// deal whose deal page, report and workbook withhold the model's returns as
+// a misread's, so one page could say "returns withheld" beside "IRR 9.3% →
+// 5.9%". It now withholds its re-runs under the same three gates.
+describe("no re-run where the page withholds the model's returns as a misread's", () => {
+  it("a building the model runs nearly vacant", () => {
+    const args = apartmentArgs();
+    const d = args.derived!;
+    const t = buildStressTest({ ...args, derived: { ...d, inputs: { ...d.inputs, vacancyPct: 0.95 }, meta: { ...d.meta, occupancyPct: 0.05 } } });
+    expect(t.impactsWithheld).toMatch(/^No return is re-run: stated 5% occupied, the model's rent line is that space's revenue grossed up through 95% vacancy/);
+    expect(t.rows.every((r) => r.impact == null)).toBe(true);
+    expect(t.headline ?? null).toBeNull();
+  });
+
+  it("a plausibility finding that the figures do not tie", () => {
+    const ex = { ...APARTMENT, metrics: APARTMENT.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$900,000,000" } : m)) };
+    const derived = deriveUnderwriteInputs(ex, "The Maddox", { t12: { summary: T12, periodEnd: "2026-06-30" } }, { debtIndex: FIVE });
+    const t = buildStressTest(apartmentArgs({ extraction: ex, derived }));
+    expect(t.impactsWithheld).toMatch(/^No return is re-run: .+, and returns built on figures that do not tie would be a misread's\.$/);
+    expect(t.rows.every((r) => r.impact == null)).toBe(true);
+  });
+
+  it("a leasehold whose lease ends inside the model's hold", () => {
+    const ex: ExtractionResult = {
+      ...APARTMENT,
+      interest: { kind: "leasehold", summary: "", share: "", groundLease: "Ground lease expires December 31, 2028; no extension options", loan: "", page: "" },
+      metrics: [...APARTMENT.metrics, { label: "Ground lease expiration", value: "December 31, 2028", flagged: false, page: "p. 9", basis: "na" }],
+    } as ExtractionResult;
+    const derived = deriveUnderwriteInputs(ex, "The Maddox", { t12: { summary: T12, periodEnd: "2026-06-30" } }, { debtIndex: FIVE });
+    const t = buildStressTest(apartmentArgs({ extraction: ex, derived }));
+    expect(t.impactsWithheld).toMatch(/^No return is re-run\. The ground lease ends Dec 2028, in year \d of the model's 5-year hold/);
+    expect(t.rows.every((r) => r.impact == null)).toBe(true);
+  });
+
+  it("and a deal whose returns stand keeps its re-runs", () => {
+    const t = buildStressTest(apartmentArgs());
+    expect(t.impactsWithheld).toBeNull();
+    expect(t.rows.some((r) => r.impact != null)).toBe(true);
+  });
+});

@@ -143,6 +143,7 @@ import {
   basisOutsideBand,
   buildingPriceOf,
   findPricedMetric,
+  findingWithholdsReturns,
   IMPLIED_CAP_CEILING,
   inferStrategy,
   isOutdoorStorageYard,
@@ -170,7 +171,8 @@ import { readTaxAbatement, taxBillOf } from "@/lib/tax-abatement";
 import { sizeLoan } from "@/lib/tools/deal-math";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import { HOLD_MONTHS, MASTER_LEASE_WORD, basisWithheldOf, classVacancyDefault, type DerivedModel } from "@/lib/underwrite/inputs";
-import { modelReadsWithheld } from "@/lib/underwrite/report-grid";
+import { modelReadsWithheld, nearlyVacantReason, screeningCompareModel } from "@/lib/underwrite/report-grid";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import { MEDIAN_FLOOR, compEvidence, medianLabel } from "@/lib/public-comps/core";
 import { achievedPremiumRow, readValueAdd } from "@/lib/value-add";
 import { readRoster } from "@/lib/tenant-roster";
@@ -4552,6 +4554,32 @@ export function headlinePrice(derived: DerivedModel): string {
  * nothing found is left out, and the challenger's unmatched challenges
  * close the list as `other` rows.
  */
+/**
+ * Why no levered return is re-run where the deal page, the report and the
+ * workbook withhold the model's returns as a misread's (lib/underwrite/
+ * report-grid's gates, beside the placeholder's): a building the model runs
+ * nearly vacant, a plausibility finding that the figures do not tie, or a
+ * leasehold whose lease ends inside the hold. The stress test had re-run the
+ * return on such a deal beside a playground that said its returns would be a
+ * misread's (the audit of 2026-11-03). One whole sentence, null where the
+ * returns stand.
+ */
+function returnsWithheldReason(
+  ex: ExtractionResult | null,
+  strategy: ReturnType<typeof inferStrategy>,
+  derived: DerivedModel,
+  readOn: string,
+): string | null {
+  const vacant = nearlyVacantReason(derived.inputs, derived.meta.occupancyPct ?? null);
+  if (vacant) return `No return is re-run: ${vacant}`;
+  const finding = assessPlausibility(ex, strategy).find(findingWithholdsReturns);
+  if (finding) return `No return is re-run: ${finding.title}, and returns built on figures that do not tie would be a misread's.`;
+  const noon = new Date(`${/^\d{4}-\d{2}-\d{2}$/.test(readOn) ? readOn : new Date().toISOString().slice(0, 10)}T12:00:00Z`);
+  const lease = modelReturnsRead(ex, screeningCompareModel(derived.inputs), noon);
+  if (lease.withheld === "lease" && lease.line) return `No return is re-run. ${lease.line.trim()}`;
+  return null;
+}
+
 export function buildStressTest(args: StressTestArgs): StressTest {
   const ex = args.extraction;
   const strategy = inferStrategy(ex, args.firstSignal ?? null);
@@ -4572,12 +4600,13 @@ export function buildStressTest(args: StressTestArgs): StressTest {
   // the price, and a master lease's price buys the position, not the
   // building: no yield on cost is struck on it.
   const masterLeasePlan = plan && withheld?.word === MASTER_LEASE_WORD ? planMasterLeaseReason(withheld.why) : null;
+  const returnsMisread = !plan && derived != null && !readsWithheld && !priceWithheld ? returnsWithheldReason(ex, strategy, derived, args.readOn) : null;
   const impactsWithheld =
     derived == null
       ? (args.withheldReason?.trim() || "No model was derived for this deal, so no return is re-run.")
       : readsWithheld
         ? `No return is re-run: ${lowerFirst(readsWithheld.trim())}${/[.!?]$/.test(readsWithheld.trim()) ? "" : "."}`
-        : (priceWithheld ?? masterLeasePlan ?? (plan && !yieldBase ? planNoYieldReason(planChecked) : null));
+        : (priceWithheld ?? returnsMisread ?? masterLeasePlan ?? (plan && !yieldBase ? planNoYieldReason(planChecked) : null));
   const planYield: PlanYield | null = plan && impactsWithheld == null && planChecked && yieldBase ? { plan: planChecked, ...yieldBase } : null;
   const ctx: Ctx = {
     ex,
