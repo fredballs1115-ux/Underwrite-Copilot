@@ -536,6 +536,7 @@ export const HEADLINE_METHOD = {
     "On a stabilized deal an assumption with no model input, such as a renovation premium or a market rent, is not in the headline, and the headline names it.",
     "No headline on a placeholder price or an assumed NOI: no return is re-run there, and the headline is withheld with the reason.",
     "None either where the price buys no building: a note, a preferred equity position, a leased fee, a share no figure grosses up, or a share beside its entity's loan.",
+    "None either where the deal page withholds the model's returns as a misread's: a building run 90% vacant or more, figures that do not tie, or a lease that ends inside the hold.",
     "A master lease's price buys the position between two rents, which the model runs as its own, so its headline is struck on that position.",
     "On a plan deal it has none: the plan's stabilized NOI is the building's, and over the position's price it is no yield on cost.",
     "Neither case is a forecast: each is the model run once on one set of figures.",

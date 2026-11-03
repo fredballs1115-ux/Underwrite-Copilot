@@ -201,6 +201,7 @@ describe("/how-we-test draws every method from the table", () => {
       "Not investment advice",
       "No levered return on a plan",
       "No return is re-run on a figure nobody stated",
+      "No return is re-run where it would be a misread's",
       "A metro figure is the metro's",
       "Licensed databases are not read",
     ]);
