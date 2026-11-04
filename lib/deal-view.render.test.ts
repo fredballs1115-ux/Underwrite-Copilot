@@ -276,7 +276,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     // Doors and dollars (lib/stress-deciders `VACANCY_ORDER`): the T-12 never
     // decides an occupancy counted by doors.
     expect(words).toContain("T-12 The OM's NOI and its operating expenses; and its tax bill and insurance premium where either sits more than 2% under the seller's own (a tax bill only where no reset bill can be struck): the building's history, not a new owner's bill or quote.");
-    expect(words).toContain("Rent roll The OM's occupancy today, by its doors. (The T-12 tests an economic vacancy today, in dollars.)");
+    expect(words).toContain("Rent roll The OM's occupancy today, by its doors: without one, that row cannot be checked. (The T-12 tests an economic vacancy today, in dollars.)");
     expect(words).not.toContain("a rent roll, else the T-12");
     expect(words).toContain("A stabilized vacancy is held to the market's published figure, else the class's norm; beside it the documents show today's gap to close, and never decide it.");
     expect(words).not.toContain("vacancy and insurance against");
