@@ -465,13 +465,16 @@ function NotTestedSection() {
 
 /**
  * The row the page shows as its worked example: the sample's first row, by
- * the panel's own order (the most severe first), that re-runs the return —
- * else the first it tested at all. None where the build tested nothing.
+ * the panel's own order (the most severe first), that re-runs the return on
+ * a dated published figure — the page's own first kind of evidence, and the
+ * one a reader most needs to see struck — else the first that re-runs at
+ * all, else the first it tested. None where the build tested nothing.
  */
 export function exampleRowOf(test: StressTest | null): StressRow | null {
   if (!test) return null;
   const tested = sortStressRows(test.rows, test).filter((r) => r.verdict !== "unchecked");
-  return tested.find(drawsRerun) ?? tested[0] ?? null;
+  const decidedByPublished = (r: StressRow) => r.decidedBy != null && r.evidence[r.decidedBy]?.kind === "published";
+  return tested.find((r) => drawsRerun(r) && decidedByPublished(r)) ?? tested.find(drawsRerun) ?? tested[0] ?? null;
 }
 
 /** One row of the sample's stress test, as the panel draws it, ahead of

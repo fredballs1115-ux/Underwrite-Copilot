@@ -452,6 +452,20 @@ describe("/how-we-test opens on a worked example and closes on the sign-up", () 
     expect(page).toContain("sampleStressTest({ today: readerToday(null), reads: await sampleTodayReads() })");
   });
 
+  it("prefers a row that re-runs on a dated published figure, the page's first kind of evidence", () => {
+    // In the sandbox the sample reads no published figure: its example is the
+    // first row that re-runs (the taxes, a scenario).
+    expect(exampleRowOf(sample)!.key).toBe("taxes");
+    // Where one re-run row is decided by a published figure, it leads.
+    const exit = sample.rows.find((r) => r.key === "exit_cap")!;
+    const published = {
+      ...exit,
+      evidence: exit.evidence.map((e, i) => (i === exit.decidedBy ? { ...e, kind: "published" as const } : e)),
+    };
+    const withPublished = { ...sample, rows: sample.rows.map((r) => (r.key === "exit_cap" ? published : r)) };
+    expect(exampleRowOf(withPublished)!.key).toBe("exit_cap");
+  });
+
   it("draws no example where none is handed in", () => {
     expect(html).not.toContain('data-qa="worked-example"');
   });
