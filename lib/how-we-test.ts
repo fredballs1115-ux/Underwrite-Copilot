@@ -112,7 +112,7 @@ export const VERDICT_RULES: Record<StressKey, string> = {
   // lib/stress-deciders' VACANCY_ORDER: a stabilized figure by the market,
   // then the class's norm, never the deal's documents (an economic one meets
   // the market's doors as a floor); today's by its own measure's document.
-  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the class's norm, never the rent roll or T-12; one in dollars meets the market's doors as a floor. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
+  vacancy: `A stabilized vacancy is held to the market (metro survey, tracker's low read, region, state), then the class's norm; today's to its own rent roll or T-12 alone, else unchecked. One in dollars meets the market's doors as a floor. Unsupported ${VACANCY_UNSUPPORTED_PTS} points past it.`,
   // lib/rent-growth-decider's order, one line.
   // Where the series' history holds two years or more, the lower of its
   // trailing year and its average decides: said in the method's limits

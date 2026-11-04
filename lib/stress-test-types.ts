@@ -18,11 +18,15 @@ import type { UnderwriteInputs } from "@/lib/underwrite/engine";
  * struck under older rules is never set against today's as if the evidence
  * had moved (lib/stress-drift: "The test's method changed since the call").
  * 1 is the rules of 2026-10-28: the exit held to the going-in cap, a vacancy
- * scored by the door. `lib/stress-rules-version.test.ts` holds it to a
+ * scored by the door. 2 is the owner's decision of 2026-11-04: an occupancy
+ * the OM states for today is decided by the building's own rent roll alone
+ * (an economic one by its T-12), and stands unchecked without it, the
+ * market's vacancy and the class's norm beside it.
+ * `lib/stress-rules-version.test.ts` holds it to a
  * fingerprint of the deciders and thresholds, so a change to them fails
  * until this is bumped.
  */
-export const STRESS_RULES_V = 1;
+export const STRESS_RULES_V = 2;
 
 /** The assumptions the screen tests, each by one name on every surface. */
 export const STRESS_KEYS = [
@@ -683,13 +687,13 @@ export const STRESS_METHODS: readonly StressMethod[] = [
       "For a commercial class, which the Census survey does not count, the research tracker's vacancy band at its low read, with its period, where the market check holds the model to it: second in that order, after the metro survey",
       "The deal's own rent roll, by its occupied doors (by area on a class priced by the foot): the building's occupancy today. It decides today's occupancy only; beside a stabilized assumption it is today's gap, the one a lease-up has to close, and never decides it",
       "The deal's T-12: its vacancy and credit loss over gross potential rent, an economic figure, dollars not doors, over a trailing year. It decides an economic figure for today only; beside a stabilized one it is today's gap, never deciding",
-      "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied), deciding only where nothing above may",
+      "The class's own norm from the model's screening defaults, a rule of thumb named as one (an apartment building about 95% occupied): it decides a stabilized figure only where no published one stands, and never today's occupancy",
     ],
     decides: [[1, 3, 4], [2], "today", "today", [5]],
     engine: "Vacancy is a direct input: the return is re-run at the deciding figure, of the OM's own measure. A plan's yield on cost is re-run, moved by its stabilized gross times the gap to the market's figure, else the class's norm.",
     reruns: { stabilized: "irr", plan: "yoc" },
     rules: [
-      "Doors and dollars are two measures: a figure for today counted by doors is decided by a count of doors, the rent roll or a published vacancy rate, and an economic one by the T-12.",
+      "Today's occupancy is the building's own fact: a figure for today in doors is decided by its rent roll alone, one in dollars by its T-12 alone. Without it the row is unchecked, the market's vacancy and the class's norm beside it, where such buildings run.",
       "A stabilized figure in dollars (a pro forma's vacancy line, a vacancy and credit loss) meets the market's doors as a floor: economic vacancy is never below physical, so under it past the margin is stretched or unsupported, at or over it holds.",
       "The T-12's economic vacancy runs over the physical one wherever rent is lost to credit loss, concessions or loss to lease, so holding one to the other would call a sound occupancy unsupported.",
       "Beside a stabilized assumption the rent roll and the T-12 are today's gap, the one a lease-up has to close, or support where the building already runs at or under it: the building as it stands, never the test of the building stabilized.",

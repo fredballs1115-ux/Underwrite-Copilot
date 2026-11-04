@@ -239,7 +239,7 @@ describe("/how-we-test draws every method from the table", () => {
     // today's rent roll — doors by doors; the T-12's dollars decide an
     // economic figure, a pro forma's vacancy line among them (the reviews of
     // 2026-10-21 and 2026-10-23).
-    expect(VERDICT_RULES.vacancy).toContain("then the class's norm, never the rent roll or T-12; one in dollars meets the market's doors as a floor.");
+    expect(VERDICT_RULES.vacancy).toContain("then the class's norm; today's to its own rent roll or T-12 alone, else unchecked. One in dollars meets the market's doors as a floor.");
     expect(VERDICT_RULES.rent_growth).toMatch(/^Held to the figure for its kind of rent/);
     // A rented house, a park, a student or a mixed-use building (audit M4).
     expect(VERDICT_RULES.rent_growth).toContain("a house, all-homes first; a park, student or mixed-use building, the closest, named so");
@@ -450,6 +450,20 @@ describe("/how-we-test opens on a worked example and closes on the sign-up", () 
     // The page reads the sample's one builder, never a copy of it.
     const page = readFileSync("app/how-we-test/page.tsx", "utf8");
     expect(page).toContain("sampleStressTest({ today: readerToday(null), reads: await sampleTodayReads() })");
+  });
+
+  it("prefers a row that re-runs on a dated published figure, the page's first kind of evidence", () => {
+    // In the sandbox the sample reads no published figure: its example is the
+    // first row that re-runs (the taxes, a scenario).
+    expect(exampleRowOf(sample)!.key).toBe("taxes");
+    // Where one re-run row is decided by a published figure, it leads.
+    const exit = sample.rows.find((r) => r.key === "exit_cap")!;
+    const published = {
+      ...exit,
+      evidence: exit.evidence.map((e, i) => (i === exit.decidedBy ? { ...e, kind: "published" as const } : e)),
+    };
+    const withPublished = { ...sample, rows: sample.rows.map((r) => (r.key === "exit_cap" ? published : r)) };
+    expect(exampleRowOf(withPublished)!.key).toBe("exit_cap");
   });
 
   it("draws no example where none is handed in", () => {

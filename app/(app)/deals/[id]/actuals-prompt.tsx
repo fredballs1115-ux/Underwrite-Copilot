@@ -20,7 +20,8 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  * insurance line decides the insurance row where the OM's premium sits more
  * than 2% under it (the seller's actual premium, the building's own
  * history, not a new owner's quote), and stands beside it otherwise; on
- * a vacancy for today counted by doors the rent roll decides, and the T-12,
+ * a vacancy for today counted by doors the rent roll alone decides (without
+ * it the row is unchecked, the owner's decision of 2026-11-04), and the T-12,
  * dollars not doors, decides only one the OM states as economic; beside a
  * stabilized vacancy they show today's gap to close and never decide it
  * (lib/stress-deciders' VACANCY_ORDER.stabilized: the market's published
@@ -35,7 +36,7 @@ export type ActualsSlotState = "missing" | "uploaded" | "done";
  */
 const ACTUALS_TESTS = [
   { doc: "T-12", tests: "The OM's NOI and its operating expenses; and its tax bill and insurance premium where either sits more than 2% under the seller's own (a tax bill only where no reset bill can be struck): the building's history, not a new owner's bill or quote." },
-  { doc: "Rent roll", tests: "The OM's occupancy today, by its doors. (The T-12 tests an economic vacancy today, in dollars.)" },
+  { doc: "Rent roll", tests: "The OM's occupancy today, by its doors: without one, that row cannot be checked. (The T-12 tests an economic vacancy today, in dollars.)" },
 ] as const;
 /** The rule the documents never decide. */
 const ACTUALS_STABILIZED =

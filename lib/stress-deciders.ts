@@ -195,8 +195,14 @@ const RULE_VACANCY: DeciderStep = { name: "the class's norm, a rule of thumb", w
 /** A stabilized figure is never decided by the deal's documents: the rent
  *  roll and the T-12 are the building as it stands, the gap a lease-up (or
  *  the plan) has to close, not the building stabilized. A figure for today
- *  is decided in its own measure: a physical one (doors) never by the T-12's
- *  economic loss (dollars), an economic one never by a count of doors. */
+ *  is the building's own fact, decided only by the building's own document
+ *  of its measure (the owner's decision of 2026-11-04): a physical one
+ *  (doors) by the rent roll, an economic one (dollars) by the T-12. A
+ *  market's average or the class's norm says nothing about how full this
+ *  building is, so with no document of the measure the row stands
+ *  unchecked and they are shown beside it — an office's stated 88% had been
+ *  called unsupported by its metro's 19.9% vacancy, moving the headline ten
+ *  points. */
 export const VACANCY_ORDER = {
   /** a stabilized assumption, whatever its measure: the market's, then the
    *  class's norm — the documents are today's, beside it (an economic one is
@@ -204,11 +210,10 @@ export const VACANCY_ORDER = {
   stabilized: [...MARKET_VACANCY, RULE_VACANCY],
   /** a plan deal's stated stabilized figure: the same order */
   plan: [...MARKET_VACANCY, RULE_VACANCY],
-  /** an occupancy for today, by its doors */
-  today: [RENT_ROLL_VACANCY, ...MARKET_VACANCY, RULE_VACANCY],
-  /** an economic figure for today: the T-12, the same measure, then the
-   *  class's norm */
-  economic: [T12_VACANCY, RULE_VACANCY],
+  /** an occupancy for today, by its doors: the rent roll alone */
+  today: [RENT_ROLL_VACANCY],
+  /** an economic figure for today: the T-12 alone, the same measure */
+  economic: [T12_VACANCY],
 } as const;
 
 /** `stabilized`: the OM's figure is a stated stabilized vacancy; `plan`: on
@@ -422,7 +427,7 @@ const STEPS_OF: Partial<Record<StressKey, readonly DeciderStep[]>> = {
   exit_cap: EXIT_CAP_ORDER,
   debt: DEBT_ORDER,
   noi: NOI_ORDER,
-  vacancy: [...VACANCY_ORDER.today, T12_VACANCY],
+  vacancy: [RENT_ROLL_VACANCY, ...MARKET_VACANCY, RULE_VACANCY, T12_VACANCY],
   market_rent: MARKET_RENT_ORDER,
   expense_growth: EXPENSE_GROWTH_ORDER,
   taxes: TAXES_ORDER,

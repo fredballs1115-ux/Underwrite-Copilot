@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { METHOD_FOLD_LABEL, StressTestPanel, compLines, keptRows, publishedScopeLine, rangeEnds, sortStressRows, testedByHint, uncheckedLine, uncheckedName } from "@/app/stress-test-panel";
 import { HEADLINE_NOI_LEFT_OUT, STRESS_KEYS, STRESS_METHODS, type StressHeadline, type StressRow, type StressTest } from "./stress-test-types";
-import { HEADLINE_EVIDENCE_CASE_LABEL, HEADLINE_MODEL_LABEL, HEADLINE_MODEL_WHY, HEADLINE_OM_CASE_LABEL, HEADLINE_WITHHELD, HOLDS_CAUTIOUS_NO_RERUN, HOLDS_NO_RERUN, keptSentence, modelCellText, stressCountLine } from "./stress-test-words";
+import { CHALLENGE_HARDER_THAN_VERDICT, HEADLINE_EVIDENCE_CASE_LABEL, HEADLINE_MODEL_LABEL, HEADLINE_MODEL_WHY, HEADLINE_OM_CASE_LABEL, HEADLINE_WITHHELD, HOLDS_CAUTIOUS_NO_RERUN, HOLDS_NO_RERUN, keptSentence, modelCellText, stressCountLine } from "./stress-test-words";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { sampleStressTest } from "./sample-stress";
@@ -213,6 +213,19 @@ describe("StressTestPanel — the OM's assumptions, tested", () => {
     // The tested rows are the list; the unchecked ones come after it, as one group.
     expect(html.indexOf('data-qa="stress-unchecked-group"')).toBeGreaterThan(html.indexOf('data-qa="stress-row-taxes"'));
     expect(html.slice(html.indexOf('data-qa="stress-rows"'), html.indexOf('data-qa="stress-unchecked-group"'))).not.toContain('data-verdict="unchecked"');
+  });
+
+  it("says the verdict is the evidence's where a high-severity challenge sits on a row that holds, and nowhere else", () => {
+    const hard = { severity: "high" as const, challenge: "The taxes reset at sale.", question: "What is the assessor's ratio?" };
+    const held = render({ ...TEST, rows: [{ ...TAXES, challenge: hard }] });
+    const row = held.slice(held.indexOf('data-qa="stress-row-taxes"'));
+    expect(row).toContain('data-qa="stress-challenge-harder"');
+    expect(visibleText(row).replace(/&#x27;/g, "'")).toContain(CHALLENGE_HARDER_THAN_VERDICT);
+    // A medium challenge on a held row, and a high one on a row past its
+    // evidence, carry no such line: the two read alike.
+    expect(render({ ...TEST, rows: [{ ...TAXES, challenge: { ...hard, severity: "medium" } }] })).not.toContain("stress-challenge-harder");
+    expect(html.slice(html.indexOf('data-qa="stress-row-vacancy"'))).toContain('data-qa="stress-challenge"');
+    expect(html).not.toContain("stress-challenge-harder");
   });
 
   it("collapses the unchecked rows into one folded group at the end: a line naming them, then 'Read why', each row two lines", () => {
