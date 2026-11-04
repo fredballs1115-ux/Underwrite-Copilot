@@ -59,7 +59,7 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(expenseGrowthDecider([{ evidence: cpi, held: false }, { evidence: core, held: true }])).toMatchObject({ figure: 2.4 });
   });
 
-  it("vacancy: the market first on a stabilized assumption, the rent roll first on today's, the rule of thumb last", () => {
+  it("vacancy: the market first on a stabilized assumption, today's by the building's own document alone, the rule of thumb last", () => {
     const metro = piece(METRO_VACANCY_LABEL, 6.2);
     const region = piece("Rental vacancy, South Census region", 9.5);
     const rr = piece(RENT_ROLL_VACANCY_LABEL, 9.2, { kind: "document", publisher: "the deal's rent roll" });
@@ -69,20 +69,20 @@ describe("one figure decides each row, never the nearest edge of a range", () =>
     expect(vacancyDecider(all, { stabilized: true })!.label).toBe(METRO_VACANCY_LABEL);
     // Today's vacancy: the rent roll, wherever it sits.
     expect(vacancyDecider(all, { stabilized: false })!.label).toBe(RENT_ROLL_VACANCY_LABEL);
-    // Doors are never decided by dollars (the review of 2026-10-21): the
-    // T-12's vacancy and credit loss over gross potential rent is economic,
-    // so a figure counted by doors passes it over for the market's, and with
-    // nothing else on file nothing decides it.
-    expect(vacancyDecider(held(t12, region, rot), { stabilized: false })!.label).toBe("Rental vacancy, South Census region");
+    // Today's occupancy is the building's own fact (the owner's decision of
+    // 2026-11-04): with no rent roll, neither the market's figure nor the
+    // class's norm decides it; and doors are never decided by dollars (the
+    // review of 2026-10-21), so the T-12 does not either.
+    expect(vacancyDecider(held(t12, region, metro, rot), { stabilized: false })).toBeNull();
     expect(vacancyDecider(held(t12), { stabilized: false })).toBeNull();
     expect(vacancyDecider(held(t12), { stabilized: true })).toBeNull();
-    // An economic figure for today is the T-12's to decide, the same
-    // measure, ahead of the market and the rent roll, which count doors; the
-    // class's norm stands in only with no T-12. A stabilized economic figure
+    // An economic figure for today is the T-12's alone to decide, the same
+    // measure: never the market or the rent roll, which count doors, nor the
+    // class's norm (the owner's decision of 2026-11-04). A stabilized economic figure
     // is the market's, as a floor, then the class's norm — never the T-12,
     // today's building (the review of 2026-10-23), on any deal.
     expect(vacancyDecider(all, { stabilized: false, economic: true })!.label).toBe(T12_VACANCY_LABEL);
-    expect(vacancyDecider(held(rr, metro, rot), { stabilized: false, economic: true })!.label).toBe(rot.label);
+    expect(vacancyDecider(held(rr, metro, rot), { stabilized: false, economic: true })).toBeNull();
     expect(vacancyDecider(all, { stabilized: true, economic: true })!.label).toBe(METRO_VACANCY_LABEL);
     expect(vacancyDecider(held(t12, rr, rot), { stabilized: true, economic: true })!.label).toBe(rot.label);
     expect(vacancyDecider(held(t12, rr), { stabilized: true, economic: true })).toBeNull();

@@ -1216,7 +1216,15 @@ export function rollTodayBeside(plan: boolean | undefined): string {
 /** Why a vacancy counted by doors stands unchecked where the deal's T-12 is
  *  the only figure on file: its loss is dollars. */
 export const VACANCY_ECONOMIC_ONLY =
-  "The deal's T-12 counts vacancy and credit loss in dollars, not doors, so it cannot decide the OM's figure, which counts doors, and no rent roll, published vacancy or class norm could be held to it.";
+  "The deal's T-12 counts vacancy and credit loss in dollars, not doors, so it cannot decide the OM's figure, which counts doors, and no rent roll is on file to hold it to.";
+
+/** Why an occupancy the OM states for today stands unchecked with no rent
+ *  roll: the building's own fact, which only its own count of doors tests —
+ *  a market's average or the class's norm is shown beside it and never
+ *  decides how full this building is (lib/stress-deciders
+ *  `VACANCY_ORDER.today`, the owner's decision of 2026-11-04). */
+export const VACANCY_TODAY_NO_ROLL =
+  "The OM's figure is the building's occupancy today, a fact only its own rent roll tests, and none is on file: a market's vacancy or the class's norm says where buildings of its kind run, never how full this one is, so it is shown beside the OM's figure and decides nothing.";
 
 /** Why a vacancy the OM states as economic stands unchecked with no T-12. */
 export const VACANCY_NO_T12_ECONOMIC =
@@ -1357,12 +1365,14 @@ function vacancyRow(ctx: Ctx): StressRow | null {
   // read as stabilized and a plan deal alike: today's rent roll never does
   // (the review of 2026-10-23 — it had decided a 6% "unsupported" on the
   // day the market read failed, against "holds" on the day it answered).
-  // Today's occupancy is the rent roll's,
-  // then the published figures', then the class's norm's. Every piece counts
+  // Today's occupancy is the building's own fact, its rent roll's alone (the
+  // owner's decision of 2026-11-04): with no rent roll it stands unchecked,
+  // the published figures and the class's norm beside it, since a market's
+  // average says nothing about how full this building is. Every piece counts
   // doors but the T-12's, whose vacancy and credit loss over gross potential
-  // rent is dollars: it never decides a figure counted by doors, and decides
-  // an economic figure for today, ahead of the class's norm, while the counts
-  // of doors are shown beside that one; a stabilized economic figure is the
+  // rent is dollars: it never decides a figure counted by doors, and alone
+  // decides an economic figure for today, while the counts of doors are
+  // shown beside that one; a stabilized economic figure is the
   // market's to judge as a floor (`ECONOMIC_FLOOR`), the T-12 beside it as
   // today's gap. Every other piece is shown
   // beside the one that decides, never in its place: a region's or a
@@ -1460,7 +1470,9 @@ function vacancyRow(ctx: Ctx): StressRow | null {
           : VACANCY_NO_T12_ECONOMIC
         : t12p && pool.every((p) => p === t12p || p.e.value == null || !p.compare)
           ? VACANCY_ECONOMIC_ONLY
-          : NO_EVIDENCE;
+          : pool.some((p) => p !== t12p && p.e.value != null)
+            ? VACANCY_TODAY_NO_ROLL
+            : NO_EVIDENCE;
     return { ...unchecked("vacancy", omSays, evidence, why, title), ...(economic ? { measure: "economic" as const } : {}) };
   }
   const bestValue = best.e.value!;

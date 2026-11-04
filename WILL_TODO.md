@@ -26,6 +26,19 @@ the cause is on Render's side. Your move, about 5 minutes:
 Until then, anyone reading the site, Matt included, sees the October 20
 version.
 
+## 🟡 2026-11-04 — one model question for you (not changed)
+
+Where no T-12 is on file, the screening model splits the OM's NOI into
+rent and expenses using the class's expense ratio ("Total opex to tie NOI
+(… % of EGI, multifamily default)", `lib/underwrite/inputs.ts`). It does
+not read an operating-expense total the OM states. The NOI ties either way.
+What changes is the split, so expense growth compounds on the class's
+share of income rather than on the OM's own expense line.
+
+The stress test's `opex` row already sets the OM's expenses against the
+T-12, so nothing it says is affected. Should the model run the OM's stated
+expenses where they tie to its NOI? This is model math, so it is your call.
+
 ## 🔴 2026-10-05 — your repository is public, with confidential deal work on main
 
 `gh api repos/fredballs1115-ux/Underwrite-Copilot` reports `"visibility":

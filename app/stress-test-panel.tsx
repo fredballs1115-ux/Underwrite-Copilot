@@ -42,6 +42,8 @@ import {
   untestedSentence,
   whenWords,
   type ShownPart,
+  CHALLENGE_HARDER_THAN_VERDICT,
+  challengeHarderThanVerdict,
 } from "@/lib/stress-test-words";
 import type { EvidenceKind, StressEvidence, StressHeadline, StressImpact, StressKept, StressKey, StressRow, StressTest, StressVerdict } from "@/lib/stress-test-types";
 
@@ -695,10 +697,15 @@ function PageChip({ page }: { page: number | null }) {
   );
 }
 
-function ChallengeFold({ challenge }: { challenge: NonNullable<StressRow["challenge"]> }) {
+function ChallengeFold({ challenge, harder }: { challenge: NonNullable<StressRow["challenge"]>; harder: boolean }) {
   return (
     <div className="mt-2.5" data-qa="stress-challenge">
       <p className="text-[11px] font-semibold text-muted">{`The challenge · ${SEVERITY[challenge.severity]} severity`}</p>
+      {harder && (
+        <p className="mt-1 text-[11px] text-muted" data-qa="stress-challenge-harder">
+          {CHALLENGE_HARDER_THAN_VERDICT}
+        </p>
+      )}
       <PanelFold rest={[challenge.challenge, `Ask the broker: ${challenge.question}`]} />
     </div>
   );
@@ -755,7 +762,7 @@ function UncheckedRow({ row }: { row: StressRow }) {
       {/* An unchecked row carries no re-run (lib/stress-test drops any: a
           move struck at a figure that tests nothing would read as one the
           evidence makes), so none is drawn. */}
-      {row.challenge && <ChallengeFold challenge={row.challenge} />}
+      {row.challenge && <ChallengeFold challenge={row.challenge} harder={challengeHarderThanVerdict(row)} />}
       <MethodLine row={row} />
     </li>
   );
@@ -841,7 +848,7 @@ function RowView({ row, test }: { row: StressRow; test: StressTest }) {
             )}
           </div>
 
-          {row.challenge && <ChallengeFold challenge={row.challenge} />}
+          {row.challenge && <ChallengeFold challenge={row.challenge} harder={challengeHarderThanVerdict(row)} />}
           <MethodLine row={row} />
         </div>
       </div>

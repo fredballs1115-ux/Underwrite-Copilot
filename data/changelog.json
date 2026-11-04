@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-11-04",
+      "title": "How full the building is today is its rent roll's to say",
+      "href": "/how-we-test#vacancy",
+      "blurb": "An occupancy the OM states for today is now tested only against the building's own rent roll, or its T-12 where the figure is in dollars. Without one, the row reads 'could not be checked', with the market's vacancy and the class's norm shown beside it as where buildings of its kind run. Where the deal page withholds the model's returns because its figures do not tie, the stress test re-runs none either. Where the challenger reads a row harder than its evidence, the row now says the verdict is the evidence's."
+    },
+    {
       "date": "2026-10-31",
       "title": "The documents add up, and say whose figures they are",
       "href": "/demo",

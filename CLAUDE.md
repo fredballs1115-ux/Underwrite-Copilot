@@ -191,6 +191,17 @@ tested and whether that is right. So:
   a levered one is set against the OM's case in words, never re-run, and
   the sample states none (its memo's one page and its buy box's target
   chip would move).
+- **Today's occupancy is the building's own fact** (2026-11-04, the
+  owner's decision): an occupancy the OM states for today is decided by
+  the deal's own rent roll alone (an economic one by its T-12 alone,
+  `VACANCY_ORDER.today` / `.economic` in lib/stress-deciders); without it
+  the row is unchecked (`VACANCY_TODAY_NO_ROLL`, `VACANCY_NO_T12_ECONOMIC`
+  in lib/stress-test), the market's vacancy and the class's norm drawn
+  beside it as where buildings of its kind run. A stabilized vacancy is
+  decided as before. `STRESS_RULES_V` is 2, its fingerprint holding every
+  vacancy order. And no return is re-run where the deal page withholds the
+  model's returns as a misread's (`returnsWithheldReason`: a nearly vacant
+  building, a finding against the returns, a lease ending inside the hold).
 
 ## Architecture
 

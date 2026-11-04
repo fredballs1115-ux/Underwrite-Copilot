@@ -562,6 +562,17 @@ export const holdsNoRerun = (row: Pick<StressRow, "gap">): string => (row.gap !=
  *  draws none (`HOLDS_NO_RERUN`), an unchecked row carries none (nothing on
  *  file tests it; lib/stress-test drops any), and a row with no impact has
  *  none to draw. */
+/** Said under a high-severity challenge on a row the evidence holds: the
+ *  challenger's words are a question for the broker, and the verdict is the
+ *  evidence's, struck in code — the two may disagree, and the reader is told
+ *  which one the verdict word is. */
+export const CHALLENGE_HARDER_THAN_VERDICT =
+  "The challenger reads this harder than the evidence does: the verdict is the evidence's, struck in code, and the challenge is a question to put to the broker.";
+
+/** Whether a row carries a challenge its own verdict reads softer than. */
+export const challengeHarderThanVerdict = (row: Pick<StressRow, "verdict" | "challenge">): boolean =>
+  row.verdict === "holds" && row.challenge?.severity === "high";
+
 export const drawsRerun = (row: StressRow): boolean => row.impact != null && row.verdict !== "holds" && row.verdict !== "unchecked";
 
 /** Whether a surface may say the return is re-run in code: the re-runs

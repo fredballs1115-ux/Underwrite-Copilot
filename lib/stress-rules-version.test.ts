@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { DECIDER_NAMES } from "@/lib/stress-deciders";
+import { DECIDER_NAMES, VACANCY_ORDER } from "@/lib/stress-deciders";
 import { STRESS_METHODS, STRESS_RULES_V } from "@/lib/stress-test-types";
 import { THRESHOLDS } from "@/lib/how-we-test";
 
 // The rules a verdict is struck by — each row's order of deciders, the role
-// of each piece it is set against and each row's thresholds — fingerprinted
+// of each piece it is set against, each row's thresholds and the vacancy
+// row's order for each kind of figure (today's, economic, stabilized, a
+// plan's) — fingerprinted
 // beside the version the snapshot is stamped with (lib/stress-snapshot
 // `rules`). A change to any of them fails here until STRESS_RULES_V is
 // bumped and this pin moved with it: a call struck under the old rules is
@@ -13,7 +15,14 @@ import { THRESHOLDS } from "@/lib/how-we-test";
 // the evidence moving.
 const fingerprint = () =>
   createHash("sha256")
-    .update(JSON.stringify({ deciders: DECIDER_NAMES, roles: STRESS_METHODS.map((m) => [m.key, m.decides]), thresholds: THRESHOLDS }))
+    .update(
+      JSON.stringify({
+        deciders: DECIDER_NAMES,
+        vacancy: Object.fromEntries(Object.entries(VACANCY_ORDER).map(([k, order]) => [k, order.map((s) => s.name)])),
+        roles: STRESS_METHODS.map((m) => [m.key, m.decides]),
+        thresholds: THRESHOLDS,
+      }),
+    )
     .digest("hex")
     .slice(0, 16);
 
@@ -22,6 +31,10 @@ describe("the stress test's rules version", () => {
     // Moved without a bump on 2026-10-31: the exit cap's stretched band was
     // re-worded ("5–25 bps" read as overlapping the 25 bps that is
     // unsupported), its rule unchanged (lib/stress-test EXIT_CAP_UNSUPPORTED_BPS).
-    expect({ v: STRESS_RULES_V, rules: fingerprint() }).toEqual({ v: 1, rules: "4726919ad892ebfb" });
+    // 2 on 2026-11-04: today's occupancy decided by the building's own rent
+    // roll alone (an economic one by its T-12), never by the market or the
+    // class's norm — the owner's decision; the vacancy row's every order is
+    // in the fingerprint since.
+    expect({ v: STRESS_RULES_V, rules: fingerprint() }).toEqual({ v: 2, rules: "b20f71d06450da73" });
   });
 });
